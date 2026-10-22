@@ -6,28 +6,28 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 
 ## 1. Hermes lane -- CAPTCHA or required login
 
-641 cells, 888,564 est_rows_affected combined.
+641 cells, 890,522 est_rows_affected combined.
 
 | state | county | column | est_rows | reason | source |
 |---|---|---|---|---|---|
 | NC | Gaston | usps_vacancy | 26,620 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | SC | Spartanburg | usps_vacancy | 19,381 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
-| NC | Lincoln | heir_naming_publication | 18,673 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
-| NC | Lincoln | multi_year_delinquent_tax | 18,673 | CAPTCHA | tax/property card: www.lincolncountytax.com |
-| NC | Lincoln | quiet_title | 18,673 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
-| NC | Lincoln | rollback_exposure | 18,673 | CAPTCHA | tax/property card: www.lincolncountytax.com |
-| NC | Lincoln | usps_vacancy | 18,673 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| NC | Lincoln | heir_naming_publication | 18,841 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
+| NC | Lincoln | multi_year_delinquent_tax | 18,841 | CAPTCHA | tax/property card: www.lincolncountytax.com |
+| NC | Lincoln | quiet_title | 18,841 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
+| NC | Lincoln | rollback_exposure | 18,841 | CAPTCHA | tax/property card: www.lincolncountytax.com |
+| NC | Lincoln | usps_vacancy | 18,841 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Mecklenburg | usps_vacancy | 18,552 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Wake | atty_rod_lien_checked | 12,941 | CAPTCHA | register: Tyler Technologies Self-Service (recorder search,  |
 | NC | Wake | liens | 12,941 | CAPTCHA | register: Tyler Technologies Self-Service (recorder search,  |
 | NC | Wake | usps_vacancy | 12,941 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
-| NC | Transylvania | usps_vacancy | 12,457 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| NC | Transylvania | usps_vacancy | 12,528 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Buncombe | usps_vacancy | 12,436 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Guilford | usps_vacancy | 12,276 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | SC | Charleston | atty_rod_lien_checked | 11,210 | CAPTCHA | register: Charleston County ROD document search (county-buil |
 | SC | Charleston | liens | 11,210 | CAPTCHA | register: Charleston County ROD document search (county-buil |
 | SC | Charleston | usps_vacancy | 11,210 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
-| NC | Rutherford | usps_vacancy | 11,011 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| NC | Rutherford | usps_vacancy | 11,206 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Forsyth | usps_vacancy | 10,688 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Brunswick | heir_naming_publication | 9,225 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
 | NC | Brunswick | liens | 9,225 | CAPTCHA | register: Internet Technologies Inc. (Inttek) 'Recording-Pro |
@@ -40,10 +40,10 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | NC | Randolph | usps_vacancy | 6,043 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Durham | usps_vacancy | 5,966 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | New Hanover | usps_vacancy | 5,924 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| SC | Pickens | usps_vacancy | 5,795 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | SC | Sumter | usps_vacancy | 5,613 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | SC | Greenville | usps_vacancy | 5,510 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Davidson | usps_vacancy | 5,468 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
-| SC | Pickens | usps_vacancy | 5,463 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Cumberland | usps_vacancy | 5,268 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Pitt | usps_vacancy | 5,182 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | SC | Spartanburg | sos_dissolution | 5,136 | SC Secretary of State search is CAPTCHA-walled | statewide: SC Secretary of State search is CAPTCHA-walled |
@@ -107,7 +107,7 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | NC | Pasquotank | usps_vacancy | 2,469 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | McDowell | atty_tax_verified_confirmed | 2,468 | CAPTCHA | tax/property card: www.bttaxpayerportal.com |
 | NC | Hyde | probate | 2,396 | CAPTCHA | probate: portal-nc.tylertech.cloud |
-| NC | Polk | usps_vacancy | 2,343 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| NC | Polk | usps_vacancy | 2,389 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Orange | probate | 2,281 | CAPTCHA | probate: portal-nc.tylertech.cloud |
 | NC | Harnett | probate | 2,244 | CAPTCHA | probate: portal-nc.tylertech.cloud |
 | NC | Rockingham | usps_vacancy | 2,241 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
@@ -125,11 +125,11 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | SC | Kershaw | usps_vacancy | 2,064 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | SC | Barnwell | usps_vacancy | 2,059 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Lincoln | atty_tax_verified_confirmed | 2,031 | CAPTCHA | tax/property card: www.lincolncountytax.com |
+| NC | Burke | multi_year_delinquent_tax | 2,019 | CAPTCHA | tax/property card: lrcpwa.ncptscloud.com |
+| NC | Burke | usps_vacancy | 2,019 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | SC | Horry | sos_dissolution | 1,995 | SC Secretary of State search is CAPTCHA-walled | statewide: SC Secretary of State search is CAPTCHA-walled |
 | NC | Granville | usps_vacancy | 1,944 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Perquimans | usps_vacancy | 1,882 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
-| NC | Burke | multi_year_delinquent_tax | 1,826 | CAPTCHA | tax/property card: lrcpwa.ncptscloud.com |
-| NC | Burke | usps_vacancy | 1,826 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | SC | York | usps_vacancy | 1,818 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | SC | Dorchester | usps_vacancy | 1,817 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Wayne | usps_vacancy | 1,793 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
@@ -154,11 +154,11 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | NC | Bertie | tax_aging_surfaced | 1,535 | CAPTCHA | tax/property card: bertie.webtaxpay.com |
 | NC | Bertie | lt_tax_lien | 1,534 | CAPTCHA | tax/property card: bertie.webtaxpay.com |
 | SC | Dillon | usps_vacancy | 1,520 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| SC | Union | usps_vacancy | 1,496 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | SC | Marlboro | usps_vacancy | 1,481 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Person | heir_naming_publication | 1,429 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
 | NC | Person | quiet_title | 1,429 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
 | NC | Person | usps_vacancy | 1,429 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
-| SC | Union | usps_vacancy | 1,408 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Wilson | usps_vacancy | 1,389 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Gaston | atty_heir_candidates | 1,381 | CAPTCHA | probate: portal-nc.tylertech.cloud |
 | NC | Perquimans | probate | 1,380 | CAPTCHA | probate: portal-nc.tylertech.cloud |
@@ -215,12 +215,12 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 
 ## 2. Bot-wall, build in-house -- Cloudflare/WAF, not Hermes
 
-190 cells, 209,912 est_rows_affected combined.
+190 cells, 210,245 est_rows_affected combined.
 
 | state | county | column | est_rows | reason | source |
 |---|---|---|---|---|---|
 | SC | Charleston | rollback_exposure | 11,210 | bot check (Cloudflare/WAF) | tax/property card: sc-charleston.publicaccessnow.com |
-| NC | Rutherford | multi_year_delinquent_tax | 11,011 | bot check (Cloudflare/WAF) | tax/property card: rutherfordcountync.gov |
+| NC | Rutherford | multi_year_delinquent_tax | 11,206 | bot check (Cloudflare/WAF) | tax/property card: rutherfordcountync.gov |
 | SC | Charleston | atty_tax_verified_confirmed | 7,518 | bot check (Cloudflare/WAF) | tax/property card: sc-charleston.publicaccessnow.com |
 | SC | Sumter | probate | 4,686 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | NC | Rowan | atty_rod_lien_checked | 4,594 | bot check (Cloudflare/WAF) | register: rod.rowancountync.gov (atty_rod_lien_checked: bloc |
@@ -239,9 +239,9 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | SC | Colleton | assessed_value | 2,563 | Cloudflare check on the county property card | county GIS: services1.arcgis.com |
 | NC | Pasquotank | atty_rod_lien_checked | 2,469 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
 | NC | Pasquotank | liens | 2,469 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
-| NC | Polk | multi_year_delinquent_tax | 2,343 | bot check (Cloudflare/WAF) | tax/property card: www.polknc.gov |
-| NC | Polk | rollback_exposure | 2,343 | bot check (Cloudflare/WAF) | tax/property card: www.polknc.gov |
-| NC | Polk | tax_aging_surfaced | 2,343 | bot check (Cloudflare/WAF) | tax/property card: www.polknc.gov |
+| NC | Polk | multi_year_delinquent_tax | 2,389 | bot check (Cloudflare/WAF) | tax/property card: www.polknc.gov |
+| NC | Polk | rollback_exposure | 2,389 | bot check (Cloudflare/WAF) | tax/property card: www.polknc.gov |
+| NC | Polk | tax_aging_surfaced | 2,389 | bot check (Cloudflare/WAF) | tax/property card: www.polknc.gov |
 | NC | Rockingham | atty_rod_lien_checked | 2,241 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) 'e-Vault' us5.co |
 | NC | Rockingham | liens | 2,241 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) 'e-Vault' us5.co |
 | SC | Richland | multi_year_delinquent_tax | 2,236 | bot check (Cloudflare/WAF) | tax/property card:  |
@@ -412,7 +412,7 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 
 ## 3. Human judgment call -- NOT a scrape target
 
-268 cells, 186,792 est_rows_affected combined.
+268 cells, 186,880 est_rows_affected combined.
 
 | state | county | column | est_rows | reason | source |
 |---|---|---|---|---|---|
@@ -460,11 +460,11 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | NC | Lincoln | tax_aging_surfaced | 1,609 | verifier is a declared wall | tax/property card: www.lincolncountytax.com |
 | SC | Richland | divorce | 1,546 | SC family-court index terms forbid automation | statewide: SC family-court index terms forbid automation |
 | SC | Dillon | phone | 1,504 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
+| SC | Union | phone | 1,486 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
 | SC | Marlboro | phone | 1,471 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
 | SC | Dorchester | divorce | 1,453 | SC family-court index terms forbid automation | statewide: SC family-court index terms forbid automation |
 | SC | Clarendon | divorce | 1,420 | SC family-court index terms forbid automation | statewide: SC family-court index terms forbid automation |
 | SC | Charleston | lt_lis_pendens | 1,406 | SC Public Index terms forbid automated querying | statewide: SC Public Index terms forbid automated querying |
-| SC | Union | phone | 1,398 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
 | SC | Dillon | divorce | 1,348 | SC family-court index terms forbid automation | statewide: SC family-court index terms forbid automation |
 | SC | Marlboro | divorce | 1,318 | SC family-court index terms forbid automation | statewide: SC family-court index terms forbid automation |
 | SC | York | divorce | 1,267 | SC family-court index terms forbid automation | statewide: SC family-court index terms forbid automation |
