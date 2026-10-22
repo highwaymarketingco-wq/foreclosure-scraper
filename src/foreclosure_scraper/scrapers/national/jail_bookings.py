@@ -174,6 +174,14 @@ ROSTERS: list[tuple[str, str, str, str]] = [
     # live 2026-10-22: 168 in custody.
     ("NC", "Lincoln", "p2c_jqgrid", "http://p2c.lincolnsheriff.org"),
 
+    # Rutherford NC — Southern Software Citizen Connect, same tenant family as Henderson/Polk/
+    # Transylvania (found 2026-10-22: the county's own official site, rutherfordcountync.gov,
+    # links "Current Inmates" straight at this exact vendor URL -- real site research, not
+    # guessing, after Spartanburg/McDowell/Mitchell came up genuinely empty the same pass).
+    # Verified live: 195 in custody, full DOB on 195/195. No JMSAgencyID needed -- the vendor
+    # accepts a blank value; its ORI shows up in the response as NC0810000.
+    ("NC", "Rutherford", "citizen_connect", "RutherfordCoNC|NC0810000"),
+
     # Gaston NC — Tyler New World InmateInquiry (replaces the retired
     # newworld.aegis.webportal InmateInquiry.aspx, which now 302s away).
     # Verified live 2026-07-31: 695 in custody, full DOB on 695/695.
@@ -1161,6 +1169,8 @@ def _to_listing(rec: dict, state: str, county: str) -> Listing:
         source_url = "https://morgantonpdnc.policetocitizen.com/en/Inmates"
     elif state == "NC" and county == "Lincoln":
         source_url = "http://p2c.lincolnsheriff.org/jailinmates.aspx"
+    elif state == "NC" and county == "Rutherford":
+        source_url = f"{CITIZEN_CONNECT_BASE}/bookingsearch/index.php?AgencyID=RutherfordCoNC"
     elif state == "NC" and county == "Gaston":
         source_url = ("https://tepsweb.cityofgastonia.com/"
                       "NewWorld.InmateInquiry/GastonCounty?InCustody=True")
