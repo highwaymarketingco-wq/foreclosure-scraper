@@ -102,6 +102,21 @@ def apply_hit(li: Listing, hit: dict, c: Counter) -> None:
     if hit.get("owner") and not (li.owner_name or "").strip():
         li.owner_name = hit["owner"]
         c["filled owner name"] += 1
+        # FOUND 2026-10-22 (gap_matrix "atty_taxpayer_of_record" investigation): this only ever
+        # filled the TOP-LEVEL li.owner_name -- gap_matrix.taxpayer_of_record_present() doesn't
+        # read that field directly (by design, for non-tax-roll listing_types it can't tell
+        # whether owner_name came from the roll or a notice/court caption), it checks
+        # raw.owner_mailing.owner specifically. A name straight from the parcel cache (the
+        # county's own tax/GIS roll) IS genuinely "taxpayer of record" regardless of this row's
+        # listing_type -- stamping it here, same provenance convention .mailing already uses,
+        # makes the existing credit check recognize it without weakening its own safety gate.
+        om_existing = li.raw.get("owner_mailing")
+        if om_existing is None or isinstance(om_existing, dict):
+            om2 = li.raw.setdefault("owner_mailing", {})
+            if not om2.get("owner"):
+                om2["owner"] = hit["owner"]
+                om2.setdefault("source", "parcel_cache")
+                c["stamped owner_mailing.owner (taxpayer-of-record credit)"] += 1
     if hit.get("market_value") and not li.market_value:
         mv = plausible_value(pc._num(hit.get("market_value")))
         if mv:
