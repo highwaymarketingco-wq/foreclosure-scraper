@@ -4,7 +4,7 @@ Generated from `gap_list_2026-10-22.csv`. Regenerate with `python scripts/low_yi
 
 Every row here already has a working reader/enrichment/verifier -- the gap is coverage, not code. `next_action` names the existing script/sweep to run; `check-before-building` still applies if the next_action text is wrong or stale (it's a heuristic guess, not ground truth) -- confirm what's actually wired before assuming a rewrite is needed.
 
-**6,499 cells, 8,368,955 total est_rows_affected.**
+**6,497 cells, 8,422,641 total est_rows_affected.**
 
 ## Top 150 by est_rows_affected
 
@@ -165,43 +165,43 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 
 | column | cells | total est_rows_affected |
 |---|---|---|
-| atty_deed_ref | 126 | 366,978 |
-| atty_deed_chain_fetched | 148 | 319,332 |
-| deed_chain_break | 148 | 319,332 |
-| deed_chain_distress_transfer | 148 | 319,332 |
-| deed_chain_has_history | 148 | 319,332 |
-| atty_legal_description | 138 | 313,190 |
-| bop_federal | 148 | 312,594 |
-| incarceration | 148 | 312,177 |
-| atty_rod_lien_checked | 93 | 284,006 |
-| tax_aging_surfaced | 139 | 278,204 |
+| atty_deed_ref | 126 | 368,669 |
+| atty_deed_chain_fetched | 148 | 321,767 |
+| deed_chain_break | 148 | 321,767 |
+| deed_chain_distress_transfer | 148 | 321,767 |
+| deed_chain_has_history | 148 | 321,767 |
+| bop_federal | 148 | 315,029 |
+| atty_legal_description | 138 | 314,618 |
+| incarceration | 148 | 314,612 |
+| atty_rod_lien_checked | 93 | 285,049 |
+| tax_aging_surfaced | 139 | 280,380 |
+| comps_tight | 149 | 275,029 |
 | phone | 104 | 272,980 |
-| comps_tight | 149 | 272,594 |
-| liens | 89 | 264,992 |
+| liens | 89 | 266,488 |
 | email | 102 | 262,854 |
-| vacant_lot | 120 | 261,639 |
-| beds_baths | 141 | 250,740 |
-| repeat_tax_loss | 137 | 249,814 |
-| divorce | 115 | 245,962 |
-| comps | 149 | 236,648 |
-| assessed_value | 135 | 233,040 |
-| lot_size | 140 | 213,987 |
-| two_year_delinquent | 133 | 207,981 |
-| sqft | 143 | 203,294 |
-| multi_year_delinquent_tax | 104 | 199,103 |
+| vacant_lot | 120 | 262,296 |
+| beds_baths | 141 | 252,375 |
+| repeat_tax_loss | 137 | 252,249 |
+| divorce | 115 | 246,082 |
+| comps | 149 | 239,083 |
+| assessed_value | 135 | 233,124 |
+| lot_size | 140 | 214,219 |
+| two_year_delinquent | 133 | 210,240 |
+| sqft | 143 | 205,124 |
+| multi_year_delinquent_tax | 104 | 201,279 |
 | marriage_license | 100 | 197,137 |
 | parcel_id | 145 | 194,540 |
 | atty_taxpayer_of_record | 146 | 172,440 |
-| address | 148 | 135,674 |
+| address | 148 | 136,808 |
 | atty_tax_verified_confirmed | 62 | 131,189 |
 | code_enforcement | 13 | 118,828 |
-| lt_tax_lien | 106 | 77,427 |
+| lt_tax_lien | 106 | 77,424 |
 | sos_dissolution | 102 | 63,018 |
-| heir_estate | 111 | 51,679 |
-| jail_booking_new | 12 | 45,251 |
-| name_care_of | 148 | 44,871 |
-| name_deceased | 148 | 44,871 |
-| name_estate_of | 148 | 44,871 |
-| name_et_al | 148 | 44,871 |
-| name_heirs | 148 | 44,871 |
-| name_life_estate | 148 | 44,871 |
+| name_care_of | 148 | 47,306 |
+| name_deceased | 148 | 47,306 |
+| name_estate_of | 148 | 47,306 |
+| name_et_al | 148 | 47,306 |
+| name_heirs | 148 | 47,306 |
+| name_life_estate | 148 | 47,306 |
+| name_trust | 148 | 47,306 |
+| owner_name | 148 | 47,306 |
