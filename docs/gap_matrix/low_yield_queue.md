@@ -4,7 +4,7 @@ Generated from `gap_list_2026-10-23.csv`. Regenerate with `python scripts/low_yi
 
 Every row here already has a working reader/enrichment/verifier -- the gap is coverage, not code. `next_action` names the existing script/sweep to run; `check-before-building` still applies if the next_action text is wrong or stale (it's a heuristic guess, not ground truth) -- confirm what's actually wired before assuming a rewrite is needed.
 
-**6,493 cells, 8,908,468 total est_rows_affected.**
+**6,494 cells, 8,935,918 total est_rows_affected.**
 
 ## Top 150 by est_rows_affected
 
@@ -33,14 +33,15 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 | NC | Mecklenburg | vacant_lot | 18.4% | 32,094 | 32,094 rows lack the inputs vacant_lot is computed from: fill the inputs, then recompute |
 | NC | Mecklenburg | lot_size | 18.9% | 31,895 | backfill lot_size for the 31,895 applicable rows without it (existing enrichers) |
 | NC | Mecklenburg | atty_tax_verified_confirmed | 0.0% | 26,941 | screen the 26,941 unchecked rows (existing enrichers); write a negative result per row |
-| NC | Gaston | tax_aging_surfaced | 0.0% | 26,619 | screen the 26,619 unchecked rows (enrichment_tax_aging); write a negative result per row |
-| NC | Gaston | atty_deed_ref | 1.5% | 26,209 | backfill atty_deed_ref for the 26,209 applicable rows without it (existing enrichers) |
-| NC | Gaston | liens | 2.6% | 25,915 | screen the 25,915 unchecked rows (enrichment_dew_liens, enrichment_irs_lien); write a negative result per row |
-| NC | Gaston | atty_rod_lien_checked | 2.7% | 25,896 | backfill atty_rod_lien_checked for the 25,896 applicable rows without it (enrichment_aumentum_rod, enrichment_cchs_rod) |
-| NC | Gaston | code_enforcement | 5.6% | 25,129 | screen the 25,129 unchecked rows (enrichment_code_enforcement, enrichment_charlotte_code); write a negative result per r |
-| NC | Gaston | email | 4.5% | 24,408 | no free owner-email source: e-mails come only from notices and filings; research a lawful source |
+| NC | Gaston | tax_aging_surfaced | 0.0% | 26,644 | screen the 26,644 unchecked rows (enrichment_tax_aging); write a negative result per row |
+| NC | Gaston | vacancy | 0.0% | 26,635 | screen the 26,635 unchecked rows (hendersonville_vacant_structures, rocky_mount_blight_survey); write a negative result  |
+| NC | Gaston | atty_deed_ref | 1.5% | 26,234 | backfill atty_deed_ref for the 26,234 applicable rows without it (existing enrichers) |
+| NC | Gaston | liens | 2.6% | 25,940 | screen the 25,940 unchecked rows (enrichment_dew_liens, enrichment_irs_lien); write a negative result per row |
+| NC | Gaston | atty_rod_lien_checked | 2.7% | 25,921 | backfill atty_rod_lien_checked for the 25,921 applicable rows without it (enrichment_aumentum_rod, enrichment_cchs_rod) |
+| NC | Gaston | code_enforcement | 5.7% | 25,129 | screen the 25,129 unchecked rows (enrichment_code_enforcement, enrichment_charlotte_code); write a negative result per r |
+| NC | Gaston | email | 4.5% | 24,433 | no free owner-email source: e-mails come only from notices and filings; research a lawful source |
 | NC | Mecklenburg | lt_tax_lien | 0.0% | 21,050 | run the tax_lien / lien_registry_wall / nc_ecourts_case sweep over the 21,050 unverified hit rows |
-| NC | Gaston | phone | 18.4% | 20,845 | backfill phone for the 20,845 applicable rows without it (existing enrichers) |
+| NC | Gaston | phone | 18.4% | 20,870 | backfill phone for the 20,870 applicable rows without it (existing enrichers) |
 | SC | Spartanburg | phone | 0.0% | 19,191 | backfill phone for the 19,191 applicable rows without it (existing enrichers) |
 | NC | Lincoln | liens | 0.0% | 18,836 | screen the 18,836 unchecked rows (enrichment_dew_liens, enrichment_irs_lien); write a negative result per row |
 | NC | Lincoln | atty_rod_lien_checked | 0.1% | 18,830 | backfill atty_rod_lien_checked for the 18,830 applicable rows without it (enrichment_aumentum_rod, enrichment_cchs_rod) |
@@ -51,10 +52,10 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 | NC | Lincoln | two_year_delinquent | 1.9% | 18,493 | screen the 18,493 unchecked rows (albemarle_observer_tax_lists, nc_its_public_tax); write a negative result per row |
 | SC | Spartanburg | multi_year_delinquent_tax | 4.7% | 18,475 | screen the 18,475 unchecked rows (enrichment_tax_owed, multi_year_delinquent_tax); write a negative result per row |
 | SC | Spartanburg | code_enforcement | 4.8% | 18,447 | screen the 18,447 unchecked rows (enrichment_code_enforcement, enrichment_charlotte_code); write a negative result per r |
-| NC | Gaston | atty_deed_chain_fetched | 31.6% | 18,205 | backfill atty_deed_chain_fetched for the 18,205 applicable rows without it (enrichment_deed_chain) |
-| NC | Gaston | deed_chain_break | 31.6% | 18,205 | 18,205 rows lack the inputs deed_chain_break is computed from: fill the inputs, then recompute |
-| NC | Gaston | deed_chain_distress_transfer | 31.6% | 18,205 | 18,205 rows lack the inputs deed_chain_distress_transfer is computed from: fill the inputs, then recompute |
-| NC | Gaston | deed_chain_has_history | 31.6% | 18,205 | backfill deed_chain_has_history for the 18,205 applicable rows without it (enrichment_deed_chain) |
+| NC | Gaston | atty_deed_chain_fetched | 31.6% | 18,230 | backfill atty_deed_chain_fetched for the 18,230 applicable rows without it (enrichment_deed_chain) |
+| NC | Gaston | deed_chain_break | 31.6% | 18,230 | 18,230 rows lack the inputs deed_chain_break is computed from: fill the inputs, then recompute |
+| NC | Gaston | deed_chain_distress_transfer | 31.6% | 18,230 | 18,230 rows lack the inputs deed_chain_distress_transfer is computed from: fill the inputs, then recompute |
+| NC | Gaston | deed_chain_has_history | 31.6% | 18,230 | backfill deed_chain_has_history for the 18,230 applicable rows without it (enrichment_deed_chain) |
 | SC | Spartanburg | atty_legal_description | 6.7% | 18,078 | backfill atty_legal_description for the 18,078 applicable rows without it (existing enrichers) |
 | NC | Lincoln | email | 2.6% | 18,058 | no free owner-email source: e-mails come only from notices and filings; research a lawful source |
 | NC | Lincoln | vacant_lot | 6.2% | 17,677 | 17,677 rows lack the inputs vacant_lot is computed from: fill the inputs, then recompute |
@@ -68,15 +69,15 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 | NC | Lincoln | bop_federal | 0.0% | 14,497 | screen the 14,497 unchecked rows (enrichment_bop_federal); write a negative result per row |
 | NC | Lincoln | incarceration | 0.1% | 14,486 | screen the 14,486 unchecked rows (enrichment_incarceration); write a negative result per row |
 | NC | Lincoln | marriage_license | 0.1% | 14,478 | screen the 14,478 unchecked rows (enrichment_register_checks, register_checks); write a negative result per row |
+| NC | Gaston | bop_federal | 0.0% | 14,086 | screen the 14,086 unchecked rows (enrichment_bop_federal); write a negative result per row |
+| NC | Gaston | divorce | 0.0% | 14,086 | screen the 14,086 unchecked rows (enrichment_nc_divorce, enrichment_sc_divorce); write a negative result per row |
+| NC | Gaston | jail_booking_new | 0.0% | 14,086 | code covers this county (enrichment_jail_bookings) but nothing landed here: run it for this county and stamp 'screened,  |
+| NC | Gaston | incarceration | 0.1% | 14,067 | screen the 14,067 unchecked rows (enrichment_incarceration); write a negative result per row |
 | SC | Spartanburg | atty_deed_chain_fetched | 27.4% | 14,067 | backfill atty_deed_chain_fetched for the 14,067 applicable rows without it (enrichment_deed_chain) |
 | SC | Spartanburg | deed_chain_break | 27.4% | 14,067 | 14,067 rows lack the inputs deed_chain_break is computed from: fill the inputs, then recompute |
 | SC | Spartanburg | deed_chain_distress_transfer | 27.4% | 14,067 | 14,067 rows lack the inputs deed_chain_distress_transfer is computed from: fill the inputs, then recompute |
 | SC | Spartanburg | deed_chain_has_history | 27.4% | 14,067 | backfill deed_chain_has_history for the 14,067 applicable rows without it (enrichment_deed_chain) |
-| NC | Gaston | bop_federal | 0.0% | 14,061 | screen the 14,061 unchecked rows (enrichment_bop_federal); write a negative result per row |
-| NC | Gaston | divorce | 0.0% | 14,061 | screen the 14,061 unchecked rows (enrichment_nc_divorce, enrichment_sc_divorce); write a negative result per row |
-| NC | Gaston | jail_booking_new | 0.0% | 14,061 | code covers this county (enrichment_jail_bookings) but nothing landed here: run it for this county and stamp 'screened,  |
-| NC | Gaston | incarceration | 0.1% | 14,042 | screen the 14,042 unchecked rows (enrichment_incarceration); write a negative result per row |
-| NC | Gaston | marriage_license | 0.3% | 14,024 | screen the 14,024 unchecked rows (enrichment_register_checks, register_checks); write a negative result per row |
+| NC | Gaston | marriage_license | 0.3% | 14,049 | screen the 14,049 unchecked rows (enrichment_register_checks, register_checks); write a negative result per row |
 | SC | Spartanburg | bop_federal | 0.0% | 13,848 | screen the 13,848 unchecked rows (enrichment_bop_federal); write a negative result per row |
 | SC | Spartanburg | incarceration | 0.2% | 13,830 | screen the 13,830 unchecked rows (enrichment_incarceration); write a negative result per row |
 | NC | Lincoln | phone | 28.8% | 13,208 | backfill phone for the 13,208 applicable rows without it (existing enrichers) |
@@ -158,40 +159,39 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 | NC | Forsyth | phone | 11.6% | 9,339 | backfill phone for the 9,339 applicable rows without it (existing enrichers) |
 | NC | Brunswick | atty_rod_lien_checked | 0.0% | 9,223 | backfill atty_rod_lien_checked for the 9,223 applicable rows without it (enrichment_aumentum_rod, enrichment_cchs_rod) |
 | NC | Gaston | sos_dissolution | 3.4% | 9,208 | screen the 9,208 unchecked rows (enrichment_sos_dissolution); write a negative result per row |
-| NC | Gaston | two_year_delinquent | 65.5% | 9,172 | screen the 9,172 unchecked rows (albemarle_observer_tax_lists, nc_its_public_tax); write a negative result per row |
-| NC | Forsyth | email | 13.5% | 9,135 | no free owner-email source: e-mails come only from notices and filings; research a lawful source |
+| NC | Gaston | two_year_delinquent | 65.5% | 9,197 | screen the 9,197 unchecked rows (albemarle_observer_tax_lists, nc_its_public_tax); write a negative result per row |
 
 ## Rolled up by column (which existing readers have the most unswept rows)
 
 | column | cells | total est_rows_affected |
 |---|---|---|
-| atty_deed_ref | 126 | 389,537 |
-| atty_deed_chain_fetched | 148 | 342,653 |
-| deed_chain_break | 148 | 342,653 |
-| deed_chain_distress_transfer | 148 | 342,653 |
-| deed_chain_has_history | 148 | 342,653 |
-| bop_federal | 148 | 335,915 |
-| incarceration | 148 | 335,498 |
-| atty_legal_description | 138 | 335,490 |
-| atty_rod_lien_checked | 93 | 305,912 |
-| comps_tight | 149 | 295,915 |
-| phone | 104 | 293,809 |
-| liens | 89 | 287,351 |
-| email | 102 | 283,683 |
-| vacant_lot | 120 | 283,151 |
-| tax_aging_surfaced | 139 | 280,466 |
-| beds_baths | 141 | 273,242 |
-| divorce | 115 | 266,928 |
-| comps | 149 | 259,969 |
-| assessed_value | 135 | 253,993 |
-| repeat_tax_loss | 137 | 252,338 |
-| lot_size | 140 | 235,102 |
-| sqft | 143 | 225,995 |
-| marriage_license | 100 | 217,966 |
-| two_year_delinquent | 133 | 210,326 |
-| multi_year_delinquent_tax | 104 | 201,330 |
+| atty_deed_ref | 126 | 389,562 |
+| atty_deed_chain_fetched | 148 | 342,679 |
+| deed_chain_break | 148 | 342,679 |
+| deed_chain_distress_transfer | 148 | 342,679 |
+| deed_chain_has_history | 148 | 342,679 |
+| bop_federal | 148 | 335,941 |
+| incarceration | 148 | 335,524 |
+| atty_legal_description | 138 | 335,515 |
+| atty_rod_lien_checked | 93 | 305,937 |
+| comps_tight | 149 | 295,941 |
+| phone | 104 | 293,834 |
+| liens | 89 | 287,376 |
+| email | 102 | 283,708 |
+| vacant_lot | 120 | 283,177 |
+| tax_aging_surfaced | 139 | 280,491 |
+| beds_baths | 141 | 273,268 |
+| divorce | 115 | 266,953 |
+| comps | 149 | 259,995 |
+| assessed_value | 135 | 254,019 |
+| repeat_tax_loss | 137 | 252,364 |
+| lot_size | 140 | 235,128 |
+| sqft | 143 | 226,021 |
+| marriage_license | 100 | 217,991 |
+| two_year_delinquent | 133 | 210,351 |
+| multi_year_delinquent_tax | 104 | 201,355 |
 | parcel_id | 145 | 194,640 |
-| atty_taxpayer_of_record | 146 | 172,540 |
+| atty_taxpayer_of_record | 146 | 172,566 |
 | atty_tax_verified_confirmed | 62 | 151,975 |
 | code_enforcement | 13 | 139,624 |
 | address | 148 | 136,908 |
