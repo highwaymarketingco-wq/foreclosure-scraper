@@ -4,7 +4,7 @@ Generated from `gap_list_2026-10-22.csv`. Regenerate with `python scripts/low_yi
 
 Every row here already has a working reader/enrichment/verifier -- the gap is coverage, not code. `next_action` names the existing script/sweep to run; `check-before-building` still applies if the next_action text is wrong or stale (it's a heuristic guess, not ground truth) -- confirm what's actually wired before assuming a rewrite is needed.
 
-**6,497 cells, 8,422,641 total est_rows_affected.**
+**6,496 cells, 8,409,700 total est_rows_affected.**
 
 ## Top 150 by est_rows_affected
 
@@ -70,7 +70,6 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 | NC | Mecklenburg | sqft | 1.7% | 13,022 | backfill sqft for the 13,022 applicable rows without it (existing enrichers) |
 | NC | Mecklenburg | beds_baths | 1.7% | 13,019 | backfill beds_baths for the 13,019 applicable rows without it (existing enrichers) |
 | NC | Mecklenburg | comps | 1.9% | 12,996 | backfill comps for the 12,996 applicable rows without it (existing enrichers) |
-| NC | Wake | rollback_exposure | 0.0% | 12,941 | code covers this county (enrichment_rollback_deferral, enrichment_tax_relief) but nothing landed here: run it for this c |
 | NC | Wake | two_year_delinquent | 0.0% | 12,940 | screen the 12,940 unchecked rows (albemarle_observer_tax_lists, nc_its_public_tax); write a negative result per row |
 | NC | Wake | multi_year_delinquent_tax | 0.0% | 12,937 | screen the 12,937 unchecked rows (enrichment_tax_owed, multi_year_delinquent_tax); write a negative result per row |
 | NC | Wake | tax_aging_surfaced | 0.0% | 12,937 | screen the 12,937 unchecked rows (enrichment_tax_aging); write a negative result per row |
@@ -160,6 +159,7 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 | NC | Gaston | two_year_delinquent | 65.5% | 9,172 | screen the 9,172 unchecked rows (albemarle_observer_tax_lists, nc_its_public_tax); write a negative result per row |
 | NC | Forsyth | email | 13.5% | 9,135 | no free owner-email source: e-mails come only from notices and filings; research a lawful source |
 | NC | Rutherford | tax_aging_surfaced | 3.9% | 9,124 | run the tax_lien / lien_registry_wall sweep over the 9,124 unverified hit rows |
+| NC | Rutherford | lt_tax_lien | 4.6% | 9,026 | run the tax_lien / lien_registry_wall / nc_ecourts_case sweep over the 9,026 unverified hit rows |
 
 ## Rolled up by column (which existing readers have the most unswept rows)
 
