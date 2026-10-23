@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-10-23T17:33:32.972707Z",
+  "run_time": "2026-10-23T19:35:27.623418Z",
   "total": 472777,
   "by_source": {
     "national.auction_bank_reo": 3,
@@ -526,210 +526,210 @@
       {
         "name": "listings_part_000.json.gz",
         "start": 0,
-        "end": 18845,
-        "records": 18845,
-        "bytes": 24049041,
-        "sha256": "cbb3c50ade309e8ee08382b6949990b5fa0b1a8db37a748d7cdc2efeca30db27"
+        "end": 18832,
+        "records": 18832,
+        "bytes": 24048409,
+        "sha256": "89f26dca6a1c01180e5b308d908477a077d79c594a85a5c6939d9e0d5f229400"
       },
       {
         "name": "listings_part_001.json.gz",
-        "start": 18845,
-        "end": 37345,
+        "start": 18832,
+        "end": 37332,
         "records": 18500,
-        "bytes": 16421107,
-        "sha256": "f638b5945e0d12d1928ef2feed2195f8db0eaf10a355b3682cea0003b24a68df"
+        "bytes": 16427761,
+        "sha256": "0ca31248851ba4ef26d7fdb4e1661d2cf2cbf38c3bacbc15c8e76f7af66ec063"
       },
       {
         "name": "listings_part_002.json.gz",
-        "start": 37345,
-        "end": 55845,
+        "start": 37332,
+        "end": 55832,
         "records": 18500,
-        "bytes": 15581756,
-        "sha256": "1280d021e0c848623d323c0b9d2b8612c8ad0cc91baaa28dcf5af9eef27ad3e4"
+        "bytes": 15576562,
+        "sha256": "48714609783f99a4ef6c59eca7600ab094d29aa1b9cdc427a906070809fde100"
       },
       {
         "name": "listings_part_003.json.gz",
-        "start": 55845,
-        "end": 74345,
+        "start": 55832,
+        "end": 74332,
         "records": 18500,
-        "bytes": 13980571,
-        "sha256": "5938fa2445fa97dfe5cc9ab0868919b57f96edd064232ddaa18d44f02cb9e75a"
+        "bytes": 13982002,
+        "sha256": "0471d00de393c4dfba20a963067bef7e1409cb8b8f08dc8b3359e3ab8bbf8f78"
       },
       {
         "name": "listings_part_004.json.gz",
-        "start": 74345,
-        "end": 92845,
+        "start": 74332,
+        "end": 92832,
         "records": 18500,
-        "bytes": 13107426,
-        "sha256": "e98097dc88a32fd65a5fda0ede8fcca7e1c7f3082802d275298055324df9fc96"
+        "bytes": 13095839,
+        "sha256": "80718f8784ff8068cc84ec3f2ba71c18574dd7791a1e10260dd65f56355eaeed"
       },
       {
         "name": "listings_part_005.json.gz",
-        "start": 92845,
-        "end": 111345,
+        "start": 92832,
+        "end": 111332,
         "records": 18500,
-        "bytes": 14148236,
-        "sha256": "3da82c2b731aa343e9e687715e94269e269282008f849159f24dcb57afef2f94"
+        "bytes": 14167581,
+        "sha256": "fc7f2c766c7cc2978cb3d0cd8b0e6d51a83b17506a9fb6d41b6648707c88c870"
       },
       {
         "name": "listings_part_006.json.gz",
-        "start": 111345,
-        "end": 129845,
+        "start": 111332,
+        "end": 129832,
         "records": 18500,
-        "bytes": 12636145,
-        "sha256": "d84eec75b013dabe2f2815ffb566ad1e6a5928affcdbbca94a0699b6ae7738f4"
+        "bytes": 12634029,
+        "sha256": "02d21f112aad0ff909f97d672e2425df9487f1c9a649b5fe5bda69a8f6443329"
       },
       {
         "name": "listings_part_007.json.gz",
-        "start": 129845,
-        "end": 148345,
+        "start": 129832,
+        "end": 148332,
         "records": 18500,
-        "bytes": 9035368,
-        "sha256": "481ea8788d17310fde603f2989315b101fd340f3741ab5be9932783e7bd3ec75"
+        "bytes": 9041003,
+        "sha256": "7c39533af2ff093165895579fa7d2fe5de560aa157f3b468694a6023ae02c470"
       },
       {
         "name": "listings_part_008.json.gz",
-        "start": 148345,
-        "end": 166845,
+        "start": 148332,
+        "end": 166832,
         "records": 18500,
-        "bytes": 9796128,
-        "sha256": "d19e8d1e3e375809e3950eb3883ce46e62c5b995111df4f4b8e2e1ec26be7169"
+        "bytes": 9798843,
+        "sha256": "84123cb6c3bd10c8180d70b2f80cd9c09e4ee4c076a60803f0c62e5ab51d1991"
       },
       {
         "name": "listings_part_009.json.gz",
-        "start": 166845,
-        "end": 185345,
+        "start": 166832,
+        "end": 185332,
         "records": 18500,
-        "bytes": 9606572,
-        "sha256": "b4b5f411fa8d9125135d2b815ad2d57ba1996f9976d9603c44dfd599d4dcbcb1"
+        "bytes": 9573218,
+        "sha256": "30d1cf0ef485c5b0d17cbd16d9dd5ee7793c3512a9e371cbab22aebbfab33299"
       },
       {
         "name": "listings_part_010.json.gz",
-        "start": 185345,
-        "end": 203845,
+        "start": 185332,
+        "end": 203832,
         "records": 18500,
-        "bytes": 8542157,
-        "sha256": "46d621d996368c6e0dc899b72c3c6d2b2d16aafd028889fcbd7163f4a6346b37"
+        "bytes": 8577699,
+        "sha256": "5cefacc9d8fec12550943eb0695722c2d37cf19811e56eeb3a10de06aca21878"
       },
       {
         "name": "listings_part_011.json.gz",
-        "start": 203845,
-        "end": 222345,
+        "start": 203832,
+        "end": 222332,
         "records": 18500,
-        "bytes": 8886104,
-        "sha256": "a7eeae4fef6e5e8f552a9222b7fc46a4deeff5d28a3a7c49aebdf91bcbeb1603"
+        "bytes": 8879022,
+        "sha256": "3ce335eadb119c1ef7bc04217cd4cde66667bd3ae83b804cef26d5fd8d0fffd6"
       },
       {
         "name": "listings_part_012.json.gz",
-        "start": 222345,
-        "end": 240845,
+        "start": 222332,
+        "end": 240832,
         "records": 18500,
-        "bytes": 10512248,
-        "sha256": "d25dad4efb2ddcc76fea31e3e807dcf5a98ab9984cbdf222c1f19ae5977a1de1"
+        "bytes": 10521945,
+        "sha256": "0ab0f83296cd4c7f62f8e0b48da6f7ae66b032e99d1f9233bdc459a4a2f340c5"
       },
       {
         "name": "listings_part_013.json.gz",
-        "start": 240845,
-        "end": 259345,
+        "start": 240832,
+        "end": 259332,
         "records": 18500,
-        "bytes": 10075101,
-        "sha256": "62cef8e05987fb04aa902ad1f4f8b2dc6c75ca83729481fa47d50cd0433e178d"
+        "bytes": 10017949,
+        "sha256": "bd56d1570037dcf7cc0d1141226f217340685dc3babb76bb2b2eae10d2d62a9a"
       },
       {
         "name": "listings_part_014.json.gz",
-        "start": 259345,
-        "end": 277845,
+        "start": 259332,
+        "end": 277832,
         "records": 18500,
-        "bytes": 7621542,
-        "sha256": "4ba897d91e6125f6a14be3a80a02b1e63925c03d0947c7b275de895af1e76804"
+        "bytes": 7678344,
+        "sha256": "b3beb09354c381e7090ef789d121b56afe78e5f2bb924e6d74914abd8a748dfa"
       },
       {
         "name": "listings_part_015.json.gz",
-        "start": 277845,
-        "end": 296345,
+        "start": 277832,
+        "end": 296332,
         "records": 18500,
-        "bytes": 7882384,
-        "sha256": "09e86d9acdc0218dba61b5f285c5a5a45ccad6938a08735699de33320105e871"
+        "bytes": 7878977,
+        "sha256": "c1e8cdd006741c5035c862ae250fc2b49a6aa031dbbc16e600a645b277ed8202"
       },
       {
         "name": "listings_part_016.json.gz",
-        "start": 296345,
-        "end": 314845,
+        "start": 296332,
+        "end": 314832,
         "records": 18500,
-        "bytes": 11150319,
-        "sha256": "152d2f2534b4860e3b67be24721b17455d6e9ed4196674fbcdbc67dfe1f7de5d"
+        "bytes": 11158179,
+        "sha256": "18f6c31aaf709c4036ab3ec43be7b9febe7769918314710aa0722323353affc1"
       },
       {
         "name": "listings_part_017.json.gz",
-        "start": 314845,
-        "end": 333345,
+        "start": 314832,
+        "end": 333332,
         "records": 18500,
-        "bytes": 10551408,
-        "sha256": "11ab04c3c38b8f5eed02b978107730ab9ebbe7bb0fc51244e70968c5f16b7147"
+        "bytes": 10532474,
+        "sha256": "0293eb311030d0e9c2e3074834e46756bc9286cc8e6e73b0aeb276ffdfb441e2"
       },
       {
         "name": "listings_part_018.json.gz",
-        "start": 333345,
-        "end": 351845,
+        "start": 333332,
+        "end": 351832,
         "records": 18500,
-        "bytes": 22083130,
-        "sha256": "e1547ecdbacfb2d1f82f56cd494e29e0a74c4986b8b18d3d8d26eb1aee184ea2"
+        "bytes": 22086333,
+        "sha256": "5a8aec719c9bda7c5c4509ea73bc39cd0fff3ebb8856d01a52c6c762ed745b17"
       },
       {
         "name": "listings_part_019.json.gz",
-        "start": 351845,
-        "end": 370345,
+        "start": 351832,
+        "end": 370332,
         "records": 18500,
-        "bytes": 11494700,
-        "sha256": "91a7f29bced0f86c4923fe09992c96dc6c0239cec760efc8858ac543053156f5"
+        "bytes": 11507872,
+        "sha256": "b5a71c22ae6feed21de08ad3e4b062404833cc64fb7120b17cab855dbbc28464"
       },
       {
         "name": "listings_part_020.json.gz",
-        "start": 370345,
-        "end": 388845,
+        "start": 370332,
+        "end": 388832,
         "records": 18500,
-        "bytes": 8636337,
-        "sha256": "27c6554cad0c62ac75e9dd259c560f0ee32f9fbbba5ec027f93def1a71203b3c"
+        "bytes": 8636267,
+        "sha256": "34b0086afc5e0b6be290b6325cc1bc85ef5816958d7e12560fc4c8dd0b731158"
       },
       {
         "name": "listings_part_021.json.gz",
-        "start": 388845,
-        "end": 407345,
+        "start": 388832,
+        "end": 407332,
         "records": 18500,
-        "bytes": 7565837,
-        "sha256": "61863821d7902b5c744d96a1a27a829df796b8ce75bfea905dd1cf42d6a568b5"
+        "bytes": 7564235,
+        "sha256": "4e3e84c681fb47db7ecdc9a1f73b1fa5711292c171b66ffc53223e48d4129299"
       },
       {
         "name": "listings_part_022.json.gz",
-        "start": 407345,
-        "end": 425845,
+        "start": 407332,
+        "end": 425832,
         "records": 18500,
-        "bytes": 20801546,
-        "sha256": "de721d77a0ec9b553faec8905c8c629061452b4d1048df23952259bc65ffe68d"
+        "bytes": 20799923,
+        "sha256": "91b1a294ed81195a06f3f6fda2e576a1c387597f249577f2e99ef90c1fc6a9a1"
       },
       {
         "name": "listings_part_023.json.gz",
-        "start": 425845,
-        "end": 444345,
+        "start": 425832,
+        "end": 444332,
         "records": 18500,
-        "bytes": 19864555,
-        "sha256": "fdb8f70990850643b57e6df9927ccc299bc70f173cf44f69999c57ffd331f5fc"
+        "bytes": 19871263,
+        "sha256": "4ca3e0228600b0f8a7396d44872967f0e5c30b7838a8545f4840317fa286d139"
       },
       {
         "name": "listings_part_024.json.gz",
-        "start": 444345,
-        "end": 462845,
+        "start": 444332,
+        "end": 462832,
         "records": 18500,
-        "bytes": 2360961,
-        "sha256": "826a55e7b6a7db8cc0a729428fe72e4fd0d809d4094abe2d80045acf6781b6dc"
+        "bytes": 2361216,
+        "sha256": "1a11f3b720482f8169f6a49c740ed59689b81d45a3ccf1f91e96610626026457"
       },
       {
         "name": "listings_part_025.json.gz",
-        "start": 462845,
+        "start": 462832,
         "end": 472777,
-        "records": 9932,
-        "bytes": 685199,
-        "sha256": "5ce49cc7a1be8f363831ae2ff27a1f451c166c3e0f2f774d8de48cd32b4e569e"
+        "records": 9945,
+        "bytes": 686055,
+        "sha256": "bdf3bf0990e956833fba98c740c76c96fa4fe228b200152a66382c5fa29fd2e5"
       }
     ]
   },
@@ -745,7 +745,7 @@
     }
   },
   "health_as_of": "2026-10-16T20:24:46.640274Z",
-  "health_age_hours": 165.15,
+  "health_age_hours": 167.18,
   "health_stale": true,
   "source_last_success": {
     "city_websites.charlotte_open_data": "2026-10-16T20:24:46.640274Z",
