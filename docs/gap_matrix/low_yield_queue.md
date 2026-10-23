@@ -4,7 +4,7 @@ Generated from `gap_list_2026-10-23.csv`. Regenerate with `python scripts/low_yi
 
 Every row here already has a working reader/enrichment/verifier -- the gap is coverage, not code. `next_action` names the existing script/sweep to run; `check-before-building` still applies if the next_action text is wrong or stale (it's a heuristic guess, not ground truth) -- confirm what's actually wired before assuming a rewrite is needed.
 
-**6,495 cells, 8,959,995 total est_rows_affected.**
+**6,497 cells, 8,959,862 total est_rows_affected.**
 
 ## Top 150 by est_rows_affected
 
@@ -103,7 +103,7 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 | NC | Guilford | two_year_delinquent | 0.6% | 12,209 | screen the 12,209 unchecked rows (albemarle_observer_tax_lists, nc_its_public_tax); write a negative result per row |
 | NC | Transylvania | email | 1.5% | 12,169 | no free owner-email source: e-mails come only from notices and filings; research a lawful source |
 | NC | Guilford | atty_deed_ref | 1.4% | 12,098 | backfill atty_deed_ref for the 12,098 applicable rows without it (existing enrichers) |
-| NC | Transylvania | atty_deed_ref | 4.6% | 11,953 | backfill atty_deed_ref for the 11,953 applicable rows without it (existing enrichers) |
+| NC | Transylvania | atty_deed_ref | 4.6% | 11,947 | backfill atty_deed_ref for the 11,947 applicable rows without it (existing enrichers) |
 | NC | Transylvania | repeat_tax_loss | 5.1% | 11,886 | 11,886 rows lack the inputs repeat_tax_loss is computed from: fill the inputs, then recompute |
 | NC | Buncombe | multi_year_delinquent_tax | 6.0% | 11,695 | screen the 11,695 unchecked rows (enrichment_tax_owed, multi_year_delinquent_tax); write a negative result per row |
 | NC | Guilford | code_enforcement | 5.1% | 11,649 | screen the 11,649 unchecked rows (enrichment_code_enforcement, enrichment_charlotte_code); write a negative result per r |
@@ -165,12 +165,12 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 
 | column | cells | total est_rows_affected |
 |---|---|---|
-| atty_deed_ref | 126 | 390,063 |
+| atty_deed_ref | 126 | 390,033 |
 | atty_deed_chain_fetched | 148 | 343,202 |
 | deed_chain_break | 148 | 343,202 |
 | deed_chain_distress_transfer | 148 | 343,202 |
 | deed_chain_has_history | 148 | 343,202 |
-| atty_legal_description | 138 | 336,015 |
+| atty_legal_description | 138 | 336,003 |
 | incarceration | 148 | 335,815 |
 | atty_rod_lien_checked | 93 | 306,460 |
 | bop_federal | 148 | 304,282 |
@@ -183,10 +183,10 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 | beds_baths | 141 | 273,791 |
 | divorce | 115 | 267,476 |
 | comps | 149 | 260,518 |
-| assessed_value | 135 | 254,542 |
+| assessed_value | 135 | 254,538 |
 | repeat_tax_loss | 137 | 252,887 |
-| lot_size | 140 | 235,640 |
-| sqft | 143 | 226,544 |
+| lot_size | 140 | 235,631 |
+| sqft | 143 | 226,536 |
 | marriage_license | 100 | 218,514 |
 | two_year_delinquent | 133 | 210,351 |
 | multi_year_delinquent_tax | 104 | 201,355 |
@@ -194,7 +194,7 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 | atty_taxpayer_of_record | 146 | 173,055 |
 | atty_tax_verified_confirmed | 62 | 151,975 |
 | code_enforcement | 13 | 139,624 |
-| address | 148 | 136,907 |
+| address | 148 | 136,833 |
 | lt_tax_lien | 106 | 98,210 |
 | vacancy | 9 | 79,407 |
 | sos_dissolution | 102 | 63,018 |
