@@ -4,34 +4,34 @@ Generated from `gap_list_2026-10-23.csv`. Regenerate with `python scripts/low_yi
 
 Every row here already has a working reader/enrichment/verifier -- the gap is coverage, not code. `next_action` names the existing script/sweep to run; `check-before-building` still applies if the next_action text is wrong or stale (it's a heuristic guess, not ground truth) -- confirm what's actually wired before assuming a rewrite is needed.
 
-**6,494 cells, 8,935,918 total est_rows_affected.**
+**6,494 cells, 8,952,654 total est_rows_affected.**
 
 ## Top 150 by est_rows_affected
 
 | state | county | column | pct done | est_rows left | next_action |
 |---|---|---|---|---|---|
-| NC | Mecklenburg | atty_rod_lien_checked | 0.0% | 39,338 | backfill atty_rod_lien_checked for the 39,338 applicable rows without it (enrichment_aumentum_rod, enrichment_cchs_rod) |
-| NC | Mecklenburg | liens | 0.0% | 39,338 | screen the 39,338 unchecked rows (enrichment_dew_liens, enrichment_irs_lien); write a negative result per row |
-| NC | Mecklenburg | atty_deed_chain_fetched | 0.2% | 39,276 | backfill atty_deed_chain_fetched for the 39,276 applicable rows without it (enrichment_deed_chain) |
-| NC | Mecklenburg | deed_chain_break | 0.2% | 39,276 | 39,276 rows lack the inputs deed_chain_break is computed from: fill the inputs, then recompute |
-| NC | Mecklenburg | deed_chain_distress_transfer | 0.2% | 39,276 | 39,276 rows lack the inputs deed_chain_distress_transfer is computed from: fill the inputs, then recompute |
-| NC | Mecklenburg | deed_chain_has_history | 0.2% | 39,276 | backfill deed_chain_has_history for the 39,276 applicable rows without it (enrichment_deed_chain) |
-| NC | Mecklenburg | atty_deed_ref | 1.7% | 38,686 | backfill atty_deed_ref for the 38,686 applicable rows without it (existing enrichers) |
-| NC | Mecklenburg | atty_legal_description | 1.9% | 38,574 | backfill atty_legal_description for the 38,574 applicable rows without it (existing enrichers) |
-| NC | Mecklenburg | code_enforcement | 8.9% | 35,849 | screen the 35,849 unchecked rows (enrichment_code_enforcement, enrichment_charlotte_code); write a negative result per r |
-| NC | Mecklenburg | phone | 11.9% | 34,540 | backfill phone for the 34,540 applicable rows without it (existing enrichers) |
-| NC | Mecklenburg | comps_tight | 0.0% | 34,025 | backfill comps_tight for the 34,025 applicable rows without it (existing enrichers) |
-| NC | Mecklenburg | sqft | 0.7% | 33,808 | backfill sqft for the 33,808 applicable rows without it (existing enrichers) |
-| NC | Mecklenburg | beds_baths | 0.7% | 33,805 | backfill beds_baths for the 33,805 applicable rows without it (existing enrichers) |
-| NC | Mecklenburg | comps | 0.7% | 33,782 | backfill comps for the 33,782 applicable rows without it (existing enrichers) |
-| NC | Mecklenburg | assessed_value | 14.9% | 33,456 | backfill assessed_value for the 33,456 applicable rows without it (existing enrichers) |
-| NC | Mecklenburg | email | 15.3% | 33,202 | no free owner-email source: e-mails come only from notices and filings; research a lawful source |
-| NC | Mecklenburg | bop_federal | 0.0% | 32,672 | screen the 32,672 unchecked rows (enrichment_bop_federal); write a negative result per row |
-| NC | Mecklenburg | divorce | 0.0% | 32,672 | screen the 32,672 unchecked rows (enrichment_nc_divorce, enrichment_sc_divorce); write a negative result per row |
-| NC | Mecklenburg | incarceration | 0.0% | 32,672 | screen the 32,672 unchecked rows (enrichment_incarceration); write a negative result per row |
-| NC | Mecklenburg | marriage_license | 0.1% | 32,648 | screen the 32,648 unchecked rows (enrichment_register_checks, register_checks); write a negative result per row |
-| NC | Mecklenburg | vacant_lot | 18.4% | 32,094 | 32,094 rows lack the inputs vacant_lot is computed from: fill the inputs, then recompute |
-| NC | Mecklenburg | lot_size | 18.9% | 31,895 | backfill lot_size for the 31,895 applicable rows without it (existing enrichers) |
+| NC | Mecklenburg | atty_rod_lien_checked | 0.0% | 39,861 | backfill atty_rod_lien_checked for the 39,861 applicable rows without it (enrichment_aumentum_rod, enrichment_cchs_rod) |
+| NC | Mecklenburg | liens | 0.0% | 39,861 | screen the 39,861 unchecked rows (enrichment_dew_liens, enrichment_irs_lien); write a negative result per row |
+| NC | Mecklenburg | atty_deed_chain_fetched | 0.2% | 39,799 | backfill atty_deed_chain_fetched for the 39,799 applicable rows without it (enrichment_deed_chain) |
+| NC | Mecklenburg | deed_chain_break | 0.2% | 39,799 | 39,799 rows lack the inputs deed_chain_break is computed from: fill the inputs, then recompute |
+| NC | Mecklenburg | deed_chain_distress_transfer | 0.2% | 39,799 | 39,799 rows lack the inputs deed_chain_distress_transfer is computed from: fill the inputs, then recompute |
+| NC | Mecklenburg | deed_chain_has_history | 0.2% | 39,799 | backfill deed_chain_has_history for the 39,799 applicable rows without it (enrichment_deed_chain) |
+| NC | Mecklenburg | atty_deed_ref | 1.6% | 39,209 | backfill atty_deed_ref for the 39,209 applicable rows without it (existing enrichers) |
+| NC | Mecklenburg | atty_legal_description | 1.9% | 39,097 | backfill atty_legal_description for the 39,097 applicable rows without it (existing enrichers) |
+| NC | Mecklenburg | code_enforcement | 10.1% | 35,849 | screen the 35,849 unchecked rows (enrichment_code_enforcement, enrichment_charlotte_code); write a negative result per r |
+| NC | Mecklenburg | phone | 11.8% | 35,063 | backfill phone for the 35,063 applicable rows without it (existing enrichers) |
+| NC | Mecklenburg | comps_tight | 0.0% | 34,548 | backfill comps_tight for the 34,548 applicable rows without it (existing enrichers) |
+| NC | Mecklenburg | sqft | 0.6% | 34,331 | backfill sqft for the 34,331 applicable rows without it (existing enrichers) |
+| NC | Mecklenburg | beds_baths | 0.7% | 34,328 | backfill beds_baths for the 34,328 applicable rows without it (existing enrichers) |
+| NC | Mecklenburg | comps | 0.7% | 34,305 | backfill comps for the 34,305 applicable rows without it (existing enrichers) |
+| NC | Mecklenburg | assessed_value | 14.8% | 33,979 | backfill assessed_value for the 33,979 applicable rows without it (existing enrichers) |
+| NC | Mecklenburg | email | 15.2% | 33,725 | no free owner-email source: e-mails come only from notices and filings; research a lawful source |
+| NC | Mecklenburg | bop_federal | 0.0% | 33,195 | screen the 33,195 unchecked rows (enrichment_bop_federal); write a negative result per row |
+| NC | Mecklenburg | divorce | 0.0% | 33,195 | screen the 33,195 unchecked rows (enrichment_nc_divorce, enrichment_sc_divorce); write a negative result per row |
+| NC | Mecklenburg | incarceration | 0.0% | 33,195 | screen the 33,195 unchecked rows (enrichment_incarceration); write a negative result per row |
+| NC | Mecklenburg | marriage_license | 0.1% | 33,171 | screen the 33,171 unchecked rows (enrichment_register_checks, register_checks); write a negative result per row |
+| NC | Mecklenburg | vacant_lot | 18.2% | 32,617 | 32,617 rows lack the inputs vacant_lot is computed from: fill the inputs, then recompute |
+| NC | Mecklenburg | lot_size | 18.7% | 32,418 | backfill lot_size for the 32,418 applicable rows without it (existing enrichers) |
 | NC | Mecklenburg | atty_tax_verified_confirmed | 0.0% | 26,941 | screen the 26,941 unchecked rows (existing enrichers); write a negative result per row |
 | NC | Gaston | tax_aging_surfaced | 0.0% | 26,644 | screen the 26,644 unchecked rows (enrichment_tax_aging); write a negative result per row |
 | NC | Gaston | vacancy | 0.0% | 26,635 | screen the 26,635 unchecked rows (hendersonville_vacant_structures, rocky_mount_blight_survey); write a negative result  |
@@ -43,12 +43,12 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 | NC | Mecklenburg | lt_tax_lien | 0.0% | 21,050 | run the tax_lien / lien_registry_wall / nc_ecourts_case sweep over the 21,050 unverified hit rows |
 | NC | Gaston | phone | 18.4% | 20,870 | backfill phone for the 20,870 applicable rows without it (existing enrichers) |
 | SC | Spartanburg | phone | 0.0% | 19,191 | backfill phone for the 19,191 applicable rows without it (existing enrichers) |
+| NC | Mecklenburg | repeat_tax_loss | 52.1% | 19,075 | 19,075 rows lack the inputs repeat_tax_loss is computed from: fill the inputs, then recompute |
 | NC | Lincoln | liens | 0.0% | 18,836 | screen the 18,836 unchecked rows (enrichment_dew_liens, enrichment_irs_lien); write a negative result per row |
 | NC | Lincoln | atty_rod_lien_checked | 0.1% | 18,830 | backfill atty_rod_lien_checked for the 18,830 applicable rows without it (enrichment_aumentum_rod, enrichment_cchs_rod) |
 | SC | Spartanburg | liens | 2.9% | 18,822 | screen the 18,822 unchecked rows (enrichment_dew_liens, enrichment_irs_lien); write a negative result per row |
 | SC | Spartanburg | atty_rod_lien_checked | 3.0% | 18,809 | backfill atty_rod_lien_checked for the 18,809 applicable rows without it (enrichment_aumentum_rod, enrichment_cchs_rod) |
 | NC | Lincoln | code_enforcement | 0.4% | 18,774 | screen the 18,774 unchecked rows (enrichment_code_enforcement, enrichment_charlotte_code); write a negative result per r |
-| NC | Mecklenburg | repeat_tax_loss | 52.8% | 18,552 | 18,552 rows lack the inputs repeat_tax_loss is computed from: fill the inputs, then recompute |
 | NC | Lincoln | two_year_delinquent | 1.9% | 18,493 | screen the 18,493 unchecked rows (albemarle_observer_tax_lists, nc_its_public_tax); write a negative result per row |
 | SC | Spartanburg | multi_year_delinquent_tax | 4.7% | 18,475 | screen the 18,475 unchecked rows (enrichment_tax_owed, multi_year_delinquent_tax); write a negative result per row |
 | SC | Spartanburg | code_enforcement | 4.8% | 18,447 | screen the 18,447 unchecked rows (enrichment_code_enforcement, enrichment_charlotte_code); write a negative result per r |
@@ -86,6 +86,7 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 | NC | Wake | tax_aging_surfaced | 0.0% | 12,938 | screen the 12,938 unchecked rows (enrichment_tax_aging); write a negative result per row |
 | NC | Wake | repeat_tax_loss | 0.0% | 12,937 | 12,937 rows lack the inputs repeat_tax_loss is computed from: fill the inputs, then recompute |
 | NC | Wake | atty_deed_ref | 1.2% | 12,780 | backfill atty_deed_ref for the 12,780 applicable rows without it (existing enrichers) |
+| NC | Mecklenburg | atty_taxpayer_of_record | 68.0% | 12,764 | backfill atty_taxpayer_of_record for the 12,764 applicable rows without it (parcel_cache, enrichment_qpaybill_tax) |
 | NC | Transylvania | liens | 0.1% | 12,511 | screen the 12,511 unchecked rows (enrichment_dew_liens, enrichment_irs_lien); write a negative result per row |
 | NC | Transylvania | atty_rod_lien_checked | 0.4% | 12,483 | backfill atty_rod_lien_checked for the 12,483 applicable rows without it (enrichment_aumentum_rod, enrichment_cchs_rod) |
 | NC | Buncombe | code_enforcement | 0.0% | 12,446 | screen the 12,446 unchecked rows (enrichment_code_enforcement, enrichment_charlotte_code); write a negative result per r |
@@ -98,7 +99,6 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 | NC | Wake | beds_baths | 1.2% | 12,244 | backfill beds_baths for the 12,244 applicable rows without it (existing enrichers) |
 | NC | Wake | sqft | 1.2% | 12,242 | backfill sqft for the 12,242 applicable rows without it (existing enrichers) |
 | NC | Guilford | multi_year_delinquent_tax | 0.3% | 12,241 | screen the 12,241 unchecked rows (enrichment_tax_owed, multi_year_delinquent_tax); write a negative result per row |
-| NC | Mecklenburg | atty_taxpayer_of_record | 68.9% | 12,241 | backfill atty_taxpayer_of_record for the 12,241 applicable rows without it (parcel_cache, enrichment_qpaybill_tax) |
 | NC | Guilford | two_year_delinquent | 0.6% | 12,209 | screen the 12,209 unchecked rows (albemarle_observer_tax_lists, nc_its_public_tax); write a negative result per row |
 | NC | Transylvania | email | 1.5% | 12,169 | no free owner-email source: e-mails come only from notices and filings; research a lawful source |
 | NC | Guilford | atty_deed_ref | 1.4% | 12,098 | backfill atty_deed_ref for the 12,098 applicable rows without it (existing enrichers) |
@@ -121,7 +121,7 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 | NC | Guilford | phone | 9.5% | 10,950 | backfill phone for the 10,950 applicable rows without it (existing enrichers) |
 | NC | Buncombe | email | 11.1% | 10,923 | no free owner-email source: e-mails come only from notices and filings; research a lawful source |
 | NC | Rutherford | email | 2.8% | 10,844 | no free owner-email source: e-mails come only from notices and filings; research a lawful source |
-| NC | Mecklenburg | parcel_id | 72.5% | 10,817 | backfill parcel_id for the 10,817 applicable rows without it (existing enrichers) |
+| NC | Mecklenburg | parcel_id | 72.9% | 10,817 | backfill parcel_id for the 10,817 applicable rows without it (existing enrichers) |
 | NC | Forsyth | atty_rod_lien_checked | 0.1% | 10,679 | backfill atty_rod_lien_checked for the 10,679 applicable rows without it (enrichment_aumentum_rod, enrichment_cchs_rod) |
 | NC | Forsyth | liens | 0.1% | 10,679 | screen the 10,679 unchecked rows (enrichment_dew_liens, enrichment_irs_lien); write a negative result per row |
 | NC | Guilford | vacant_lot | 14.0% | 10,562 | 10,562 rows lack the inputs vacant_lot is computed from: fill the inputs, then recompute |
@@ -165,43 +165,43 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 
 | column | cells | total est_rows_affected |
 |---|---|---|
-| atty_deed_ref | 126 | 389,562 |
-| atty_deed_chain_fetched | 148 | 342,679 |
-| deed_chain_break | 148 | 342,679 |
-| deed_chain_distress_transfer | 148 | 342,679 |
-| deed_chain_has_history | 148 | 342,679 |
-| bop_federal | 148 | 335,941 |
-| incarceration | 148 | 335,524 |
-| atty_legal_description | 138 | 335,515 |
-| atty_rod_lien_checked | 93 | 305,937 |
-| comps_tight | 149 | 295,941 |
-| phone | 104 | 293,834 |
-| liens | 89 | 287,376 |
-| email | 102 | 283,708 |
-| vacant_lot | 120 | 283,177 |
+| atty_deed_ref | 126 | 390,085 |
+| atty_deed_chain_fetched | 148 | 343,202 |
+| deed_chain_break | 148 | 343,202 |
+| deed_chain_distress_transfer | 148 | 343,202 |
+| deed_chain_has_history | 148 | 343,202 |
+| bop_federal | 148 | 336,464 |
+| incarceration | 148 | 336,047 |
+| atty_legal_description | 138 | 336,038 |
+| atty_rod_lien_checked | 93 | 306,460 |
+| comps_tight | 149 | 296,464 |
+| phone | 104 | 294,357 |
+| liens | 89 | 287,899 |
+| email | 102 | 284,231 |
+| vacant_lot | 120 | 283,700 |
 | tax_aging_surfaced | 139 | 280,491 |
-| beds_baths | 141 | 273,268 |
-| divorce | 115 | 266,953 |
-| comps | 149 | 259,995 |
-| assessed_value | 135 | 254,019 |
-| repeat_tax_loss | 137 | 252,364 |
-| lot_size | 140 | 235,128 |
-| sqft | 143 | 226,021 |
-| marriage_license | 100 | 217,991 |
+| beds_baths | 141 | 273,791 |
+| divorce | 115 | 267,476 |
+| comps | 149 | 260,518 |
+| assessed_value | 135 | 254,542 |
+| repeat_tax_loss | 137 | 252,887 |
+| lot_size | 140 | 235,651 |
+| sqft | 143 | 226,544 |
+| marriage_license | 100 | 218,514 |
 | two_year_delinquent | 133 | 210,351 |
 | multi_year_delinquent_tax | 104 | 201,355 |
 | parcel_id | 145 | 194,640 |
-| atty_taxpayer_of_record | 146 | 172,566 |
+| atty_taxpayer_of_record | 146 | 173,089 |
 | atty_tax_verified_confirmed | 62 | 151,975 |
 | code_enforcement | 13 | 139,624 |
 | address | 148 | 136,908 |
 | lt_tax_lien | 106 | 98,210 |
 | sos_dissolution | 102 | 63,018 |
-| name_care_of | 148 | 47,306 |
-| name_deceased | 148 | 47,306 |
-| name_estate_of | 148 | 47,306 |
-| name_et_al | 148 | 47,306 |
-| name_heirs | 148 | 47,306 |
-| name_life_estate | 148 | 47,306 |
-| name_trust | 148 | 47,306 |
-| owner_name | 148 | 47,306 |
+| name_care_of | 148 | 47,829 |
+| name_deceased | 148 | 47,829 |
+| name_estate_of | 148 | 47,829 |
+| name_et_al | 148 | 47,829 |
+| name_heirs | 148 | 47,829 |
+| name_life_estate | 148 | 47,829 |
+| name_trust | 148 | 47,829 |
+| owner_name | 148 | 47,829 |

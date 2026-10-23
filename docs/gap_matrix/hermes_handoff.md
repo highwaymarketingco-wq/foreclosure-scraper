@@ -6,11 +6,11 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 
 ## 1. Hermes lane -- CAPTCHA or required login
 
-641 cells, 917,679 est_rows_affected combined.
+641 cells, 918,202 est_rows_affected combined.
 
 | state | county | column | est_rows | reason | source |
 |---|---|---|---|---|---|
-| NC | Mecklenburg | usps_vacancy | 39,338 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| NC | Mecklenburg | usps_vacancy | 39,861 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Gaston | usps_vacancy | 26,645 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | SC | Spartanburg | usps_vacancy | 19,381 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Lincoln | heir_naming_publication | 18,841 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
