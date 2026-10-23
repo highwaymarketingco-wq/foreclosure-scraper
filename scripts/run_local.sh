@@ -136,6 +136,16 @@ load GOOGLE_MAPS_API_KEY "$SECRETS/google_maps_api_key.txt"
 export ASSESSOR_CARD_ON="${ASSESSOR_CARD_ON:-1}"
 export ASSESSOR_CARD_MAX="${ASSESSOR_CARD_MAX:-400}"
 
+# Mecklenburg's own NCGS 105-369 statutory tax-lien advertisement (operator-enabled
+# 2026-10-23): 43,355 rows / $35.5M due, free, no login/CAPTCHA, the earliest county-wide
+# tax-distress list there is for NC's largest county. Off by default because the ~29k
+# parcel-resolved rows it emits carry no coordinates and compete for the shared, already
+# budget-capped (GEOCODE_BUDGET_S, 600s/run) geocode step -- that cap is the safety valve,
+# so turning this on is a resource-sharing decision, not an unbounded-cost one. A one-time
+# catch-up already landed 21,059 genuinely-new rows (scripts/land_mecklenburg_delinquent_tax.py);
+# this keeps future advertisement updates (new tax year, newly-added parcels) landing too.
+export FORECLOSURE_MECKLENBURG_DELINQUENT="${FORECLOSURE_MECKLENBURG_DELINQUENT:-1}"
+
 # Enrichment budget — keep the run finishing in a sane window. The cloud
 # run died at 4h partly on a Gemini-quota Vision spiral; locally we use
 # Anthropic (set above) and cap Vision so the run completes. ROD deed
