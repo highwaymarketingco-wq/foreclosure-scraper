@@ -160,7 +160,13 @@ NC_ESTATE_EXTRA_COUNTIES = (
 #: Same probe, SC side (Darlington 75 probate notices/year, Greenville 17, Chesterfield 3).
 #: Greenville is SCOPE_DENY'd for FLIP leads only; a probate notice here is a distressed lead
 #: and is unaffected by that deny entry (see main._in_scope / _is_flip).
-SC_PROBATE_EXTRA_COUNTIES = ("Darlington", "Greenville", "Chesterfield")
+#: RE-PROBED 2026-10-23 (the "stale scope, needs periodic recheck" lane -- see
+#: gap_matrix.SC_QUIET_TITLE_WALL's own comment): re-ran the identical 2026-10-02 probe
+#: against all 28 then-empty SC counties. 27 are still genuinely empty (that finding holds);
+#: Aiken now returns a real notice -- Presstar 2023 LLC v. The Estate of James Simmons,
+#: case 2026-CP-02-02482, a quiet-title/lis-pendens action naming heirs by publication,
+#: real parcel (TMS 104-15-07-023) and address (707 Washington Circle). Added here.
+SC_PROBATE_EXTRA_COUNTIES = ("Darlington", "Greenville", "Chesterfield", "Aiken")
 
 NC_FORECLOSURE_TYPE = "Foreclosure Sale"
 
