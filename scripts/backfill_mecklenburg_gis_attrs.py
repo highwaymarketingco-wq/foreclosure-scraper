@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import copy
 import os
 import sys
 from pathlib import Path
@@ -87,8 +88,14 @@ def main() -> int:
         except Exception:  # noqa: BLE001
             continue
         keyed[key] = li
+        # deepcopy: enrich_gis_attrs() mutates raw['gis'] IN PLACE when it already
+        # exists (li.raw.setdefault("gis", {})["queried"] = True) rather than
+        # replacing it. A shallow snapshot would hold the SAME dict object, so
+        # it "sees" the mutation too and the diff below wrongly reports no
+        # change -- found live 2026-10-23 (see backfill_gis_attrs_boardwide.py),
+        # affecting any row whose raw['gis'] pre-existed from another source.
         before[key] = {**{f: getattr(li, f, None) for f in _TOP_FIELDS},
-                       **{k: li.raw.get(k) if isinstance(li.raw, dict) else None
+                       **{k: copy.deepcopy(li.raw.get(k)) if isinstance(li.raw, dict) else None
                           for k in _RAW_WATCH_KEYS}}
 
     print(f"{COUNTY} rows loaded this run: {len(keyed):,}"

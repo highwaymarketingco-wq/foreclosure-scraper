@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import copy
 import os
 import sys
 from pathlib import Path
@@ -110,8 +111,17 @@ def main() -> int:
         except Exception:  # noqa: BLE001
             continue
         keyed[key] = li
+        # deepcopy the raw-dict values: enrich_gis_attrs() MUTATES raw['gis'] in
+        # place (li.raw.setdefault("gis", {})["queried"] = True) when it already
+        # exists, rather than replacing it -- a shallow snapshot would hold the
+        # SAME dict object, so it would "see" the mutation too and the diff below
+        # would wrongly report no change. Found live 2026-10-23: 224,446 of
+        # 472,777 rows already carry a raw['gis'] dict from another source, and
+        # every one of them was silently falling through this exact trap --
+        # their 'queried' stamp (and any gis.owner/mailing fill) never reached
+        # the patch, so they looked "never queried" again on the next batch.
         before[key] = {**{f: getattr(li, f, None) for f in _TOP_FIELDS},
-                       **{k: li.raw.get(k) for k in _RAW_WATCH_KEYS}}
+                       **{k: copy.deepcopy(li.raw.get(k)) for k in _RAW_WATCH_KEYS}}
 
     print(f"rows loaded this run: {len(keyed):,}"
           + (f" (capped at {args.max_rows} never-queried, {already_queried_skipped} "
