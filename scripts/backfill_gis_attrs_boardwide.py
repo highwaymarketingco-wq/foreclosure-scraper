@@ -91,7 +91,14 @@ def main() -> int:
     for rec in iter_board_rows(docs_dir / "listings.json.gz"):
         full_raw = rec.get("raw") if isinstance(rec.get("raw"), dict) else {}
         never_queried = not (full_raw.get("gis") or {}).get("queried")
-        if args.max_rows and never_queried:
+        if args.max_rows:
+            if not never_queried:
+                # Already processed by an earlier batch -- nothing left for this
+                # function to do here (idempotent skip inside enrich_gis_attrs
+                # confirms this; found live 2026-10-23 that omitting this check
+                # let already-done rows ride along "for free" each batch,
+                # wasting load time without being capped).
+                continue
             if never_queried_count >= args.max_rows:
                 already_queried_skipped += 1
                 continue
