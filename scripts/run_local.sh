@@ -146,6 +146,27 @@ export ASSESSOR_CARD_MAX="${ASSESSOR_CARD_MAX:-400}"
 # this keeps future advertisement updates (new tax year, newly-added parcels) landing too.
 export FORECLOSURE_MECKLENBURG_DELINQUENT="${FORECLOSURE_MECKLENBURG_DELINQUENT:-1}"
 
+# Mecklenburg/Carteret's Harris "ROD Web Access" real-estate + marriage name-index search
+# (operator-enabled 2026-10-23): a Playwright headless-browser lookup, live-verified working
+# (no login/CAPTCHA, just a one-time disclaimer click-through), held off since 2026-10-07
+# (HANDOFF item 82) pending a real yield measurement -- each lookup costs ~15-30s and a
+# transient ~250-540MB browser-process footprint (one browser at a time, by design, see
+# rod/nc_render.py). Measured live 2026-10-23: 3/3 Mecklenburg lookups in a 90s bounded test
+# came back with real ROD instruments (2 carrying a mortgage), no walls, no errors, memory
+# flat after the browser closed. Already runs inside enrich_nc_rod_render()'s own
+# FORECLOSURE_NC_ROD_RENDER_BUDGET_S budget (default 3600s/run, ~120 lookups/day at this
+# pace) -- that budget is the safety valve, so turning this on is the same resource-sharing
+# decision as the Mecklenburg delinquent-tax flag above, not an unbounded-cost one. Mecklenburg
+# has 39,861 rows; at ~120/day this chips away at the backlog over many days by design, same
+# as bop_federal/incarceration's own daily-capped rate.
+export FORECLOSURE_NC_HARRIS_ROD="${FORECLOSURE_NC_HARRIS_ROD:-1}"
+# Same Harris session's Marriage index (enrich_marriage_render, called from
+# enrich_nc_rod_render right after the ROD loop) -- shares the SAME budget_s above, not an
+# additional resource; live-reconfirmed 2026-10-20 (108 real 1881-2026 Mecklenburg licence
+# rows, no login/CAPTCHA). gap_matrix.py's own comment flags this column as misclassified
+# while both flags default off (see docs comment at RENDER_ROD_CONFIG usage).
+export FORECLOSURE_NC_HARRIS_MARRIAGE="${FORECLOSURE_NC_HARRIS_MARRIAGE:-1}"
+
 # Enrichment budget — keep the run finishing in a sane window. The cloud
 # run died at 4h partly on a Gemini-quota Vision spiral; locally we use
 # Anthropic (set above) and cap Vision so the run completes. ROD deed
