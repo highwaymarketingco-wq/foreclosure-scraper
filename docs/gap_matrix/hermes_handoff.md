@@ -1,15 +1,16 @@
 # Hermes hand-off -- the walled bucket, triaged
 
-Generated from `gap_list_2026-10-22.csv`. Regenerate with `python scripts/hermes_handoff.py` any time the gap list changes -- this file is a derived view, not hand-maintained.
+Generated from `gap_list_2026-10-23.csv`. Regenerate with `python scripts/hermes_handoff.py` any time the gap list changes -- this file is a derived view, not hand-maintained.
 
 Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bot-wall, build in-house** is ordinary scraper work for this project (existing WAF-bypass/stealth-browser code, applied per-site) -- not a Hermes hand-off. The last two piles need a human policy call or a scheduled recheck, not a scraper at all -- see this script's own module docstring for why.
 
 ## 1. Hermes lane -- CAPTCHA or required login
 
-641 cells, 896,559 est_rows_affected combined.
+641 cells, 917,653 est_rows_affected combined.
 
 | state | county | column | est_rows | reason | source |
 |---|---|---|---|---|---|
+| NC | Mecklenburg | usps_vacancy | 39,338 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Gaston | usps_vacancy | 26,620 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | SC | Spartanburg | usps_vacancy | 19,381 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Lincoln | heir_naming_publication | 18,841 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
@@ -17,16 +18,15 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | NC | Lincoln | quiet_title | 18,841 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
 | NC | Lincoln | rollback_exposure | 18,841 | CAPTCHA | tax/property card: www.lincolncountytax.com |
 | NC | Lincoln | usps_vacancy | 18,841 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
-| NC | Mecklenburg | usps_vacancy | 18,552 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
-| NC | Wake | atty_rod_lien_checked | 12,941 | CAPTCHA | register: Tyler Technologies Self-Service (recorder search,  |
-| NC | Wake | liens | 12,941 | CAPTCHA | register: Tyler Technologies Self-Service (recorder search,  |
-| NC | Wake | usps_vacancy | 12,941 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| NC | Wake | atty_rod_lien_checked | 12,942 | CAPTCHA | register: Tyler Technologies Self-Service (recorder search,  |
+| NC | Wake | liens | 12,942 | CAPTCHA | register: Tyler Technologies Self-Service (recorder search,  |
+| NC | Wake | usps_vacancy | 12,942 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Transylvania | usps_vacancy | 12,528 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
-| NC | Buncombe | usps_vacancy | 12,436 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| NC | Buncombe | usps_vacancy | 12,446 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Guilford | usps_vacancy | 12,276 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
-| SC | Charleston | atty_rod_lien_checked | 11,210 | CAPTCHA | register: Charleston County ROD document search (county-buil |
-| SC | Charleston | liens | 11,210 | CAPTCHA | register: Charleston County ROD document search (county-buil |
-| SC | Charleston | usps_vacancy | 11,210 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| SC | Charleston | atty_rod_lien_checked | 11,212 | CAPTCHA | register: Charleston County ROD document search (county-buil |
+| SC | Charleston | liens | 11,212 | CAPTCHA | register: Charleston County ROD document search (county-buil |
+| SC | Charleston | usps_vacancy | 11,212 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Rutherford | usps_vacancy | 11,206 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Forsyth | usps_vacancy | 10,688 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Brunswick | heir_naming_publication | 9,225 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
@@ -45,14 +45,14 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | SC | Greenville | usps_vacancy | 5,547 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Davidson | usps_vacancy | 5,468 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Cumberland | usps_vacancy | 5,268 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
-| NC | Pitt | usps_vacancy | 5,182 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| NC | Pitt | usps_vacancy | 5,183 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | SC | Spartanburg | sos_dissolution | 5,136 | SC Secretary of State search is CAPTCHA-walled | statewide: SC Secretary of State search is CAPTCHA-walled |
 | NC | Onslow | usps_vacancy | 4,836 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Rowan | usps_vacancy | 4,594 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
-| SC | Orangeburg | atty_deed_ref | 4,573 | login | register index: www.orangeburgscrod.org |
-| SC | Orangeburg | atty_rod_lien_checked | 4,573 | login | register: County-run 'Register Of Deeds Remote Access Site'  |
-| SC | Orangeburg | liens | 4,573 | login | register: County-run 'Register Of Deeds Remote Access Site'  |
-| SC | Orangeburg | usps_vacancy | 4,573 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| SC | Orangeburg | atty_deed_ref | 4,586 | login | register index: www.orangeburgscrod.org |
+| SC | Orangeburg | atty_rod_lien_checked | 4,586 | login | register: County-run 'Register Of Deeds Remote Access Site'  |
+| SC | Orangeburg | liens | 4,586 | login | register: County-run 'Register Of Deeds Remote Access Site'  |
+| SC | Orangeburg | usps_vacancy | 4,586 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Beaufort | usps_vacancy | 4,281 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Harnett | atty_rod_lien_checked | 4,226 | CAPTCHA | register: Courthouse Computer Systems LRSearch (MVC) at us6  |
 | NC | Harnett | heir_naming_publication | 4,226 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
@@ -63,12 +63,12 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | NC | Duplin | usps_vacancy | 3,956 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Lee | usps_vacancy | 3,907 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | SC | Oconee | usps_vacancy | 3,888 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
-| SC | Florence | usps_vacancy | 3,882 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| SC | Florence | usps_vacancy | 3,883 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | SC | Charleston | sos_dissolution | 3,846 | SC Secretary of State search is CAPTCHA-walled | statewide: SC Secretary of State search is CAPTCHA-walled |
 | SC | Colleton | usps_vacancy | 3,680 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Duplin | probate | 3,678 | CAPTCHA | probate: portal-nc.tylertech.cloud |
 | NC | Beaufort | probate | 3,657 | CAPTCHA | probate: portal-nc.tylertech.cloud |
-| SC | Berkeley | usps_vacancy | 3,623 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| SC | Berkeley | usps_vacancy | 3,641 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | SC | Laurens | usps_vacancy | 3,611 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | McDowell | multi_year_delinquent_tax | 3,526 | CAPTCHA | tax/property card: www.bttaxpayerportal.com |
 | NC | McDowell | rollback_exposure | 3,526 | CAPTCHA | tax/property card: www.bttaxpayerportal.com |
@@ -77,12 +77,12 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | NC | Hoke | heir_naming_publication | 3,466 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
 | NC | Hoke | quiet_title | 3,466 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
 | NC | Hoke | usps_vacancy | 3,466 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
-| SC | Anderson | multi_year_delinquent_tax | 3,373 | login | tax/property card: acpass.andersoncountysc.org |
-| SC | Anderson | usps_vacancy | 3,373 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| SC | Anderson | multi_year_delinquent_tax | 3,388 | login | tax/property card: acpass.andersoncountysc.org |
+| SC | Anderson | usps_vacancy | 3,388 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | SC | Cherokee | usps_vacancy | 3,325 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
-| SC | Lexington | atty_rod_lien_checked | 3,299 | login | register: Kofile/GovOS CountyFusion countyfusion14.govos.com |
-| SC | Lexington | liens | 3,299 | login | register: Kofile/GovOS CountyFusion countyfusion14.govos.com |
-| SC | Lexington | usps_vacancy | 3,299 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| SC | Lexington | atty_rod_lien_checked | 3,303 | login | register: Kofile/GovOS CountyFusion countyfusion14.govos.com |
+| SC | Lexington | liens | 3,303 | login | register: Kofile/GovOS CountyFusion countyfusion14.govos.com |
+| SC | Lexington | usps_vacancy | 3,303 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Union | usps_vacancy | 3,163 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Hyde | heir_naming_publication | 3,148 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
 | NC | Hyde | quiet_title | 3,148 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
@@ -90,10 +90,10 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | NC | Orange | heir_naming_publication | 3,046 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
 | NC | Orange | quiet_title | 3,046 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
 | NC | Orange | usps_vacancy | 3,046 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
-| SC | Williamsburg | atty_deed_ref | 2,954 | login | register index: williamsburgsc.avenuinsights.com |
-| SC | Williamsburg | atty_rod_lien_checked | 2,954 | login | register: Neumo Records Management (formerly Avenu Insights  |
-| SC | Williamsburg | liens | 2,954 | login | register: Neumo Records Management (formerly Avenu Insights  |
-| SC | Williamsburg | usps_vacancy | 2,954 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| SC | Williamsburg | atty_deed_ref | 2,956 | login | register index: williamsburgsc.avenuinsights.com |
+| SC | Williamsburg | atty_rod_lien_checked | 2,956 | login | register: Neumo Records Management (formerly Avenu Insights  |
+| SC | Williamsburg | liens | 2,956 | login | register: Neumo Records Management (formerly Avenu Insights  |
+| SC | Williamsburg | usps_vacancy | 2,956 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Hoke | probate | 2,940 | CAPTCHA | probate: portal-nc.tylertech.cloud |
 | SC | Darlington | atty_rod_lien_checked | 2,927 | login | register: Cott Systems RECORDhub recordhub.cottsystems.com |
 | SC | Darlington | liens | 2,927 | login | register: Cott Systems RECORDhub recordhub.cottsystems.com |
@@ -106,7 +106,7 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | NC | Anson | usps_vacancy | 2,580 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Pasquotank | usps_vacancy | 2,469 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | McDowell | atty_tax_verified_confirmed | 2,468 | CAPTCHA | tax/property card: www.bttaxpayerportal.com |
-| SC | Lexington | probate | 2,413 | CAPTCHA | probate: www.lex-co.com |
+| SC | Lexington | probate | 2,417 | CAPTCHA | probate: www.lex-co.com |
 | NC | Hyde | probate | 2,396 | CAPTCHA | probate: portal-nc.tylertech.cloud |
 | NC | Polk | usps_vacancy | 2,389 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Orange | probate | 2,281 | CAPTCHA | probate: portal-nc.tylertech.cloud |
@@ -136,15 +136,15 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | SC | Beaufort | liens | 1,744 | CAPTCHA | register: NewVision Systems BrowserView (rod.beaufortcountys |
 | SC | Beaufort | usps_vacancy | 1,744 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Madison | usps_vacancy | 1,704 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| SC | Clarendon | usps_vacancy | 1,669 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | SC | Jasper | atty_rod_lien_checked | 1,669 | CAPTCHA | register: Courthouse Computer Systems (CCHS) Registrar us6.c |
 | SC | Jasper | usps_vacancy | 1,669 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
-| SC | Clarendon | usps_vacancy | 1,668 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Union | probate | 1,632 | CAPTCHA | probate: portal-nc.tylertech.cloud |
 | NC | Craven | liens | 1,608 | CAPTCHA | register: Courthouse Computer Systems LRSearch (us5.courthou |
 | NC | Craven | usps_vacancy | 1,608 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
-| NC | Cleveland | multi_year_delinquent_tax | 1,582 | CAPTCHA | tax/property card: www.clevelandcountytaxes.com |
-| NC | Cleveland | rollback_exposure | 1,582 | CAPTCHA | tax/property card: www.clevelandcountytaxes.com |
-| NC | Cleveland | usps_vacancy | 1,582 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| NC | Cleveland | multi_year_delinquent_tax | 1,602 | CAPTCHA | tax/property card: www.clevelandcountytaxes.com |
+| NC | Cleveland | rollback_exposure | 1,602 | CAPTCHA | tax/property card: www.clevelandcountytaxes.com |
+| NC | Cleveland | usps_vacancy | 1,602 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Robeson | usps_vacancy | 1,582 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | SC | Greenville | sos_dissolution | 1,570 | SC Secretary of State search is CAPTCHA-walled | statewide: SC Secretary of State search is CAPTCHA-walled |
 | NC | Bertie | atty_tax_verified_confirmed | 1,562 | CAPTCHA | tax/property card: bertie.webtaxpay.com |
@@ -197,9 +197,9 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | NC | Caldwell | tax_aging_surfaced | 1,054 | CAPTCHA | tax/property card: www.caldwellcountynctax.com |
 | NC | Caldwell | two_year_delinquent | 1,054 | CAPTCHA | tax/property card: www.caldwellcountynctax.com |
 | NC | Caldwell | usps_vacancy | 1,054 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
-| NC | Edgecombe | heir_naming_publication | 1,040 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
-| NC | Edgecombe | quiet_title | 1,040 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
-| NC | Edgecombe | usps_vacancy | 1,040 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
+| NC | Edgecombe | heir_naming_publication | 1,051 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
+| NC | Edgecombe | quiet_title | 1,051 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
+| NC | Edgecombe | usps_vacancy | 1,051 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | SC | Chesterfield | usps_vacancy | 1,034 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | SC | Georgetown | multi_year_delinquent_tax | 997 | CAPTCHA | tax/property card: georgetowncountysctax.com |
 | SC | Georgetown | rollback_exposure | 997 | CAPTCHA | tax/property card: georgetowncountysctax.com |
@@ -215,11 +215,11 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 
 ## 2. Bot-wall, build in-house -- Cloudflare/WAF, not Hermes
 
-190 cells, 213,034 est_rows_affected combined.
+190 cells, 213,108 est_rows_affected combined.
 
 | state | county | column | est_rows | reason | source |
 |---|---|---|---|---|---|
-| SC | Charleston | rollback_exposure | 11,210 | bot check (Cloudflare/WAF) | tax/property card: sc-charleston.publicaccessnow.com |
+| SC | Charleston | rollback_exposure | 11,212 | bot check (Cloudflare/WAF) | tax/property card: sc-charleston.publicaccessnow.com |
 | NC | Rutherford | multi_year_delinquent_tax | 11,206 | bot check (Cloudflare/WAF) | tax/property card: rutherfordcountync.gov |
 | SC | Charleston | atty_tax_verified_confirmed | 7,518 | bot check (Cloudflare/WAF) | tax/property card: sc-charleston.publicaccessnow.com |
 | SC | Sumter | probate | 4,686 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
@@ -229,7 +229,7 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | NC | Lee | multi_year_delinquent_tax | 3,907 | bot check (Cloudflare/WAF) | tax/property card: taxaccess.leecountync.gov |
 | NC | Lee | rollback_exposure | 3,907 | bot check (Cloudflare/WAF) | tax/property card: taxaccess.leecountync.gov |
 | NC | Lee | two_year_delinquent | 3,907 | bot check (Cloudflare/WAF) | tax/property card: taxaccess.leecountync.gov |
-| SC | Florence | assessed_value | 3,836 | Cloudflare check on the county property card | county GIS: services1.arcgis.com |
+| SC | Florence | assessed_value | 3,837 | Cloudflare check on the county property card | county GIS: services1.arcgis.com |
 | NC | Union | multi_year_delinquent_tax | 3,163 | bot check (Cloudflare/WAF) | tax/property card:  |
 | NC | Union | repeat_tax_loss | 3,163 | bot check (Cloudflare/WAF) | tax/property card:  |
 | NC | Union | rollback_exposure | 3,163 | bot check (Cloudflare/WAF) | tax/property card:  |
@@ -260,9 +260,9 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | SC | Sumter | atty_probate_case | 1,793 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | NC | Polk | atty_tax_verified_confirmed | 1,756 | bot check (Cloudflare/WAF) | tax/property card: www.polknc.gov |
 | SC | Barnwell | probate | 1,695 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
-| SC | Clarendon | atty_deed_ref | 1,668 | bot check (Cloudflare/WAF) | register index: acclaimprod.clarendoncountygov.org |
-| SC | Clarendon | atty_rod_lien_checked | 1,668 | bot check (Cloudflare/WAF) | register: Harris AcclaimWeb acclaimprod.clarendoncountygov.o |
-| SC | Clarendon | liens | 1,668 | bot check (Cloudflare/WAF) | register: Harris AcclaimWeb acclaimprod.clarendoncountygov.o |
+| SC | Clarendon | atty_deed_ref | 1,669 | bot check (Cloudflare/WAF) | register index: acclaimprod.clarendoncountygov.org |
+| SC | Clarendon | atty_rod_lien_checked | 1,669 | bot check (Cloudflare/WAF) | register: Harris AcclaimWeb acclaimprod.clarendoncountygov.o |
+| SC | Clarendon | liens | 1,669 | bot check (Cloudflare/WAF) | register: Harris AcclaimWeb acclaimprod.clarendoncountygov.o |
 | NC | Moore | atty_rod_lien_checked | 1,557 | bot check (Cloudflare/WAF) | register: Aumentum Recorder web access (Harris Recording Sol |
 | NC | Moore | liens | 1,557 | bot check (Cloudflare/WAF) | register: Aumentum Recorder web access (Harris Recording Sol |
 | NC | Chatham | multi_year_delinquent_tax | 1,553 | bot check (Cloudflare/WAF) | tax/property card:  |
@@ -271,7 +271,7 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | NC | Chatham | two_year_delinquent | 1,553 | bot check (Cloudflare/WAF) | tax/property card:  |
 | NC | Pender | atty_rod_lien_checked | 1,543 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
 | NC | Pender | liens | 1,543 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
-| SC | Clarendon | lot_size | 1,541 | Cloudflare check on the county property card | county GIS: qpublic.schneidercorp.com |
+| SC | Clarendon | lot_size | 1,542 | Cloudflare check on the county property card | county GIS: qpublic.schneidercorp.com |
 | NC | Union | atty_tax_verified_confirmed | 1,509 | bot check (Cloudflare/WAF) | tax/property card:  |
 | NC | Person | atty_rod_lien_checked | 1,429 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
 | NC | Person | liens | 1,429 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
@@ -280,7 +280,7 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | NC | Wilson | rollback_exposure | 1,389 | bot check (Cloudflare/WAF) | tax/property card: www.wilsoncountync.gov |
 | NC | Wilson | tax_aging_surfaced | 1,389 | bot check (Cloudflare/WAF) | tax/property card: www.wilsoncountync.gov |
 | NC | Wilson | two_year_delinquent | 1,389 | bot check (Cloudflare/WAF) | tax/property card: www.wilsoncountync.gov |
-| SC | Clarendon | assessed_value | 1,382 | Cloudflare check on the county property card | county GIS: qpublic.schneidercorp.com |
+| SC | Clarendon | assessed_value | 1,383 | Cloudflare check on the county property card | county GIS: qpublic.schneidercorp.com |
 | SC | Sumter | atty_heir_candidates | 1,347 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | SC | Sumter | lt_estate_lead | 1,339 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | SC | Florence | atty_heir_candidates | 1,308 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
@@ -290,10 +290,10 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | SC | York | beds_baths | 1,128 | bot check (Cloudflare/WAF) | tax/property card: www.yorkcountysc.gov |
 | SC | Barnwell | atty_probate_case | 1,098 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | SC | Newberry | lot_size | 1,078 | Cloudflare check on the county property card | county GIS: map.newberrycounty.net |
-| NC | Edgecombe | multi_year_delinquent_tax | 1,040 | bot check (Cloudflare/WAF) | tax/property card: taxpa.edgecombecountync.gov |
-| NC | Edgecombe | repeat_tax_loss | 1,040 | bot check (Cloudflare/WAF) | tax/property card: taxpa.edgecombecountync.gov |
-| NC | Edgecombe | tax_aging_surfaced | 1,040 | bot check (Cloudflare/WAF) | tax/property card: taxpa.edgecombecountync.gov |
-| NC | Edgecombe | two_year_delinquent | 1,040 | bot check (Cloudflare/WAF) | tax/property card: taxpa.edgecombecountync.gov |
+| NC | Edgecombe | multi_year_delinquent_tax | 1,051 | bot check (Cloudflare/WAF) | tax/property card: taxpa.edgecombecountync.gov |
+| NC | Edgecombe | repeat_tax_loss | 1,051 | bot check (Cloudflare/WAF) | tax/property card: taxpa.edgecombecountync.gov |
+| NC | Edgecombe | tax_aging_surfaced | 1,051 | bot check (Cloudflare/WAF) | tax/property card: taxpa.edgecombecountync.gov |
+| NC | Edgecombe | two_year_delinquent | 1,051 | bot check (Cloudflare/WAF) | tax/property card: taxpa.edgecombecountync.gov |
 | SC | Edgefield | lot_size | 1,025 | Cloudflare check on the county property card | county GIS: qpublic.net |
 | SC | Edgefield | assessed_value | 1,024 | Cloudflare check on the county property card | county GIS: qpublic.net |
 | SC | Newberry | assessed_value | 981 | Cloudflare check on the county property card | county GIS: map.newberrycounty.net |
@@ -312,7 +312,7 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | NC | Ashe | repeat_tax_loss | 794 | bot check (Cloudflare/WAF) | tax/property card: qpublic.schneidercorp.com |
 | NC | Ashe | tax_aging_surfaced | 794 | bot check (Cloudflare/WAF) | tax/property card: qpublic.schneidercorp.com |
 | NC | Ashe | two_year_delinquent | 794 | bot check (Cloudflare/WAF) | tax/property card: qpublic.schneidercorp.com |
-| SC | Charleston | lt_tax_sale_overage | 726 | bot check (Cloudflare/WAF) | tax/property card: sc-charleston.publicaccessnow.com |
+| SC | Charleston | lt_tax_sale_overage | 727 | bot check (Cloudflare/WAF) | tax/property card: sc-charleston.publicaccessnow.com |
 | SC | Berkeley | atty_heir_candidates | 723 | bot check (Cloudflare/WAF) | probate: berkeleycountysc.gov |
 | SC | Berkeley | lt_estate_lead | 716 | bot check (Cloudflare/WAF) | probate: berkeleycountysc.gov |
 | NC | Richmond | atty_rod_lien_checked | 682 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
@@ -326,7 +326,7 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | NC | Tyrrell | liens | 537 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
 | SC | Aiken | probate | 519 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | SC | Charleston | atty_heir_candidates | 509 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
-| SC | Charleston | lt_probate_notice | 507 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
+| SC | Charleston | lt_probate_notice | 509 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | SC | Charleston | atty_probate_case | 417 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | SC | Dorchester | atty_heir_candidates | 364 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | NC | Avery | multi_year_delinquent_tax | 362 | bot check (Cloudflare/WAF) | tax/property card: webtax.averycountync.gov |
@@ -379,12 +379,13 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | SC | Lancaster | lt_estate_lead | 32 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | SC | Oconee | lt_probate_notice | 28 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | NC | Pasquotank | divorce_no_subsequent_deed | 20 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
+| SC | Berkeley | lt_probate_notice | 20 | bot check (Cloudflare/WAF) | probate: berkeleycountysc.gov |
 | SC | York | atty_probate_case | 19 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | SC | York | lt_probate_notice | 19 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | NC | Edgecombe | lt_tax_sale | 17 | bot check (Cloudflare/WAF) | tax/property card: taxpa.edgecombecountync.gov |
 | NC | Person | divorce_no_subsequent_deed | 15 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
+| SC | Florence | lt_probate_notice | 12 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | SC | Florence | atty_probate_case | 11 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
-| SC | Florence | lt_probate_notice | 11 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | SC | Barnwell | lt_probate_notice | 10 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | SC | Charleston | probate | 8 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | NC | Perquimans | divorce_no_subsequent_deed | 5 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
@@ -393,7 +394,6 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | NC | Tyrrell | divorce_no_subsequent_deed | 3 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
 | SC | Georgetown | lt_probate_notice | 3 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | SC | Berkeley | atty_probate_case | 2 | bot check (Cloudflare/WAF) | probate: berkeleycountysc.gov |
-| SC | Berkeley | lt_probate_notice | 2 | bot check (Cloudflare/WAF) | probate: berkeleycountysc.gov |
 | NC | Washington | divorce_no_subsequent_deed | 1 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
 | SC | Dorchester | probate | 1 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | SC | Georgetown | atty_probate_case | 1 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
@@ -412,37 +412,37 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 
 ## 3. Human judgment call -- NOT a scrape target
 
-268 cells, 191,894 est_rows_affected combined.
+268 cells, 192,014 est_rows_affected combined.
 
 | state | county | column | est_rows | reason | source |
 |---|---|---|---|---|---|
-| SC | Charleston | phone | 11,124 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
+| SC | Charleston | phone | 11,126 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
 | SC | Horry | phone | 6,616 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
 | SC | Sumter | phone | 5,552 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
 | SC | Greenville | phone | 5,380 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
 | SC | Sumter | divorce | 4,686 | SC family-court index terms forbid automation | statewide: SC family-court index terms forbid automation |
+| SC | Orangeburg | phone | 4,552 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
 | SC | Horry | divorce | 4,551 | SC family-court index terms forbid automation | statewide: SC family-court index terms forbid automation |
-| SC | Orangeburg | phone | 4,539 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
-| SC | Florence | atty_legal_description | 3,882 | only on the deed image | register: search.florencedeeds.com |
+| SC | Florence | atty_legal_description | 3,883 | only on the deed image | register: search.florencedeeds.com |
 | SC | Oconee | phone | 3,851 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
-| SC | Florence | phone | 3,848 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
-| SC | Orangeburg | divorce | 3,835 | SC family-court index terms forbid automation | statewide: SC family-court index terms forbid automation |
+| SC | Florence | phone | 3,849 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
+| SC | Orangeburg | divorce | 3,848 | SC family-court index terms forbid automation | statewide: SC family-court index terms forbid automation |
 | SC | Colleton | phone | 3,667 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
 | SC | Laurens | phone | 3,533 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
-| SC | Berkeley | phone | 3,444 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
+| SC | Berkeley | phone | 3,462 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
 | SC | Charleston | tax_aging_surfaced | 3,412 | verifier is a declared wall | tax/property card: sc-charleston.publicaccessnow.com |
+| SC | Anderson | phone | 3,333 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
 | SC | Cherokee | liens | 3,325 | terms forbid automation | register: Avenu Insights / Neumo Records Management (GRIDS), |
-| SC | Anderson | phone | 3,318 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
 | SC | Cherokee | phone | 3,316 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
 | SC | Charleston | lt_tax_lien | 3,285 | verifier is a declared wall | tax/property card: sc-charleston.publicaccessnow.com |
-| SC | Lexington | phone | 3,258 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
-| SC | Florence | divorce | 3,149 | SC family-court index terms forbid automation | statewide: SC family-court index terms forbid automation |
-| SC | Williamsburg | phone | 2,947 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
+| SC | Lexington | phone | 3,262 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
+| SC | Florence | divorce | 3,150 | SC family-court index terms forbid automation | statewide: SC family-court index terms forbid automation |
+| SC | Williamsburg | phone | 2,949 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
 | SC | Darlington | phone | 2,910 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
-| SC | Berkeley | divorce | 2,670 | SC family-court index terms forbid automation | statewide: SC family-court index terms forbid automation |
+| SC | Berkeley | divorce | 2,688 | SC family-court index terms forbid automation | statewide: SC family-court index terms forbid automation |
 | SC | Darlington | divorce | 2,505 | SC family-court index terms forbid automation | statewide: SC family-court index terms forbid automation |
-| SC | Williamsburg | divorce | 2,451 | SC family-court index terms forbid automation | statewide: SC family-court index terms forbid automation |
-| SC | Lexington | divorce | 2,413 | SC family-court index terms forbid automation | statewide: SC family-court index terms forbid automation |
+| SC | Williamsburg | divorce | 2,453 | SC family-court index terms forbid automation | statewide: SC family-court index terms forbid automation |
+| SC | Lexington | divorce | 2,417 | SC family-court index terms forbid automation | statewide: SC family-court index terms forbid automation |
 | SC | Richland | atty_deed_ref | 2,236 | paywall | register index: www.richlandcountysc.gov |
 | SC | Richland | atty_rod_lien_checked | 2,236 | paywall | register: Richland County 'Online Data Services' subscriptio |
 | SC | Richland | liens | 2,236 | paywall | register: Richland County 'Online Data Services' subscriptio |
@@ -457,15 +457,15 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | SC | Dorchester | divorce | 1,716 | SC family-court index terms forbid automation | statewide: SC family-court index terms forbid automation |
 | SC | Beaufort | phone | 1,698 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
 | SC | Barnwell | divorce | 1,695 | SC family-court index terms forbid automation | statewide: SC family-court index terms forbid automation |
+| SC | Clarendon | phone | 1,663 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
 | SC | Jasper | phone | 1,663 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
-| SC | Clarendon | phone | 1,662 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
 | NC | Lincoln | tax_aging_surfaced | 1,609 | verifier is a declared wall | tax/property card: www.lincolncountytax.com |
 | SC | Richland | divorce | 1,546 | SC family-court index terms forbid automation | statewide: SC family-court index terms forbid automation |
 | SC | Dillon | phone | 1,504 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
 | SC | Union | phone | 1,486 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
 | SC | Marlboro | phone | 1,471 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
 | SC | Jasper | divorce | 1,426 | SC family-court index terms forbid automation | statewide: SC family-court index terms forbid automation |
-| SC | Clarendon | divorce | 1,420 | SC family-court index terms forbid automation | statewide: SC family-court index terms forbid automation |
+| SC | Clarendon | divorce | 1,421 | SC family-court index terms forbid automation | statewide: SC family-court index terms forbid automation |
 | SC | Charleston | lt_lis_pendens | 1,406 | SC Public Index terms forbid automated querying | statewide: SC Public Index terms forbid automated querying |
 | SC | Dillon | divorce | 1,348 | SC family-court index terms forbid automation | statewide: SC family-court index terms forbid automation |
 | SC | Marlboro | divorce | 1,318 | SC family-court index terms forbid automation | statewide: SC family-court index terms forbid automation |
@@ -486,12 +486,12 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | SC | Spartanburg | lt_lis_pendens | 917 | verifier is a declared wall | statewide: SC Public Index terms forbid automated querying |
 | SC | Bamberg | phone | 872 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
 | SC | Beaufort | lt_tax_lien | 863 | verifier is a declared wall | tax/property card: www.beaufortcountytreasurer.com |
-| SC | Abbeville | phone | 861 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
+| SC | Abbeville | phone | 862 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
 | SC | Anderson | lt_lis_pendens | 838 | verifier is a declared wall | statewide: SC Public Index terms forbid automated querying |
 | SC | Newberry | divorce | 819 | SC family-court index terms forbid automation | statewide: SC family-court index terms forbid automation |
 | SC | Chesterfield | divorce | 810 | SC family-court index terms forbid automation | statewide: SC family-court index terms forbid automation |
 | SC | Aiken | phone | 788 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
-| SC | Abbeville | divorce | 734 | SC family-court index terms forbid automation | statewide: SC family-court index terms forbid automation |
+| SC | Abbeville | divorce | 735 | SC family-court index terms forbid automation | statewide: SC family-court index terms forbid automation |
 | SC | Bamberg | divorce | 726 | SC family-court index terms forbid automation | statewide: SC family-court index terms forbid automation |
 | SC | Allendale | phone | 674 | SC voter list is sold, not free | statewide: SC voter list is sold, not free |
 | SC | Lee | atty_deed_ref | 628 | paywall | register index: leesc.avenuinsights.com |
@@ -550,6 +550,7 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | NC | Catawba | lt_probate_notice | 54 | verifier is a declared wall | probate: portal-nc.tylertech.cloud |
 | NC | New Hanover | lt_probate_notice | 52 | verifier is a declared wall | county missing from the county records matrix |
 | SC | Berkeley | lt_lis_pendens | 52 | SC Public Index terms forbid automated querying | statewide: SC Public Index terms forbid automated querying |
+| NC | Cleveland | lt_probate_notice | 50 | verifier is a declared wall | probate: portal-nc.tylertech.cloud |
 | NC | Columbus | lt_probate_notice | 50 | verifier is a declared wall | probate: portal-nc.tylertech.cloud |
 | SC | Edgefield | lt_lis_pendens | 48 | verifier is a declared wall | statewide: SC Public Index terms forbid automated querying |
 | SC | Saluda | lt_lis_pendens | 42 | verifier is a declared wall | statewide: SC Public Index terms forbid automated querying |
@@ -559,7 +560,6 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | SC | Cherokee | divorce | 35 | verifier is a declared wall | statewide: SC family-court index terms forbid automation |
 | NC | Haywood | lt_probate_notice | 31 | verifier is a declared wall | probate: portal-nc.tylertech.cloud |
 | SC | Richland | lt_tax_lien | 31 | verifier is a declared wall | tax/property card:  |
-| NC | Cleveland | lt_probate_notice | 30 | verifier is a declared wall | probate: portal-nc.tylertech.cloud |
 | SC | Colleton | lt_lis_pendens | 28 | SC Public Index terms forbid automated querying | statewide: SC Public Index terms forbid automated querying |
 | NC | Anson | lt_probate_notice | 27 | verifier is a declared wall | probate: portal-nc.tylertech.cloud |
 | SC | Oconee | divorce | 26 | verifier is a declared wall | statewide: SC family-court index terms forbid automation |
@@ -590,13 +590,14 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | SC | Orangeburg | lt_tax_lien | 5 | verifier is a declared wall | tax/property card: orangeburgtreasurer.qpaybill.com |
 | NC | Alamance | lt_probate_notice | 4 | verifier is a declared wall | probate: portal-nc.tylertech.cloud |
 | NC | Lenoir | lt_probate_notice | 4 | verifier is a declared wall | probate: portal-nc.tylertech.cloud |
+| NC | Wake | lt_probate_notice | 4 | verifier is a declared wall | probate: portal-nc.tylertech.cloud |
 | SC | Clarendon | lt_tax_lien | 4 | verifier is a declared wall | tax/property card: clarendoncountysctax.qpaybill.com |
 | SC | Darlington | lt_tax_lien | 4 | verifier is a declared wall | tax/property card: darlingtontreasurer.qpaybill.com |
 | SC | Kershaw | lt_tax_lien | 4 | verifier is a declared wall | tax/property card: kershawcounty.qpaybill.com |
 | SC | Sumter | lt_tax_lien | 4 | verifier is a declared wall | tax/property card: sumtercounty.qpaybill.com |
 | SC | York | lt_lis_pendens | 4 | SC Public Index terms forbid automated querying | statewide: SC Public Index terms forbid automated querying |
 | NC | Pender | lt_probate_notice | 3 | verifier is a declared wall | probate: portal-nc.tylertech.cloud |
-| NC | Wake | lt_probate_notice | 3 | verifier is a declared wall | probate: portal-nc.tylertech.cloud |
+| NC | Pitt | lt_probate_notice | 3 | verifier is a declared wall | probate: portal-nc.tylertech.cloud |
 | SC | Greenwood | lt_tax_lien | 3 | verifier is a declared wall | tax/property card: greenwoodco.corebtpay.com |
 | SC | Hampton | lt_lis_pendens | 3 | SC Public Index terms forbid automated querying | statewide: SC Public Index terms forbid automated querying |
 | SC | Hampton | lt_tax_lien | 3 | verifier is a declared wall | tax/property card: hamptoncountytax.org |
@@ -608,7 +609,6 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | NC | Halifax | lt_probate_notice | 2 | verifier is a declared wall | probate: portal-nc.tylertech.cloud |
 | NC | Hertford | lt_probate_notice | 2 | verifier is a declared wall | probate: portal-nc.tylertech.cloud |
 | NC | Lee | lt_probate_notice | 2 | verifier is a declared wall | probate: portal-nc.tylertech.cloud |
-| NC | Pitt | lt_probate_notice | 2 | verifier is a declared wall | probate: portal-nc.tylertech.cloud |
 | NC | Rowan | lt_probate_notice | 2 | verifier is a declared wall | probate: portal-nc.tylertech.cloud |
 | NC | Warren | lt_probate_notice | 2 | verifier is a declared wall | probate: portal-nc.tylertech.cloud |
 | SC | Barnwell | lt_tax_lien | 2 | verifier is a declared wall | tax/property card: barnwelltreasurer.qpaybill.com |
@@ -621,20 +621,20 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 
 ## 4. Stale scope -- needs a periodic recheck, not a wall
 
-56 cells, 92,896 est_rows_affected combined.
+56 cells, 92,974 est_rows_affected combined.
 
 | state | county | column | est_rows | reason | source |
 |---|---|---|---|---|---|
 | SC | Sumter | heir_naming_publication | 5,613 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
 | SC | Sumter | quiet_title | 5,613 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
-| SC | Orangeburg | heir_naming_publication | 4,573 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
-| SC | Orangeburg | quiet_title | 4,573 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
-| SC | Berkeley | heir_naming_publication | 3,623 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
-| SC | Berkeley | quiet_title | 3,623 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
-| SC | Lexington | heir_naming_publication | 3,299 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
-| SC | Lexington | quiet_title | 3,299 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
-| SC | Williamsburg | heir_naming_publication | 2,954 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
-| SC | Williamsburg | quiet_title | 2,954 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
+| SC | Orangeburg | heir_naming_publication | 4,586 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
+| SC | Orangeburg | quiet_title | 4,586 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
+| SC | Berkeley | heir_naming_publication | 3,641 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
+| SC | Berkeley | quiet_title | 3,641 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
+| SC | Lexington | heir_naming_publication | 3,303 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
+| SC | Lexington | quiet_title | 3,303 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
+| SC | Williamsburg | heir_naming_publication | 2,956 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
+| SC | Williamsburg | quiet_title | 2,956 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
 | SC | Richland | heir_naming_publication | 2,236 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
 | SC | Richland | quiet_title | 2,236 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
 | SC | Dorchester | heir_naming_publication | 2,080 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
@@ -645,10 +645,10 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | SC | Barnwell | quiet_title | 2,059 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
 | SC | York | heir_naming_publication | 1,818 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
 | SC | York | quiet_title | 1,818 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
+| SC | Clarendon | heir_naming_publication | 1,669 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
+| SC | Clarendon | quiet_title | 1,669 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
 | SC | Jasper | heir_naming_publication | 1,669 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
 | SC | Jasper | quiet_title | 1,669 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
-| SC | Clarendon | heir_naming_publication | 1,668 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
-| SC | Clarendon | quiet_title | 1,668 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
 | SC | Dillon | heir_naming_publication | 1,520 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
 | SC | Dillon | quiet_title | 1,520 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
 | SC | Lancaster | heir_naming_publication | 1,246 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
@@ -663,8 +663,8 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | SC | Greenwood | quiet_title | 1,070 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
 | SC | Bamberg | heir_naming_publication | 894 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
 | SC | Bamberg | quiet_title | 894 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
-| SC | Abbeville | heir_naming_publication | 869 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
-| SC | Abbeville | quiet_title | 869 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
+| SC | Abbeville | heir_naming_publication | 870 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
+| SC | Abbeville | quiet_title | 870 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
 | SC | Aiken | heir_naming_publication | 804 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
 | SC | Aiken | quiet_title | 804 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
 | SC | Allendale | heir_naming_publication | 686 | Column's SC estate lane only queries 18 of 46 counties per run; the other 28 were probed once (2026- | statewide: Column's SC estate lane only queries 18 of 46 cou |
