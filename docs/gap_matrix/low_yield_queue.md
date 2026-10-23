@@ -4,7 +4,7 @@ Generated from `gap_list_2026-10-23.csv`. Regenerate with `python scripts/low_yi
 
 Every row here already has a working reader/enrichment/verifier -- the gap is coverage, not code. `next_action` names the existing script/sweep to run; `check-before-building` still applies if the next_action text is wrong or stale (it's a heuristic guess, not ground truth) -- confirm what's actually wired before assuming a rewrite is needed.
 
-**6,494 cells, 8,952,654 total est_rows_affected.**
+**6,495 cells, 8,992,500 total est_rows_affected.**
 
 ## Top 150 by est_rows_affected
 
@@ -12,6 +12,7 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 |---|---|---|---|---|---|
 | NC | Mecklenburg | atty_rod_lien_checked | 0.0% | 39,861 | backfill atty_rod_lien_checked for the 39,861 applicable rows without it (enrichment_aumentum_rod, enrichment_cchs_rod) |
 | NC | Mecklenburg | liens | 0.0% | 39,861 | screen the 39,861 unchecked rows (enrichment_dew_liens, enrichment_irs_lien); write a negative result per row |
+| NC | Mecklenburg | vacancy | 0.0% | 39,846 | screen the 39,846 unchecked rows (hendersonville_vacant_structures, rocky_mount_blight_survey); write a negative result  |
 | NC | Mecklenburg | atty_deed_chain_fetched | 0.2% | 39,799 | backfill atty_deed_chain_fetched for the 39,799 applicable rows without it (enrichment_deed_chain) |
 | NC | Mecklenburg | deed_chain_break | 0.2% | 39,799 | 39,799 rows lack the inputs deed_chain_break is computed from: fill the inputs, then recompute |
 | NC | Mecklenburg | deed_chain_distress_transfer | 0.2% | 39,799 | 39,799 rows lack the inputs deed_chain_distress_transfer is computed from: fill the inputs, then recompute |
@@ -159,7 +160,6 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 | NC | Forsyth | phone | 11.6% | 9,339 | backfill phone for the 9,339 applicable rows without it (existing enrichers) |
 | NC | Brunswick | atty_rod_lien_checked | 0.0% | 9,223 | backfill atty_rod_lien_checked for the 9,223 applicable rows without it (enrichment_aumentum_rod, enrichment_cchs_rod) |
 | NC | Gaston | sos_dissolution | 3.4% | 9,208 | screen the 9,208 unchecked rows (enrichment_sos_dissolution); write a negative result per row |
-| NC | Gaston | two_year_delinquent | 65.5% | 9,197 | screen the 9,197 unchecked rows (albemarle_observer_tax_lists, nc_its_public_tax); write a negative result per row |
 
 ## Rolled up by column (which existing readers have the most unswept rows)
 
@@ -196,6 +196,7 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 | code_enforcement | 13 | 139,624 |
 | address | 148 | 136,908 |
 | lt_tax_lien | 106 | 98,210 |
+| vacancy | 9 | 79,407 |
 | sos_dissolution | 102 | 63,018 |
 | name_care_of | 148 | 47,829 |
 | name_deceased | 148 | 47,829 |
@@ -204,4 +205,3 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 | name_heirs | 148 | 47,829 |
 | name_life_estate | 148 | 47,829 |
 | name_trust | 148 | 47,829 |
-| owner_name | 148 | 47,829 |
