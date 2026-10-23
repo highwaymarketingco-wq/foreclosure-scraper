@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-10-23T14:04:50.027690Z",
-  "total": 472229,
+  "run_time": "2026-10-23T14:49:57.564454Z",
+  "total": 472254,
   "by_source": {
     "national.auction_bank_reo": 3,
     "national.bankruptcy_rss_relief_from_stay": 14,
@@ -237,7 +237,7 @@
     "courts.lis_pendens_discovery": 0
   },
   "by_state": {
-    "NC": 344602,
+    "NC": 344627,
     "SC": 127627
   },
   "by_source_on_board": {
@@ -290,7 +290,7 @@
     "counties_nc.nc_county_csv_delinquent_tax": 1388,
     "counties_generic.arcgis_distress.new_hanover_demolition_permits": 1362,
     "counties_sc.dorchester_billtrax_delinquent_tax": 1306,
-    "counties_nc.gastonia_code_enforcement": 1167,
+    "counties_nc.gastonia_code_enforcement": 1192,
     "counties.multi_year_delinquent_tax": 1153,
     "counties_sc.greenville_tax_distress": 1086,
     "counties_generic.arcgis_distress.spartanburg_infill_eligible": 1073,
@@ -514,12 +514,12 @@
   ],
   "errors": null,
   "notes": "daily vision pass: 36971 of 447006 listings have a vision report (+10 this run)",
-  "detail_count": 472229,
-  "detail_digest": "83dde8a465f0349f",
+  "detail_count": 472254,
+  "detail_digest": "90d311c524eaa6eb",
   "board_parts": {
     "schema": "board-parts-v1",
     "count": 26,
-    "records": 472229,
+    "records": 472254,
     "max_bytes": 25165824,
     "rows_per_part": 18500,
     "files": [
@@ -712,8 +712,8 @@
         "start": 425500,
         "end": 444000,
         "records": 18500,
-        "bytes": 20257073,
-        "sha256": "fff0ff0423f59a1c1761e257e929a198de2adb90e4181b7ed646b0b03afa3461"
+        "bytes": 20257515,
+        "sha256": "22e2c37665683e57406b3c50c31de7b441569a1df91958225cd63227868a8569"
       },
       {
         "name": "listings_part_024.json.gz",
@@ -726,10 +726,10 @@
       {
         "name": "listings_part_025.json.gz",
         "start": 462500,
-        "end": 472229,
-        "records": 9729,
-        "bytes": 640281,
-        "sha256": "5f78937ec20cb41eb5dd6c5858114d322554bb7f27604b2527cc8fc21322647e"
+        "end": 472254,
+        "records": 9754,
+        "bytes": 643640,
+        "sha256": "01df4e2c61f02f001df61f6a53ee76d6a1f48d63b9ec6eb89f794f72e45b9e56"
       }
     ]
   },
@@ -745,7 +745,7 @@
     }
   },
   "health_as_of": "2026-10-16T20:24:46.640274Z",
-  "health_age_hours": 161.67,
+  "health_age_hours": 162.42,
   "health_stale": true,
   "source_last_success": {
     "city_websites.charlotte_open_data": "2026-10-16T20:24:46.640274Z",
