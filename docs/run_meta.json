@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-10-23T12:13:47.755928Z",
-  "total": 472228,
+  "run_time": "2026-10-23T14:04:50.027690Z",
+  "total": 472229,
   "by_source": {
     "national.auction_bank_reo": 3,
     "national.bankruptcy_rss_relief_from_stay": 14,
@@ -238,7 +238,7 @@
   },
   "by_state": {
     "NC": 344602,
-    "SC": 127626
+    "SC": 127627
   },
   "by_source_on_board": {
     "counties_generic.liensnc": 52408,
@@ -277,7 +277,7 @@
     "nc_ecourts_judgments": 2223,
     "national.sc_public_index": 2035,
     "counties_generic.epa_frs.sems": 2034,
-    "counties.column_legal_notices": 1929,
+    "counties.column_legal_notices": 1930,
     "counties_sc.florence_delinquent_tax": 1828,
     "counties_sc.spartanburg_condemned": 1783,
     "counties_sc.charleston_delinquent_tax": 1757,
@@ -514,12 +514,12 @@
   ],
   "errors": null,
   "notes": "daily vision pass: 36971 of 447006 listings have a vision report (+10 this run)",
-  "detail_count": 472228,
-  "detail_digest": "a1290df622112168",
+  "detail_count": 472229,
+  "detail_digest": "83dde8a465f0349f",
   "board_parts": {
     "schema": "board-parts-v1",
     "count": 26,
-    "records": 472228,
+    "records": 472229,
     "max_bytes": 25165824,
     "rows_per_part": 18500,
     "files": [
@@ -726,10 +726,10 @@
       {
         "name": "listings_part_025.json.gz",
         "start": 462500,
-        "end": 472228,
-        "records": 9728,
-        "bytes": 636236,
-        "sha256": "a48579d531e78fda57da1e47de7d70e10604bb6c6924bf27b1b7a002dcabec2b"
+        "end": 472229,
+        "records": 9729,
+        "bytes": 640281,
+        "sha256": "5f78937ec20cb41eb5dd6c5858114d322554bb7f27604b2527cc8fc21322647e"
       }
     ]
   },
@@ -745,7 +745,7 @@
     }
   },
   "health_as_of": "2026-10-16T20:24:46.640274Z",
-  "health_age_hours": 159.82,
+  "health_age_hours": 161.67,
   "health_stale": true,
   "source_last_success": {
     "city_websites.charlotte_open_data": "2026-10-16T20:24:46.640274Z",
