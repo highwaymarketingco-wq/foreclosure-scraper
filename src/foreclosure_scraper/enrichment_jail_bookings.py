@@ -315,6 +315,11 @@ ROSTERS = [
     # Verified live through the existing adapter 2026-09-20: 183 in custody, DOB on
     # every row. No state-prison-only gap left for Oconee once this rides.
     ("SC", "Oconee", "zuercher", "oconee-so-sc"),
+    # Mecklenburg NC (Charlotte, the largest county in either state -- gap_matrix had
+    # this as "no source known", 33,195 est_rows_affected, until this build 2026-10-24).
+    # Custom ASP.NET MVC JSON roster, see _fetch_mcso_json's own docstring. Verified
+    # live: 2,197 in custody, full DOB on every row.
+    ("NC", "Mecklenburg", "mcso_json", "https://mecksheriffweb.mecklenburgcountync.gov"),
 ]
 
 # (state, county, vendor, target) for the PER-NAME search vendors — no bulk
@@ -478,6 +483,62 @@ async def _fetch_p2c_centralsquare(target: str) -> list[dict]:
     return out
 
 
+async def _fetch_mcso_json(base: str) -> list[dict]:
+    """Mecklenburg County Sheriff's Office (MCSO) custom ASP.NET MVC inmate inquiry.
+
+    Found 2026-10-24: the search form at <base>/Inmate posts to a plain JSON GET,
+    `<base>/Inmate/_Search?lastName=&firstName=&pid=&jid=&prisType=ALL&activeOnly=true&
+    max=<n>&page=<p>` -- a blank name returns the WHOLE active roster, paginated.
+    The page carries a Cloudflare challenge-platform script but it is a PASSIVE JS
+    check (sets a cookie) -- confirmed live with a bare curl_cffi chrome-impersonation
+    GET, no cookie/token pre-fetch needed, HTTP 200 straight away. `max` above ~500
+    returns HTTP 500 (server-side cap); 500/page is the proven-safe size for the
+    ~2,200-strong active roster (~5 pages). Live-verified 2026-10-24: 2,197 in custody.
+
+    Full name, DOB (human-formatted in DobFormatted, no parsing needed), race/sex,
+    PID/JID/arrest number -- no charge/booking-date on this grid (would need a GET
+    of DetailsUrl per inmate, not fetched here to keep one run cheap, same tradeoff
+    _fetch_tyler_inmate_inquiry makes with detail_limit).
+    """
+    from curl_cffi.requests import AsyncSession
+
+    out: list[dict] = []
+    page_size = 500
+    try:
+        async with AsyncSession(impersonate="chrome") as s:
+            page = 1
+            while True:
+                r = await s.get(
+                    f"{base}/Inmate/_Search",
+                    params={"lastName": "", "firstName": "", "pid": "", "jid": "",
+                            "prisType": "ALL", "activeOnly": "true",
+                            "max": str(page_size), "page": str(page)},
+                    timeout=30)
+                recs = r.json() or []
+                if not recs:
+                    break
+                for rec in recs:
+                    last = (rec.get("LastName") or "").strip().upper()
+                    first = (rec.get("FirstName") or "").strip().upper()
+                    if not last or not first:
+                        continue
+                    out.append({
+                        "last": last, "first": first,
+                        "middle": (rec.get("MiddleName") or "").strip().upper(),
+                        "dob": rec.get("DobFormatted"),
+                        "pid": rec.get("PID"), "jid": rec.get("JID")})
+                total = recs[0].get("TotalRows") if recs else None
+                if len(recs) < page_size or (isinstance(total, int) and len(out) >= total):
+                    break
+                page += 1
+                await asyncio.sleep(0.3)  # polite pacing
+    except Exception as exc:  # noqa: BLE001
+        log.warning("jail.mcso_fail", base=base, error=str(exc)[:120])
+        return out
+    log.info("jail_scraper.mcso_ok", base=base, count=len(out))
+    return out
+
+
 # ---- per-name search vendors -------------------------------------------------
 
 _NAME_RE = re.compile(r'name=["\']([^"\']+)["\']')
@@ -635,6 +696,8 @@ async def _load_roster(state: str, county: str, vendor: str, target: str,
         recs = await _fetch_citizen_connect(target)
     elif vendor == "tyler_inmate_inquiry":
         recs = await _fetch_tyler_inmate_inquiry(target)
+    elif vendor == "mcso_json":
+        recs = await _fetch_mcso_json(target)
     else:
         recs = await _fetch_p2c_jqgrid(target)
     index = RosterIndex()
