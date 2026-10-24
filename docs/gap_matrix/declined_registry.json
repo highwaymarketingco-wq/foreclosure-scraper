@@ -76,6 +76,46 @@
       "state": "SC", "county": null, "column": "marriage_license",
       "reason": "South Carolina marriage licenses are issued and recorded by the county PROBATE COURT, never the Register of Deeds, statewide (state law, not county discretion) -- confirmed directly for Sumter (live-pulled its full 182-code CountyFusion/GovOS instrument-type tree: zero marriage-related codes) and corroborated by SCDHEC + Sumter's own Probate Court page. This is structurally different from NC, where RODs DO record marriage licenses (why the Johnston NC EagleWeb sweep worked). This project's ROD-platform infrastructure (sc_countyfusion.py, kofile.py, publicsearch.py, etc.) cannot reach Probate Court records at all -- a different county office entirely, not a missing filter. DIRECTLY verified only for Sumter; HIGH confidence it generalizes (state law), but not independently re-checked county-by-county.",
       "confirmed_date": "2026-10-21", "confidence": "medium"
+    },
+    {
+      "state": "NC", "county": "Mecklenburg", "column": "atty_obituary_match",
+      "reason": "Already live-swept (2026-09-28, \"round 3\" of ~55 candidate domains across the state's 15 biggest-population NC/SC counties with zero coverage, see scrapers/public_notices/funeral_home_rss.py's own module docstring) -- zero usable hits. Charlotte-area funeral homes cluster on three patterns this project's RSS adapters cannot read: large corporate rollups (Dignity Memorial/SCI) whose obituaries live on the parent's own CMS; funeral-vertical SaaS (Tukios, custom allobituaries.php) that return plain HTML, never RSS, for both probe shapes; or a Cloudflare challenge page on every path including /feed (houseofrosadalecharlotte.com, confirmed again live 2026-10-24). gannett_obituaries.py (this column's other declared producer) does not cover Mecklenburg either (its 8 hardcoded papers are Buncombe/Henderson/Gaston/Cleveland/Rutherford NC + Spartanburg/Greenville/Anderson SC). Re-confirmed live 2026-10-24 (6 fresh domain probes, same zero-hit result) before realizing this exact research was already documented -- a check-before-reinvestigating miss on my own part, recorded here so it is not repeated a third time.",
+      "confirmed_date": "2026-10-24", "confidence": "high"
+    },
+    {
+      "state": "NC", "county": "Guilford", "column": "atty_obituary_match",
+      "reason": "Same round-3 sweep (see the Mecklenburg entry above and funeral_home_rss.py's module docstring) -- one of the 15 populous NC/SC counties checked with zero usable hits.",
+      "confirmed_date": "2026-09-28", "confidence": "high"
+    },
+    {
+      "state": "NC", "county": "Forsyth", "column": "atty_obituary_match",
+      "reason": "Same round-3 sweep (see the Mecklenburg entry above and funeral_home_rss.py's module docstring) -- one of the 15 populous NC/SC counties checked with zero usable hits.",
+      "confirmed_date": "2026-09-28", "confidence": "high"
+    },
+    {
+      "state": "NC", "county": "Cumberland", "column": "atty_obituary_match",
+      "reason": "Same round-3 sweep (see the Mecklenburg entry above and funeral_home_rss.py's module docstring) -- one of the 15 populous NC/SC counties checked with zero usable hits.",
+      "confirmed_date": "2026-09-28", "confidence": "high"
+    },
+    {
+      "state": "NC", "county": "New Hanover", "column": "atty_obituary_match",
+      "reason": "Same round-3 sweep (see the Mecklenburg entry above and funeral_home_rss.py's module docstring) -- one of the 15 populous NC/SC counties checked with zero usable hits.",
+      "confirmed_date": "2026-09-28", "confidence": "high"
+    },
+    {
+      "state": "NC", "county": "Durham", "column": "atty_obituary_match",
+      "reason": "Same round-3 sweep (see the Mecklenburg entry above and funeral_home_rss.py's module docstring) -- one of the 15 populous NC/SC counties checked with zero usable hits.",
+      "confirmed_date": "2026-09-28", "confidence": "high"
+    },
+    {
+      "state": "SC", "county": "Horry", "column": "atty_obituary_match",
+      "reason": "Same round-3 sweep (see the Mecklenburg entry above and funeral_home_rss.py's module docstring) -- one of the 15 populous NC/SC counties checked with zero usable hits.",
+      "confirmed_date": "2026-09-28", "confidence": "high"
+    },
+    {
+      "state": "SC", "county": "Richland", "column": "atty_obituary_match",
+      "reason": "Same round-3 sweep (see the Mecklenburg entry above and funeral_home_rss.py's module docstring) -- one of the 15 populous NC/SC counties checked with zero usable hits.",
+      "confirmed_date": "2026-09-28", "confidence": "high"
     }
   ]
 }
