@@ -59,6 +59,7 @@ _HUMAN_JUDGMENT = (
 )
 _STALE_SCOPE = (
     "probed once",
+    "periodic recheck",
 )
 
 

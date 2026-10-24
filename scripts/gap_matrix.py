@@ -603,8 +603,9 @@ _S = "signal"
 SC_QUIET_TITLE = (("SC", "SC estate notices via Column (column_legal_notices, SC estate lane)"),)
 NC_QUIET_TITLE_SOURCE = ()      # was: NC notices known, no parser. scrapers/public_notices/nc_heir_notices.py reads them
 NC_QUIET_TITLE_WALL = (("NC", "no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled"),)
-SC_QUIET_TITLE_WALL = (("SC", "Column's SC estate lane only queries 18 of 46 counties per run; the "
-                              "other 28 were probed once (2026-10-02) and found empty"),)
+SC_QUIET_TITLE_WALL = (("SC", "Column's SC estate lane only queries 19 of 46 counties per run; the "
+                              "other 27 were probed 2026-10-02 and RE-PROBED 2026-10-23 (both times "
+                              "found empty) -- periodic recheck, not a technical wall"),)
 NC_QUIET_TITLE_READ = (("NC", "NC quiet-title / heir notices via Column (nc_heir_notices, notices searched by text)"),)
 
 
@@ -621,8 +622,8 @@ def _nc_without_column_paper() -> tuple:
 
 def _sc_without_column_probate() -> tuple:
     """The SC counties column_legal_notices's SC estate lane never queries (its fetch() loop is
-    scoped to SC_FOOTPRINT + SC_DISTRESSED_ONLY + SC_PROBATE_EXTRA_COUNTIES, 18 of 46 counties;
-    the rest were dropped after a one-time 2026-10-02 probe found zero notices): there the
+    scoped to SC_FOOTPRINT + SC_DISTRESSED_ONLY + SC_PROBATE_EXTRA_COUNTIES, 19 of 46 counties;
+    the rest were probed 2026-10-02 and re-probed 2026-10-23, both times zero notices): there the
     source is a verdict (walled), not a gap."""
     try:
         from foreclosure_scraper.scrapers.newspapers.column_legal_notices import (
