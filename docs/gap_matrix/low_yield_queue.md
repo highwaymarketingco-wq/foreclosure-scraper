@@ -1,10 +1,10 @@
 # Built-but-low-yield work queue
 
-Generated from `gap_list_2026-10-23.csv`. Regenerate with `python scripts/low_yield_queue.py` any time the gap list changes -- this file is a derived view, not hand-maintained.
+Generated from `gap_list_2026-10-24.csv`. Regenerate with `python scripts/low_yield_queue.py` any time the gap list changes -- this file is a derived view, not hand-maintained.
 
 Every row here already has a working reader/enrichment/verifier -- the gap is coverage, not code. `next_action` names the existing script/sweep to run; `check-before-building` still applies if the next_action text is wrong or stale (it's a heuristic guess, not ground truth) -- confirm what's actually wired before assuming a rewrite is needed.
 
-**6,497 cells, 8,958,346 total est_rows_affected.**
+**6,497 cells, 8,934,999 total est_rows_affected.**
 
 ## Top 150 by est_rows_affected
 
@@ -28,9 +28,9 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 | NC | Mecklenburg | assessed_value | 14.8% | 33,979 | backfill assessed_value for the 33,979 applicable rows without it (existing enrichers) |
 | NC | Mecklenburg | email | 15.2% | 33,725 | no free owner-email source: e-mails come only from notices and filings; research a lawful source |
 | NC | Mecklenburg | divorce | 0.0% | 33,195 | screen the 33,195 unchecked rows (enrichment_nc_divorce, enrichment_sc_divorce); write a negative result per row |
-| NC | Mecklenburg | incarceration | 0.0% | 33,195 | screen the 33,195 unchecked rows (enrichment_incarceration); write a negative result per row |
+| NC | Mecklenburg | incarceration | 0.0% | 33,194 | screen the 33,194 unchecked rows (enrichment_incarceration); write a negative result per row |
 | NC | Mecklenburg | marriage_license | 0.1% | 33,171 | screen the 33,171 unchecked rows (enrichment_register_checks, register_checks); write a negative result per row |
-| NC | Mecklenburg | bop_federal | 0.5% | 33,045 | screen the 33,045 unchecked rows (enrichment_bop_federal); write a negative result per row |
+| NC | Mecklenburg | bop_federal | 0.9% | 32,884 | screen the 32,884 unchecked rows (enrichment_bop_federal); write a negative result per row |
 | NC | Mecklenburg | vacant_lot | 18.2% | 32,617 | 32,617 rows lack the inputs vacant_lot is computed from: fill the inputs, then recompute |
 | NC | Mecklenburg | lot_size | 18.7% | 32,407 | backfill lot_size for the 32,407 applicable rows without it (existing enrichers) |
 | NC | Mecklenburg | atty_tax_verified_confirmed | 0.0% | 26,941 | screen the 26,941 unchecked rows (existing enrichers); write a negative result per row |
@@ -67,20 +67,20 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 | SC | Spartanburg | tax_aging_surfaced | 18.9% | 15,723 | screen the 15,723 unchecked rows (enrichment_tax_aging); write a negative result per row |
 | SC | Spartanburg | atty_deed_ref | 21.8% | 15,161 | backfill atty_deed_ref for the 15,161 applicable rows without it (existing enrichers) |
 | NC | Lincoln | divorce | 0.0% | 14,498 | screen the 14,498 unchecked rows (enrichment_nc_divorce, enrichment_sc_divorce); write a negative result per row |
-| NC | Lincoln | incarceration | 0.1% | 14,480 | screen the 14,480 unchecked rows (enrichment_incarceration); write a negative result per row |
 | NC | Lincoln | marriage_license | 0.1% | 14,478 | screen the 14,478 unchecked rows (enrichment_register_checks, register_checks); write a negative result per row |
-| NC | Lincoln | bop_federal | 2.1% | 14,199 | screen the 14,199 unchecked rows (enrichment_bop_federal); write a negative result per row |
+| NC | Lincoln | incarceration | 0.2% | 14,475 | screen the 14,475 unchecked rows (enrichment_incarceration); write a negative result per row |
 | NC | Gaston | divorce | 0.0% | 14,086 | screen the 14,086 unchecked rows (enrichment_nc_divorce, enrichment_sc_divorce); write a negative result per row |
 | NC | Gaston | jail_booking_new | 0.0% | 14,086 | code covers this county (enrichment_jail_bookings) but nothing landed here: run it for this county and stamp 'screened,  |
 | SC | Spartanburg | atty_deed_chain_fetched | 27.4% | 14,067 | backfill atty_deed_chain_fetched for the 14,067 applicable rows without it (enrichment_deed_chain) |
 | SC | Spartanburg | deed_chain_break | 27.4% | 14,067 | 14,067 rows lack the inputs deed_chain_break is computed from: fill the inputs, then recompute |
 | SC | Spartanburg | deed_chain_distress_transfer | 27.4% | 14,067 | 14,067 rows lack the inputs deed_chain_distress_transfer is computed from: fill the inputs, then recompute |
 | SC | Spartanburg | deed_chain_has_history | 27.4% | 14,067 | backfill deed_chain_has_history for the 14,067 applicable rows without it (enrichment_deed_chain) |
-| NC | Gaston | incarceration | 0.1% | 14,066 | screen the 14,066 unchecked rows (enrichment_incarceration); write a negative result per row |
+| NC | Gaston | incarceration | 0.2% | 14,062 | screen the 14,062 unchecked rows (enrichment_incarceration); write a negative result per row |
 | NC | Gaston | marriage_license | 0.3% | 14,049 | screen the 14,049 unchecked rows (enrichment_register_checks, register_checks); write a negative result per row |
-| NC | Gaston | bop_federal | 1.0% | 13,950 | screen the 13,950 unchecked rows (enrichment_bop_federal); write a negative result per row |
-| SC | Spartanburg | incarceration | 0.2% | 13,828 | screen the 13,828 unchecked rows (enrichment_incarceration); write a negative result per row |
-| SC | Spartanburg | bop_federal | 1.1% | 13,709 | screen the 13,709 unchecked rows (enrichment_bop_federal); write a negative result per row |
+| NC | Lincoln | bop_federal | 3.6% | 13,982 | screen the 13,982 unchecked rows (enrichment_bop_federal); write a negative result per row |
+| SC | Spartanburg | incarceration | 0.2% | 13,826 | screen the 13,826 unchecked rows (enrichment_incarceration); write a negative result per row |
+| NC | Gaston | bop_federal | 2.3% | 13,767 | screen the 13,767 unchecked rows (enrichment_bop_federal); write a negative result per row |
+| SC | Spartanburg | bop_federal | 2.1% | 13,560 | screen the 13,560 unchecked rows (enrichment_bop_federal); write a negative result per row |
 | NC | Lincoln | phone | 28.8% | 13,208 | backfill phone for the 13,208 applicable rows without it (existing enrichers) |
 | NC | Wake | two_year_delinquent | 0.0% | 12,941 | screen the 12,941 unchecked rows (albemarle_observer_tax_lists, nc_its_public_tax); write a negative result per row |
 | NC | Wake | multi_year_delinquent_tax | 0.0% | 12,938 | screen the 12,938 unchecked rows (enrichment_tax_owed, multi_year_delinquent_tax); write a negative result per row |
@@ -132,7 +132,7 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 | NC | Buncombe | comps_tight | 5.4% | 10,300 | backfill comps_tight for the 10,300 applicable rows without it (existing enrichers) |
 | NC | Buncombe | divorce | 0.0% | 10,175 | screen the 10,175 unchecked rows (enrichment_nc_divorce, enrichment_sc_divorce); write a negative result per row |
 | NC | Guilford | parcel_id | 17.3% | 10,151 | backfill parcel_id for the 10,151 applicable rows without it (existing enrichers) |
-| NC | Buncombe | incarceration | 0.3% | 10,143 | screen the 10,143 unchecked rows (enrichment_incarceration); write a negative result per row |
+| NC | Buncombe | incarceration | 0.3% | 10,141 | screen the 10,141 unchecked rows (enrichment_incarceration); write a negative result per row |
 | NC | Rutherford | atty_deed_ref | 9.6% | 10,130 | backfill atty_deed_ref for the 10,130 applicable rows without it (existing enrichers) |
 | NC | Buncombe | marriage_license | 0.6% | 10,115 | screen the 10,115 unchecked rows (enrichment_register_checks, register_checks); write a negative result per row |
 | NC | Forsyth | atty_deed_chain_fetched | 6.7% | 9,970 | backfill atty_deed_chain_fetched for the 9,970 applicable rows without it (enrichment_deed_chain) |
@@ -144,22 +144,22 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 | NC | Transylvania | divorce | 0.0% | 9,840 | screen the 9,840 unchecked rows (enrichment_nc_divorce, enrichment_sc_divorce); write a negative result per row |
 | NC | Transylvania | jail_booking_new | 0.0% | 9,840 | code covers this county (enrichment_jail_bookings) but nothing landed here: run it for this county and stamp 'screened,  |
 | NC | Transylvania | marriage_license | 0.1% | 9,832 | screen the 9,832 unchecked rows (enrichment_register_checks, register_checks); write a negative result per row |
-| NC | Transylvania | incarceration | 0.1% | 9,829 | screen the 9,829 unchecked rows (enrichment_incarceration); write a negative result per row |
-| NC | Buncombe | bop_federal | 3.5% | 9,823 | screen the 9,823 unchecked rows (enrichment_bop_federal); write a negative result per row |
+| NC | Transylvania | incarceration | 0.1% | 9,827 | screen the 9,827 unchecked rows (enrichment_incarceration); write a negative result per row |
 | SC | Charleston | comps_tight | 0.1% | 9,790 | backfill comps_tight for the 9,790 applicable rows without it (existing enrichers) |
 | NC | Transylvania | phone | 20.9% | 9,774 | backfill phone for the 9,774 applicable rows without it (existing enrichers) |
 | SC | Charleston | comps | 0.8% | 9,716 | backfill comps for the 9,716 applicable rows without it (existing enrichers) |
-| NC | Transylvania | bop_federal | 1.4% | 9,702 | screen the 9,702 unchecked rows (enrichment_bop_federal); write a negative result per row |
 | SC | Charleston | beds_baths | 1.1% | 9,686 | backfill beds_baths for the 9,686 applicable rows without it (existing enrichers) |
+| NC | Buncombe | bop_federal | 4.9% | 9,673 | screen the 9,673 unchecked rows (enrichment_bop_federal); write a negative result per row |
 | SC | Spartanburg | lot_size | 50.4% | 9,619 | backfill lot_size for the 9,619 applicable rows without it (existing enrichers) |
 | SC | Spartanburg | comps_tight | 12.8% | 9,583 | backfill comps_tight for the 9,583 applicable rows without it (existing enrichers) |
+| NC | Transylvania | bop_federal | 2.9% | 9,553 | screen the 9,553 unchecked rows (enrichment_bop_federal); write a negative result per row |
 | NC | Rutherford | atty_tax_verified_confirmed | 4.9% | 9,544 | screen the 9,544 unchecked rows (existing enrichers); write a negative result per row |
 | NC | Rutherford | divorce | 0.0% | 9,474 | screen the 9,474 unchecked rows (enrichment_nc_divorce, enrichment_sc_divorce); write a negative result per row |
-| NC | Rutherford | incarceration | 0.2% | 9,456 | screen the 9,456 unchecked rows (enrichment_incarceration); write a negative result per row |
+| NC | Rutherford | incarceration | 0.2% | 9,451 | screen the 9,451 unchecked rows (enrichment_incarceration); write a negative result per row |
 | NC | Forsyth | phone | 11.6% | 9,339 | backfill phone for the 9,339 applicable rows without it (existing enrichers) |
-| NC | Rutherford | bop_federal | 1.5% | 9,333 | screen the 9,333 unchecked rows (enrichment_bop_federal); write a negative result per row |
 | NC | Brunswick | atty_rod_lien_checked | 0.0% | 9,223 | backfill atty_rod_lien_checked for the 9,223 applicable rows without it (enrichment_aumentum_rod, enrichment_cchs_rod) |
 | NC | Gaston | sos_dissolution | 3.4% | 9,208 | screen the 9,208 unchecked rows (enrichment_sos_dissolution); write a negative result per row |
+| NC | Gaston | two_year_delinquent | 65.5% | 9,197 | screen the 9,197 unchecked rows (albemarle_observer_tax_lists, nc_its_public_tax); write a negative result per row |
 
 ## Rolled up by column (which existing readers have the most unswept rows)
 
@@ -171,14 +171,14 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 | deed_chain_distress_transfer | 148 | 343,202 |
 | deed_chain_has_history | 148 | 343,202 |
 | atty_legal_description | 138 | 335,980 |
-| incarceration | 148 | 335,815 |
+| incarceration | 148 | 335,649 |
 | atty_rod_lien_checked | 93 | 306,460 |
-| bop_federal | 148 | 304,282 |
 | comps_tight | 149 | 296,464 |
 | phone | 104 | 294,357 |
 | liens | 89 | 287,899 |
 | email | 102 | 284,231 |
 | vacant_lot | 120 | 283,698 |
+| bop_federal | 148 | 281,102 |
 | tax_aging_surfaced | 139 | 280,491 |
 | beds_baths | 141 | 273,791 |
 | divorce | 115 | 267,476 |
