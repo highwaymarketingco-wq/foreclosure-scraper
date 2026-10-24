@@ -54,6 +54,16 @@ _LIGHT_FIELDS = _APPEND_SIG_FIELDS + ("raw", "owner_name")
 _BULK_COVERED = {(s, c) for s, c, _, _ in ROSTERS}
 _SEARCH_COVERED = {(s, c) for s, c, _, _ in SEARCH_ROSTERS}
 _WATCH_KEYS = ("jail_booking", "jail_booking_new", "jail_booking_screen")
+# FOUND 2026-10-24: li.raw = dict(rec.get("raw") or {}) below used to copy the FULL
+# raw dict (comps/vision/cama/deed_chain/rod/gis_attrs_full/...) for every one of
+# ~100K rows across the 13 covered counties -- pushed this 8GB Mac's swap to
+# 9.4GB/10.2GB (110MB unused physical) when run alongside another backfill, had
+# to be killed. enrichment_jail_bookings.py only ever reads/writes these 4 raw
+# sub-keys (confirmed by grep: raw["jail_booking"]/["jail_booking_new"]/
+# ["jail_booking_screen"] are all fresh reassignments, never in-place mutations
+# of a pre-existing dict, so no deepcopy-aliasing risk here, unlike
+# backfill_gis_attrs_boardwide.py's fix the same night -- just a size problem).
+_NEEDED_RAW_KEYS = ("jail_booking", "incarceration", "jail_booking_new", "jail_booking_screen")
 
 
 def main() -> int:
@@ -86,7 +96,8 @@ def main() -> int:
         if (rec.get("state"), (rec.get("county") or "").strip()) not in covered:
             continue
         li = Listing.model_construct(**{k: rec.get(k) for k in _LIGHT_FIELDS})
-        li.raw = dict(rec.get("raw") or {})
+        full_raw = rec.get("raw") if isinstance(rec.get("raw"), dict) else {}
+        li.raw = {k: full_raw[k] for k in _NEEDED_RAW_KEYS if k in full_raw}
         try:
             key = li.dedupe_key()
         except Exception:  # noqa: BLE001
