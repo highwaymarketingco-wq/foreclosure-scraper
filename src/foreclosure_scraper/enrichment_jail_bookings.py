@@ -253,6 +253,7 @@ needs the stamp's own booking date and date of birth, which a new match does not
 from __future__ import annotations
 
 import asyncio
+import html
 import re
 import traceback
 from datetime import date, datetime, timezone
@@ -334,6 +335,10 @@ ROSTERS = [
     # build 2026-10-24). Same vendor, zero new code. Verified live:
     # forsythsheriffnc.policetocitizen.com, listId 359, 944 in custody.
     ("NC", "Forsyth", "p2c_centralsquare", "https://forsythsheriffnc.policetocitizen.com|359"),
+    # Catawba NC (5,605 est_rows_affected, "no source known" until this build
+    # 2026-10-24). Custom ASP.NET GridView, see _fetch_catawba_gridview's own
+    # docstring. Verified live: 199 in custody (816 charge-rows).
+    ("NC", "Catawba", "catawba_gridview", "https://injail.catawbacountync.gov/WhosInJail/"),
 ]
 
 # (state, county, vendor, target) for the PER-NAME search vendors — no bulk
@@ -553,6 +558,63 @@ async def _fetch_mcso_json(base: str) -> list[dict]:
     return out
 
 
+_CATAWBA_ROW_RE = re.compile(r'<td[^>]*>(.*?)</td>', re.S)
+
+
+async def _fetch_catawba_gridview(base: str) -> list[dict]:
+    """Catawba County NC's "Who's In Jail" -- a classic ASP.NET WebForms GridView
+    rendered server-side on a single plain GET, no search/pagination needed (the
+    whole current population is already in the HTML). No Cloudflare/WAF seen.
+
+    Grid shape (11 cells/row, live-verified 2026-10-24): Picture | Inmate Name |
+    Date Confined | (blank) | Age | Charge | Bond Amount | Court Date |
+    Court Docket | WRIT | Agency. One row per CHARGE, not per person -- only the
+    row that starts a new inmate carries a non-empty Inmate Name/Date
+    Confined/Age; every row after it (same person, next charge) repeats those
+    cells blank, so the parser forward-fills from the last-seen name. 816 rows /
+    199 unique people in the live sample.
+    """
+    from curl_cffi.requests import AsyncSession
+
+    out: list[dict] = []
+    try:
+        async with AsyncSession(impersonate="chrome") as s:
+            r = await s.get(base, timeout=30)
+            body = r.text or ""
+    except Exception as exc:  # noqa: BLE001
+        log.warning("jail.catawba_fail", base=base, error=str(exc)[:120])
+        return out
+    start = body.find('id="MainContent_GridView1"')
+    if start < 0:
+        log.warning("jail.catawba_no_grid", base=base)
+        return out
+    table = body[start:body.find("</table>", start)]
+    rows = table.split('<tr style="background-color:White;">')[1:]
+    people: dict[str, dict] = {}
+    last_key: Optional[str] = None
+    for row in rows:
+        cells = _CATAWBA_ROW_RE.findall(row)
+        cells = [html.unescape(re.sub(r"<[^>]+>", "", c)).strip() for c in cells]
+        if len(cells) < 11:
+            continue
+        _pic, name, confined, _blank, age, charge, *_rest = cells[:11]
+        if name:
+            parts = _split_zuercher_name(name)
+            if parts:
+                last, first, middle = parts
+                last_key = f"{last}|{first}|{middle}"
+                people.setdefault(last_key, {"last": last, "first": first, "middle": middle,
+                                              "dob": None, "age": age or None,
+                                              "arrest_date": confined or None, "charge": charge})
+            else:
+                last_key = None
+        elif last_key and charge and not people[last_key]["charge"]:
+            people[last_key]["charge"] = charge  # keep the first charge only, same as other vendors
+    out = list(people.values())
+    log.info("jail_scraper.catawba_ok", base=base, count=len(out))
+    return out
+
+
 # ---- per-name search vendors -------------------------------------------------
 
 _NAME_RE = re.compile(r'name=["\']([^"\']+)["\']')
@@ -712,6 +774,8 @@ async def _load_roster(state: str, county: str, vendor: str, target: str,
         recs = await _fetch_tyler_inmate_inquiry(target)
     elif vendor == "mcso_json":
         recs = await _fetch_mcso_json(target)
+    elif vendor == "catawba_gridview":
+        recs = await _fetch_catawba_gridview(target)
     else:
         recs = await _fetch_p2c_jqgrid(target)
     index = RosterIndex()
