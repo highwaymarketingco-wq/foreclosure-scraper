@@ -215,14 +215,13 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 
 ## 2. Bot-wall, build in-house -- Cloudflare/WAF, not Hermes
 
-191 cells, 212,970 est_rows_affected combined.
+140 cells, 184,746 est_rows_affected combined.
 
 | state | county | column | est_rows | reason | source |
 |---|---|---|---|---|---|
 | SC | Charleston | rollback_exposure | 11,212 | bot check (Cloudflare/WAF) | tax/property card: sc-charleston.publicaccessnow.com |
 | NC | Rutherford | multi_year_delinquent_tax | 11,206 | bot check (Cloudflare/WAF) | tax/property card: rutherfordcountync.gov |
 | SC | Charleston | atty_tax_verified_confirmed | 7,518 | bot check (Cloudflare/WAF) | tax/property card: sc-charleston.publicaccessnow.com |
-| SC | Sumter | probate | 4,686 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | NC | Rowan | atty_rod_lien_checked | 4,594 | bot check (Cloudflare/WAF) | register: rod.rowancountync.gov (atty_rod_lien_checked: bloc |
 | NC | Rowan | liens | 4,594 | bot check (Cloudflare/WAF) | register: rod.rowancountync.gov (liens: blocked) |
 | SC | Charleston | lt_tax_sale | 4,156 | bot check (Cloudflare/WAF) | tax/property card: sc-charleston.publicaccessnow.com |
@@ -250,16 +249,11 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | SC | Richland | two_year_delinquent | 2,236 | bot check (Cloudflare/WAF) | tax/property card:  |
 | NC | Washington | atty_rod_lien_checked | 2,167 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
 | NC | Washington | liens | 2,167 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
-| SC | Colleton | atty_probate_case | 2,125 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | NC | Perquimans | atty_rod_lien_checked | 1,882 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
 | NC | Perquimans | liens | 1,882 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
-| SC | Colleton | atty_heir_candidates | 1,826 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | SC | York | rollback_exposure | 1,818 | bot check (Cloudflare/WAF) | tax/property card: www.yorkcountysc.gov |
-| SC | Colleton | lt_estate_lead | 1,817 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | SC | Kershaw | probate | 1,802 | bot check (Cloudflare/WAF) | probate: www.kershaw.sc.gov |
-| SC | Sumter | atty_probate_case | 1,793 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | NC | Polk | atty_tax_verified_confirmed | 1,756 | bot check (Cloudflare/WAF) | tax/property card: www.polknc.gov |
-| SC | Barnwell | probate | 1,695 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | SC | Clarendon | atty_deed_ref | 1,669 | bot check (Cloudflare/WAF) | register index: acclaimprod.clarendoncountygov.org |
 | SC | Clarendon | atty_rod_lien_checked | 1,669 | bot check (Cloudflare/WAF) | register: Harris AcclaimWeb acclaimprod.clarendoncountygov.o |
 | SC | Clarendon | liens | 1,669 | bot check (Cloudflare/WAF) | register: Harris AcclaimWeb acclaimprod.clarendoncountygov.o |
@@ -281,14 +275,8 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | NC | Wilson | tax_aging_surfaced | 1,389 | bot check (Cloudflare/WAF) | tax/property card: www.wilsoncountync.gov |
 | NC | Wilson | two_year_delinquent | 1,389 | bot check (Cloudflare/WAF) | tax/property card: www.wilsoncountync.gov |
 | SC | Clarendon | assessed_value | 1,383 | Cloudflare check on the county property card | county GIS: qpublic.schneidercorp.com |
-| SC | Sumter | atty_heir_candidates | 1,347 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
-| SC | Sumter | lt_estate_lead | 1,339 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
-| SC | Florence | atty_heir_candidates | 1,308 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
-| SC | Florence | lt_estate_lead | 1,297 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
-| SC | York | probate | 1,267 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | SC | Lancaster | assessed_value | 1,204 | Cloudflare check on the county property card | county GIS: services3.arcgis.com |
 | SC | York | beds_baths | 1,128 | bot check (Cloudflare/WAF) | tax/property card: www.yorkcountysc.gov |
-| SC | Barnwell | atty_probate_case | 1,098 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | SC | Newberry | lot_size | 1,078 | Cloudflare check on the county property card | county GIS: map.newberrycounty.net |
 | NC | Edgecombe | multi_year_delinquent_tax | 1,051 | bot check (Cloudflare/WAF) | tax/property card: taxpa.edgecombecountync.gov |
 | NC | Edgecombe | repeat_tax_loss | 1,051 | bot check (Cloudflare/WAF) | tax/property card: taxpa.edgecombecountync.gov |
@@ -297,15 +285,12 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | SC | Edgefield | lot_size | 1,025 | Cloudflare check on the county property card | county GIS: qpublic.net |
 | SC | Edgefield | assessed_value | 1,024 | Cloudflare check on the county property card | county GIS: qpublic.net |
 | SC | Newberry | assessed_value | 981 | Cloudflare check on the county property card | county GIS: map.newberrycounty.net |
-| SC | Lancaster | probate | 970 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | NC | Halifax | multi_year_delinquent_tax | 957 | bot check (Cloudflare/WAF) | tax/property card: halifaxnctax.com |
 | NC | Halifax | repeat_tax_loss | 957 | bot check (Cloudflare/WAF) | tax/property card: halifaxnctax.com |
 | NC | Halifax | rollback_exposure | 957 | bot check (Cloudflare/WAF) | tax/property card: halifaxnctax.com |
 | NC | Halifax | tax_aging_surfaced | 957 | bot check (Cloudflare/WAF) | tax/property card: halifaxnctax.com |
 | NC | Halifax | two_year_delinquent | 957 | bot check (Cloudflare/WAF) | tax/property card: halifaxnctax.com |
 | SC | York | atty_tax_verified_confirmed | 853 | bot check (Cloudflare/WAF) | tax/property card: www.yorkcountysc.gov |
-| SC | Barnwell | atty_heir_candidates | 833 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
-| SC | Barnwell | lt_estate_lead | 819 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | SC | Aiken | atty_rod_lien_checked | 805 | bot check (Cloudflare/WAF) | register:  www.aikencountysc.gov |
 | SC | Aiken | liens | 805 | bot check (Cloudflare/WAF) | register:  www.aikencountysc.gov |
 | NC | Ashe | multi_year_delinquent_tax | 794 | bot check (Cloudflare/WAF) | tax/property card: qpublic.schneidercorp.com |
@@ -324,11 +309,6 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | SC | Lee | assessed_value | 574 | Cloudflare check on the county property card | county GIS: qpublic.schneidercorp.com |
 | NC | Tyrrell | atty_rod_lien_checked | 537 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
 | NC | Tyrrell | liens | 537 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
-| SC | Aiken | probate | 520 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
-| SC | Charleston | atty_heir_candidates | 509 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
-| SC | Charleston | lt_probate_notice | 509 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
-| SC | Charleston | atty_probate_case | 417 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
-| SC | Dorchester | atty_heir_candidates | 364 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | NC | Avery | multi_year_delinquent_tax | 362 | bot check (Cloudflare/WAF) | tax/property card: webtax.averycountync.gov |
 | NC | Avery | repeat_tax_loss | 362 | bot check (Cloudflare/WAF) | tax/property card: webtax.averycountync.gov |
 | NC | Avery | rollback_exposure | 362 | bot check (Cloudflare/WAF) | tax/property card: webtax.averycountync.gov |
@@ -337,69 +317,38 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | NC | Rockingham | divorce_no_subsequent_deed | 327 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) 'e-Vault' us5.co |
 | NC | Tyrrell | marriage_license | 326 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
 | NC | Wilson | atty_tax_verified_confirmed | 268 | bot check (Cloudflare/WAF) | tax/property card: www.wilsoncountync.gov |
-| SC | Dorchester | lt_estate_lead | 263 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | SC | Chester | probate | 214 | bot check (Cloudflare/WAF) | probate:  |
 | SC | Fairfield | assessed_value | 199 | Cloudflare check on the county property card | county GIS: beacon.schneidercorp.com |
 | SC | Fairfield | lot_size | 198 | Cloudflare check on the county property card | county GIS: beacon.schneidercorp.com |
 | NC | Ashe | atty_tax_verified_confirmed | 179 | bot check (Cloudflare/WAF) | tax/property card: qpublic.schneidercorp.com |
 | NC | Gaston | divorce_no_subsequent_deed | 145 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems LRSearch (MVC/DevExpre |
 | SC | Richland | lt_tax_sale_overage | 145 | bot check (Cloudflare/WAF) | tax/property card:  |
-| SC | Aiken | atty_heir_candidates | 139 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
-| SC | Aiken | lt_estate_lead | 139 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | NC | Avery | atty_tax_verified_confirmed | 128 | bot check (Cloudflare/WAF) | tax/property card: webtax.averycountync.gov |
 | SC | Spartanburg | lt_probate_notice | 111 | bot check (Cloudflare/WAF) | probate: www.spartanburgcounty.gov |
-| SC | Lancaster | atty_probate_case | 110 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | SC | Spartanburg | atty_heir_candidates | 109 | bot check (Cloudflare/WAF) | probate: www.spartanburgcounty.gov |
-| SC | Marlboro | atty_heir_candidates | 107 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
-| SC | Dorchester | atty_probate_case | 106 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
-| SC | Dorchester | lt_probate_notice | 106 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
-| SC | Colleton | lt_probate_notice | 102 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | NC | Edgecombe | atty_tax_verified_confirmed | 101 | bot check (Cloudflare/WAF) | tax/property card: taxpa.edgecombecountync.gov |
 | NC | Halifax | atty_tax_verified_confirmed | 85 | bot check (Cloudflare/WAF) | tax/property card: halifaxnctax.com |
-| SC | Georgetown | atty_heir_candidates | 84 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
-| SC | Georgetown | lt_estate_lead | 84 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | SC | Spartanburg | atty_probate_case | 79 | bot check (Cloudflare/WAF) | probate: www.spartanburgcounty.gov |
 | SC | Spartanburg | probate | 75 | bot check (Cloudflare/WAF) | probate: www.spartanburgcounty.gov |
 | SC | Kershaw | lt_estate_lead | 72 | bot check (Cloudflare/WAF) | probate: www.kershaw.sc.gov |
-| SC | Oconee | atty_heir_candidates | 64 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | NC | Moore | divorce_no_subsequent_deed | 58 | bot check (Cloudflare/WAF) | register: Aumentum Recorder web access (Harris Recording Sol |
 | SC | Kershaw | atty_heir_candidates | 56 | bot check (Cloudflare/WAF) | probate: www.kershaw.sc.gov |
 | SC | Kershaw | atty_probate_case | 56 | bot check (Cloudflare/WAF) | probate: www.kershaw.sc.gov |
 | SC | Chester | atty_probate_case | 54 | bot check (Cloudflare/WAF) | probate:  |
-| SC | Marlboro | lt_estate_lead | 52 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | SC | Chester | atty_heir_candidates | 51 | bot check (Cloudflare/WAF) | probate:  |
 | SC | Chester | lt_estate_lead | 51 | bot check (Cloudflare/WAF) | probate:  |
-| SC | Marlboro | lt_probate_notice | 51 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
-| SC | York | atty_heir_candidates | 50 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
-| SC | Marlboro | atty_probate_case | 48 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | NC | Pender | divorce_no_subsequent_deed | 37 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
 | SC | Richland | atty_tax_verified_confirmed | 35 | bot check (Cloudflare/WAF) | tax/property card:  |
-| SC | Lancaster | atty_heir_candidates | 32 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
-| SC | Lancaster | lt_estate_lead | 32 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
-| SC | Oconee | lt_probate_notice | 28 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | NC | Pasquotank | divorce_no_subsequent_deed | 20 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
 | SC | Berkeley | lt_probate_notice | 20 | bot check (Cloudflare/WAF) | probate: berkeleycountysc.gov |
-| SC | York | atty_probate_case | 19 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
-| SC | York | lt_probate_notice | 19 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | NC | Edgecombe | lt_tax_sale | 17 | bot check (Cloudflare/WAF) | tax/property card: taxpa.edgecombecountync.gov |
 | NC | Person | divorce_no_subsequent_deed | 15 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
-| SC | Florence | lt_probate_notice | 12 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
-| SC | Florence | atty_probate_case | 11 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
-| SC | Barnwell | lt_probate_notice | 10 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
-| SC | Charleston | probate | 8 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | NC | Perquimans | divorce_no_subsequent_deed | 5 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
 | NC | Chatham | lt_tax_sale | 4 | bot check (Cloudflare/WAF) | tax/property card:  |
 | SC | Richland | lt_tax_sale | 4 | bot check (Cloudflare/WAF) | tax/property card:  |
 | NC | Tyrrell | divorce_no_subsequent_deed | 3 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
-| SC | Georgetown | lt_probate_notice | 3 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | SC | Berkeley | atty_probate_case | 2 | bot check (Cloudflare/WAF) | probate: berkeleycountysc.gov |
 | NC | Washington | divorce_no_subsequent_deed | 1 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
-| SC | Aiken | atty_probate_case | 1 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
-| SC | Aiken | lt_probate_notice | 1 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
-| SC | Dorchester | probate | 1 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
-| SC | Georgetown | atty_probate_case | 1 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
-| SC | Oconee | atty_probate_case | 1 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
-| SC | Oconee | probate | 1 | bot check (Cloudflare/WAF) | probate: www.southcarolinaprobate.net |
 | NC | Ashe | lt_tax_sale_overage | 0 | bot check (Cloudflare/WAF) | tax/property card: qpublic.schneidercorp.com |
 | NC | Avery | lt_tax_sale_overage | 0 | bot check (Cloudflare/WAF) | tax/property card: webtax.averycountync.gov |
 | NC | Chatham | lt_tax_sale_overage | 0 | bot check (Cloudflare/WAF) | tax/property card:  |
