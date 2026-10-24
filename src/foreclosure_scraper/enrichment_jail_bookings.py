@@ -339,6 +339,11 @@ ROSTERS = [
     # 2026-10-24). Custom ASP.NET GridView, see _fetch_catawba_gridview's own
     # docstring. Verified live: 199 in custody (816 charge-rows).
     ("NC", "Catawba", "catawba_gridview", "https://injail.catawbacountync.gov/WhosInJail/"),
+    # Brunswick NC (6,145 est_rows_affected, "no source known" until this build
+    # 2026-10-24). Same Zuercher vendor already wired for Cherokee/Anderson/
+    # Laurens/Oconee SC -- zero new code. Verified live:
+    # brunswick-so-nc.zuercherportal.com, 281 in custody.
+    ("NC", "Brunswick", "zuercher", "brunswick-so-nc"),
 ]
 
 # (state, county, vendor, target) for the PER-NAME search vendors — no bulk
