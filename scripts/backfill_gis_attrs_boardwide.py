@@ -41,11 +41,13 @@ import asyncio
 import copy
 import os
 import sys
+from collections import Counter
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "src"))
 
+from foreclosure_scraper.block_binding import FALLBACK_POINT_MIN_ROWS  # noqa: E402
 from foreclosure_scraper.board_stream import iter_board_rows  # noqa: E402
 from foreclosure_scraper.enrichment_gis_attrs import enrich_gis_attrs  # noqa: E402
 from foreclosure_scraper.models import Listing  # noqa: E402
@@ -84,7 +86,23 @@ def main() -> int:
         if args.allow_large:
             os.environ["BOARD_PATCH_ALLOW_LARGE"] = "1"
 
-    print("streaming board (trimmed raw, all counties)...")
+    print("pass 1: finding globally-shared fallback points (lat,lng only, cheap)...")
+    point_counts: Counter = Counter()
+    for rec in iter_board_rows(docs_dir / "listings.json.gz"):
+        lat, lng = rec.get("latitude"), rec.get("longitude")
+        try:
+            point_counts[(round(float(lat), 5), round(float(lng), 5))] += 1
+        except (TypeError, ValueError):
+            continue
+    shared_points = {p for p, c in point_counts.items() if c >= FALLBACK_POINT_MIN_ROWS}
+    print(f"  {len(shared_points):,} points shared by >={FALLBACK_POINT_MIN_ROWS} rows "
+          f"(same threshold enrich_gis_attrs() itself uses -- a row with no parcel_id "
+          f"AT one of these is a fallback/county-seat centroid, not its own location, "
+          f"and the function always refuses to live-query it; computed GLOBALLY here "
+          f"so a --max-rows batch can skip these ahead of time instead of burning a "
+          f"whole batch's cap loading rows the function will just skip anyway)")
+
+    print("pass 2: streaming board (trimmed raw, all counties)...")
     keyed: dict[str, Listing] = {}
     before: dict[str, dict] = {}
     never_queried_count = 0
@@ -115,6 +133,21 @@ def main() -> int:
                 # act on them.
                 structurally_unresolvable += 1
                 continue
+            if not rec.get("parcel_id"):
+                try:
+                    pt = (round(float(rec.get("latitude")), 5), round(float(rec.get("longitude")), 5))
+                except (TypeError, ValueError):
+                    pt = None
+                if pt in shared_points:
+                    # No parcel_id and this point is shared by >=FALLBACK_POINT_MIN_ROWS
+                    # rows board-wide -- a fallback/county-seat centroid, not this row's
+                    # own location. enrich_gis_attrs() always refuses to live-query it
+                    # (block_binding.imprecise_point() -> skipped_fallback_point, never
+                    # reaches the 'queried' stamp). Found live 2026-10-23: batches 4-6
+                    # kept landing on a 100K+-row cluster of exactly this shape
+                    # (environmental/registry/filing sources sharing a county centroid).
+                    structurally_unresolvable += 1
+                    continue
             if never_queried_count >= args.max_rows:
                 already_queried_skipped += 1
                 continue
