@@ -320,6 +320,20 @@ ROSTERS = [
     # Custom ASP.NET MVC JSON roster, see _fetch_mcso_json's own docstring. Verified
     # live: 2,197 in custody, full DOB on every row.
     ("NC", "Mecklenburg", "mcso_json", "https://mecksheriffweb.mecklenburgcountync.gov"),
+    # Wake NC (Raleigh, 2nd-largest county in either state -- 6,116 est_rows_affected,
+    # "no source known" until this build 2026-10-24). Same modern CentralSquare P2C
+    # shape already wired for Buncombe/Burke -- zero new code, just a new roster entry.
+    # Verified live: wakeso.policetocitizen.com, listId 384, 1,200 in custody, DOB
+    # redacted on this feed (same as Buncombe's), age+arrest_date+charge present.
+    ("NC", "Wake", "p2c_centralsquare", "https://wakeso.policetocitizen.com|384"),
+    # Guilford NC (Greensboro/High Point, 8,439 est_rows_affected, "no source known"
+    # until this build 2026-10-24). Same vendor, zero new code. Verified live:
+    # guilfordcountysheriff.policetocitizen.com, listId 61, 1,162 in custody.
+    ("NC", "Guilford", "p2c_centralsquare", "https://guilfordcountysheriff.policetocitizen.com|61"),
+    # Forsyth NC (Winston-Salem, 7,165 est_rows_affected, "no source known" until this
+    # build 2026-10-24). Same vendor, zero new code. Verified live:
+    # forsythsheriffnc.policetocitizen.com, listId 359, 944 in custody.
+    ("NC", "Forsyth", "p2c_centralsquare", "https://forsythsheriffnc.policetocitizen.com|359"),
 ]
 
 # (state, county, vendor, target) for the PER-NAME search vendors — no bulk
