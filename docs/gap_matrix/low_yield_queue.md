@@ -4,7 +4,7 @@ Generated from `gap_list_2026-10-23.csv`. Regenerate with `python scripts/low_yi
 
 Every row here already has a working reader/enrichment/verifier -- the gap is coverage, not code. `next_action` names the existing script/sweep to run; `check-before-building` still applies if the next_action text is wrong or stale (it's a heuristic guess, not ground truth) -- confirm what's actually wired before assuming a rewrite is needed.
 
-**6,497 cells, 8,959,779 total est_rows_affected.**
+**6,497 cells, 8,959,736 total est_rows_affected.**
 
 ## Top 150 by est_rows_affected
 
@@ -165,12 +165,12 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 
 | column | cells | total est_rows_affected |
 |---|---|---|
-| atty_deed_ref | 126 | 390,033 |
+| atty_deed_ref | 126 | 390,030 |
 | atty_deed_chain_fetched | 148 | 343,202 |
 | deed_chain_break | 148 | 343,202 |
 | deed_chain_distress_transfer | 148 | 343,202 |
 | deed_chain_has_history | 148 | 343,202 |
-| atty_legal_description | 138 | 336,003 |
+| atty_legal_description | 138 | 336,002 |
 | incarceration | 148 | 335,815 |
 | atty_rod_lien_checked | 93 | 306,460 |
 | bop_federal | 148 | 304,282 |
@@ -183,18 +183,18 @@ Every row here already has a working reader/enrichment/verifier -- the gap is co
 | beds_baths | 141 | 273,791 |
 | divorce | 115 | 267,476 |
 | comps | 149 | 260,518 |
-| assessed_value | 135 | 254,538 |
+| assessed_value | 135 | 254,525 |
 | repeat_tax_loss | 137 | 252,887 |
-| lot_size | 140 | 235,631 |
-| sqft | 143 | 226,536 |
+| lot_size | 140 | 235,625 |
+| sqft | 143 | 226,535 |
 | marriage_license | 100 | 218,514 |
 | two_year_delinquent | 133 | 210,351 |
 | multi_year_delinquent_tax | 104 | 201,355 |
 | parcel_id | 145 | 194,640 |
-| atty_taxpayer_of_record | 146 | 172,972 |
+| atty_taxpayer_of_record | 146 | 172,969 |
 | atty_tax_verified_confirmed | 62 | 151,975 |
 | code_enforcement | 13 | 139,624 |
-| address | 148 | 136,833 |
+| address | 148 | 136,817 |
 | lt_tax_lien | 106 | 98,210 |
 | vacancy | 9 | 79,407 |
 | sos_dissolution | 102 | 63,018 |
