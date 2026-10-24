@@ -89,6 +89,7 @@ def main() -> int:
     before: dict[str, dict] = {}
     never_queried_count = 0
     already_queried_skipped = 0
+    structurally_unresolvable = 0
     for rec in iter_board_rows(docs_dir / "listings.json.gz"):
         full_raw = rec.get("raw") if isinstance(rec.get("raw"), dict) else {}
         never_queried = not (full_raw.get("gis") or {}).get("queried")
@@ -99,6 +100,20 @@ def main() -> int:
                 # confirms this; found live 2026-10-23 that omitting this check
                 # let already-done rows ride along "for free" each batch,
                 # wasting load time without being capped).
+                continue
+            if not (rec.get("parcel_id") or (rec.get("latitude") and rec.get("longitude"))):
+                # enrich_gis_attrs() needs a parcel_id OR lat/lng to do ANYTHING
+                # (parcel_cache lookup requires parcel_id; both live-query paths
+                # require one or the other) -- a row with neither never reaches
+                # the 'queried' stamp and will keep re-appearing as a candidate
+                # forever. Found live 2026-10-23: 63,115 of 471,672 never-queried
+                # rows are like this (liensnc/nc_ecourts/tax-list filing sources
+                # with no property-record geocode) -- batches 4-5 landed on a
+                # long contiguous run of them in file order and cratered to
+                # near-zero yield. Excluded from the candidate pool entirely
+                # rather than just deprioritized, since this function can never
+                # act on them.
+                structurally_unresolvable += 1
                 continue
             if never_queried_count >= args.max_rows:
                 already_queried_skipped += 1
@@ -124,8 +139,10 @@ def main() -> int:
                        **{k: copy.deepcopy(li.raw.get(k)) for k in _RAW_WATCH_KEYS}}
 
     print(f"rows loaded this run: {len(keyed):,}"
-          + (f" (capped at {args.max_rows} never-queried, {already_queried_skipped} "
-             f"more never-queried rows left for a future batch)" if args.max_rows else ""))
+          + (f" (capped at {args.max_rows} resolvable never-queried, {already_queried_skipped} "
+             f"more left for a future batch, {structurally_unresolvable:,} skipped -- no "
+             f"parcel_id and no lat/lng, this function can never act on them)"
+             if args.max_rows else ""))
 
     async def run():
         return await enrich_gis_attrs(list(keyed.values()))
