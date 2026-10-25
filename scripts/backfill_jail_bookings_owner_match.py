@@ -139,6 +139,23 @@ def main() -> int:
         print("nothing to patch.")
         return 0
 
+    # FOUND 2026-10-25: this script's write hung/OOM'd 5 times in a row overnight while
+    # backfill_bop_federal.py's same patch_existing_rows() call succeeded twice -- the one
+    # structural difference found: bop_federal's write always follows ~5.5 HOURS of quiet,
+    # paced (1 req/sec) querying, while this script's write always follows a ~20-40s CPU-
+    # churning board-stream + roster-fetch burst, with zero settling time. Explicitly drop
+    # the now-unneeded keyed/before dicts and force a GC pass + a brief pause here on that
+    # theory -- TESTED LIVE, did NOT fix attempt 5 (still ballooned into the same crisis
+    # inside patch_existing_rows() itself, confirmed via logs/.board.lock/pid that no other
+    # process held the lock). Left in anyway (harmless, a 5s pause costs nothing even when
+    # insufficient) but this alone is NOT a proven fix -- see project memory
+    # "gis_attrs_boardwide_batch13_write_blowup" for the full unresolved investigation.
+    del keyed, before
+    import gc
+    gc.collect()
+    import time
+    time.sleep(5)
+
     with board_lock(REPO, owner="backfill_jail_bookings_owner_match", wait=900, poll=10):
         pstats = patch_existing_rows(
             patches, {"backfill_jail_bookings_owner_match": len(patches)}, docs_dir=docs_dir)
