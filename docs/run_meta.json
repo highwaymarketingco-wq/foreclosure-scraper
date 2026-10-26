@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-10-26T22:17:20.362666Z",
+  "run_time": "2026-10-26T22:29:20.290245Z",
   "total": 472777,
   "by_source": {
     "national.auction_bank_reo": 3,
@@ -536,16 +536,16 @@
         "start": 18341,
         "end": 36341,
         "records": 18000,
-        "bytes": 16316734,
-        "sha256": "beb18c1fc4b51665f87f127be1ccd801dd15e0b4cf64d571a4946f58cdc84b67"
+        "bytes": 16320139,
+        "sha256": "03325bb42ec00afaaa60806c6ea1126ffbe4a56543e77a234f481da4488c4e91"
       },
       {
         "name": "listings_part_002.json.gz",
         "start": 36341,
         "end": 54341,
         "records": 18000,
-        "bytes": 15576789,
-        "sha256": "e5225aa004edba546e016f2b8e1e15971301b264a398a2b9b8d5625b9c150b5e"
+        "bytes": 15576812,
+        "sha256": "2efeb9f1f8304ef2fcbc8cbcd3f58ab3b94ea48d72b50fa470efd99c950fadf9"
       },
       {
         "name": "listings_part_003.json.gz",
@@ -608,8 +608,8 @@
         "start": 180341,
         "end": 198341,
         "records": 18000,
-        "bytes": 13047535,
-        "sha256": "a8906b8e27d80a5535f48849a95ce2f62823525c1f6ee19f31fc3d89a37a285d"
+        "bytes": 13047541,
+        "sha256": "c1f0122e171c9d5277118701a75a499cbeb577fa05a8d74d638ac04772ba9a55"
       },
       {
         "name": "listings_part_011.json.gz",
@@ -761,7 +761,7 @@
     }
   },
   "health_as_of": "2026-10-16T20:24:46.640274Z",
-  "health_age_hours": 241.88,
+  "health_age_hours": 242.08,
   "health_stale": true,
   "source_last_success": {
     "city_websites.charlotte_open_data": "2026-10-16T20:24:46.640274Z",
