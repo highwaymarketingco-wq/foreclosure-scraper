@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-10-27T13:51:32.319820Z",
+  "run_time": "2026-10-27T14:04:06.460570Z",
   "total": 472777,
   "by_source": {
     "national.auction_bank_reo": 3,
@@ -536,8 +536,8 @@
         "start": 18340,
         "end": 36340,
         "records": 18000,
-        "bytes": 16343312,
-        "sha256": "bb57e6aa1929bd42e03fe1aa8c0cbc85153700df9b081a7eb35c56304ccc8c5f"
+        "bytes": 16343318,
+        "sha256": "e88d6322f1c2b1881c1aef8035f70e6680214fb5eae8d1250862052e2ec5d5dc"
       },
       {
         "name": "listings_part_002.json.gz",
@@ -761,7 +761,7 @@
     }
   },
   "health_as_of": "2026-10-16T20:24:46.640274Z",
-  "health_age_hours": 257.45,
+  "health_age_hours": 257.66,
   "health_stale": true,
   "source_last_success": {
     "city_websites.charlotte_open_data": "2026-10-16T20:24:46.640274Z",
