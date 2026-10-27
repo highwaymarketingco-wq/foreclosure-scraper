@@ -1,7 +1,7 @@
 {
  "schema": "board-manifest-v1",
- "written_at": "2026-10-27T14:13:35.143510Z",
- "run_time": "2026-10-27T14:13:34.589579Z",
+ "written_at": "2026-10-27T14:26:11.324874Z",
+ "run_time": "2026-10-27T14:26:10.682125Z",
  "count": 472777,
  "detail_count": 472777,
  "slim_count": 437170,
@@ -14,8 +14,8 @@
  },
  "files": {
   "listings.json": {
-   "bytes": 5041577709,
-   "sha256": "674e63cba875ea24979bbf55d84b5e09b99f3a35ca834ab3fe5a7a974f9990fb",
+   "bytes": 5041577843,
+   "sha256": "a4e3fa8ff65d8f5804772950f0238535aa179592cc9cddc815d9a4efe1ddfe16",
    "records": 472777
   },
   "listings_detail.json": {
@@ -35,7 +35,7 @@
   },
   "run_meta.json": {
    "bytes": 39839,
-   "sha256": "cda305735c1fcbf9859dac10585e2cb71965cce0036735b5951dfcf482c66091"
+   "sha256": "6082ce456cbc4287547c607d24cdfcf37c6f670fe33a105c4d0895053461c176"
   },
   "listings_part_000.json.gz": {
    "bytes": 24084273,
@@ -45,8 +45,8 @@
    "end": 18340
   },
   "listings_part_001.json.gz": {
-   "bytes": 16343318,
-   "sha256": "e88d6322f1c2b1881c1aef8035f70e6680214fb5eae8d1250862052e2ec5d5dc",
+   "bytes": 16343321,
+   "sha256": "0390bce4c54715638745b2b53e8b8168b37090ad61323654c68ce7161c877f60",
    "records": 18000,
    "start": 18340,
    "end": 36340
@@ -2006,8 +2006,8 @@
     "start": 18340,
     "end": 36340,
     "records": 18000,
-    "bytes": 16343318,
-    "sha256": "e88d6322f1c2b1881c1aef8035f70e6680214fb5eae8d1250862052e2ec5d5dc"
+    "bytes": 16343321,
+    "sha256": "0390bce4c54715638745b2b53e8b8168b37090ad61323654c68ce7161c877f60"
    },
    {
     "name": "listings_part_002.json.gz",
