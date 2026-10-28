@@ -3483,6 +3483,51 @@ async def run_enrich_tail(st: TailState) -> dict:
     except Exception:
         log.error("gaston_mydt.failed", traceback=traceback.format_exc())
 
+    # Nash NC per-parcel tax search (Munis Citizen Self Service, nashcountync.munisselfservice.com):
+    # multi-year unpaid-bill history, keyed by the board's own parcel_id (realistic ceiling ~612 of
+    # 2,090 rows -- see enrichment_nash_multiyear_tax.py's own docstring for the parcel_id-shape
+    # finding). Must run BEFORE enrich_tax_owed, same reason as gaston_mydt above. Gate off with
+    # FORECLOSURE_NASH_MYDT=0.
+    try:
+        from .enrichment_nash_multiyear_tax import enrich_with_nash_multiyear_tax
+        s = await _await_capped(enrich_with_nash_multiyear_tax(enriched), "nash_mydt")
+        if s:
+            enrichment_stats["nash_mydt"] = s
+    except Exception:
+        log.error("nash_mydt.failed", traceback=traceback.format_exc())
+
+    # Iredell NC per-parcel tax search (classic ITS.NET TaxBill.aspx, same vendor tax_lien_itsnet.py
+    # already drives for Iredell/Chowan tax-lien verification): multi-year unpaid-bill history.
+    # Must run BEFORE enrich_tax_owed, same reason as nash_mydt/gaston_mydt above. Gate off with
+    # FORECLOSURE_IREDELL_MYDT=0.
+    try:
+        from .enrichment_iredell_multiyear_tax import enrich_with_iredell_multiyear_tax
+        s = await _await_capped(enrich_with_iredell_multiyear_tax(enriched), "iredell_mydt")
+        if s:
+            enrichment_stats["iredell_mydt"] = s
+    except Exception:
+        log.error("iredell_mydt.failed", traceback=traceback.format_exc())
+
+    # Johnston NC two_year_delinquent: pure restatement of raw['johnston_delinquent_tax_crosswalk']
+    # (scrapers/counties_nc/johnston_delinquent_tax_crosswalk.py, landed 2026-10-20) -- no network
+    # call, the crosswalk's own ingest already did the one real fetch.
+    try:
+        from .enrichment_johnston_two_year_delinquent import enrich_johnston_two_year_delinquent
+        s = enrich_johnston_two_year_delinquent(enriched)
+        if s:
+            enrichment_stats["johnston_two_year_delinquent"] = s
+    except Exception:
+        log.error("johnston_two_year_delinquent.failed", traceback=traceback.format_exc())
+
+    # Johnston NC rollback_exposure. Gate off with FORECLOSURE_JOHNSTON_ROLLBACK=0.
+    try:
+        from .enrichment_johnston_rollback_exposure import enrich_johnston_rollback_exposure
+        s = await _await_capped(enrich_johnston_rollback_exposure(enriched), "johnston_rollback_exposure")
+        if s and s.get("deferred_found"):
+            enrichment_stats["johnston_rollback_exposure"] = s
+    except Exception:
+        log.error("johnston_rollback_exposure.failed", traceback=traceback.format_exc())
+
     # NC PTS Cloud (bcpwa.ncptscloud.com / Forsyth, Pitt, Beaufort, Henderson, Guilford, Madison,
     # Hyde, Orange, Cleveland) multi-year unpaid-bill history — a pure, no-network restatement of
     # the per-year depth counties_nc.nc_ptscloud_delinquent_tax already fetches into its own raw
@@ -3801,6 +3846,18 @@ async def run_enrich_tail(st: TailState) -> dict:
             enrichment_stats["hyde_rollback_exposure"] = s
     except Exception:
         log.error("hyde_rollback_exposure.failed", traceback=traceback.format_exc())
+
+    # Madison NC's lrcpwa.ncptscloud.com parcel-CAMA product carries the SAME totalDeferredValue /
+    # useValueDeferred fields Hyde's module above already proved out -- live-verified 2026-10-28
+    # that Madison is also a live lrcpwa tenant with the identical field schema. See
+    # enrichment_madison_rollback_exposure.py's own docstring for the live evidence.
+    try:
+        from .enrichment_madison_rollback_exposure import enrich_madison_rollback_exposure
+        s = await _await_capped(enrich_madison_rollback_exposure(enriched), "madison_rollback_exposure")
+        if s and s.get("deferred_found"):
+            enrichment_stats["madison_rollback_exposure"] = s
+    except Exception:
+        log.error("madison_rollback_exposure.failed", traceback=traceback.format_exc())
 
     # Rowan NC's tax.rowancountync.gov (iasWorld) already has a live tax_lien reader
     # (tax_lien_rowan.py) -- the gap list's "add a new tax-roll reader" premise was wrong; the
