@@ -3483,6 +3483,19 @@ async def run_enrich_tail(st: TailState) -> dict:
     except Exception:
         log.error("ustaxdata_multiyear_tax.failed", traceback=traceback.format_exc())
 
+    # Alamance NC delinquent-tax search (property.spatialest.com/nc/alamance-tax, a DIFFERENT
+    # tenant from the assessor-card host) -- live name+address-confirmed search, writes
+    # raw["alamance_tax_bills"] (picked up by enrich_tax_owed's generic Pass B below) plus
+    # multi_year_delinquent_tax/two_year_delinquent directly. Must run BEFORE enrich_tax_owed,
+    # same reason as ustaxdata above. Gate off with FORECLOSURE_ALAMANCE_TAX=0.
+    try:
+        from .enrichment_alamance_tax_search import enrich_alamance_tax
+        s = await _await_capped(enrich_alamance_tax(enriched), "alamance_tax")
+        if s:
+            enrichment_stats["alamance_tax"] = s
+    except Exception:
+        log.error("alamance_tax.failed", traceback=traceback.format_exc())
+
     # Gaston NC per-parcel tax search (DevNetWedge): multi-year unpaid-bill history, keyed by
     # the board's own parcel_id. Same reason as ustaxdata just above: must run BEFORE
     # enrich_tax_owed, which reads raw['multi_year_delinquent_tax']['total_due'] by exact key.
