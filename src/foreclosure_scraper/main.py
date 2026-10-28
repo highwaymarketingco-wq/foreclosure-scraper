@@ -3471,6 +3471,18 @@ async def run_enrich_tail(st: TailState) -> dict:
         except Exception:
             log.error("ustaxdata.failed", traceback=traceback.format_exc())
 
+    # Pure restatement of raw["ustaxdata_delinquent_tax"] (just fetched above) into
+    # multi_year_delinquent_tax/two_year_delinquent -- no network call. Must run AFTER
+    # ustaxdata just above (needs its output) and BEFORE enrich_tax_owed below (same reason as
+    # ustaxdata itself). See enrichment_ustaxdata_multiyear_tax.py's own docstring.
+    try:
+        from .enrichment_ustaxdata_multiyear_tax import enrich_ustaxdata_multiyear_tax
+        s = enrich_ustaxdata_multiyear_tax(enriched)
+        if s:
+            enrichment_stats["ustaxdata_multiyear_tax"] = s
+    except Exception:
+        log.error("ustaxdata_multiyear_tax.failed", traceback=traceback.format_exc())
+
     # Gaston NC per-parcel tax search (DevNetWedge): multi-year unpaid-bill history, keyed by
     # the board's own parcel_id. Same reason as ustaxdata just above: must run BEFORE
     # enrich_tax_owed, which reads raw['multi_year_delinquent_tax']['total_due'] by exact key.
