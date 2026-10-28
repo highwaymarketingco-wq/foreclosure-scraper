@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-10-28T19:42:12.146968Z",
-  "total": 472777,
+  "run_time": "2026-10-28T21:05:05.907685Z",
+  "total": 472803,
   "by_source": {
     "national.auction_bank_reo": 3,
     "national.bankruptcy_rss_relief_from_stay": 14,
@@ -238,7 +238,7 @@
   },
   "by_state": {
     "NC": 345150,
-    "SC": 127627
+    "SC": 127653
   },
   "by_source_on_board": {
     "counties_generic.liensnc": 52408,
@@ -256,7 +256,7 @@
     "counties_nc.nc_ecourts_lis_pendens": 10623,
     "counties_nc.albemarle_observer_tax_lists": 9310,
     "counties_nc.rutherford_tax": 9163,
-    "counties_sc.sc_heir_estate_parcel_cache": 8528,
+    "counties_sc.sc_heir_estate_parcel_cache": 8554,
     "counties_sc.sc_dew_lien_registry": 8394,
     "counties_nc.nc_county_pdf_delinquent_tax": 8305,
     "counties_nc.nc_ecourts_lis_pendens.judgment_lien": 7693,
@@ -514,12 +514,12 @@
   ],
   "errors": null,
   "notes": "daily vision pass: 36971 of 447006 listings have a vision report (+10 this run)",
-  "detail_count": 472777,
-  "detail_digest": "5a583150ebe9d051",
+  "detail_count": 472803,
+  "detail_digest": "5ea68b3a6084521f",
   "board_parts": {
     "schema": "board-parts-v1",
     "count": 28,
-    "records": 472777,
+    "records": 472803,
     "max_bytes": 25165824,
     "rows_per_part": 12500,
     "files": [
@@ -742,10 +742,10 @@
       {
         "name": "listings_part_027.json.gz",
         "start": 464625,
-        "end": 472777,
-        "records": 8152,
-        "bytes": 567983,
-        "sha256": "6309ffe91165d9fe999fce2f971c5fe4391cb6a3373fe646e75f2e8e31b649ca"
+        "end": 472803,
+        "records": 8178,
+        "bytes": 570935,
+        "sha256": "8c2a05d100b3928dbdbfcad347d089eb83014a75a9a4c3cdd759006b68d2bd85"
       }
     ]
   },
@@ -761,7 +761,7 @@
     }
   },
   "health_as_of": "2026-10-16T20:24:46.640274Z",
-  "health_age_hours": 287.29,
+  "health_age_hours": 288.67,
   "health_stale": true,
   "source_last_success": {
     "city_websites.charlotte_open_data": "2026-10-16T20:24:46.640274Z",
