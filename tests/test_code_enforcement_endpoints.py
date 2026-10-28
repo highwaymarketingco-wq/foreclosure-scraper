@@ -38,8 +38,17 @@ ALL = {**{f"{k} (cases)": v for k, v in CITY_ENDPOINTS.items()},
        **{f"{k} (severe)": v for k, v in SEVERE_ENDPOINTS.items()}}
 
 #: The host must contain the city's own name, or be an ArcGIS Online org id that a human
-#: has verified. Bare services*.arcgis.com entries are exactly how Yucaipa got in.
+#: has verified. Bare services*.arcgis.com entries are exactly how Yucaipa got in. For a
+#: GENUINELY shared multi-city host (one real org id serving several real cities -- e.g. Wake
+#: County's own code-enforcement feed, live-verified 2026-10-28, not guessed), the same org-id
+#: token is declared for each of those cities deliberately, and the check below matches against
+#: host+org-id (the full authority+first path segment), not the bare domain alone -- a random
+#: services*.arcgis.com/<other-org-id>/... still fails this exactly the same way Yucaipa would.
 CITY_HOST_TOKEN = {"Asheville": "ashevillenc", "Charlotte": "charlottenc"}
+for _wake_city in ("Raleigh", "Cary", "Apex", "Garner", "Wake Forest", "Fuquay Varina",
+                   "Zebulon", "Wendell", "Knightdale", "Rolesville", "Youngsville",
+                   "New Hill", "Willow Spring"):
+    CITY_HOST_TOKEN[_wake_city] = "a7cwfugp5znlye7i"
 
 
 @pytest.mark.parametrize("label", sorted(ALL))
@@ -48,10 +57,11 @@ def test_the_endpoint_host_belongs_to_its_own_city(label):
     url = ALL[label]["url"]
     token = CITY_HOST_TOKEN.get(city)
     assert token, f"{city} has no verified host token -- add one deliberately, do not guess"
-    host = re.sub(r"^https?://", "", url).split("/")[0].lower()
-    assert token in host, (
-        f"{label} points at {host!r}, which does not carry {token!r}. This is the Yucaipa "
-        f"check: a generic services*.arcgis.com host can serve ANY city in the country."
+    authority_and_org = re.sub(r"^https?://", "", url).split("/", 2)
+    host_plus_org = "/".join(authority_and_org[:2]).lower()
+    assert token in host_plus_org, (
+        f"{label} points at {host_plus_org!r}, which does not carry {token!r}. This is the "
+        f"Yucaipa check: a generic services*.arcgis.com host can serve ANY city in the country."
     )
 
 

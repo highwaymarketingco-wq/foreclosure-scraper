@@ -568,29 +568,38 @@ LAYERS: tuple[Layer, ...] = (
     # data, thin non-property nuisance complaints, or an outright login/token wall). Only Guilford,
     # Durham (NC) and York (SC) had a real, live, case-level hit.
     # ------------------------------------------------------------------
-    # Greensboro (Guilford County) code compliance cases, CaseStatus='A' (active) filters the
-    # 98,696-row full case history down to 1,511 currently-open cases; CaseType='Housing' (665 of
-    # those) isolates minimum-housing/structural violations from the weaker Nuisances/Vehicle/
-    # Zoning/Front-Yard-Parking/Graffiti categories on the same layer -- several rows are absentee
-    # LLC landlords (e.g. "Trail Llc", "Place Holdings Llc") with an out-of-state or out-of-county
-    # mailing address, a real distressed-landlord signal. CaseNotes carries tenant name/phone
-    # (confirmed live, e.g. "Tenant Andicca Clarke 336-42-6399") and is deliberately NOT requested,
-    # same privacy discipline as the rest of this module.
-    Layer(
-        slug="greensboro_code_housing",
-        state="NC", county="Guilford",
-        url=("https://gis.greensboro-nc.gov/arcgis/rest/services/"
-             "OpenGateCity/OpenData_CC_DS/MapServer/1"),
-        listing_type=ListingType.DISTRESSED,
-        where="CaseStatus='A' AND CaseType='Housing'",
-        fields=("CaseNumber", "CaseType", "FullAddress", "City", "State",
-                "OwnerName", "OwnerName2", "OwnerMailAddr", "OwnerMailCity",
-                "OwnerMailState", "OwnerMailZip", "EntryDate", "CaseStatus"),
-        situs="FullAddress", city="City", owner_last="OwnerName",
-        process="code_enforcement",
-        source_page=("https://www.greensboro-nc.gov/departments/"
-                      "neighborhood-development/code-compliance"),
-    ),
+    # Greensboro (Guilford County) code compliance cases -- REMOVED 2026-10-28. The layer below
+    # (OpenData_CC_DS/MapServer/1, where="CaseStatus='A' AND CaseType='Housing'") was added
+    # 2026-10-02 on the strength of a non-zero count (665) and never checked whether the sync
+    # was still running -- the SAME mistake enrichment_code_enforcement.py's own docstring
+    # already names and rejects for the old Asheville endpoint ("a false-positive distress
+    # signal manufactured from dead data"). Live re-verified 2026-10-28: an outStatistics MAX
+    # query on EntryDate against this exact where-clause returns 2024-06-18 as the newest row in
+    # the ENTIRE 665-row "active" set (confirmed again by CaseNumber -- the newest of all 665 is
+    # "24-003499", a 2024 case number, Durham's own year-prefix convention this module already
+    # uses elsewhere as a freshness tell). The table's full 98,696-row history (not just this
+    # filter) has not been written to since that date either -- the sync has simply stopped, and
+    # every "Active" status among these 665 has been frozen, not really open, for 2+ years.
+    # This had been live-wired and feeding raw["code_enforcement"]/raw["distressed"] for the
+    # full ~26 days since 2026-10-02 before this check caught it. Kept here, not deleted, so a
+    # future session does not re-add it on the strength of the same stale 665 count; re-check the
+    # live date range again before ever restoring this.
+    #
+    # Layer(
+    #     slug="greensboro_code_housing",
+    #     state="NC", county="Guilford",
+    #     url=("https://gis.greensboro-nc.gov/arcgis/rest/services/"
+    #          "OpenGateCity/OpenData_CC_DS/MapServer/1"),
+    #     listing_type=ListingType.DISTRESSED,
+    #     where="CaseStatus='A' AND CaseType='Housing'",
+    #     fields=("CaseNumber", "CaseType", "FullAddress", "City", "State",
+    #             "OwnerName", "OwnerName2", "OwnerMailAddr", "OwnerMailCity",
+    #             "OwnerMailState", "OwnerMailZip", "EntryDate", "CaseStatus"),
+    #     situs="FullAddress", city="City", owner_last="OwnerName",
+    #     process="code_enforcement",
+    #     source_page=("https://www.greensboro-nc.gov/departments/"
+    #                   "neighborhood-development/code-compliance"),
+    # ),
     # City of Durham's own "Open Landuse Code Violation Cases" dataset (its name, not a filter this
     # module applies) -- 1,110 rows, case numbers running "26-xxxx" confirming it is a live current
     # feed, not a stale export. No owner/parcel field, only situs (AddressNum + Street), so the
@@ -1187,7 +1196,7 @@ class ArcgisDistressLayers(BaseScraper):
             tolerate=("laurens_county_owned", "pickens_county_owned",
                       "burke_county_owned", "lincoln_code_violations",
                       "greenville_unpaid_tax_parcels",
-                      "greensboro_code_housing", "durham_open_code_violations",
+                      "durham_open_code_violations",
                       "rockhill_code_housing", "rockhill_code_demolition",
                       "rockhill_code_exterior_major"),
             attempts=3)

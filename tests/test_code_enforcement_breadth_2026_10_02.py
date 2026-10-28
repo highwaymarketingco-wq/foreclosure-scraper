@@ -45,11 +45,11 @@ def test_columbia_code_case_bridges_into_code_enforcement_and_is_severe():
     assert li.raw["arcgis_distress"]["layer"] == "columbia_code_vacant_boarded"
 
 
-def test_greensboro_housing_case_bridges_and_is_severe():
-    lay = _lay("greensboro_code_housing")
-    li = M._to_listing({"CaseNumber": "26-002", "FullAddress": "200 ELM ST"}, lay)
-    assert li.raw["code_enforcement"]["severe"] is True
-    assert li.raw["distressed"] is True
+def test_greensboro_code_housing_was_removed_for_being_frozen_since_2024():
+    """REMOVED 2026-10-28 -- the live service stopped syncing in June 2024; every row this
+    layer called "Active" had been frozen, not really open, for 2+ years. See
+    arcgis_distress_layers.py's own comment at the (now commented-out) Layer definition."""
+    assert not any(l.slug == "greensboro_code_housing" for l in M.LAYERS)
 
 
 def test_rockhill_housing_and_exterior_major_bridge_and_are_severe():
