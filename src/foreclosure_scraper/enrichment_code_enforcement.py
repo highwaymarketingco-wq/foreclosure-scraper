@@ -62,7 +62,7 @@ from __future__ import annotations
 import asyncio
 import math
 import re
-from typing import Optional
+from typing import Any, Optional
 
 import structlog
 
@@ -123,6 +123,28 @@ CITY_ENDPOINTS: dict[str, dict] = {
     },
 }
 
+# Wake County Code Enforcement (hosted on the Raleigh open-data portal, data.raleighnc.gov,
+# but live-verified 2026-10-28 to cover the whole county: 489 live cases spanning Raleigh,
+# Cary, Apex, Garner, Wake Forest, Fuquay Varina, Zebulon, Wendell, Knightdale, Rolesville,
+# Youngsville, New Hill, Willow Spring -- not Raleigh-city-only. maxDate across all rows was
+# 2026-10-27 (one day before this check), a genuinely live rolling feed, NOT the frozen-sync
+# trap this module's own docstring warns about for Asheville/the old Charlotte guess --
+# checked the actual date range before trusting it, not just a 200. No parcel/owner field,
+# address-match only (same addr_fields mechanism Charlotte already uses). CASE_STATUS uses
+# compound text ("Closed - VIO Resolved", "Void", etc.) -- this is why
+# _is_closed_status() replaced the old exact-match check for ALL cities, not just this one.
+_WAKE_CFG = {
+    "url": "https://services1.arcgis.com/a7CWfuGP5ZnLYE7I/arcgis/rest/services/codecases_90days_test/FeatureServer/0",
+    "addr_fields": ("STREET_ADDRESS",),
+    "violation_fields": ("CASE_TYPE", "DESCRIPTION"),
+    "status_fields": ("CASE_STATUS",),
+    "date_fields": ("OPENED_DATE",),
+}
+for _wake_city in ("Raleigh", "Cary", "Apex", "Garner", "Wake Forest", "Fuquay Varina",
+                   "Zebulon", "Wendell", "Knightdale", "Rolesville", "Youngsville",
+                   "New Hill", "Willow Spring"):
+    CITY_ENDPOINTS[_wake_city] = _WAKE_CFG
+
 #: Layers that are not "a violation" but a TERMINAL condition. A standing order to
 #: demolish means the structure is coming down: the owner is about to lose the
 #: improvement and keep the lot, which is the clearest motivated-seller state there is.
@@ -167,6 +189,20 @@ def _street_keywords(s: str) -> str:
     return max(tokens, key=len, default=s.strip())
 
 
+#: A city's own compound status text (e.g. Wake County's "Closed - VIO Resolved",
+#: "Closed – Inconclusive ", "Void") is still closed-equivalent even though it is not
+#: byte-identical to the bare "closed"/"resolved" this module originally checked for -- an
+#: exact-match test silently treated every one of those as OPEN. Prefix match on the same
+#: convention this project already uses for this exact problem
+#: (scrapers/counties_nc/gastonia_code_enforcement.py's own _is_closed/_CLOSED_RE).
+_CLOSED_STATUS_PREFIXES = ("closed", "resolved", "void")
+
+
+def _is_closed_status(status: Any) -> bool:
+    s = str(status or "").strip().lower()
+    return s.startswith(_CLOSED_STATUS_PREFIXES)
+
+
 def _pick(attrs: dict, fields: tuple) -> Optional[str]:
     norm = {k.lower(): v for k, v in attrs.items()}
     for f in fields:
@@ -202,7 +238,13 @@ async def _fetch_violations_for_listing(
                 "resultRecordCount": "10",
                 "f": "json",
             }
-            r = await c.get(cfg["url"], params=params, timeout=15.0)
+            # cfg["url"] is the LAYER url (test_every_endpoint_is_a_layer_url_not_a_query_url
+            # enforces this); /query is the actual ArcGIS REST query sub-resource -- without it
+            # this hits the layer's own metadata/schema endpoint (always 200, never has a
+            # "features" key) and every single city has been silently getting 0 results
+            # forever, confirmed live 2026-10-28 against Charlotte's own already-wired endpoint,
+            # not just the new ones added this session.
+            r = await c.get(cfg["url"].rstrip("/") + "/query", params=params, timeout=15.0)
             if r.status_code != 200:
                 continue
             data = r.json()
@@ -312,10 +354,10 @@ async def enrich_with_code_enforcement(listings: list[Listing]) -> None:
             block = {
                 "city": li.city,
                 "open_violations": len([v for v in violations
-                                        if v["status"].lower() not in ("closed", "resolved")]),
+                                        if not _is_closed_status(v["status"])]),
                 "total_violations": len(real_hits),
                 "violations": violations,
-                "has_open": any(s not in ("closed", "resolved") for s in statuses),
+                "has_open": any(not _is_closed_status(s) for s in statuses),
                 "source": _SOURCE_TAG,
             }
             li.raw["code_enforcement"] = stamp(block, ttl_days=_TTL_DAYS)
