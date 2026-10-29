@@ -41,10 +41,15 @@ own 14-digit PARID ("42028261520000") -- see that function's own docstring.
 
 GRID VS. BALANCE: tax_lien_munis.search()'s grid carries no dollar amount, only
 {address,owner,parcel,year,type,target} per bill row -- the balance comes only from each
-year's own ViewBill page (view()'s "due"). This module views every real-estate grid year up
-to VIEWS_PER_PARCEL_CAP (matching Nash's own 12, the full depth live-verified on a real
-parcel: DINKEL/42028261520000 showed a clean 4-year grid, 2023-2026 -- 12 stays a safety
-ceiling, not a typical cost).
+year's own ViewBill page (view()'s "due"). This module views grid years NEWEST FIRST (the
+grid itself lists them OLDEST first, live-confirmed against a real 19-year-deep parcel,
+2008-2026 -- the first version of this module took rows[:CAP] unsorted and silently only
+ever saw the oldest 12 years, never the current one) up to VIEWS_PER_PARCEL_CAP (matching
+Nash's own 12), STOPPING once a bill's own prior_unpaid flag is false -- no older unpaid
+bill on file means the rest are paid, the same early-exit tax_lien_munis.verify()'s own
+_decide() already uses. A parcel with only one bill record on file skips the grid entirely
+(tax_lien_munis.py's own _single_bill_row, added 2026-10-29 for this reason) and this
+module's view() call on it is a cache hit, no extra request.
 
 GATE, same discipline as enrichment_nash_multiyear_tax.py / enrichment_iredell_multiyear_tax.py.
 raw['two_year_delinquent'] is written for every row a search actually answers (status "ok",
@@ -215,6 +220,12 @@ async def _fetch(client: Any, board_parcel: str) -> tuple[Optional[list[dict]], 
     rows = [b for b in rows if "REAL ESTATE" in b["type"]]
     if not rows:
         return None, "parcel_not_found"
+    # NEWEST year first: live-verified 2026-10-29 against a real 19-year-deep Pender parcel
+    # (2008-2026) that the grid itself lists OLDEST first -- the naive rows[:CAP] this module
+    # shipped with first took the OLDEST 12 years and silently never saw the current,
+    # most-delinquency-relevant ones at all. Sorted here, matching tax_lien_munis.verify()'s
+    # own _decide() walk order.
+    rows = sorted(rows, key=lambda b: -b["year"])
     bills: list[dict] = []
     for b in rows[:VIEWS_PER_PARCEL_CAP]:
         try:
@@ -224,6 +235,8 @@ async def _fetch(client: Any, board_parcel: str) -> tuple[Optional[list[dict]], 
         except Exception:  # noqa: BLE001 - keep whatever years already viewed
             continue
         bills.append(page)
+        if not page.get("prior_unpaid"):
+            break   # no older unpaid bill on file: the rest are paid, same stop rule _decide() uses
     if not bills:
         return None, "bill_pages_unreadable"
     return bills, "ok"

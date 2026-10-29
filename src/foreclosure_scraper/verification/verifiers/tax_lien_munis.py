@@ -450,6 +450,39 @@ def _failed(client: Any, portal: Portal, why: str) -> None:
         st.dead = f"{st.failures} failures in a row this run, last {why}"[:200]
 
 
+#: A SINGLE-BILL parcel (exactly one bill record on file, any year) skips the browse grid
+#: entirely and lands straight on ViewBill.aspx -- live-verified 2026-10-29 against a real
+#: Pender parcel (42246871290000, "SWAN SONG PROPERTIES LLC", a single 2026 bill, $621.73
+#: due) that had never shown up in New Hanover/Hoke/Lee's own live testing, presumably
+#: because a parcel with only one bill-year on file is rare there but common on Pender's
+#: shorter digitized history. parse_grid() correctly returns None for this page (it is not a
+#: grid), but treating that as a hard failure wrongly tripped the PORTAL_MAX_FAILURES circuit
+#: breaker and silently zeroed out a real slice of a 658-row backfill (602 of 658 rows,
+#: enrichment_pender_multiyear_tax.py's own backfill log). The direct-landing page has no
+#: "Bill Type" field to read (checked live: ViewBill1_CategoryLabel is the PARCEL ID, not a
+#: type) -- its own <title> ("Real Estate Bill Details") and the fact it was only reachable
+#: through the Real Estate search form (Personal Property / Utility Bills are entirely
+#: separate top-level searches on this platform) are the only signal, and a strong enough one
+#: to treat it as a REGULAR/ORIGINAL - REAL ESTATE bill, matching the type string _regular()
+#: already checks for.
+_SINGLE_BILL_TYPE = "REGULAR/ORIGINAL - REAL ESTATE"
+
+
+def _single_bill_row(client: Any, portal: Portal, page_text: str) -> Optional[dict]:
+    """A grid-shaped row for a direct ViewBill.aspx landing (see _SINGLE_BILL_TYPE above),
+    with the bill page itself pre-cached under this row's own synthetic target so a caller's
+    later view() call returns it with no extra request."""
+    bill = parse_bill(page_text)
+    if bill is None:
+        return None
+    target = f"_direct_landing_{bill['year']}"
+    row = {"address": None, "unit": None, "owner": bill.get("owner"), "parcel": bill.get("parcel"),
+          "year": bill["year"], "type": _SINGLE_BILL_TYPE, "target": target}
+    ck = ("bill", portal.county, tc.alnum(bill.get("parcel")), bill["year"], target)
+    _run(client)["cache"][ck] = bill
+    return row
+
+
 async def search(client: Any, portal: Portal, parcel: str) -> list[dict]:
     """The bills of exactly this parcel (all years), and the session left on its browse page."""
     st = _state(client, portal)
@@ -463,7 +496,10 @@ async def search(client: Any, portal: Portal, parcel: str) -> list[dict]:
             raise RuntimeError(f"search HTTP {r.status}")
         grid = parse_grid(r.text)
         if grid is None:
-            raise ValueError("no bills grid on the answer")
+            single = _single_bill_row(client, portal, r.text)
+            if single is None:
+                raise ValueError("no bills grid on the answer")
+            grid = [single]
     except PortalDown:
         raise
     except Exception as exc:  # noqa: BLE001

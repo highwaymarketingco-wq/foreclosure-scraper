@@ -164,6 +164,86 @@ def test_applies():
                           "source": "x", "parcel_id": "R1", "raw": {}})
 
 
+class _FakeClientHandle:
+    """A stand-in `client` for tests that only need identity, not real I/O -- `object()` can't
+    be weakly referenced, which would silently make _run()'s WeakKeyDictionary cache fall back
+    to a fresh, disconnected dict on every call (its own TypeError except-fallback)."""
+
+
+def _view_bill_page(year, parcel, owner, due, amount=None):
+    """A real-shaped ViewBill.aspx page (the direct-landing case _single_bill_row reads), no
+    browse grid at all -- same span-id convention FakeMunis._bill() already uses."""
+    amount = amount if amount is not None else due
+
+    def span(sfx, v):
+        return f'<span id="ctl00_ctl00_PrimaryPlaceHolder_ContentPlaceHolderMain_ViewBill1_{sfx}">{v}</span>'
+    return ("<table>" + span("FiscalYearLabel", year) + span("BillNumberLabel", f"{year % 100}000001")
+            + span("OwnerLabel", owner) + span("CategoryLabel", parcel) + "</table>"
+            '<div id="ctl00_ctl00_PrimaryPlaceHolder_ContentPlaceHolderMain_ViewBill1_BillDetailsUpdatePanel">'
+            '<table class="datatable nocaption"><tr><th>Installment</th><th>Pay By</th><th>Amount</th>'
+            '<th>Payments/Credits</th><th>Balance</th><th>Interest</th><th>Due</th></tr>'
+            f'<tr><td>1</td><td>1/5/{year + 1}</td><td>${amount:,.2f}</td><td>$0.00</td>'
+            f'<td>${due:,.2f}</td><td>$0.00</td><td>${due:,.2f}</td></tr>'
+            f'<tr><td colspan="2" class="strong">TOTAL</td><td>${amount:,.2f}</td><td>$0.00</td>'
+            f'<td>${due:,.2f}</td><td>$0.00</td><td>${due:,.2f}</td></tr></table></div>')
+
+
+def test_single_bill_row_reads_a_direct_viewbill_landing():
+    """2026-10-29: a parcel with exactly one bill record on file skips the browse grid
+    entirely and lands straight on ViewBill.aspx -- live-verified against a real Pender
+    parcel (42246871290000, a single 2026 bill, $621.73 due). parse_grid() correctly answers
+    None for this page (there is no grid); treating that as a hard search() failure wrongly
+    tripped the circuit breaker and zeroed out 602 of 658 rows in a real backfill."""
+    page = _view_bill_page(2026, "42246871290000", "SWAN SONG PROPERTIES LLC", 621.73)
+    fake_client = _FakeClientHandle()
+    row = p._single_bill_row(fake_client, p.PORTALS["Pender"], page)
+    assert row["year"] == 2026
+    assert row["owner"] == "SWAN SONG PROPERTIES LLC"
+    assert row["parcel"] == "42246871290000"
+    assert row["type"] == p._SINGLE_BILL_TYPE
+    assert "REAL ESTATE" in row["type"]
+
+
+def test_single_bill_row_pre_caches_the_bill_so_view_is_a_free_hit():
+    page = _view_bill_page(2026, "42246871290000", "SWAN SONG PROPERTIES LLC", 621.73)
+    client = _FakeClientHandle()
+    row = p._single_bill_row(client, p.PORTALS["Pender"], page)
+    bill_page = asyncio.run(p.view(client, p.PORTALS["Pender"], row["parcel"], row))
+    assert bill_page["due"] == 621.73
+    assert bill_page["owner"] == "SWAN SONG PROPERTIES LLC"
+
+
+def test_single_bill_row_returns_none_on_a_page_that_is_neither_grid_nor_bill():
+    assert p._single_bill_row(object(), p.PORTALS["Pender"], "<html>not a real page</html>") is None
+
+
+def test_search_falls_back_to_single_bill_row_when_the_grid_is_missing():
+    """End-to-end through search() itself (not just the pure helper): a FORM POST whose
+    answer is a ViewBill page, not a browse grid, must still return a usable one-row result
+    instead of raising and tripping the circuit breaker."""
+    class DirectLandingMunis:
+        def form_session(self, **_):
+            return self
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return None
+
+        async def get(self, url, **_):
+            return FormResponse(200, url, '<form><input type="hidden" name="__VIEWSTATE" '
+                                f'id="__VIEWSTATE" value="vs1" /><input name="{p.PARCEL_FIELD}" '
+                                'type="text" maxlength="30" /></form>')
+
+        async def post_form(self, url, data, **_):
+            return FormResponse(200, url, _view_bill_page(2026, "42246871290000",
+                                                          "SWAN SONG PROPERTIES LLC", 621.73))
+
+    rows = asyncio.run(p.search(DirectLandingMunis(), p.PORTALS["Pender"], "42246871290000"))
+    assert len(rows) == 1 and rows[0]["year"] == 2026
+
+
 def test_hoke_applies_with_no_munis_roll_block():
     """2026-10-18: Hoke's rows come from nc_tax_lien_ads (the county's own ad-list PDF), not this
     module's own nc_county_csv_delinquent_tax roll -- applies() must still recognize them via the

@@ -27,10 +27,22 @@ BOARD_PARCEL = "4202-82-6152-0000"
 PARID = "42028261520000"          # what Pender's Munis actually wants (dashes stripped)
 
 
-def bill(year, due, *, owner="TESTOWNER ALPHA", parcel=PARID, pay_by=None):
+def bill(year, due, *, owner="TESTOWNER ALPHA", parcel=PARID, pay_by=None, prior_unpaid=False):
     return {"year": year, "bill": f"{year % 100}00001", "owner": owner, "parcel": parcel,
             "amount": round(due + 100, 2), "credits": 100.0, "balance": due, "interest": 0.0,
-            "due": due, "pay_by": pay_by or f"{year}-09-01", "prior_unpaid": False, "newer_unpaid": False}
+            "due": due, "pay_by": pay_by or f"{year}-09-01", "prior_unpaid": prior_unpaid,
+            "newer_unpaid": False}
+
+
+def bills_sequence(*years_and_due):
+    """A realistic multi-year sequence: every bill but the OLDEST says prior_unpaid=True (an
+    older unpaid bill is still on file), matching how a real chronic-delinquent Pender parcel
+    actually answers -- this module's _fetch() now views newest-first and stops at the first
+    prior_unpaid=False it sees (see its own 2026-10-29 fix), so a test fixture with every bill
+    defaulting to prior_unpaid=False would only ever exercise the newest year."""
+    pairs = sorted(years_and_due)
+    out = [bill(y, d, prior_unpaid=(i > 0)) for i, (y, d) in enumerate(pairs)]
+    return out
 
 
 def _li(parcel=BOARD_PARCEL, county="Pender", state="NC", raw=None) -> Listing:
@@ -161,8 +173,19 @@ class FakePenderMunis:
             return f'<span id="ctl00_ctl00_PrimaryPlaceHolder_ContentPlaceHolderMain_ViewBill1_{sfx}">{v}</span>'
         due, amount = b["due"], b["amount"]
         paid = round(amount - due, 2)
+        # parse_bill() reads prior_unpaid/newer_unpaid from this paragraph's own text (the
+        # portal's real wording: "You have ... prior unpaid bill(s)" / "... newer unpaid
+        # bill(s)") -- omitting it (as an earlier version of this fake did) silently makes
+        # every bill answer prior_unpaid=False regardless of what this dict says.
+        msgs = []
+        if b.get("prior_unpaid"):
+            msgs.append("You have prior unpaid bills.")
+        if b.get("newer_unpaid"):
+            msgs.append("You have a newer unpaid bill.")
+        blockage = f'<p id="x_BlockageMessageParagraph">{" ".join(msgs)}</p>'
         return ("<table>" + span("FiscalYearLabel", b["year"]) + span("BillNumberLabel", b["bill"])
                 + span("OwnerLabel", b["owner"]) + span("CategoryLabel", b["parcel"]) + "</table>"
+                + blockage +
                 '<div id="x_ViewBill1_BillDetailsUpdatePanel">'
                 '<table class="datatable"><tr><th>Installment</th><th>Pay By</th><th>Amount</th>'
                 '<th>Payments/Credits</th><th>Balance</th><th>Interest</th><th>Due</th></tr>'
@@ -177,7 +200,7 @@ class FakePenderMunis:
 # ---------------------------------------------------------------------------
 
 def test_fetch_ok_path_reuses_tax_lien_munis_search_and_view_verbatim():
-    bills = [bill(2024, 30.0), bill(2025, 32.0)]
+    bills = bills_sequence((2024, 30.0), (2025, 32.0))
     client = FakePenderMunis({PARID: bills})
     got, status = run(_fetch(client, BOARD_PARCEL))
     assert status == "ok"
@@ -201,7 +224,7 @@ def test_fetch_parcel_not_found():
 
 
 def test_enrich_end_to_end_qualifies_both_blocks():
-    bills = [bill(2024, 52.0), bill(2025, 50.0), bill(2026, 10.0)]
+    bills = bills_sequence((2024, 52.0), (2025, 50.0), (2026, 10.0))
     li = _li()
     client = FakePenderMunis({PARID: bills})
     stats = run(enrich_with_pender_multiyear_tax([li], client=client))
@@ -240,3 +263,37 @@ def test_enrich_runs_one_row_at_a_time_by_default():
     per-portal session and the real portal answered search HTTP 500 for both -- see the
     module docstring. The default must stay 1."""
     assert mod.CONCURRENCY == 1
+
+
+def test_fetch_views_newest_year_first():
+    """2026-10-29: a real 19-year-deep Pender parcel's grid lists years OLDEST first; the
+    first version of this module took rows[:CAP] unsorted and only ever saw the oldest 12
+    years, never the current one."""
+    bills = [bill(2020, 0.0, prior_unpaid=False), bill(2021, 0.0, prior_unpaid=False),
+            bill(2022, 50.0, prior_unpaid=True)]
+    # FakePenderMunis._browse enumerates self.shown (sorted by year ascending) in that same
+    # order -- the real grid's own oldest-first shape, confirmed live 2026-10-29.
+    client = FakePenderMunis({PARID: bills})
+    got, status = run(_fetch(client, BOARD_PARCEL))
+    assert status == "ok"
+    assert got[0]["year"] == 2022   # newest viewed first, not the grid's own oldest-first order
+
+
+def test_fetch_stops_once_an_older_bill_is_known_fully_paid():
+    """Once a viewed year's own prior_unpaid is False, every OLDER year is known paid already
+    (the portal's own statement, not inferred) -- they are never fetched at all."""
+    bills = [bill(2020, 50.0, prior_unpaid=False),   # would be unpaid, but never reached
+            bill(2021, 0.0, prior_unpaid=False),     # no older unpaid bill on file -> stop here
+            bill(2022, 10.0, prior_unpaid=True)]     # newest, viewed first
+    client = FakePenderMunis({PARID: bills})
+    got, status = run(_fetch(client, BOARD_PARCEL))
+    assert status == "ok"
+    assert [b["year"] for b in got] == [2022, 2021]
+    assert 2020 not in {b["year"] for b in got}
+
+
+def test_single_year_parcel_is_not_truncated_by_the_cap():
+    bills = [bill(2026, 621.73)]
+    client = FakePenderMunis({PARID: bills})
+    got, status = run(_fetch(client, BOARD_PARCEL))
+    assert status == "ok" and [b["year"] for b in got] == [2026]
