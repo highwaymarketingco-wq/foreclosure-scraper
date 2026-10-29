@@ -89,8 +89,16 @@ def main() -> int:
         stats = asyncio.run(enrich_with_cabarrus_multiyear_tax(listings))
         print(f"  {stats}")
         for key, li in cands:
-            seen_keys.add(key)
+            # 2026-10-29: only mark a key "seen" once it was ACTUALLY touched this batch --
+            # enrich_with_cabarrus_multiyear_tax() internally caps at CABARRUS_MYDT_MAX (300)
+            # per call, so a batch handed 493 candidates only touches the first 300; the other
+            # 193 never got li.raw set at all. Marking them "seen" anyway (as this used to do)
+            # made the next batch's re-scan find "nothing left eligible" -- stopping the whole
+            # run 193 rows short of what --max-batches actually promised, with no error or
+            # warning. Caught live: a real run wrote 300/493, reported done, and a second
+            # invocation of this exact script was needed to pick up the rest.
             if TYD_KEY in li.raw or MYDT_KEY in li.raw or CHECKED_KEY in li.raw:
+                seen_keys.add(key)
                 checked += 1
                 if MYDT_KEY in li.raw:
                     qualified += 1
