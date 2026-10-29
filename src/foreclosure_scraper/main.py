@@ -3522,6 +3522,20 @@ async def run_enrich_tail(st: TailState) -> dict:
     except Exception:
         log.error("nash_mydt.failed", traceback=traceback.format_exc())
 
+    # Pender NC per-parcel tax search (Munis Citizen Self Service, mss.pendercountync.gov/css --
+    # already a registered Portal in verification/verifiers/tax_lien_munis.py's own PORTALS dict,
+    # added 2026-10-29): multi-year unpaid-bill history, keyed by the board's own parcel_id (a
+    # prior "needs stealth-browser, AJAX-rendered" diagnosis was wrong -- see tax_lien_munis.py's
+    # PORTALS note; a plain modern-UA fetch works unchanged). Must run BEFORE enrich_tax_owed,
+    # same reason as nash_mydt above. Gate off with FORECLOSURE_PENDER_MYDT=0.
+    try:
+        from .enrichment_pender_multiyear_tax import enrich_with_pender_multiyear_tax
+        s = await _await_capped(enrich_with_pender_multiyear_tax(enriched), "pender_mydt")
+        if s:
+            enrichment_stats["pender_mydt"] = s
+    except Exception:
+        log.error("pender_mydt.failed", traceback=traceback.format_exc())
+
     # Iredell NC per-parcel tax search (classic ITS.NET TaxBill.aspx, same vendor tax_lien_itsnet.py
     # already drives for Iredell/Chowan tax-lien verification): multi-year unpaid-bill history.
     # Must run BEFORE enrich_tax_owed, same reason as nash_mydt/gaston_mydt above. Gate off with
