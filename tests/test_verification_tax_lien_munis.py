@@ -202,6 +202,30 @@ def test_a_block_of_another_parcel_names_no_claimed_year():
     assert p.claimed_years(row_of()) == [2017, 2016]
 
 
+def test_pender_applies_and_is_undashed_for_the_search():
+    """2026-10-29: Pender is on the same Munis platform (mss.pendercountync.gov/css),
+    live-verified against 3 real board parcels. Its board parcel_id is dashed the OPPOSITE
+    way New Hanover's is -- "4202-82-6152-0000" -- and the portal's internal PARID wants it
+    undashed, "42028261520000" (confirmed live: owner DINKEL, same PARID the iasWorld CAMA
+    side for the same parcel also carries). search_id must take a county to know which
+    direction to go; omitting it (every other portal's own tests above) must keep behaving
+    exactly as before."""
+    row = {"state": "NC", "county": "Pender", "listing_type": "tax_lien",
+           "source": "counties_nc.nc_tax_lien_ads", "parcel_id": "4202-82-6152-0000",
+           "raw": {"tax_owed": {"balance": 900.0, "year": 2025}}}
+    assert p.portal_of(row) is p.PORTALS["Pender"]
+    assert p.PORTALS["Pender"].base.endswith("/css")
+    assert p.applies(row)
+    assert p.search_id("4202-82-6152-0000", "Pender") == "42028261520000"
+    assert p.search_id("4202-82-6152-0000", "pender") == "42028261520000"   # case-insensitive
+    # a county OTHER than Pender, or none at all, must not take the undash branch
+    assert p.search_id("4202-82-6152-0000") == "4202-82-6152-0000"
+    assert p.search_id("4202-82-6152-0000", "New Hanover") == "4202-82-6152-0000"
+    # already-undashed or a shape that doesn't match the 4-2-4-4 grouping passes through
+    assert p.search_id("42028261520000", "Pender") == "42028261520000"
+    assert p.search_id("R09999-001-002-000", "Pender") == "R09999-001-002-000"
+
+
 def test_an_undashed_parcel_id_is_dashed_for_the_search():
     assert p.search_id("R09999001002000") == "R09999-001-002-000"
     assert p.search_id("R09999-001-002-000") == "R09999-001-002-000"

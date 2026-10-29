@@ -121,6 +121,15 @@ PORTALS: dict[str, Portal] = {
     "New Hanover": Portal("New Hanover", "https://newhanovercountynccss.munisselfservice.com"),
     "Hoke": Portal("Hoke", "https://hokecountytaxes.munisselfservice.com"),
     "Lee": Portal("Lee", "https://leecountync.munisselfservice.com"),
+    # ADDED 2026-10-29. Live-verified: the search form's real control names ARE in a plain
+    # fetch's HTML (a bare `curl` with no User-Agent was misread as "AJAX-rendered, fields
+    # missing" in an earlier pass -- that fetch was actually hitting a browser-upgrade
+    # redirect, `Location: /css/common/Upgrade.aspx`, that a modern UA avoids entirely; this
+    # project's own Fetcher.form_session() already sends one). search()/view()/parse_grid()/
+    # parse_bill() all work UNCHANGED: a live owner-name search for "DINKEL" returned the real
+    # multi-year grid (parcel 42028261520000, 1707 S Anderson Blvd, bills 2023-2026). The
+    # `/css` path segment is REQUIRED (the tenant's base, not `/citizens/...` directly).
+    "Pender": Portal("Pender", "https://mss.pendercountync.gov/css"),
 }
 _BY_COUNTY = {k.lower(): v for k, v in PORTALS.items()}
 
@@ -180,13 +189,26 @@ def applies(row: dict) -> bool:
 
 
 _UNDASHED = re.compile(r"^([A-Z]{1,2}\d{4,5})(\d{3})(\d{3})([0-9A-Z]{3})$")
+#: Pender's board parcel_id ("4202-82-6152-0000") is dashed the OPPOSITE way New Hanover's is --
+#: the portal's internal PARID wants the 14 digits with NO dashes ("42028261520000"), confirmed
+#: live against a real parcel (owner DINKEL, same PARID on the iasWorld CAMA side too, see the
+#: module's 2026-10-29 PORTALS note). A 1,543-row sample of real board parcel_ids (10 non-null
+#: examples checked) is consistently this 4-2-4-4 digit grouping; nothing else on this portal
+#: uses it, so this is scoped to Pender specifically rather than a blanket digit-dash rule that
+#: could misfire for some other county's own dashed-but-different numbering.
+_PENDER_DASHED = re.compile(r"^(\d{4})-(\d{2})-(\d{4})-(\d{4})$")
 
 
-def search_id(parcel: Any) -> str:
+def search_id(parcel: Any, county: Optional[str] = None) -> str:
     """The parcel id as the portal's Parcel ID search wants it: New Hanover's "R09999-001-002-000".
     The board also carries it with the dashes dropped ("R09999001002000", 568 rows on 2026-10-07),
-    which the portal does not find; those are dashed again. Anything else is passed as it is."""
+    which the portal does not find; those are dashed again. Pender's board id is dashed digits
+    that the portal wants UNDASHED (see _PENDER_DASHED above) -- the opposite direction, and only
+    for Pender. Anything else is passed as it is."""
     s = str(parcel or "").strip().upper()
+    if (county or "").strip().lower() == "pender":
+        m = _PENDER_DASHED.match(s)
+        return "".join(m.groups()) if m else s
     m = _UNDASHED.match(s)
     return "-".join(m.groups()) if m else s
 
@@ -541,7 +563,7 @@ async def verify(row: dict, client, *, today: Optional[date] = None) -> Verifica
     parcel = str(row.get("parcel_id") or "").strip()
     if not tc.alnum(parcel) or set(tc.alnum(parcel)) <= {"0"}:
         return _res("unconfirmed", dict(ev, reason="parcel_unresolvable"))
-    parcel = search_id(parcel)
+    parcel = search_id(parcel, portal.county)
     try:
         bills = await search(client, portal, parcel)
     except PortalDown as exc:
