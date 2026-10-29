@@ -110,13 +110,14 @@ def _name_parts(owner: str) -> Optional[tuple[str, str]]:
     last, first = last.strip().upper(), first.strip().upper()
     if len(last) < 2 or len(first) < 2:
         return None
-    if len(last) > 25 or len(first) > 25:
+    if len(last) >= 25 or len(first) >= 25:
         # A joint-owner mailing name with no separator before a comma-joined final
         # owner (e.g. "SMITH JOHN DOE JANE, WILL") makes the comma-partition above
         # swallow every prior owner into `last`. Not a real person's name either
-        # way, and BOP's own form rejects anything over 25 chars per field --
-        # live-verified 2026-10-29 ("length that exceeds the allowed size of 25"
-        # on both First Name and Last Name) -- so every such query was doomed
+        # way, and BOP's own form rejects at exactly 25 chars per field, despite
+        # its own message saying "exceeds the allowed size of 25" -- live-verified
+        # 2026-10-29: 24 chars passes, 25 chars fails, on both fields -- so every
+        # such query was doomed
         # before it was sent, tripping bop_federal's host_failing breaker on a
         # deterministic input bug, not a real host problem.
         return None

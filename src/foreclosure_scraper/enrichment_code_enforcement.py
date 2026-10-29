@@ -259,6 +259,24 @@ async def _fetch_violations_for_listing(
     return [] if answered else None
 
 
+def _proximity_filter(li: Listing, feats: list[dict]) -> list[dict]:
+    """Narrow raw address-keyword hits to ones within ~250ft of the listing's own
+    coordinates; returns `feats` unfiltered when the listing has no coordinates to
+    check against (same fallback the main CITY_ENDPOINTS loop already uses)."""
+    if not (li.latitude and li.longitude):
+        return feats
+    out = []
+    for f in feats:
+        geom = f.get("geometry") or {}
+        glat, glon = geom.get("y"), geom.get("x")
+        if glat is None or glon is None:
+            continue
+        if _haversine_miles(float(li.latitude), float(li.longitude),
+                             float(glat), float(glon)) <= 0.05:
+            out.append(f)
+    return out
+
+
 def _clear_stale_block(li: Listing, counts: dict) -> None:
     """The city answered and has no case at this address.
 
@@ -289,19 +307,23 @@ async def enrich_with_code_enforcement(listings: list[Listing]) -> None:
 
     # City detection by city name (case-insensitive)
     targets_by_city: dict[str, list[Listing]] = {}
+    severe_targets_by_city: dict[str, list[Listing]] = {}
     for li in listings:
         if not li.city:
             continue
         city_norm = li.city.strip().title()
         if city_norm in CITY_ENDPOINTS:
             targets_by_city.setdefault(city_norm, []).append(li)
+        if city_norm in SEVERE_ENDPOINTS:
+            severe_targets_by_city.setdefault(city_norm, []).append(li)
 
-    if not targets_by_city:
+    if not targets_by_city and not severe_targets_by_city:
         log.info("code_enf.no_targets")
         return
 
     sem = asyncio.Semaphore(4)
-    counts = {"queried": 0, "tagged": 0, "violations_found": 0}
+    counts = {"queried": 0, "tagged": 0, "violations_found": 0,
+              "severe_queried": 0, "severe_tagged": 0}
 
     async def one(li: Listing, cfg: dict) -> None:
         async with sem:
@@ -312,21 +334,7 @@ async def enrich_with_code_enforcement(listings: list[Listing]) -> None:
             if not feats:
                 _clear_stale_block(li, counts)
                 return
-            # Verify by lat/lng proximity if listing has coords
-            real_hits: list[dict] = []
-            if li.latitude and li.longitude:
-                for f in feats:
-                    geom = f.get("geometry") or {}
-                    glat, glon = geom.get("y"), geom.get("x")
-                    if glat is None or glon is None:
-                        continue
-                    d = _haversine_miles(float(li.latitude), float(li.longitude),
-                                         float(glat), float(glon))
-                    if d <= 0.05:  # 0.05 mile = ~250 ft
-                        real_hits.append(f)
-            else:
-                real_hits = feats
-
+            real_hits = _proximity_filter(li, feats)
             if not real_hits:
                 _clear_stale_block(li, counts)
                 return
@@ -362,10 +370,40 @@ async def enrich_with_code_enforcement(listings: list[Listing]) -> None:
             }
             li.raw["code_enforcement"] = stamp(block, ttl_days=_TTL_DAYS)
 
+    async def severe_one(li: Listing, cfg: dict) -> None:
+        """A standing order to demolish outranks an ordinary open-violation case, so
+        it is checked separately and merged in as a `severity` marker on whatever
+        code_enforcement block already exists (building a minimal one if this city
+        isn't also in CITY_ENDPOINTS) rather than overwriting it. A miss here means
+        "no demolish order on file" -- NOT "no violations" -- so it never clears an
+        existing block the regular pass (or another producer) already wrote."""
+        async with sem:
+            feats = await _fetch_violations_for_listing(c, li, cfg)
+            counts["severe_queried"] += 1
+            if not feats:
+                return
+            real_hits = _proximity_filter(li, feats)
+            if not real_hits:
+                return
+            if not isinstance(li.raw, dict):
+                li.raw = {}
+            ce = li.raw.get("code_enforcement")
+            if not isinstance(ce, dict):
+                ce = {"city": li.city, "open_violations": 0, "total_violations": 0,
+                      "violations": [], "has_open": False, "source": _SOURCE_TAG}
+            ce["severity"] = cfg["severity"]
+            ce["has_open"] = True
+            li.raw["code_enforcement"] = stamp(ce, ttl_days=_TTL_DAYS)
+            counts["severe_tagged"] += 1
+
     async with client(timeout=20.0) as c:
         for city, lis in targets_by_city.items():
             cfg = CITY_ENDPOINTS[city]
             log.info("code_enf.city_start", city=city, target_count=len(lis))
             await asyncio.gather(*(one(li, cfg) for li in lis))
+        for city, lis in severe_targets_by_city.items():
+            cfg = SEVERE_ENDPOINTS[city]
+            log.info("code_enf.severe_city_start", city=city, target_count=len(lis))
+            await asyncio.gather(*(severe_one(li, cfg) for li in lis))
 
     log.info("code_enf.done", **counts)

@@ -112,9 +112,11 @@ async def _bop_lookup(http: httpx.AsyncClient, last: str, first: str) -> _Lookup
                     exc_msg=str(exc)[:200])
         return _Lookup()
     if not isinstance(data, dict) or "InmateLocator" not in data:
-        log.warning("bop.lookup_failed", reason="shape",
+        log.warning("bop.lookup_failed", reason="shape", last=last, first=first,
+                    last_len=len(last), first_len=len(first),
                     data_type=type(data).__name__,
-                    data_preview=str(data)[:200] if not isinstance(data, dict) else sorted(data.keys()))
+                    data_preview=str(data)[:300] if not isinstance(data, dict) else sorted(data.keys()),
+                    body=str(data)[:300])
         return _Lookup()                # not the JSON shape we verified — no answer
     if data.get("Captcha"):
         return _Lookup(blocked=True)     # would only trip if BOP ever gates this feed
