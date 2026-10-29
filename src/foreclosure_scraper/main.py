@@ -590,6 +590,7 @@ def _coastal_county_source(li: Listing) -> bool:
 # inventory, not historical events. For everything else (court rosters, law-firm
 # trustee calendars, tax-sale lists, public notices) we require a parseable date.
 DATELESS_OK_SOURCES = {
+    "counties_sc.sc_richland_probate",     # Richland Estate Inquiry: a filed estate is a standing condition, no sale date
     "national.usmarshals_realproperty",   # audit 2026-10-09: federal sale lists carry no filing date
     "national.tranzon",
     # 2026-10-07 new sources: standing tax balances, tax-foreclosure parcels and obituary/estate lists carry
