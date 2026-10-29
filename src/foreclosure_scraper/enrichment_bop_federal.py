@@ -104,11 +104,17 @@ async def _bop_lookup(http: httpx.AsyncClient, last: str, first: str) -> _Lookup
         if r.status_code in _BLOCK_STATUS:
             return _Lookup(blocked=True)
         if r.status_code != 200:
+            log.warning("bop.lookup_failed", reason="status", status=r.status_code)
             return _Lookup()
         data = r.json()
-    except Exception:
+    except Exception as exc:
+        log.warning("bop.lookup_failed", reason="exception", exc_type=type(exc).__name__,
+                    exc_msg=str(exc)[:200])
         return _Lookup()
     if not isinstance(data, dict) or "InmateLocator" not in data:
+        log.warning("bop.lookup_failed", reason="shape",
+                    data_type=type(data).__name__,
+                    data_preview=str(data)[:200] if not isinstance(data, dict) else sorted(data.keys()))
         return _Lookup()                # not the JSON shape we verified — no answer
     if data.get("Captcha"):
         return _Lookup(blocked=True)     # would only trip if BOP ever gates this feed
