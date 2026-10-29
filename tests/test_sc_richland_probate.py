@@ -5,7 +5,59 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from foreclosure_scraper.scrapers.counties_sc.sc_richland_probate import _is_current, _parse_results
+from foreclosure_scraper.scrapers.counties_sc.sc_richland_probate import (
+    _is_current, _parse_detail, _parse_results, case_number_parts,
+)
+
+REAL_DETAIL_LUCAS = """
+<span id="lblCaseNumber">2026-ES40-00110</span>
+<table id="dlPR" cellspacing="2" cellpadding="2" border="0">
+	<tr>
+		<td>
+                        <td class="rowHeading2">Name</td>
+                        <td class="rowHeading2">1st Line Address</td>
+                        <td class="rowHeading2">2nd Line Address</td>
+                        <td class="rowHeading2">City</td>
+                        <td class="rowHeading2">State Zip</td>
+                        <td class="rowHeading2">Work Phone</td>
+                        <td class="rowHeading2">Home Phone</td>
+                    </td>
+	</tr><tr>
+		<td>
+                        <td class="rowHeading3">Marjan S. Lucas</td>
+                        <td class="rowHeading3">100 SUNSET BLVD</td>
+                        <td class="rowHeading3">APT 704</td>
+                        <td class="rowHeading3">WEST COLUMBIA</td>
+                        <td class="rowHeading3">SC 29169</td>
+                        <td class="rowHeading3"></td>
+                        <td class="rowHeading3">8034147444</td>
+                    </td>
+	</tr>
+</table>
+<table id="dlAT" cellspacing="2" cellpadding="2" border="0">
+	<tr>
+		<td>
+                        <td class="rowHeading2">Name</td>
+                        <td class="rowHeading2">1st Line Address</td>
+                        <td class="rowHeading2">2nd Line Address</td>
+                        <td class="rowHeading2">City</td>
+                        <td class="rowHeading2">State Zip</td>
+                        <td class="rowHeading2">Work Phone</td>
+                        <td class="rowHeading2">Home Phone</td>
+                    </td>
+	</tr><tr>
+		<td>
+                        <td class="rowHeading3">Madison Elizabeth    Barnhill            </td>
+                        <td class="rowHeading3">609 Sims Avenue</td>
+                        <td class="rowHeading3"></td>
+                        <td class="rowHeading3">COLUMBIA</td>
+                        <td class="rowHeading3">SC 29205</td>
+                        <td class="rowHeading3"></td>
+                        <td class="rowHeading3">8032521500</td>
+                    </td>
+	</tr>
+</table>
+"""
 
 REAL_RESULTS_SIMS_ISOM = """
 <table tabindex="6" cellspacing="0" cellpadding="6" border="0" id="gvEstates" width="100%">
@@ -91,3 +143,30 @@ def test_is_current_keeps_recently_closed_estate():
 def test_is_current_drops_long_closed_estate():
     row = {"date_closed": "04/01/1985"}
     assert _is_current(row, datetime(2026, 10, 28)) is False
+
+
+def test_case_number_parts_reads_real_format():
+    assert case_number_parts("1991-ES40-00827") == ("1991", "827")
+    assert case_number_parts("2026-ES40-00110") == ("2026", "110")
+
+
+def test_case_number_parts_none_on_unrecognized_format():
+    assert case_number_parts("not-a-case-number") is None
+    assert case_number_parts("") is None
+
+
+def test_parse_detail_reads_real_pr_and_attorney():
+    d = _parse_detail(REAL_DETAIL_LUCAS)
+    assert d["pr"]["name"] == "Marjan S. Lucas"
+    assert d["pr"]["address_line1"] == "100 SUNSET BLVD"
+    assert d["pr"]["city"] == "WEST COLUMBIA"
+    assert d["pr"]["home_phone"] == "8034147444"
+    assert d["attorney"]["name"] == "Madison Elizabeth    Barnhill"
+    assert d["attorney"]["address_line1"] == "609 Sims Avenue"
+    assert d["attorney"]["home_phone"] == "8032521500"
+
+
+def test_parse_detail_none_on_garbage():
+    d = _parse_detail("<html><body>not a detail page</body></html>")
+    assert d["pr"] is None
+    assert d["attorney"] is None

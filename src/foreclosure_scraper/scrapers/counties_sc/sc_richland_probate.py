@@ -31,9 +31,23 @@ name pair, rather than treating it as "this name has no cases."
 Each result row carries Case Number, Decedent's Name (Last/First/Middle/Suffix spans), Date of
 Death, Date Opened, Date Closed -- emitted as address-less ``ListingType.PROBATE_NOTICE`` leads,
 same shape sc_probate_net.py already uses (a decedent + an open estate is a classic
-motivated-seller signal, backfilled to a property by the downstream owner->GIS enricher). The
-"View Parties" sub-grid (the estate's Personal Representative / attorney) needs its own
-postback per case and is NOT read here -- a real, documented gap, not attempted on a first pass.
+motivated-seller signal, backfilled to a property by the downstream owner->GIS enricher).
+
+PERSONAL REPRESENTATIVE / ATTORNEY CONTACT, added 2026-10-29: the grid's "View Parties" button
+looked like it needed its own ASP.NET postback, but live-checked via the browser (not guessed),
+clicking it navigates to a PLAIN GET: ``Detail.aspx?Year=<Y>&Type=ES&Cnty=40&Seq=<N>&Atny=
+&SelectFirstName=<F>&SelectLastName=<L>`` -- Year/Seq parse straight out of the case number
+("2026-ES40-00110" -> Year=2026, Seq=110, leading zeros dropped), Cnty is always "40"
+(Richland's own county code in this system), and the two Select* params are just the search
+names already in hand. No cookies, no viewstate, no postback -- a second plain GET per kept
+case. Live-verified on a real 2026 case: Personal Representative "Marjan S. Lucas, 100 SUNSET
+BLVD APT 704, WEST COLUMBIA, SC 29169, Home Phone 8034147444" and Attorney "Madison Elizabeth
+Barnhill, 609 Sims Avenue, COLUMBIA, SC 29205, Work Phone 8032521500" -- full name, mailing
+address and phone for both, exactly the trustee/attorney contact HERMES already wants (same
+``trustee`` field convention law_firms/* and the master-in-equity scrapers use). Two HTML
+tables, ``#dlPR`` (Personal Representatives) and ``#dlAT`` (Attorneys), each a header row plus
+one data row per party: Name / 1st Line Address / 2nd Line Address / City / State Zip / Work
+Phone / Home Phone.
 
 Only open or recently-closed estates are useful leads; a case closed decades ago is not an active
 motivated-seller signal. ``MAX_CLOSED_AGE_DAYS`` filters those out the same way sc_probate_net.py
@@ -58,8 +72,10 @@ from ...models import Listing, ListingType, PropertyKind
 log = structlog.get_logger()
 
 BASE_URL = "https://www7.richlandcountysc.gov/EstateInquiry/main.aspx"
+DETAIL_URL = "https://www7.richlandcountysc.gov/EstateInquiry/Detail.aspx"
 COUNTY = "Richland"
 STATE = "SC"
+_RICHLAND_CNTY_CODE = "40"
 
 #: Common SC surnames, same list sc_probate_net.py already uses for its own 1-D sweep.
 SURNAMES: tuple[str, ...] = (
@@ -141,6 +157,74 @@ def _is_current(row: dict, now: datetime) -> bool:
     return (now - closed).days <= MAX_CLOSED_AGE_DAYS
 
 
+_CASE_NO_RE = re.compile(r"^(\d{4})-ES\d*-0*(\d+)$", re.I)
+
+
+def case_number_parts(case_no: str) -> Optional[tuple[str, str]]:
+    """Pure: (Year, Seq) for the Detail.aspx query string, or None when `case_no` doesn't match
+    this site's own "YYYY-ESnn-NNNNN" shape (defensive -- never guessed at, matches the real
+    case numbers this module's own _parse_results() reads: "2026-ES40-00110")."""
+    m = _CASE_NO_RE.match(case_no or "")
+    if not m:
+        return None
+    return m.group(1), m.group(2)
+
+
+def _parse_party_table(html: str, table_id: str) -> Optional[dict]:
+    """Pure: the first data row of ``#dlPR``/``#dlAT`` (Name/Addr1/Addr2/City/StateZip/
+    WorkPhone/HomePhone), or None when the table has no party row (header only / absent) --
+    never invents a party from a table that is genuinely empty."""
+    tree = HTMLParser(html)
+    table = tree.css_first(f"#{table_id}")
+    if table is None:
+        return None
+    rows = table.css("tr")
+    if len(rows) < 2:
+        return None
+    cells = rows[1].css("td.rowHeading3")
+    if not cells:
+        return None
+    vals = [c.text(strip=True) for c in cells]
+    vals += [""] * (7 - len(vals))
+    name = vals[0].strip()
+    if not name:
+        return None
+    return {
+        "name": name,
+        "address_line1": vals[1].strip() or None,
+        "address_line2": vals[2].strip() or None,
+        "city": vals[3].strip() or None,
+        "state_zip": vals[4].strip() or None,
+        "work_phone": vals[5].strip() or None,
+        "home_phone": vals[6].strip() or None,
+    }
+
+
+def _parse_detail(html: str) -> dict:
+    """Pure: {"pr": {...} | None, "attorney": {...} | None} from one Detail.aspx response."""
+    return {
+        "pr": _parse_party_table(html, "dlPR"),
+        "attorney": _parse_party_table(html, "dlAT"),
+    }
+
+
+async def _fetch_detail(client: httpx.AsyncClient, case_no: str, last: str, first: str) -> dict:
+    """One plain GET for the PR/attorney contact on a kept case -- no cookies/viewstate needed
+    (module docstring). Returns {} on any failure or unparseable case number; never raises."""
+    parts = case_number_parts(case_no)
+    if parts is None:
+        return {}
+    year, seq = parts
+    params = {"Year": year, "Type": "ES", "Cnty": _RICHLAND_CNTY_CODE, "Seq": seq,
+             "Atny": "", "SelectFirstName": first, "SelectLastName": last}
+    try:
+        r = await client.get(DETAIL_URL, params=params)
+        r.raise_for_status()
+    except httpx.HTTPError:
+        return {}
+    return _parse_detail(r.text)
+
+
 async def _search(client: httpx.AsyncClient, last: str, first: str) -> list[dict]:
     """One (last, first) search, with one retry on the load-balanced-server viewstate-MAC
     failure this site's own lack of a session cookie causes intermittently (module docstring)."""
@@ -197,9 +281,21 @@ class SCRichlandProbate(BaseScraper):
                         if not _is_current(row, now):
                             continue
                         decedent = row.get("decedent")
+                        try:
+                            detail = await _fetch_detail(client, case_no, last, first)
+                        except Exception:  # noqa: BLE001 - a missing detail never drops the lead
+                            detail = {}
+                        await asyncio.sleep(0.3)
+                        pr = detail.get("pr") or {}
+                        attorney = detail.get("attorney") or {}
+                        pr_mailing = ", ".join(x for x in (
+                            pr.get("address_line1"), pr.get("address_line2"),
+                            pr.get("city"), pr.get("state_zip")) if x) or None
                         desc = f"SC probate estate {case_no} (Richland County)"
                         if decedent:
                             desc += f" — decedent {decedent}"
+                        if pr.get("name"):
+                            desc += f"; PR {pr['name']}"
                         out.append(Listing(
                             source=self.slug,
                             source_url=BASE_URL,
@@ -208,6 +304,8 @@ class SCRichlandProbate(BaseScraper):
                             state=STATE,
                             county=COUNTY,
                             owner_name=decedent,
+                            defendant=pr.get("name"),
+                            trustee=attorney.get("name") or None,
                             case_number=case_no,
                             description=desc[:500],
                             first_seen=now,
@@ -218,6 +316,11 @@ class SCRichlandProbate(BaseScraper):
                                 "date_of_death": row.get("date_of_death"),
                                 "date_opened": row.get("date_opened"),
                                 "date_closed": row.get("date_closed"),
+                                "pr_name": pr.get("name"),
+                                "pr_mailing": pr_mailing,
+                                "pr_phone": pr.get("home_phone") or pr.get("work_phone"),
+                                "attorney_name": attorney.get("name"),
+                                "attorney_phone": attorney.get("home_phone") or attorney.get("work_phone"),
                             }},
                         ))
                     await asyncio.sleep(_REQUEST_PAUSE_S)
