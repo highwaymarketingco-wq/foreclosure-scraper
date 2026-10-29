@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
-"""One-time backfill: restate multi_year_delinquent_tax + two_year_delinquent for every NC
-Robeson/Alexander/Rockingham row that already carries raw['ustaxdata_delinquent_tax'] -- pure
-compute, NO network call at all. Same shape as backfill_johnston_tax_restatement.py.
+"""One-time backfill: enrichment_ustaxdata_multiyear_tax.py is a PURE, no-network restatement
+of raw['ustaxdata_delinquent_tax'] (already fetched by enrichment_ustaxdata_tax_search.py)
+into raw['multi_year_delinquent_tax'] + raw['two_year_delinquent']. Built 2026-10-28 and wired
+into main.py, but the one-off backfill script that originally populated
+ustaxdata_delinquent_tax for Robeson/Alexander/Rockingham (2026-10-16) predates it and never
+calls it -- so none of the rows it already populated ever got the restatement applied. Since
+this is pure compute (no network, no rate limit), the backfill is just: stream the board,
+call the function once, patch the diff. Covers all three tenant counties in one pass.
 
 Usage:
     python scripts/backfill_ustaxdata_multiyear_tax.py --dry-run
@@ -13,21 +18,20 @@ import argparse
 import os
 import sys
 from pathlib import Path
-from typing import Any
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "src"))
 
 from foreclosure_scraper.board_stream import iter_board_rows  # noqa: E402
 from foreclosure_scraper.enrichment_ustaxdata_multiyear_tax import (  # noqa: E402
-    RAW_KEY, TWO_YEAR_KEY, _eligible, enrich_ustaxdata_multiyear_tax,
+    enrich_ustaxdata_multiyear_tax, RAW_KEY, TWO_YEAR_KEY, SRC_KEY, _TENANT_COUNTIES,
 )
 from foreclosure_scraper.models import Listing  # noqa: E402
 from foreclosure_scraper.web_artifact import (  # noqa: E402
     _APPEND_SIG_FIELDS, board_lock, board_patch_size_state, patch_existing_rows,
 )
 
-_LIGHT_FIELDS = _APPEND_SIG_FIELDS + ("raw",)
+_LIGHT_FIELDS = _APPEND_SIG_FIELDS + ("raw", "state", "county")
 _WATCH_KEYS = (RAW_KEY, TWO_YEAR_KEY)
 
 
@@ -35,20 +39,29 @@ def _light(rec: dict) -> Listing:
     return Listing.model_construct(**{k: rec.get(k) for k in _LIGHT_FIELDS})
 
 
-def _collect_candidates(docs: Path) -> tuple[dict[str, Listing], int]:
+def _collect_candidates(docs: Path) -> tuple[dict[str, Listing], dict[str, dict]]:
+    """Returns (candidates, before) -- `before[key]` is each row's raw dict exactly as read
+    off the board, captured before any Listing is constructed or mutated."""
     cands: dict[str, Listing] = {}
-    total = 0
+    before: dict[str, dict] = {}
     for rec in iter_board_rows(docs / "listings.json.gz"):
-        total += 1
-        li = _light(rec)
-        if not _eligible(li):
+        if (rec.get("state") or "").strip().upper() != "NC":
             continue
+        if (rec.get("county") or "").replace(" County", "").strip().lower() not in _TENANT_COUNTIES:
+            continue
+        raw_before = rec.get("raw")
+        if not isinstance(raw_before, dict) or not isinstance(raw_before.get(SRC_KEY), dict):
+            continue  # nothing to restate
+        if isinstance(raw_before.get(RAW_KEY), dict):
+            continue  # already done
+        li = _light(rec)
         try:
             key = li.dedupe_key()
         except Exception:  # noqa: BLE001
             continue
+        before[key] = dict(raw_before)
         cands[key] = li
-    return cands, total
+    return cands, before
 
 
 def main() -> int:
@@ -58,25 +71,29 @@ def main() -> int:
     args = ap.parse_args()
 
     docs = REPO / "docs"
-    candidates, total_rows = _collect_candidates(docs)
-    print(f"board rows streamed: {total_rows:,}")
-    print(f"NC Robeson/Alexander/Rockingham candidates: {len(candidates):,}")
+    candidates, before = _collect_candidates(docs)
+    print(f"ustaxdata-tenant NC candidates with ustaxdata_delinquent_tax, not already "
+          f"restated: {len(candidates):,}")
     if not candidates:
         print("\nnothing to do.")
         return 0
 
-    before = {key: dict(li.raw) for key, li in candidates.items()}
     listings = list(candidates.values())
     stats = enrich_ustaxdata_multiyear_tax(listings)
-    print(f"\nenrich_ustaxdata_multiyear_tax: {stats}")
+    print(f"\nstats: {stats}")
 
     patches: dict[str, dict] = {}
+    qualified = 0
     for key, li in candidates.items():
         b = before[key]
-        raw_patch = {k: li.raw.get(k) for k in _WATCH_KEYS if li.raw.get(k) != b.get(k)}
+        raw_patch = {k: li.raw.get(k) for k in _WATCH_KEYS
+                    if isinstance(li.raw, dict) and li.raw.get(k) != b.get(k)}
         if raw_patch:
             patches[key] = {"raw": raw_patch}
-    print(f"\npatches staged: {len(patches):,}")
+            if RAW_KEY in raw_patch:
+                qualified += 1
+    print(f"\npatches staged: {len(patches):,} (of which {qualified:,} carry a real "
+          f"multi_year_delinquent_tax block)")
 
     if args.dry_run:
         print("\nDRY RUN -- nothing written.")
@@ -94,8 +111,8 @@ def main() -> int:
     if _allow_large:
         os.environ["BOARD_PATCH_ALLOW_LARGE"] = "1"
 
-    with board_lock(REPO, owner="ustaxdata_multiyear_tax_backfill"):
-        result = patch_existing_rows(patches, dict(stats), docs_dir=docs)
+    with board_lock(REPO, owner="ustaxdata_mydt_backfill"):
+        result = patch_existing_rows(patches, {"qualified": qualified}, docs_dir=docs)
     print(f"\nwrote board: patched {result['applied']:,}/{len(patches):,} rows "
           f"(existing: {result['existing']:,}, not_found: {result['not_found']:,}, "
           f"duplicate_key_matches: {result['duplicate_key_matches']:,})")
