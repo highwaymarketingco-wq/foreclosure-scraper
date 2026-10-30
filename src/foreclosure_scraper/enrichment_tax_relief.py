@@ -82,6 +82,25 @@ THE ELDERLY EXEMPTION DOES NOT EXTEND BEYOND BUNCOMBE (NC) — checked 2026-08-0
     straight in" for senior exemption, was WRONG and is retracted. Buncombe NC
     is unusual in publishing the elderly-or-disabled exclusion per parcel.
     York SC is the SC equivalent for homestead exemption flags.
+
+BREADTH RE-PASS, 2026-10-30 — the other 32 PARCEL_LAYERS counties re-checked
+    against the now much larger (124-county) data/parcel_cache/, now that
+    there are far more live GIS layers to search than the 17 probed above.
+    Field-name pattern search across all live layers found candidates in 5 SC
+    counties: Barnwell (Exempt_Parcel), Greenwood (TaxExemption), Hampton
+    (Exempt_Class, Hmstd_Code), Lexington (Homestead, AG), Saluda
+    (Exempt_Parcel, same Catalis/SDE vendor as Barnwell).
+
+    Greenwood's TaxExemption='Exempt' (2,409 parcels) is institutional-PLUS-
+    noise, not personal: live sample mixed real $0-assessed individually-owned
+    homes with churches, a Masonic lodge, and an LLC, with no field to tell
+    them apart -- rejected, same shape as the NC fields above. Hampton's
+    Exempt_Class='Y' sample was 100% churches/cemetery associations/state
+    agencies (CLIFTON BAPTIST, SC DEPT OF NATURAL RESOURCES); its Hmstd_Code='H'
+    sample mixed individual owners with an LLC and commercial-class parcels --
+    both rejected as unclean. Barnwell/Saluda's Exempt_Parcel read 'N' on
+    every one of 30 sampled live rows -- not pursued further. Lexington's
+    Homestead field (below) is the one real, clean hit -- wired in.
 """
 from __future__ import annotations
 
@@ -204,6 +223,25 @@ _RELIEF_LAYERS: dict[tuple[str, str], dict] = {
         "fields": "ParcelID,HOMESTEAD,LandUseDesc",
         "classify": "york_sc",
     },
+    # Lexington SC (2026-10-30 addition) -- the SAME SC homestead exemption
+    # statute as York, on a DIFFERENT CAMA vendor/schema: Homestead='YES'/'NO'
+    # (not 'Y'/'N') plus a separate AG='AG YES'/'AG NO' ag-use rollback flag.
+    # Live-verified: 28,112 parcels countywide read Homestead='YES', and a
+    # random 150-row sample of REAL board leads with a parcel_id (98 resolved
+    # on the layer, 52 not found -- a parcel_id/TMS format gap, not chased
+    # further) measured 4.1% Homestead=YES + 7.1% AG=AG YES, i.e. ~192
+    # estimated real tags across the board's 1,707 Lexington SC rows that
+    # carry a parcel_id. This is a real but modest base rate, the same shape
+    # as Gaston/Rutherford's use-value deferral above -- do not expect York-
+    # sized volume. TMS is the SAME key parcel_cache.PARCEL_LAYERS['Lexington']
+    # already uses for owner/mailing joins (dashed, e.g. "004121-01-024").
+    ("SC", "Lexington"): {
+        "url": "https://maps.lex-co.com/agstserver/rest/services/Property/MapServer/4",
+        "pin_field": "TMS",
+        "where_extra": "Homestead='YES' OR AG='AG YES'",
+        "fields": "TMS,Owner,Homestead,AG",
+        "classify": "lexington_sc",
+    },
 }
 
 _EXEMPT_KIND = {"ELD": "elderly", "DIS": "disabled", "BLD": "blind"}
@@ -268,6 +306,21 @@ def _classify(cfg: dict, attrs: dict) -> Optional[dict]:
             return {"kind": "homestead_exemption", "basis": "sc_homestead_age65_disabled",
                     "deferred_value": None}
         if "FARM" in lu:
+            return {"kind": "use_value_deferral", "basis": "sc_ag_use_value_rollback",
+                    "deferred_value": None}
+        return None
+    if cfg["classify"] == "lexington_sc":
+        # Lexington SC: Homestead='YES' is the same SC homestead exemption
+        # York's HOMESTEAD='Y' covers, just spelled out on this vendor's schema.
+        # AG='AG YES' is the SC ag-use-value rollback flag (3-year lookback on
+        # sale, same statute as York's LandUseDesc FARM match). Neither carries
+        # a dollar amount.
+        hs = str(attrs.get("Homestead") or "").strip().upper()
+        ag = str(attrs.get("AG") or "").strip().upper()
+        if hs == "YES":
+            return {"kind": "homestead_exemption", "basis": "sc_homestead_age65_disabled",
+                    "deferred_value": None}
+        if ag == "AG YES":
             return {"kind": "use_value_deferral", "basis": "sc_ag_use_value_rollback",
                     "deferred_value": None}
         return None
