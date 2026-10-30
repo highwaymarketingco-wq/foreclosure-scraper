@@ -18,6 +18,23 @@ county, by querying that county's parcel layer for the relief field. Reuses the
 COUNTY-layer _query + PID-variant helpers. Free, no auth. Adds raw['tax_relief']
 and a modest distress-score signal. Gate off with FORECLOSURE_TAX_RELIEF=0.
 
+QUERY-PRECEDENCE BUG, FIXED 2026-10-30 — any _RELIEF_LAYERS entry whose
+    where_extra itself contains an OR (only York and Lexington) was silently
+    broken since the day it was added: enrich_tax_relief() built
+    "PIN LIKE '%x%' AND A='v1' OR B='v2'" with no parens around where_extra,
+    and SQL/ArcGIS's AND binds tighter than OR, so that parsed as
+    "(PIN LIKE '%x%' AND A='v1') OR (B='v2')" -- the PIN filter was dropped
+    entirely on the second branch, matching an ARBITRARY unrelated parcel
+    anywhere in the county that happened to satisfy B='v2'. Caught live
+    building Lexington's backfill dry-run (every one of 1,707 rows "hit"
+    the SAME wrong classification). Fixed by parenthesizing where_extra at
+    the one shared call site. York's entry has carried this bug since
+    2026-10-02 -- any board row with a York-sourced raw['tax_relief'] whose
+    kind is use_value_deferral (the second, OR'd branch) should be treated
+    as UNVERIFIED until re-run against the fixed query; a kind of
+    homestead_exemption (the first, AND'd branch) was never affected, since
+    PIN LIKE was still correctly ANDed with HOMESTEAD='Y' on that path.
+
 2026-10-02 BREADTH FIX — a use_value_deferral hit ALSO stamps raw['rollback_exposure'].
     `enrichment_rollback_deferral.py` (the OTHER module that models this exact
     "rollback tax comes due on sale" liability, Buncombe + Anderson only) and the
@@ -356,7 +373,19 @@ async def enrich_tax_relief(listings: list[Listing], max_queries: int = 200) -> 
                                else (cfg["pin_field"], _pid_variants(li.parcel_id)[:3]))
             for pid in pids:
                 safe = pid.replace("'", "''")
-                where = f"{pin_field} LIKE '%{safe}%' AND {cfg['where_extra']}"
+                # cfg["where_extra"] MUST be parenthesized here (2026-10-30 fix):
+                # without it, "PIN LIKE '%x%' AND A='v1' OR B='v2'" parses as
+                # "(PIN LIKE '%x%' AND A='v1') OR (B='v2')" -- SQL/ArcGIS AND
+                # binds tighter than OR, so an entry whose where_extra itself
+                # contains an OR (both York and Lexington) silently drops the
+                # PIN filter on its second branch and matches an ARBITRARY
+                # unrelated row anywhere in the county that satisfies B='v2'.
+                # Live-caught building Lexington's backfill dry-run: a known
+                # Homestead=NO/AG=NO parcel was "matched" against a completely
+                # different parcel's AG='AG YES' row. This bug is as old as
+                # York's entry (2026-10-02) -- see the module docstring note
+                # on re-auditing York's existing tax_relief tags.
+                where = f"{pin_field} LIKE '%{safe}%' AND ({cfg['where_extra']})"
                 rows = await _query(use_http, cfg["url"], where, out_fields=cfg["fields"], count=1)
                 if rows:
                     hit = _classify(cfg, rows[0])
