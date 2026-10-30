@@ -629,6 +629,16 @@ class SCProbateNet(BaseScraper):
         out: list[Listing] = self.partial
         # Dedupe across surname sweeps + counties on (county, kind, case#).
         seen: set[tuple] = set()
+        # 2026-10-29 (tax_lien-sweep-adjacent discovery, VM session): COUNTIES is a FIXED-order
+        # tuple and this class's own 900s timeout_s is regularly exhausted by the earlier
+        # entries' 25-page grid caps (Charleston/Charleston Marriage/Dorchester) before the loop
+        # ever reaches York/York Marriage -- the last two entries -- live-confirmed: York has
+        # real hits (20+ across the first 8 surnames alone, every one hitting the grid-page cap)
+        # despite 0 raw['probate'] on any of its 1,818 board rows today. Same starvation shape as
+        # ITS_TAX_COUNTIES (nc_its_public_tax.py); mirrors that exact override so a scoped
+        # catch-up run can reach a starved county without touching normal full-run behavior.
+        only = {c.strip().title() for c in
+                (os.getenv("SC_PROBATE_NET_COUNTIES") or "").split(",") if c.strip()}
 
         async with httpx.AsyncClient(
             headers={"User-Agent": cfg.user_agent},
@@ -637,6 +647,8 @@ class SCProbateNet(BaseScraper):
         ) as client:
             # Sequential per (county, surname) — compliant, one request at a time.
             for dropdown_value, county, state, marriage in COUNTIES:
+                if only and county not in only:
+                    continue
                 county_hits = 0
                 county_stale = 0
                 for surname in SURNAMES:
