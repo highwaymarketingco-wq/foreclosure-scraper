@@ -102,6 +102,7 @@ async def _bop_lookup(http: httpx.AsyncClient, last: str, first: str) -> _Lookup
                            headers={"User-Agent": "Mozilla/5.0",
                                     "Accept": "application/json"})
         if r.status_code in _BLOCK_STATUS:
+            log.warning("bop.lookup_failed", reason="block_status", status=r.status_code)
             return _Lookup(blocked=True)
         if r.status_code != 200:
             log.warning("bop.lookup_failed", reason="status", status=r.status_code)
