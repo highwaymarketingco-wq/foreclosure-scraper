@@ -29,6 +29,7 @@ sweep coverage gap already flagged for it.
 """
 from __future__ import annotations
 
+import os
 import time
 from typing import Any, Optional
 
@@ -63,6 +64,19 @@ RUTHERFORD_SOURCES = frozenset({"counties_nc.rutherford_tax", "counties_nc.ruthe
 
 
 def applies(row: dict) -> bool:
+    # AVALON_TAX_SKIP=1 (2026-10-31): a scoped, reversible escape hatch for a sustained
+    # CloudFront block -- confirmed live across 3+ consecutive sweeps (sweeps #16-18 of the
+    # 2026-10-29 tax_lien verification cycle), each a FRESH process independently tripping
+    # the circuit breaker below within its first 5 requests, so this is a real, ongoing block,
+    # not a stuck/stale breaker (see project_rutherford_avalon_cloudfront_block_2026-10-30.md).
+    # TRANSIENT_REASONS makes a failed row re-eligible "after hours", so while the block
+    # persists Rutherford's ~8,500 rows keep winning the priority-first "most overdue" sort
+    # and crowd out every other county's overdue backlog -- measured: 2 of those sweeps
+    # checked 2000+2000 rows for a combined 10 new confirms. Default unset/0 leaves behavior
+    # completely unchanged; set this only for the duration of a confirmed ongoing block, same
+    # pattern as ITS_TAX_COUNTIES/SC_PROBATE_NET_COUNTIES elsewhere in this verifier set.
+    if os.environ.get("AVALON_TAX_SKIP") == "1":
+        return False
     src = str(row.get("source") or "")
     lt = str(row.get("listing_type") or "")
     return src in RUTHERFORD_SOURCES and lt in ("tax_lien", "tax_sale")
