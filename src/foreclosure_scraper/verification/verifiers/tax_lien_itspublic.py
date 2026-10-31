@@ -137,6 +137,7 @@ from __future__ import annotations
 
 import html as _html
 import json
+import os
 import re
 import time
 import weakref
@@ -325,6 +326,20 @@ def _own_roll(row: Any) -> Optional[tuple[Roll, dict]]:
 
 
 def applies(row: dict) -> bool:
+    # ITSPUBLIC_SKIP_COUNTIES=County1,County2 (2026-10-31): a scoped, reversible escape
+    # hatch for a county whose rows are returning real but useless parcel_not_found answers
+    # on nearly every candidate (confirmed live: Duplin, sweep #26 of the 2026-10-29
+    # tax_lien verification cycle, 18/635 confirmed -- see
+    # feedback_duplin_harnett_parcel_id_format_mismatch_2026-10-31.md). The board carries
+    # at least 3 different parcel_id shapes for Duplin and which producer's short-digit
+    # form actually maps to this portal's ParcelNumber field was not yet traced -- this
+    # just stops it from crowding out every other county's overdue backlog while that's
+    # unresolved, same pattern as avalon_tax.py's AVALON_TAX_SKIP. Default (unset) behavior
+    # is completely unchanged.
+    skip = {c.strip().lower() for c in
+            (os.environ.get("ITSPUBLIC_SKIP_COUNTIES") or "").split(",") if c.strip()}
+    if skip and str(row.get("county") or "").strip().lower() in skip:
+        return False
     if str(row.get("state") or "").strip().upper() != "NC":
         return False
     if portal_of(row) is None or str(row.get("source") or "") == PTS_ROLL_SLUG:
