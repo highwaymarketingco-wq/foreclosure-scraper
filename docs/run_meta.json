@@ -608,8 +608,8 @@
         "start": 180297,
         "end": 198297,
         "records": 18000,
-        "bytes": 13252126,
-        "sha256": "f10d11c51fd879c657f94e3bc2f568202ff32cd50fc5b68f345a5ad4aee418fd"
+        "bytes": 13252121,
+        "sha256": "137ac08c523117f473cac605bd336afdf8dc7d43e9a53fd6207f22907bd5abaf"
       },
       {
         "name": "listings_part_011.json.gz",
@@ -641,7 +641,7 @@
         "end": 270297,
         "records": 18000,
         "bytes": 9985087,
-        "sha256": "6c6d7c642a108318c4e5c056be1acc935abc93087585f443f158ac4394fd625a"
+        "sha256": "e645bfd9d32a1e8e14ae0d0caa08daa7e708a5337c15dbff8c15b22a1fd8ea9e"
       },
       {
         "name": "listings_part_015.json.gz",
