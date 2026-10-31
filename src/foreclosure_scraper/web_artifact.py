@@ -5634,12 +5634,25 @@ def patch_existing_rows(patches: dict[str, dict], summary: dict,
     # --- shared backup-before-overwrite (count is unchanged, so the shrink check is a no-op) ---
     _count_guard_and_backup(docs, listings_path, existing_total, summary)
 
-    # --- write listings.json + gzipped parts (the SAME low-level writers write_artifact/
-    # append_new_rows use) ---
+    # --- write the parts-gate FIRST: it is the authoritative, committed board. listings.json/
+    # listings_detail.json below are gitignored, non-authoritative display twins that any later
+    # successful write regenerates (feedback_gitignored_plain_fallback_survives_merges) -- a
+    # disk-full write partway through them must not cost a patch that already made it here.
+    # Reproduces/fixes the 2026-10-30/31 bop_federal incident: 5 consecutive identical ENOSPC
+    # crashes losing the same matches every time, because the old order wrote the throwaway
+    # files first and the real parts-gate write was never reached.
     total = existing_total
+    _prior_parts = _bp.manifest_parts_block(_bp.read_manifest(docs)) or {}
+    _parts = _bp.write_parts(docs, listing_blobs, hint_rows=_prior_parts.get("rows_per_part"))
+    _parts_block = _bp.make_block(_parts["entries"], rows_per_part=_parts["rows_per_part"],
+                                  cap=_parts["cap"])
+
+    # --- listings.json + listings_detail.json (the SAME low-level writers write_artifact/
+    # append_new_rows use) ---
     _manifest_pre: dict = {
         "listings.json": {**_write_plain_array(listings_path, listing_blobs), "records": total},
     }
+    del listing_blobs
     detail_path = docs / "listings_detail.json"
     detail_count = len(details)
     detail_bytes = json.dumps(details, ensure_ascii=False, default=str).encode("utf-8")
@@ -5648,11 +5661,6 @@ def patch_existing_rows(patches: dict[str, dict], summary: dict,
                                              "sha256": hashlib.sha256(detail_bytes).hexdigest(),
                                              "records": detail_count}
     _atomic_write_bytes(detail_path, detail_bytes)
-    _prior_parts = _bp.manifest_parts_block(_bp.read_manifest(docs)) or {}
-    _parts = _bp.write_parts(docs, listing_blobs, hint_rows=_prior_parts.get("rows_per_part"))
-    _parts_block = _bp.make_block(_parts["entries"], rows_per_part=_parts["rows_per_part"],
-                                  cap=_parts["cap"])
-    del listing_blobs
     import gzip
     detail_gz = gzip.compress(detail_bytes, compresslevel=9, mtime=0)
     _manifest_pre["listings_detail.json.gz"] = {"bytes": len(detail_gz),

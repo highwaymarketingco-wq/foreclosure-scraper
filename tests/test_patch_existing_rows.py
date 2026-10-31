@@ -265,6 +265,46 @@ def test_backup_still_runs_even_though_the_shrink_check_is_a_no_op(tmp_path):
 
 
 # ===========================================================================
+# 3b. crash safety: a disk-full write must not lose a patch that already made it to the
+# authoritative parts-gate -- reproduces the 2026-10-30/31 bop_federal incident (5
+# consecutive identical ENOSPC crashes, same matches lost every time, because the
+# throwaway plain-fallback files were written BEFORE the real parts-gate shards)
+# ===========================================================================
+
+def test_a_crash_writing_the_throwaway_plain_fallback_still_banks_the_patch_in_the_parts_gate(
+    tmp_path, monkeypatch,
+):
+    """listings.json/listings_detail.json are gitignored, non-authoritative, and regenerated
+    by any later successful write (feedback_gitignored_plain_fallback_survives_merges) -- the
+    REAL, committed data is the listings_part_NNN.json.gz shards. If disk runs out while
+    writing the throwaway files, the patch must already be in the parts-gate: losing the
+    display files is cheap, losing a fully-computed patch because it never reached the parts
+    write is not."""
+    docs = tmp_path / "docs"
+    seed = _seed(docs, n=5)
+    real_atomic_write = wa._atomic_write_bytes
+
+    def flaky(path, data):
+        if path.name == "listings_detail.json":
+            raise OSError(28, "No space left on device")
+        real_atomic_write(path, data)
+
+    monkeypatch.setattr(wa, "_atomic_write_bytes", flaky)
+    with pytest.raises(OSError):
+        wa.patch_existing_rows({seed[0].dedupe_key(): {"parcel_id": "P0"}}, {"notes": "t"},
+                               docs_dir=docs)
+
+    import gzip
+    part_bytes = gzip.decompress((docs / "listings_part_000.json.gz").read_bytes())
+    rows = json.loads(part_bytes)
+    patched = [r for r in rows if r.get("parcel_id") == "P0"]
+    assert len(patched) == 1, (
+        "the patch never reached the parts-gate before the crash -- a disk-full write lost "
+        "real, already-computed data instead of only the regenerable display files"
+    )
+
+
+# ===========================================================================
 # 4. contracts: lock, manifest, size ceiling
 # ===========================================================================
 
