@@ -1,20 +1,29 @@
 {
- "generated": "2026-10-17 13:46 EDT",
- "commit": "de1975d9",
+ "generated": "2026-10-31 14:51 EDT",
+ "commit": "edd6470e",
  "fingerprint": {
   "inputs": {
    "docs/walls_register.json": "fe0651e20d9ef95d",
-   "docs/county_records/county_records_matrix.json": "f5bb56ddc98ab7b3",
+   "docs/county_records/county_records_matrix.json": "48adb93a841480ac",
    "docs/county_records/nc_rod_platform_clusters.md": "a4f5831e7c7cbb9d",
    "docs/county_records/sc_rod_platform_clusters.md": "a1031bf224f1ac1c",
    "docs/new_sources_2026-10-07_contact_and_facts.json": "aa5cddac3cb79e06",
    "docs/new_sources_2026-10-07_distress.json": "7572dfc70ff761f3",
    "docs/new_sources_2026-10-07_liens_courts.json": "78c80420b0cb1aa0",
+   "docs/gap_matrix/declined_registry.json": "86e9091d6b7afe93",
    "docs/gap_matrix/gap_matrix_2026-10-07.json": "321e8b5f9780fb4d",
    "docs/gap_matrix/gap_matrix_2026-10-09.json": "a20f3554f4355869",
    "docs/gap_matrix/gap_matrix_2026-10-16.json": "9c009b312dd7afcd",
    "docs/gap_matrix/gap_matrix_2026-10-17.json": "da7bc641995b1d36",
-   "docs/gap_matrix/county_signal_coverage_2026-10-17.csv": "35dc47d40c5e8859"
+   "docs/gap_matrix/gap_matrix_2026-10-18.json": "6879ea62de6d37cc",
+   "docs/gap_matrix/gap_matrix_2026-10-19.json": "713bb14ca8d6847d",
+   "docs/gap_matrix/gap_matrix_2026-10-20.json": "b2c564d4b73b2918",
+   "docs/gap_matrix/gap_matrix_2026-10-21.json": "90c3e7cad907f878",
+   "docs/gap_matrix/gap_matrix_2026-10-22.json": "54c132af6fbd1149",
+   "docs/gap_matrix/gap_matrix_2026-10-23.json": "d34a8f9a5d8727b0",
+   "docs/gap_matrix/gap_matrix_2026-10-24.json": "0e63df8a7792956b",
+   "docs/gap_matrix/gap_matrix_2026-10-28.json": "45bddf0d13bb66b2",
+   "docs/gap_matrix/county_signal_coverage_2026-10-24.csv": "109ea26af29ccf77"
   },
   "adapters": [
    "NC|Alamance|nc_cott_v4|FORECLOSURE_NC_COTT_ROD|off",
@@ -141,8 +150,8 @@
   },
   {
    "path": "docs/county_records/county_records_matrix.json",
-   "sha": "f5bb56ddc98ab7b3",
-   "date": "2026-10-11"
+   "sha": "48adb93a841480ac",
+   "date": "2026-10-24"
   },
   {
    "path": "docs/county_records/nc_rod_platform_clusters.md",
@@ -170,6 +179,11 @@
    "date": "2026-10-08"
   },
   {
+   "path": "docs/gap_matrix/declined_registry.json",
+   "sha": "86e9091d6b7afe93",
+   "date": "2026-10-24"
+  },
+  {
    "path": "docs/gap_matrix/gap_matrix_2026-10-07.json",
    "sha": "321e8b5f9780fb4d",
    "date": "2026-10-07"
@@ -190,9 +204,49 @@
    "date": "2026-10-17"
   },
   {
-   "path": "docs/gap_matrix/county_signal_coverage_2026-10-17.csv",
-   "sha": "35dc47d40c5e8859",
-   "date": "2026-10-17 11:19 (file time)"
+   "path": "docs/gap_matrix/gap_matrix_2026-10-18.json",
+   "sha": "6879ea62de6d37cc",
+   "date": "2026-10-19"
+  },
+  {
+   "path": "docs/gap_matrix/gap_matrix_2026-10-19.json",
+   "sha": "713bb14ca8d6847d",
+   "date": "2026-10-19"
+  },
+  {
+   "path": "docs/gap_matrix/gap_matrix_2026-10-20.json",
+   "sha": "b2c564d4b73b2918",
+   "date": "2026-10-20"
+  },
+  {
+   "path": "docs/gap_matrix/gap_matrix_2026-10-21.json",
+   "sha": "90c3e7cad907f878",
+   "date": "2026-10-21"
+  },
+  {
+   "path": "docs/gap_matrix/gap_matrix_2026-10-22.json",
+   "sha": "54c132af6fbd1149",
+   "date": "2026-10-22"
+  },
+  {
+   "path": "docs/gap_matrix/gap_matrix_2026-10-23.json",
+   "sha": "d34a8f9a5d8727b0",
+   "date": "2026-10-23"
+  },
+  {
+   "path": "docs/gap_matrix/gap_matrix_2026-10-24.json",
+   "sha": "0e63df8a7792956b",
+   "date": "2026-10-24"
+  },
+  {
+   "path": "docs/gap_matrix/gap_matrix_2026-10-28.json",
+   "sha": "45bddf0d13bb66b2",
+   "date": "2026-10-28"
+  },
+  {
+   "path": "docs/gap_matrix/county_signal_coverage_2026-10-24.csv",
+   "sha": "109ea26af29ccf77",
+   "date": "2026-10-24 14:59 (file time)"
   }
  ],
  "run_meta": {

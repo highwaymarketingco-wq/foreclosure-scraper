@@ -1,6 +1,6 @@
 # Hermes hand-off -- the walled bucket, triaged
 
-Generated from `gap_list_2026-10-24.csv`. Regenerate with `python scripts/hermes_handoff.py` any time the gap list changes -- this file is a derived view, not hand-maintained.
+Generated from `gap_list_2026-11-03.csv`. Regenerate with `python scripts/hermes_handoff.py` any time the gap list changes -- this file is a derived view, not hand-maintained.
 
 Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bot-wall, build in-house** is ordinary scraper work for this project (existing WAF-bypass/stealth-browser code, applied per-site) -- not a Hermes hand-off. The last two piles need a human policy call or a scheduled recheck, not a scraper at all -- see this script's own module docstring for why.
 
@@ -215,10 +215,11 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 
 ## 2. Bot-wall, build in-house -- Cloudflare/WAF, not Hermes
 
-140 cells, 184,746 est_rows_affected combined.
+142 cells, 197,483 est_rows_affected combined.
 
 | state | county | column | est_rows | reason | source |
 |---|---|---|---|---|---|
+| SC | Charleston | multi_year_delinquent_tax | 11,212 | bot check (Cloudflare/WAF) | tax/property card: sc-charleston.publicaccessnow.com |
 | SC | Charleston | rollback_exposure | 11,212 | bot check (Cloudflare/WAF) | tax/property card: sc-charleston.publicaccessnow.com |
 | NC | Rutherford | multi_year_delinquent_tax | 11,206 | bot check (Cloudflare/WAF) | tax/property card: rutherfordcountync.gov |
 | SC | Charleston | atty_tax_verified_confirmed | 7,518 | bot check (Cloudflare/WAF) | tax/property card: sc-charleston.publicaccessnow.com |
@@ -234,7 +235,6 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | NC | Union | rollback_exposure | 3,163 | bot check (Cloudflare/WAF) | tax/property card:  |
 | NC | Union | tax_aging_surfaced | 3,163 | bot check (Cloudflare/WAF) | tax/property card:  |
 | NC | Union | two_year_delinquent | 3,163 | bot check (Cloudflare/WAF) | tax/property card:  |
-| NC | Lee | atty_tax_verified_confirmed | 3,076 | bot check (Cloudflare/WAF) | tax/property card: taxaccess.leecountync.gov |
 | SC | Colleton | assessed_value | 2,563 | Cloudflare check on the county property card | county GIS: services1.arcgis.com |
 | NC | Pasquotank | atty_rod_lien_checked | 2,469 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
 | NC | Pasquotank | liens | 2,469 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
@@ -251,7 +251,10 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | NC | Washington | liens | 2,167 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
 | NC | Perquimans | atty_rod_lien_checked | 1,882 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
 | NC | Perquimans | liens | 1,882 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
+| SC | York | multi_year_delinquent_tax | 1,818 | bot check (Cloudflare/WAF) | tax/property card: www.yorkcountysc.gov |
 | SC | York | rollback_exposure | 1,818 | bot check (Cloudflare/WAF) | tax/property card: www.yorkcountysc.gov |
+| SC | York | tax_aging_surfaced | 1,818 | bot check (Cloudflare/WAF) | tax/property card: www.yorkcountysc.gov |
+| SC | York | two_year_delinquent | 1,818 | bot check (Cloudflare/WAF) | tax/property card: www.yorkcountysc.gov |
 | SC | Kershaw | probate | 1,802 | bot check (Cloudflare/WAF) | probate: www.kershaw.sc.gov |
 | NC | Polk | atty_tax_verified_confirmed | 1,756 | bot check (Cloudflare/WAF) | tax/property card: www.polknc.gov |
 | SC | Clarendon | atty_deed_ref | 1,669 | bot check (Cloudflare/WAF) | register index: acclaimprod.clarendoncountygov.org |
@@ -290,7 +293,6 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | NC | Halifax | rollback_exposure | 957 | bot check (Cloudflare/WAF) | tax/property card: halifaxnctax.com |
 | NC | Halifax | tax_aging_surfaced | 957 | bot check (Cloudflare/WAF) | tax/property card: halifaxnctax.com |
 | NC | Halifax | two_year_delinquent | 957 | bot check (Cloudflare/WAF) | tax/property card: halifaxnctax.com |
-| SC | York | atty_tax_verified_confirmed | 853 | bot check (Cloudflare/WAF) | tax/property card: www.yorkcountysc.gov |
 | SC | Aiken | atty_rod_lien_checked | 805 | bot check (Cloudflare/WAF) | register:  www.aikencountysc.gov |
 | SC | Aiken | liens | 805 | bot check (Cloudflare/WAF) | register:  www.aikencountysc.gov |
 | NC | Ashe | multi_year_delinquent_tax | 794 | bot check (Cloudflare/WAF) | tax/property card: qpublic.schneidercorp.com |
@@ -362,7 +364,7 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 
 ## 3. Human judgment call -- NOT a scrape target
 
-268 cells, 192,016 est_rows_affected combined.
+268 cells, 192,014 est_rows_affected combined.
 
 | state | county | column | est_rows | reason | source |
 |---|---|---|---|---|---|
@@ -507,7 +509,7 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | SC | Union | lt_tax_lien | 42 | verifier is a declared wall | tax/property card: uniontreasurer.qpaybill.com |
 | NC | Burke | lt_probate_notice | 38 | verifier is a declared wall | probate: portal-nc.tylertech.cloud |
 | NC | Carteret | lt_probate_notice | 35 | verifier is a declared wall | probate: portal-nc.tylertech.cloud |
-| SC | Cherokee | divorce | 35 | verifier is a declared wall | statewide: SC family-court index terms forbid automation |
+| SC | Cherokee | divorce | 33 | verifier is a declared wall | statewide: SC family-court index terms forbid automation |
 | NC | Haywood | lt_probate_notice | 31 | verifier is a declared wall | probate: portal-nc.tylertech.cloud |
 | SC | Richland | lt_tax_lien | 31 | verifier is a declared wall | tax/property card:  |
 | SC | Colleton | lt_lis_pendens | 28 | SC Public Index terms forbid automated querying | statewide: SC Public Index terms forbid automated querying |
