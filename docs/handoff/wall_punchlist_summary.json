@@ -1,7 +1,7 @@
 {
- "board_rows": 447664,
+ "board_rows": 472777,
  "by_category": {
-  "uncovered": 177244,
+  "uncovered": 181451,
   "wall": 20358
  },
  "format_version": 1,
@@ -61,8 +61,8 @@
    "generated_at": "2026-10-17T14:28:27Z"
   },
   "tax_lien": {
-   "entries": 39052,
-   "generated_at": "2026-10-22T06:07:14Z"
+   "entries": 42153,
+   "generated_at": "2026-11-03T19:50:02Z"
   },
   "tax_lien_johnston_static": {
    "entries": 8,
@@ -73,10 +73,10 @@
    "generated_at": "2026-10-17T14:28:27Z"
   }
  },
- "listings": 197602,
+ "listings": 201809,
  "uncovered": {
   "by_scraper_source": {
-   "city_websites.charlotte_open_data": 4927,
+   "city_websites.charlotte_open_data": 5436,
    "counties_generic.arcgis_distress.columbia_code_vacant_boarded": 972,
    "counties_generic.arcgis_distress.durham_open_code_violations": 1034,
    "counties_generic.arcgis_distress.greensboro_code_housing": 603,
@@ -93,17 +93,17 @@
    "counties_nc.albemarle_observer_tax_lists": 5939,
    "counties_nc.asheville_helene": 698,
    "counties_nc.gaston_vacant": 21251,
-   "counties_nc.gastonia_code_enforcement": 1099,
+   "counties_nc.gastonia_code_enforcement": 1124,
    "counties_nc.lincoln_vacant": 14878,
-   "counties_nc.nc_county_pdf_delinquent_tax": 3204,
+   "counties_nc.nc_county_pdf_delinquent_tax": 3201,
    "counties_nc.polk_tax": 1622,
    "counties_nc.transylvania_vacant": 10883,
    "counties_sc.charleston_delinquent_tax": 1757,
    "counties_sc.charleston_tax_sale_xlsx": 2393,
-   "counties_sc.sc_heir_estate_parcel_cache": 6093,
+   "counties_sc.sc_heir_estate_parcel_cache": 8528,
    "counties_sc.sc_probate_net": 507,
    "counties_sc.sc_probate_notices.yourpickenscounty": 442,
-   "counties_sc.sc_public_index": 2680,
+   "counties_sc.sc_public_index": 2675,
    "counties_sc.sc_public_notices": 643,
    "counties_sc.sc_ust_registry": 15582,
    "counties_sc.spartanburg_condemned": 1492,
@@ -111,7 +111,7 @@
    "courtlistener.recap": 730,
    "national.distressed": 4777,
    "national.hud_reac_inspection": 816,
-   "national.jail_bookings": 993,
+   "national.jail_bookings": 2236,
    "national.landandfarm": 461,
    "national.landwatch": 578,
    "national.sc_public_index": 1587,
@@ -121,16 +121,16 @@
    "NC:cumberland": 2185,
    "NC:durham": 2925,
    "NC:forsyth": 2407,
-   "NC:gaston": 24280,
+   "NC:gaston": 24305,
    "NC:guilford": 4621,
-   "NC:lincoln": 16673,
+   "NC:lincoln": 16835,
    "NC:mcdowell": 2950,
-   "NC:mecklenburg": 9160,
-   "NC:transylvania": 11297,
-   "NC:wake": 3879,
-   "SC:charleston": 7696,
+   "NC:mecklenburg": 9669,
+   "NC:transylvania": 11368,
+   "NC:wake": 3880,
+   "SC:charleston": 7698,
    "SC:colleton": 2200,
-   "SC:pickens": 2067,
+   "SC:pickens": 2399,
    "SC:richland": 2202,
    "SC:spartanburg": 11125
   }
@@ -206,8 +206,8 @@
    "sc_publicindex": 3967
   },
   "by_wall_state": {
-   "not_yet_labelled": 18703,
-   "recorded": 1655
+   "not_yet_labelled": 18702,
+   "recorded": 1656
   },
   "top_counties": {
    "NC:buncombe": 255,
