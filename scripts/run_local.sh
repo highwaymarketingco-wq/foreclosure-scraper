@@ -167,6 +167,28 @@ export FORECLOSURE_NC_HARRIS_ROD="${FORECLOSURE_NC_HARRIS_ROD:-1}"
 # while both flags default off (see docs comment at RENDER_ROD_CONFIG usage).
 export FORECLOSURE_NC_HARRIS_MARRIAGE="${FORECLOSURE_NC_HARRIS_MARRIAGE:-1}"
 
+# NC Cott/Lookup/ORS/CCHS-classic/Tyler ROD name-index search (operator-enabled 2026-11-03,
+# after a 5-agent investigation confirmed these are proven working code, not walls, not
+# stubs): all 5 platforms were built 2026-10-07 and live-proven with real hits on at least
+# some of their counties -- Cott 17/20 via guest-button click-through (commits a237f78b,
+# 8cb3325b), Lookup Avery+Columbus of 11 (commit dbd53293), ORS/CCHS-classic/Tyler
+# platform-proven per enrichment_generic_rod.py's own docstring. Shipped OFF by default
+# purely because board-lead yield was never measured, same as Harris above before its
+# 2026-10-23 flip -- NOT the same as the older ROD_ENRICH_ON path further down this file,
+# which gates a separate, superseded legacy system (rod/enrich.py's aumentum/cchs/cott/
+# kofile modules, broken as of a 2026-06-16 measurement) using different vendor code; leave
+# that one alone. Already declared "1" in deploy/oracle/run_profile.json for the VM;
+# enabling here too since the VM has been down since 2026-10-31 and this is the only lane
+# currently alive. Pure-HTTP (not the Playwright-rendered kind), wall-clock-budget-capped
+# via _await_capped (main.py), same safety pattern as the Harris flag above. Lookup's other
+# 9 counties beyond Avery/Columbus haven't been individually search-tested yet (only
+# platform-level, via Avery/Columbus) -- watch its first run's logs.
+export FORECLOSURE_NC_COTT_ROD="${FORECLOSURE_NC_COTT_ROD:-1}"
+export FORECLOSURE_NC_LOOKUP_ROD="${FORECLOSURE_NC_LOOKUP_ROD:-1}"
+export FORECLOSURE_NC_ORS_ROD="${FORECLOSURE_NC_ORS_ROD:-1}"
+export FORECLOSURE_NC_CCHS_CLASSIC_ROD="${FORECLOSURE_NC_CCHS_CLASSIC_ROD:-1}"
+export FORECLOSURE_NC_TYLER_ROD="${FORECLOSURE_NC_TYLER_ROD:-1}"
+
 # Enrichment budget — keep the run finishing in a sane window. The cloud
 # run died at 4h partly on a Gemini-quota Vision spiral; locally we use
 # Anthropic (set above) and cap Vision so the run completes. ROD deed
