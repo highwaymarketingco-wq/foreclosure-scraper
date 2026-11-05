@@ -1,187 +1,196 @@
 {
  "buckets": 16,
  "counts": {
-  "confirmed": 30966,
-  "refuted": 934,
-  "rows": 53015,
-  "stale": 9314,
-  "unconfirmed": 11801,
+  "confirmed": 31403,
+  "refuted": 944,
+  "rows": 53338,
+  "stale": 9419,
+  "unconfirmed": 11572,
   "wall": 0
  },
- "generated_at": "2026-11-05T00:34:01Z",
+ "generated_at": "2026-11-05T02:07:58Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-05T00:34:00Z",
+  "at": "2026-11-05T02:07:56Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 2000,
   "recheck_only": false,
   "requests": {
    "errors": {
-    "leecountync.munisselfservice.com": 1
+    "berkeleycountysc.paystar.io": 22,
+    "taxes.paystar.io": 111
    },
    "requests": {
-    "barnwelltreasurer.qpaybill.com": 4,
-    "bcpwa.ncptscloud.com": 145,
-    "berkeleycountysc.paystar.io": 4,
-    "cherokeecountysctax.qpaybill.com": 3,
-    "darlingtontreasurer.qpaybill.com": 4,
-    "lancastersctax.qpaybill.com": 2,
-    "laurenstreasurer.qpaybill.com": 3,
-    "leecountync.munisselfservice.com": 1902,
-    "lexingtoncountytreasurer.qpaybill.com": 8,
-    "oconeesctax.qpaybill.com": 103,
-    "services1.arcgis.com": 31,
-    "spartanburgcountytax.qpaybill.com": 132,
-    "sumtercounty.qpaybill.com": 5,
-    "tax.buncombenc.gov": 465,
+    "barnwelltreasurer.qpaybill.com": 7,
+    "bcpwa.ncptscloud.com": 1,
+    "berkeleycountysc.paystar.io": 118,
+    "cama.harnett.org": 1821,
+    "cherokeecountysctax.qpaybill.com": 9,
+    "chesterfieldcountytax.qpaybill.com": 6,
+    "colleton.qpaybill.com": 6,
+    "horrycountytreasurer.qpaybill.com": 6,
+    "leecountync.munisselfservice.com": 43,
+    "marlborocountytax.qpaybill.com": 6,
+    "newhanovercountynccss.munisselfservice.com": 2587,
+    "oconeesctax.qpaybill.com": 3,
+    "services.nconemap.gov": 1,
+    "services.wake.gov": 1,
+    "services1.arcgis.com": 34,
+    "spartanburgcountytax.qpaybill.com": 3,
+    "tax.buncombenc.gov": 43,
+    "tax.cabarruscounty.us": 6,
     "tax.onslowcountync.gov": 10,
-    "tax.transylvaniacounty.org": 489,
-    "taxbill.catawbacountync.gov": 34
+    "tax.rowancountync.gov": 61,
+    "tax.transylvaniacounty.org": 17,
+    "taxbill.catawbacountync.gov": 812,
+    "taxes.paystar.io": 301,
+    "taxweb.iredellcountync.gov": 2,
+    "www.bttaxpayerportal.com": 9
    }
   },
   "result": {
-   "budget_stop": 1,
-   "checked": 1525,
-   "confirmed": 528,
-   "deferred": 6,
-   "refuted": 22,
-   "stale": 230,
-   "unconfirmed": 745
+   "budget_stop": 2,
+   "checked": 1323,
+   "confirmed": 440,
+   "deferred": 136,
+   "refuted": 10,
+   "stale": 106,
+   "unconfirmed": 767
   },
-  "seconds": 5425,
+  "seconds": 5452,
   "selection": {
    "applies": 145931,
-   "due_new": 98604,
-   "due_retry": 3510,
+   "due_new": 98118,
+   "due_retry": 2749,
    "due_retry_transient": 707,
-   "due_ttl": 1030,
-   "due_version": 5513,
-   "not_due_retry": 1650,
-   "not_due_retry_transient": 1,
-   "not_due_ttl": 34916,
-   "same_property_queued": 184
+   "due_ttl": 883,
+   "due_version": 5378,
+   "not_due_retry": 2389,
+   "not_due_retry_transient": 8,
+   "not_due_ttl": 35699,
+   "same_property_queued": 195
   },
   "source": null,
   "tier": null
  },
- "rows": 53015,
+ "rows": 53338,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4496869,
+   "bytes": 4531626,
    "file": "000.json",
-   "rows": 3261,
-   "sha256": "fd8003f2cac3206600b9cf4f691fc0c2384b7bfe5ac6117551e64a47bc19f77a"
+   "rows": 3275,
+   "sha256": "a9c8d8fc2ccb6bae07bb85455e356ac739917c5a4031ade8eff407df75549e75"
   },
   {
    "bucket": 1,
-   "bytes": 4485987,
+   "bytes": 4534322,
    "file": "001.json",
-   "rows": 3234,
-   "sha256": "e84de58c7fdd109b8da27168c8321108027649f6dc9ddee391c1e3aa34ad2ac0"
+   "rows": 3257,
+   "sha256": "29261b12e2913e7516b869c22aa98fcb168d79a198e876b6ed9e2d8ee07b1a66"
   },
   {
    "bucket": 2,
-   "bytes": 4576418,
+   "bytes": 4615451,
    "file": "002.json",
-   "rows": 3336,
-   "sha256": "980dfc6100a7493f4bfc8d1a52b659b00b7477436b7d3131686ae579bea63829"
+   "rows": 3353,
+   "sha256": "b7f529cca1d5a1fce97d93342cb4d9b7a29ffe07ed8b91791eef125c0cda3de4"
   },
   {
    "bucket": 3,
-   "bytes": 4607814,
+   "bytes": 4635520,
    "file": "003.json",
-   "rows": 3334,
-   "sha256": "2182f785f04439cf1417d45d500d0a8b0d784eef16ae48c88937408fbd3f5736"
+   "rows": 3348,
+   "sha256": "558f0fe3ddbed6a2bfb4d165e1512e5c7fed72cb8993b917b6a6c13d126c435f"
   },
   {
    "bucket": 4,
-   "bytes": 4496124,
+   "bytes": 4564732,
    "file": "004.json",
-   "rows": 3259,
-   "sha256": "326547bab00fa1016e5a7b313f7e351f9eb56654a32822f2a7b5362efc38c935"
+   "rows": 3291,
+   "sha256": "4217524500b4d410afd19b8443cd08a0c1bee8332c5d3c56835b1bf29362e3e9"
   },
   {
    "bucket": 5,
-   "bytes": 4652470,
+   "bytes": 4697350,
    "file": "005.json",
-   "rows": 3375,
-   "sha256": "86eab2bbc175c3b9a8f919738c6e6a8f4b7999a83b3ad7e3d8fc4b1fa853e5e6"
+   "rows": 3397,
+   "sha256": "9902eda2f6424814496faab924c2fe09f048c7884a6ab283e6c31eed5b62b97f"
   },
   {
    "bucket": 6,
-   "bytes": 4463531,
+   "bytes": 4502347,
    "file": "006.json",
-   "rows": 3243,
-   "sha256": "430f1bfd2a7ee6e3d5c4dbb90bf7d8695eafb47ca8658fb5dae1420403ef1b1e"
+   "rows": 3257,
+   "sha256": "df04f32b9d2ad8a2efe68ef368b191d11c98cc1284b32c7083645c6a047cb9c8"
   },
   {
    "bucket": 7,
-   "bytes": 4634913,
+   "bytes": 4691462,
    "file": "007.json",
-   "rows": 3374,
-   "sha256": "80c9632fb532045a273e86a674e49f724a10e1cbdba1bb4acc8acf3e7a757fc0"
+   "rows": 3400,
+   "sha256": "efc06416f3c1939733c78a216f8781d2352730b64b4cecd4d90db0a1d23e735a"
   },
   {
    "bucket": 8,
-   "bytes": 4672969,
+   "bytes": 4710132,
    "file": "008.json",
-   "rows": 3371,
-   "sha256": "8e4f3a624b3731556c0cc6694e2954908ecb5d5aee4a70f34d12896f91e1da2e"
+   "rows": 3391,
+   "sha256": "3cedd5a73184bd1a4f86d6265f6af04ca22637a0ecdf6ef08d51537f088ca277"
   },
   {
    "bucket": 9,
-   "bytes": 4596201,
+   "bytes": 4635107,
    "file": "009.json",
-   "rows": 3328,
-   "sha256": "42ce7e377221b8ba251c51bef15f1cfbda8984d1f51aa28aedbbbd197a956a6d"
+   "rows": 3348,
+   "sha256": "f26a3d13408babd8d10114261a51b2526a4d8223e9787a7a54a9f7c1aaf96e16"
   },
   {
    "bucket": 10,
-   "bytes": 4424807,
+   "bytes": 4478204,
    "file": "010.json",
-   "rows": 3231,
-   "sha256": "817b38c6de8dbe2e3284e110bf8c82bc67dd43f93cc8c1a775989edcc9b7bb3d"
+   "rows": 3259,
+   "sha256": "615faf6d52b2e2a683c3ae4587bc373aed26e25a2f35fd9d9db3bf94c61720e9"
   },
   {
    "bucket": 11,
-   "bytes": 4513759,
+   "bytes": 4552756,
    "file": "011.json",
-   "rows": 3289,
-   "sha256": "2decfd03502385723947ec185ea162b4368d8c284d0a2c4cf7682768a7da7d15"
+   "rows": 3307,
+   "sha256": "0310fce08243e4ddd3db01257fb2bfb3ad9ff9058f7aa6affe0597b4e2c04bfe"
   },
   {
    "bucket": 12,
-   "bytes": 4547778,
+   "bytes": 4588917,
    "file": "012.json",
-   "rows": 3311,
-   "sha256": "7e40dde6697168dcf40f6557aafc57b47ae991a157ec6c6b91d2df4550cc2153"
+   "rows": 3331,
+   "sha256": "2b070c54a24833d584a2d7240f2eaf534cb74790dcc9b527eff5dcdaffea8c80"
   },
   {
    "bucket": 13,
-   "bytes": 4611727,
+   "bytes": 4650275,
    "file": "013.json",
-   "rows": 3344,
-   "sha256": "380c242c8312b9118cf641fb8493e876508e1dce3085d044c770eb93197ae9be"
+   "rows": 3362,
+   "sha256": "e046ab5d3eef051137d46274a77e680ce450e61ca53270a5b669be5952e3ae0d"
   },
   {
    "bucket": 14,
-   "bytes": 4634402,
+   "bytes": 4671746,
    "file": "014.json",
-   "rows": 3349,
-   "sha256": "64869458d09c0e052af0909bd02144fda2e6b1b6b53f0caa63feb465ffa43acb"
+   "rows": 3364,
+   "sha256": "7de083be0518d9d9fa73697a9dc918cc717da8adee8f121169fbc60b70dba49f"
   },
   {
    "bucket": 15,
-   "bytes": 4696748,
+   "bytes": 4745189,
    "file": "015.json",
-   "rows": 3376,
-   "sha256": "042dad7324000501cf8eaf3f71f0ae4b83d77873a2c8a3f060fa5957bfedb218"
+   "rows": 3398,
+   "sha256": "63775544a567f32dd98af84c5b10ed401d7faeb5a31b992e513a5defbf13ddd2"
   }
  ],
  "signal": "tax_lien",
