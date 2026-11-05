@@ -195,6 +195,166 @@ ROSTERS: list[tuple[str, str, str, str]] = [
     # (10 pages) -- see _fetch_york_webforms's own docstring for the pagination-depth scope.
     ("SC", "York", "york_webforms",
      "https://inmatesinjail.yorkcountygov.com/detentioncenter/inmatesinjail.aspx"),
+
+    # Sumter SC — CentralSquare Zuercher/P2C cloud host variant (found via live web research
+    # 2026-11-05, verified real inmate data loads). SAME underlying API family as this file's
+    # "zuercher" vendor (api/portal/inmates/load) but hosted on CentralSquare's newer
+    # "centralsquarecloudgov.com" cloud domain ("Public Safety Suite Pro") instead of the legacy
+    # zuercherportal.com domain every other zuercher entry above uses. Verified live via browser
+    # network capture: POST to /api/portal/inmates/load returned 483 total records, arrest dates
+    # as recent as 11/04/2026, e.g. ATKINSON, DEMARCUS (shared Sumter-Lee Regional Detention
+    # Center -- carries both Sumter and Lee County SC warrants). Found via sumtersheriff.org's
+    # Detention Center page -> "Police to Citizens Portal" link.
+    # NOTE target is a FULL base URL, not a bare subdomain -- _fetch_zuercher() as currently
+    # written assumes a bare {subdomain}.zuercherportal.com host, so this entry will NOT resolve
+    # correctly until that fetcher is updated to accept a full base URL / second host pattern
+    # (request/response shape is otherwise identical). Until that follow-up lands this will
+    # silently return 0 rows each run (fail-closed, same as any other zuercher fetch error).
+    ("SC", "Sumter", "zuercher", "https://portal-sc-sumter-pd.centralsquarecloudgov.com"),
+
+    # Duplin NC — Southern Software Citizen Connect, same tenant family as Henderson/Polk/
+    # Transylvania/Rutherford above (found via live web research 2026-11-05, verified real inmate
+    # data loads). AgencyID=DuplinCoNC, JMSAgencyID=NC0310000 (matches Duplin's real NC county-31
+    # ORI). Verified with the real 2-step handshake and cross-checked against Henderson
+    # (known-good) and a bogus AgencyID (known-bad): Duplin's response shape matched Henderson's,
+    # not the bogus-ID shape. Sample: HANNAH ELIZABETH BARNETTE, charges BREAKING AND OR ENTERING
+    # / LARCENY AFTER BREAK/ENTER, Arresting Agency DUPLIN - NC0310000, Arrest Date 09/14/2026,
+    # Bond $75,000.
+    ("NC", "Duplin", "citizen_connect", "DuplinCoNC|NC0310000"),
+
+    # Rowan NC — CentralSquare P2C modern (policetocitizen.com SPA), same vendor as Buncombe/Burke
+    # above (found via live web research 2026-11-05, verified real inmate data loads). Host
+    # rowancountync.policetocitizen.com, listId 465 -- confirmed by driving a real browser session
+    # (Home -> Inmates -> Inmates/Catalog) and capturing its own calls to /api/Agency/465,
+    # /api/Module/465, /api/Inmates/SearchCriteria/465 and POST /api/Inmates/465, all consistently
+    # using listId 465. Verified live: {"Total":318,...}, e.g. LAQUERIUS MARKESE MARTIN (arrested
+    # 11/5/2026, ASSAULT BY POINTING A GUN, $30,000 bond, docket 26CR403105-790).
+    ("NC", "Rowan", "p2c_centralsquare",
+     "https://rowancountync.policetocitizen.com|465"),
+
+    # New Hanover NC — CentralSquare P2C jqGrid (classic ASP.NET WebForms), same vendor as
+    # Cleveland/Lincoln above (found via live web research 2026-11-05, verified real inmate data
+    # loads). Base http://p2c.nhcgov.com/p2c (https also works identically). Verified with this
+    # file's own _fetch_p2c_jqgrid handshake: GET /jailinmates.aspx seeds the session, POST
+    # /jqHandler.ashx?op=s returns real paginated JSON, 482 total in custody. Sample: ELIAS GABY
+    # ACHI (booked 10/06/2026, DOMESTIC VIOLENCE PROTECTIVE ORDER VIOLATION), COLOGENO KOBIA ALLEN
+    # (booked 11/04/2026, POSSESSION OF STOLEN GOODS/PROPERTY) -- full DOB on every row, same as
+    # this vendor elsewhere.
+    ("NC", "New Hanover", "p2c_jqgrid", "http://p2c.nhcgov.com/p2c"),
+
+    # Colleton SC — Zuercher Portal, {county}-so-{state} subdomain pattern (found via live web
+    # research 2026-11-05, verified real inmate data loads). Verified by loading the live Inmates
+    # page itself: "Viewing 1-51 of 86 results", e.g. AIKEN, JERRY JERMAINE - FTP Bench Warrant,
+    # Arrest Date 12/23/2024. Root page is the standard Zuercher Angular SPA shell ("PUBLIC SAFETY
+    # SUITE PRO", CentralSquare branding). CAVEAT: a cold, cookie-less POST straight to
+    # api/portal/inmates/load returned {"status":500} during verification -- this tenant's SPA
+    # appears to seed session state via prior GETs first. The already-live zuercher counties
+    # above all succeed with this file's current direct-POST _fetch_zuercher, so this may just
+    # work too, but if Colleton ever comes back empty/500 in the logs, this is the first thing to
+    # check (replicate an init-GET sequence before the POST).
+    ("SC", "Colleton", "zuercher", "colleton-so-sc"),
+
+    # Hoke NC — Zuercher Portal, {county}-so-{state} subdomain pattern (found via live web
+    # research 2026-11-05, verified real inmate data loads). Verified live: "Viewing 1-51 of 130
+    # results", e.g. ABARCA-PEREZ, FORTINO - DWI, Arrest Date 09/25/2026; BAKER, JERMAINE
+    # MONTREAL - Sentenced, Serving 82 days. Landing page labeled "Zuercher Portal" with the
+    # identical CentralSquare shell/nav seen on Colleton, confirming same vendor/product.
+    ("NC", "Hoke", "zuercher", "hoke-so-nc"),
+
+    # Berkeley SC — Southern Software Citizen Connect, same tenant family as Henderson/Duplin
+    # above (found via live web research 2026-11-05, verified real inmate data loads). AgencyID
+    # is exactly "BerkelyCoSC" -- note the real-world misspelling (missing the second "e" in
+    # Berkeley), confirmed in two separate link instances on sheriff.berkeleycountysc.gov's own
+    # "Inmate Lookup" link (that .gov domain 403s a plain curl/WebFetch WAF check -- verify with a
+    # real browser instead). Verified live: 451 real inmates in a rendered DataTables page, e.g.
+    # Jonathan Colby Adkins, Daniel Filippone Agold, with arresting-agency ORI codes BERKELEY -
+    # SC0080000, GOOSE CREEK - SC0080300, SUMMERVILLE - SC0180200.
+    ("SC", "Berkeley", "citizen_connect", "BerkelyCoSC|SC0080000"),
+
+    # Lexington SC — CentralSquare P2C modern (policetocitizen.com SPA), same vendor as
+    # Buncombe/Burke/Rowan above (found via live web research 2026-11-05, verified real inmate
+    # data loads). Host lexingtonsheriffsc.policetocitizen.com, found via lex-co.sc.gov ->
+    # Sheriff's Department -> lexingtonscsheriff.com -> "Inmate Search". Verified live by clicking
+    # "Inmate Inquiry": catalog reported "511 Found", real current inmates with arrest dates of
+    # 11/04/2026-11/05/2026, e.g. STROTHER, JUNE arrested 11/05/2026. An older domain,
+    # jail.lexingtonsheriff.net, carries a valid cert for this same sheriff's office but currently
+    # 503s/fails to load -- looks deprecated, not the live tenant.
+    # NOTE no listId was captured during verification -- _fetch_p2c_centralsquare defaults an
+    # unspecified listId to "23" (Buncombe's own id), which is almost certainly WRONG for this
+    # tenant. This entry needs its real listId determined (e.g. by probing /api/Agency/<id> the
+    # way the Rowan NC entry above was confirmed) before it returns this county's own roster
+    # instead of silently hitting the wrong list or an empty one.
+    ("SC", "Lexington", "p2c_centralsquare", "https://lexingtonsheriffsc.policetocitizen.com"),
+
+    # Harnett NC — Southern Software Citizen Connect, same tenant family as Henderson/Duplin
+    # above (found via live web research 2026-11-05, verified real inmate data loads). AgencyID=
+    # HarnettCoNC, linked from harnettsheriff.com's Detention Center page as "Inmate Population
+    # Search". Verified live via real browser render: Total Inmates 295, e.g. Lisa Ann Acevedo
+    # (48/W/F), Booked 06/27/2026, charge MURDER, Arresting Agency HARNETT - NC0430000.
+    # CAVEAT: a plain curl/script GET to this URL hits an "Access Denied -- Automated traffic
+    # detected" reCAPTCHA-style wall (confirmed -- curl blocked, real browser did not; no CAPTCHA
+    # was solved or clicked through to get this result). This file's existing
+    # _fetch_citizen_connect already uses curl_cffi chrome impersonation, which may or may not be
+    # enough to pass -- if Harnett comes back empty, this bot-detection layer is why.
+    ("NC", "Harnett", "citizen_connect", "HarnettCoNC|NC0430000"),
+
+    # Anson NC — Southern Software Citizen Connect, same tenant family as Henderson/Duplin/
+    # Harnett above (found via live web research 2026-11-05, verified real inmate data loads).
+    # AgencyID=AnsonCoNC, linked from the county's own Jail page (co.anson.nc.us/303/Jail) as
+    # "Anson County Jail Booking Information". Verified live: Total Inmates 69, e.g. Emilio
+    # Francisco Alston (DOB 12/11/1990) Booked 07/25/2025, Brandon Lamont Bennett (DOB 12/28/1988)
+    # Booked 10/22/2026, Arresting Agency ANSON - NC0040000. NOTE this tenant does NOT show up in
+    # Southern Software's own public agency-search directory ("No agency matches that search") --
+    # it is nonetheless live and real at this exact county-linked URL; don't rely on that vendor
+    # directory alone to rule a county out.
+    ("NC", "Anson", "citizen_connect", "AnsonCoNC|NC0040000"),
+
+    # Pasquotank NC — Zuercher Portal, {county}-911-{state} subdomain pattern (the {county}-so-
+    # {state} variant is NXDOMAIN here) (found via live web research 2026-11-05, verified real
+    # inmate data loads). Page title "Zuercher Portal -- Joint Pasquotank and Camden County and
+    # Elizabeth City PD Portal" (serves Albemarle District Jail). Verified live, no login: 177
+    # total records, e.g. "Allen, Ladir Amarion," Booked 06/29/2026, charge 14-87 ROBBERY-ARMED,
+    # bond $250,000 secured. The live page's own XHR payload (captured via network interception)
+    # matches this file's existing _fetch_zuercher body shape exactly (flat JSON: name/race/sex/
+    # cell_block/held_for_agency/in_custody/paging/sorting) -- confirms that shape is current and
+    # correct, not the bracket-notation guess that 500s on this backend. Bonus: this portal is
+    # joint, so it likely also covers Camden County NC bookings if that's ever useful.
+    ("NC", "Pasquotank", "zuercher", "pasquotank-911-nc"),
+
+    # Cabarrus NC — CentralSquare P2C jqGrid (classic ASP.NET/jqGrid; this instance's own footer
+    # still reads "powered by Superion's P2C engine", Superion being the pre-merger predecessor
+    # brand of CentralSquare -- same engine lineage as Cleveland/Lincoln above) (found via live
+    # web research 2026-11-05, verified real inmate data loads). Base
+    # onlineservices.cabarruscounty.us/p2c, found via cabarruscounty.us/Services/Inmate-Lookup,
+    # which 302-redirects straight there. Loads a full roster immediately, no search/login: "1 -
+    # 10 of 510 Results" at check time, e.g. Abreu, Reinaldo (W/M/37), TRAFFIC IN AMPHETAM/METHAM,
+    # Arrest Date 05/27/2026; Adams, Gaines D Marion (B/M/21), MURDER-1ST DEGREE.
+    ("NC", "Cabarrus", "p2c_jqgrid", "https://onlineservices.cabarruscounty.us/p2c"),
+
+    # Iredell NC — CentralSquare P2C jqGrid (classic ASP.NET/jqGrid; this instance's footer
+    # explicitly reads "powered by CentralSquare's P2C engine") (found via live web research
+    # 2026-11-05, verified real inmate data loads). County hosts its own instance at
+    # p2c.iredellcountync.gov (Sheriff Darren E. Campbell branding). Loads a full live roster
+    # immediately, no search/login: e.g. Adams, Roy Lee (B/M/64), FAIL TO REGISTER-SEX OFFENDER,
+    # Arrest Date 11/04/2026; Alexander, Noel Ethan (B/M/26), ASSAULT INFLICT SERIOUS INJURY TO
+    # LEO/PROBATION/ETC, Arrest Date 10/05/2025.
+    ("NC", "Iredell", "p2c_jqgrid", "https://p2c.iredellcountync.gov"),
+
+    # Kershaw SC — Zuercher Portal, same subdomain pattern as Cherokee/Anderson/Laurens/Oconee/
+    # Pickens/Union above (found via live web research 2026-11-05, verified real inmate data
+    # loads). Verified by direct POST (identical request shape to this file's live
+    # _fetch_zuercher) to kershaw-so-sc.zuercherportal.com/api/portal/inmates/load: HTTP 200,
+    # total_record_count=133, e.g. name="ALTMAN, TERRY JAMES".
+    ("SC", "Kershaw", "zuercher", "kershaw-so-sc"),
+
+    # Alamance NC — CentralSquare P2C jqGrid (classic ASP.NET build), same vendor as Cleveland/
+    # Lincoln/Cabarrus above (found via live web research 2026-11-05, verified real inmate data
+    # loads). Base apps.alamance-nc.com/p2c, linked directly as "Inmate List" from
+    # sheriff.alamancecountync.gov -> alamancecountync.gov/public_safety/sheriffs_office. Verified
+    # with this file's own _fetch_p2c_jqgrid handshake: GET /jailinmates.aspx seeds the session,
+    # POST /jqHandler.ashx?op=s returned 339 real rows, e.g. ADAMS/MARTY/LEE, DOB 12/17/1964,
+    # ASSAULT WITH DEADLY WEAPON, arrest date 08/11/2026; AGUALO/JUSTIN/CRUZ.
+    ("NC", "Alamance", "p2c_jqgrid", "https://apps.alamance-nc.com/p2c"),
 ]
 
 # Southern Software hosts every Citizen Connect tenant off one origin; the
