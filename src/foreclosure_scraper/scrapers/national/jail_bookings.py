@@ -205,11 +205,29 @@ ROSTERS: list[tuple[str, str, str, str]] = [
     # as recent as 11/04/2026, e.g. ATKINSON, DEMARCUS (shared Sumter-Lee Regional Detention
     # Center -- carries both Sumter and Lee County SC warrants). Found via sumtersheriff.org's
     # Detention Center page -> "Police to Citizens Portal" link.
-    # NOTE target is a FULL base URL, not a bare subdomain -- _fetch_zuercher() as currently
-    # written assumes a bare {subdomain}.zuercherportal.com host, so this entry will NOT resolve
-    # correctly until that fetcher is updated to accept a full base URL / second host pattern
-    # (request/response shape is otherwise identical). Until that follow-up lands this will
-    # silently return 0 rows each run (fail-closed, same as any other zuercher fetch error).
+    # PARTIALLY FIXED 2026-11-05: the full-base-URL problem is resolved -- _fetch_zuercher() now
+    # accepts a string starting with http(s):// as-is instead of forcing zuercherportal.com -- but
+    # this tenant turned out to ALSO need a CSRF handshake the legacy zuercherportal.com tenants
+    # never do, so this entry still returns 0 rows until that's built. What's confirmed so far
+    # (live-debugged via real browser + manual fetch() calls against the live site, not guessed):
+    #   - a GET to /api/portal/inmates/init (same host) must happen first -- it both seeds the
+    #     session AND returns the page's jail_agencies list
+    #   - the CSRF token itself is NOT delivered as a normal Set-Cookie header (checked -- only
+    #     AWSALB/AWSALBCORS come back that way); it shows up in document.cookie as XSRF-TOKEN
+    #     regardless, so something in the app's own JS sets it client-side -- a real browser
+    #     session (not curl_cffi) may be unavoidable here, or there's a specific prior request that
+    #     triggers the Set-Cookie that a plain GET /, GET /home, GET init alone didn't trigger in
+    #     testing
+    #   - the header name is X-CSRFToken (Flask-WTF's default, NOT Angular's default X-XSRF-TOKEN
+    #     -- this backend is Flask/gunicorn, confirmed via response headers, unlike the legacy
+    #     tenants' stack) -- sending X-XSRF-TOKEN gets "CSRF token is missing" (400); X-CSRFToken
+    #     with a real token gets PAST that check but then 500s with no error detail, even replayed
+    #     from inside the live page's own JS context (same-origin, real cookies, fresh token each
+    #     time) -- so the remaining bug is NOT a client-replication mismatch, it's either a
+    #     body-shape difference this host's backend is stricter about, or a second undiscovered
+    #     requirement. Next step: capture the app's OWN actual request body (its own code never
+    #     hit this error) via a script-injected fetch/XHR intercept from page load, not a
+    #     reload-and-guess loop.
     ("SC", "Sumter", "zuercher", "https://portal-sc-sumter-pd.centralsquarecloudgov.com"),
 
     # Duplin NC — Southern Software Citizen Connect, same tenant family as Henderson/Polk/
@@ -279,12 +297,15 @@ ROSTERS: list[tuple[str, str, str, str]] = [
     # 11/04/2026-11/05/2026, e.g. STROTHER, JUNE arrested 11/05/2026. An older domain,
     # jail.lexingtonsheriff.net, carries a valid cert for this same sheriff's office but currently
     # 503s/fails to load -- looks deprecated, not the live tenant.
-    # NOTE no listId was captured during verification -- _fetch_p2c_centralsquare defaults an
-    # unspecified listId to "23" (Buncombe's own id), which is almost certainly WRONG for this
-    # tenant. This entry needs its real listId determined (e.g. by probing /api/Agency/<id> the
-    # way the Rowan NC entry above was confirmed) before it returns this county's own roster
-    # instead of silently hitting the wrong list or an empty one.
-    ("SC", "Lexington", "p2c_centralsquare", "https://lexingtonsheriffsc.policetocitizen.com"),
+    # RESOLVED 2026-11-05: real listId is 576, confirmed live via a real browser session's own
+    # network calls after clicking through Home -> "Inmate Inquiry" (the SPA's actual route is
+    # /Inmates, not the locale-prefixed /en/Inmates -- that 404s here, same gotcha as Buncombe)
+    # -- captured /api/Agency/576 calls, then cross-checked by hitting the tenant's own
+    # host-relative, no-auth /api/Agency/InitialSettings, which answers {"AgencyId":576,...}
+    # directly. _fetch_p2c_centralsquare now also auto-discovers via that same endpoint whenever
+    # a target carries no explicit listId, instead of silently defaulting to Buncombe's "23".
+    ("SC", "Lexington", "p2c_centralsquare",
+     "https://lexingtonsheriffsc.policetocitizen.com|576"),
 
     # Harnett NC — Southern Software Citizen Connect, same tenant family as Henderson/Duplin
     # above (found via live web research 2026-11-05, verified real inmate data loads). AgencyID=
@@ -468,10 +489,21 @@ async def _fetch_zuercher(subdomain: str) -> list[dict]:
     API: POST https://{subdomain}.zuercherportal.com/api/portal/inmates/load
     Returns JSON with 'records' array. Each record has name, dob, charges,
     arrest_date.
+
+    `subdomain` is normally a bare subdomain on the legacy zuercherportal.com
+    domain (the original and still-majority case). FIXED 2026-11-05 (Sumter SC
+    build): some tenants are migrated to CentralSquare's newer cloud host
+    ("centralsquarecloudgov.com", branded "Public Safety Suite Pro") under a
+    FULL base URL instead -- accept either: a string starting with http(s)://
+    is used as-is (just appending the API path), anything else still gets the
+    original {subdomain}.zuercherportal.com treatment. Request/response shape
+    is identical across both hosts -- only the base URL differs.
     """
     from curl_cffi.requests import AsyncSession
 
-    url = f"https://{subdomain}.zuercherportal.com/api/portal/inmates/load"
+    base = subdomain.rstrip("/") if subdomain.startswith(("http://", "https://")) \
+        else f"https://{subdomain}.zuercherportal.com"
+    url = f"{base}/api/portal/inmates/load"
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
     body = {
         "name": "", "race": "all", "sex": "all", "cell_block": "all",
@@ -704,17 +736,40 @@ async def _fetch_p2c_centralsquare(target: str) -> list[dict]:
     cookie, then echo it as X-XSRF-TOKEN header on the JSON search POST to
     /api/Inmates/<listId>. Page in blocks of 200 until a short page.
     DOB is redacted on the public feed; Age + ArrestDate survive.
+
+    FIXED 2026-11-05 (Lexington SC build): `target` not carrying a `|listId`
+    used to silently default to "23" (Buncombe's own id) -- wrong for any
+    other tenant, and nothing surfaced the mistake (the API still returns
+    200s, just for the wrong agency's roster or an empty one). A listId
+    doesn't need manual browser-click-through discovery: every tenant's own
+    host-relative `/api/Agency/InitialSettings` (no auth, no id required)
+    answers with its own `AgencyId` directly -- confirmed live for Lexington
+    (AgencyId=576) by comparing a real browser session's own network calls
+    against this endpoint's response. Auto-discover it here whenever
+    `target` doesn't already carry an explicit listId, instead of guessing.
     """
     from curl_cffi.requests import AsyncSession
 
     host, _, list_id = target.partition("|")
-    list_id = list_id or "23"
-    api = f"{host}/api/Inmates/{list_id}"
+
+    async def _discover_list_id(s: "AsyncSession") -> str:
+        try:
+            r = await s.get(f"{host}/api/Agency/InitialSettings", timeout=20)
+            agency_id = (r.json() or {}).get("AgencyId")
+            if agency_id:
+                return str(agency_id)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("jail_scraper.p2c_cs_discover_fail", host=host, error=str(exc)[:120])
+        return "23"  # last-resort fallback: Buncombe's own id, same as pre-fix behavior
+
     page_size = 200
     out: list[dict] = []
 
     try:
         async with AsyncSession(impersonate="chrome", verify=False) as s:
+            if not list_id:
+                list_id = await _discover_list_id(s)
+            api = f"{host}/api/Inmates/{list_id}"
             # 1) Establish XSRF-TOKEN cookie via app-route GET
             await s.get(f"{host}/en/Inmates", timeout=25)
             token = s.cookies.get("XSRF-TOKEN")
