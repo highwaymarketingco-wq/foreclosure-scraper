@@ -39,11 +39,29 @@ history is recovered even though older years' AssetDescription often drops the h
 ("COTTONWOOD DR" with no "6815") and would not confirm on its own.
 
 Writes raw['alamance_tax_bills'] = {bills, years_unpaid, balance, taxpayer_of_record,
-assessed_value, source_url} -- same shape enrichment_ustaxdata_tax_search.py already uses, so
-enrichment_tax_owed.py's existing generic Pass B (gated on `_TAXISH` substring match in the
-block name, "tax" qualifies) picks up tax_owed/tax_aging_surfaced with no new wiring there.
-multi_year_delinquent_tax/two_year_delinquent are each their own literal raw key (gap_matrix.py
-reads them as an exact presence check) and need their own restatement, built() below.
+assessed_value, source_url, situs} -- same shape enrichment_ustaxdata_tax_search.py already
+uses, so enrichment_tax_owed.py's existing generic Pass B (gated on `_TAXISH` substring match in
+the block name, "tax" qualifies) picks up tax_owed, and enrichment_tax_aging.py's own separately-
+wired, unconditional pass (tax_aging_surfaced's ONLY producer, per gap_matrix.py's own Spec) then
+derives tax_aging_surfaced from that -- no new wiring in either of those two modules.
+
+THE 'situs' FIELD IS LOAD-BEARING, not cosmetic (live-confirmed 2026-11-05, 3/3 real rows). Pass B
+only runs after tax_binding.scrub_unbound_tax() (Pass 0) decides the block is this row's OWN
+record, via bind_block(): a parcel-id match (tax_binding.BLOCK_PARCEL_FIELDS has no entry for
+this block name, and this vendor's PARID is never the board's own parcel_id anyway -- see above),
+an address match (tax_binding.BLOCK_ADDRESS_FIELDS -- checked on EVERY tax block by field name,
+regardless of which block it is), or a source-name match (this enrichment attaches to rows from
+ANY original scraper, never one named "alamance"/"tax"). Before 'situs' was added, this block
+had NONE of the three, so bind_block() returned 'no_evidence' and scrub_unbound_tax() removed it
+on every single row, before Pass B ever ran -- confirmed live: raw['tax_owed'] and raw[
+'tax_aging_surfaced'] stayed absent on 168+ already-backfilled live board rows (2026-10-28 backfill)
+despite real unpaid balances sitting right there in raw['alamance_tax_bills']['balance']. Stamping
+'situs' with the EXACT AssetDescription text _confirm_parid() already address_relation()-matched
+against the row's own street_address (never invented, never the board's own address echoed back)
+gives bind_block() the address-match field it already knows how to check, verdict 'own_address',
+and the block survives into Pass B. multi_year_delinquent_tax/two_year_delinquent are each their
+own literal raw key (gap_matrix.py reads them as an exact presence check, never through tax_owed/
+tax_aging_surfaced) and need their own restatement, built() below -- neither needed this fix.
 
 Bounded, opt-in, free, public JSON endpoint, no login, no CAPTCHA. Gate off entirely with
 FORECLOSURE_ALAMANCE_TAX=0.
@@ -121,22 +139,38 @@ async def _search(c, term: str) -> list[dict]:
     return [row for row in (data.get("results") or []) if isinstance(row, dict)]
 
 
-def _confirm_parid(rows: list[dict], street_address: Optional[str]) -> Optional[Any]:
-    """The one PARID whose own AssetDescription address_relation()-matches the row's
-    street_address -- never \"closest\" or \"only result\"."""
+def _confirm_parid(rows: list[dict], street_address: Optional[str]) -> Optional[tuple[Any, str]]:
+    """The one (PARID, matched AssetDescription) pair whose address address_relation()-matches
+    the row's street_address -- never \"closest\" or \"only result\". The matched address string
+    is returned too (not just the PARID) so the caller can stamp it back onto raw[RAW_KEY] as
+    build_block()'s confirmed_address -- see that function's docstring for why this one field is
+    what keeps tax_binding.scrub_unbound_tax() from stripping the whole block before it is read."""
     if not street_address:
         return None
     for row in rows:
         if row.get("PropertyType") != "R" or row.get("PARID") is None:
             continue
-        if address_relation(row.get("AssetDescription"), street_address) == "match":
-            return row["PARID"]
+        addr = row.get("AssetDescription")
+        if address_relation(addr, street_address) == "match":
+            return row["PARID"], addr
     return None
 
 
-def build_block(bills: list[dict]) -> dict[str, Any]:
+def build_block(bills: list[dict], confirmed_address: Optional[str] = None) -> dict[str, Any]:
     """Pure: the raw[RAW_KEY] block from one parcel's full bill list (one dict per TaxYear,
-    already filtered to a single confirmed PARID)."""
+    already filtered to a single confirmed PARID).
+
+    confirmed_address, when given, is stamped as the block's own top-level raw['situs'] -- the
+    EXACT vendor AssetDescription text _confirm_parid() already address_relation()-matched
+    against this row's street_address (never invented here, never a second guess). This one field
+    is what lets tax_binding.bind_block() verify the block as this row's own ('own_address')
+    instead of 'no_evidence': tax_binding.BLOCK_ADDRESS_FIELDS checks every property-tax block for
+    a 'situs' field regardless of the block's name, while tax_binding.BLOCK_PARCEL_FIELDS has no
+    entry for this block name at all (this vendor's own PARID is never the board's own parcel_id,
+    see the module docstring), and this enrichment attaches to rows from ANY original scraper, so
+    no source-name relation exists either -- 'situs' is the ONLY evidence this block could ever
+    carry. Without it, scrub_unbound_tax() strips the block before enrich_tax_owed() ever reads
+    it (live-confirmed 2026-11-05, 3/3 real rows), and tax_owed/tax_aging_surfaced never derive."""
     years_unpaid = sorted({b["year"] for b in bills if b.get("status") != _PAID_STATUS})
     unpaid_total = round(sum(b["balance"] for b in bills
                              if b.get("status") != _PAID_STATUS and b.get("balance")), 2) or None
@@ -149,6 +183,8 @@ def build_block(bills: list[dict]) -> dict[str, Any]:
         "source_url": SEARCH_URL,
         "checked_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
+    if confirmed_address:
+        block["situs"] = confirmed_address
     if unpaid_total:
         block["balance"] = unpaid_total
         block["total_due"] = unpaid_total
@@ -224,10 +260,11 @@ async def enrich_alamance_tax(listings: Iterable[Listing]) -> dict[str, Any]:
                 return
             stats["searched"] += 1
             await asyncio.sleep(0.3)
-        parid = _confirm_parid(rows, li.street_address)
-        if parid is None:
+        confirmed = _confirm_parid(rows, li.street_address)
+        if confirmed is None:
             stats["no_match"] += 1
             return
+        parid, confirmed_address = confirmed
         stats["confirmed"] += 1
         bills = []
         for row in rows:
@@ -247,7 +284,7 @@ async def enrich_alamance_tax(listings: Iterable[Listing]) -> dict[str, Any]:
             })
         if not isinstance(li.raw, dict):
             li.raw = {}
-        li.raw[RAW_KEY] = build_block(bills)
+        li.raw[RAW_KEY] = build_block(bills, confirmed_address=confirmed_address)
         mydt = build_mydt_block(bills)
         if mydt:
             li.raw[MYDT_KEY] = mydt

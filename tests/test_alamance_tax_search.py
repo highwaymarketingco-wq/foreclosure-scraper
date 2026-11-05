@@ -32,7 +32,7 @@ def test_confirm_parid_matches_on_address_only():
         {"PropertyType": "R", "PARID": 999999, "AssetDescription": "100 OTHER ST"},
         {"PropertyType": "search?", "PARID": None, "AssetDescription": "2002 HD MC"},
     ]
-    assert _confirm_parid(rows, "3949 Rural Retreat Road") == 106711
+    assert _confirm_parid(rows, "3949 Rural Retreat Road") == (106711, "3949 RURAL RETREAT RD")
     assert _confirm_parid(rows, "999 Nowhere Ave") is None
     assert _confirm_parid([], "3949 Rural Retreat Road") is None
 
@@ -43,6 +43,39 @@ def test_build_block_sums_only_unpaid():
     assert block["years_unpaid"] == [2026]
     assert block["balance"] == 100.0
     assert block["taxpayer_of_record"] == "X"
+    assert "situs" not in block  # no confirmed_address given -> no fabricated field
+
+
+def test_build_block_stamps_confirmed_address_as_situs():
+    """situs is load-bearing, not cosmetic: it is the ONLY field tax_binding.bind_block() can
+    recognize as evidence for this block (no parcel-id registry entry for this block name, no
+    row-source relation) -- see test_alamance_tax_bills_survives_scrub_unbound_tax below."""
+    bills = [_bill(2026, "open", 100.0)]
+    block = build_block(bills, confirmed_address="3949 RURAL RETREAT RD")
+    assert block["situs"] == "3949 RURAL RETREAT RD"
+
+
+def test_alamance_tax_bills_survives_scrub_unbound_tax():
+    """Regression test for the live-confirmed 2026-11-05 finding: without 'situs', tax_binding's
+    Pass 0 (scrub_unbound_tax) strips raw['alamance_tax_bills'] as 'no_evidence' -- this vendor's
+    PARID is never registered in tax_binding.BLOCK_PARCEL_FIELDS (and never the board's own
+    parcel_id either way, see the module docstring), and this enrichment attaches to rows from
+    ANY original scraper, so no row-source relation exists -- BEFORE enrich_tax_owed()'s Pass B
+    ever runs, so tax_owed/tax_aging_surfaced never derive. With 'situs' stamped (the exact
+    address _confirm_parid() already matched), bind_block() resolves 'own_address' and the block
+    is kept."""
+    from foreclosure_scraper import tax_binding
+
+    li = Listing(source="counties_generic.liensnc", source_url="https://x", state="NC",
+                 county="Alamance", street_address="3949 Rural Retreat Road",
+                 parcel_id="8844451684")
+    bills = [_bill(2026, "open", 100.0)]
+
+    unbound_block = build_block(bills)  # pre-fix shape: no confirmed_address
+    assert tax_binding.bind_block(li, RAW_KEY, unbound_block) == "no_evidence"
+
+    bound_block = build_block(bills, confirmed_address="3949 RURAL RETREAT RD")
+    assert tax_binding.bind_block(li, RAW_KEY, bound_block) == "own_address"
 
 
 def test_build_mydt_block_none_below_min_years():
