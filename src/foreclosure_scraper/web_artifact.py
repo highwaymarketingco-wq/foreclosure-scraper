@@ -5566,48 +5566,89 @@ def patch_existing_rows(patches: dict[str, dict], summary: dict,
     matched_keys: set = set()
     dup_keys: set = set()
 
-    # --- ONE streaming pass over the existing board: identity-match + patch + pop + encode ---
+    # --- ONE streaming pass over the existing board: identity-match + patch + pop + encode,
+    # feeding write_parts() (via a generator) and the plain/detail writers as it goes.
+    #
+    # FIXES a real, verified crash (2026-11): the old version here appended every row's
+    # encoded bytes to `listing_blobs` and every row's detail dict to `details` -- each
+    # growing to ~472K entries regardless of how few rows `patches` actually touched. Repeated
+    # list-reallocation at that scale is exactly what exhausts this machine's compressor
+    # SEGMENT limit (not raw swap%/free-bytes, which read "fine" the whole time) -- see
+    # feedback_bop_federal_silent_death_during_board_write_2026-11-03.md for the full
+    # evidence trail (2 silent deaths + 1 reboot correlation, all during this exact step).
+    # Below, nothing ever holds more than one row's parsed dict AND one row's encoded bytes
+    # at a time; memory cost is bounded by write_parts()'s own per-part chunk, not board size.
+    #
+    # write_parts() still gets its DEFAULT (immediate-commit) writer here, deliberately NOT
+    # staged -- same timing as before this fix: each part lands on disk, durably, as soon as
+    # write_parts() produces it, independent of whatever happens to listings.json/
+    # listings_detail.json afterward. That preserves the 2026-10-30/31 bop_federal ENOSPC fix
+    # (test_a_crash_writing_the_throwaway_plain_fallback_still_banks_the_patch_in_the_parts_gate):
+    # losing the regenerable display twins to a later disk-full write must never cost an
+    # already-computed patch that already made it into the parts-gate.
     row_enc = json.JSONEncoder(ensure_ascii=False, default=str)
-    listing_blobs: list[bytes] = []
-    details: list[dict] = []
     by_state: collections.Counter = collections.Counter()
     by_source: collections.Counter = collections.Counter()
     existing_total = 0
     applied = 0
-    for rec in _iter_board_records(docs):
-        existing_total += 1
-        if isinstance(rec, dict) and pending:
-            light = Listing.model_construct(**{k: rec.get(k) for k in _APPEND_SIG_FIELDS})
-            try:
-                key = light.dedupe_key()
-            except Exception:  # noqa: BLE001 - a row too malformed to key is simply unmatched
-                key = None
-            if key is not None and key in pending:
-                if key in matched_keys:
-                    dup_keys.add(key)
-                matched_keys.add(key)
-                update = pending[key]
-                raw_update = update.get("raw")
-                if isinstance(raw_update, dict):
-                    raw = rec.get("raw")
-                    if not isinstance(raw, dict):
-                        raw = {}
-                        rec["raw"] = raw
-                    raw.update(raw_update)
-                for field, value in update.items():
-                    if field != "raw":
-                        rec[field] = value
-                applied += 1
-        by_state[str(rec.get("state") or "").strip() or "unknown"] += 1
-        by_source[str(rec.get("source") or "").strip() or "unknown"] += 1
-        raw = rec.get("raw")
-        d: dict = {}
-        if isinstance(raw, dict):
-            for k in LAZY_DETAIL_KEYS:
-                if k in raw:
-                    d[k] = raw.pop(k)
-        details.append(d)
-        listing_blobs.append(row_enc.encode(rec).encode("utf-8"))
+
+    plain_w = _ArrayFileWriter(listings_path)
+    detail_path = docs / "listings_detail.json"
+    detail_w = _ArrayFileWriter(detail_path)
+
+    def _rows_for_parts():
+        nonlocal existing_total, applied
+        for rec in _iter_board_records(docs):
+            existing_total += 1
+            if isinstance(rec, dict) and pending:
+                light = Listing.model_construct(**{k: rec.get(k) for k in _APPEND_SIG_FIELDS})
+                try:
+                    key = light.dedupe_key()
+                except Exception:  # noqa: BLE001 - too malformed to key is simply unmatched
+                    key = None
+                if key is not None and key in pending:
+                    if key in matched_keys:
+                        dup_keys.add(key)
+                    matched_keys.add(key)
+                    update = pending[key]
+                    raw_update = update.get("raw")
+                    if isinstance(raw_update, dict):
+                        raw = rec.get("raw")
+                        if not isinstance(raw, dict):
+                            raw = {}
+                            rec["raw"] = raw
+                        raw.update(raw_update)
+                    for field, value in update.items():
+                        if field != "raw":
+                            rec[field] = value
+                    applied += 1
+            by_state[str(rec.get("state") or "").strip() or "unknown"] += 1
+            by_source[str(rec.get("source") or "").strip() or "unknown"] += 1
+            raw = rec.get("raw")
+            d: dict = {}
+            if isinstance(raw, dict):
+                for k in LAZY_DETAIL_KEYS:
+                    if k in raw:
+                        d[k] = raw.pop(k)
+            detail_w.add(row_enc.encode(d).encode("utf-8"))
+            blob = row_enc.encode(rec).encode("utf-8")
+            plain_w.add(blob)
+            yield blob
+
+    try:
+        _prior_parts = _bp.manifest_parts_block(_bp.read_manifest(docs)) or {}
+        _parts = _bp.write_parts(docs, _rows_for_parts(),
+                                 hint_rows=_prior_parts.get("rows_per_part"))
+        if plain_w.rows != existing_total:
+            raise RuntimeError(
+                f"patch_existing_rows: streamed {plain_w.rows} rows into listings.json but "
+                f"{existing_total} rows off the board -- should never differ.")
+        _plain_ent = plain_w.finish()
+        _detail_ent = detail_w.finish()
+    except BaseException:
+        plain_w.abort()
+        detail_w.abort()
+        raise
 
     not_found = len(pending) - len(matched_keys)
     stats: dict = {
@@ -5616,6 +5657,13 @@ def patch_existing_rows(patches: dict[str, dict], summary: dict,
         "written": False, "total_after": existing_total,
     }
     if applied == 0:
+        # The parts-gate was already (harmlessly) rewritten with identical content above --
+        # nothing patched, so write_parts() reproduces the same bytes. Only the display twins
+        # still need discarding so listings.json/listings_detail.json stay untouched, matching
+        # this function's documented "applied == 0 touches nothing" contract for the files a
+        # caller can actually observe changing.
+        plain_w.abort()
+        detail_w.abort()
         return stats
 
     # --- STRICT count guard (this function's OWN, tighter than the shared 10% one below) ---
@@ -5623,6 +5671,8 @@ def patch_existing_rows(patches: dict[str, dict], summary: dict,
     if _manifest_now:
         _expected = ((_manifest_now.get("files") or {}).get("listings.json") or {}).get("records")
         if isinstance(_expected, int) and existing_total != _expected:
+            plain_w.abort()
+            detail_w.abort()
             raise BoardPatchCountMismatch(
                 f"patch_existing_rows refused: streamed {existing_total:,} rows off "
                 f"{listings_path}, but {docs / MANIFEST_NAME} records {_expected:,} for it. "
@@ -5634,41 +5684,28 @@ def patch_existing_rows(patches: dict[str, dict], summary: dict,
     # --- shared backup-before-overwrite (count is unchanged, so the shrink check is a no-op) ---
     _count_guard_and_backup(docs, listings_path, existing_total, summary)
 
-    # --- write the parts-gate FIRST: it is the authoritative, committed board. listings.json/
-    # listings_detail.json below are gitignored, non-authoritative display twins that any later
-    # successful write regenerates (feedback_gitignored_plain_fallback_survives_merges) -- a
-    # disk-full write partway through them must not cost a patch that already made it here.
-    # Reproduces/fixes the 2026-10-30/31 bop_federal incident: 5 consecutive identical ENOSPC
-    # crashes losing the same matches every time, because the old order wrote the throwaway
-    # files first and the real parts-gate write was never reached.
     total = existing_total
-    _prior_parts = _bp.manifest_parts_block(_bp.read_manifest(docs)) or {}
-    _parts = _bp.write_parts(docs, listing_blobs, hint_rows=_prior_parts.get("rows_per_part"))
     _parts_block = _bp.make_block(_parts["entries"], rows_per_part=_parts["rows_per_part"],
                                   cap=_parts["cap"])
+    plain_w.commit()
+    detail_w.commit()
 
-    # --- listings.json + listings_detail.json (the SAME low-level writers write_artifact/
-    # append_new_rows use) ---
     _manifest_pre: dict = {
-        "listings.json": {**_write_plain_array(listings_path, listing_blobs), "records": total},
+        "listings.json": {**_plain_ent, "records": total},
     }
-    del listing_blobs
-    detail_path = docs / "listings_detail.json"
-    detail_count = len(details)
-    detail_bytes = json.dumps(details, ensure_ascii=False, default=str).encode("utf-8")
-    del details
-    _manifest_pre["listings_detail.json"] = {"bytes": len(detail_bytes),
-                                             "sha256": hashlib.sha256(detail_bytes).hexdigest(),
-                                             "records": detail_count}
-    _atomic_write_bytes(detail_path, detail_bytes)
+    detail_count = detail_w.rows
+    _manifest_pre["listings_detail.json"] = {**_detail_ent, "records": detail_count}
+    # ~250 MB read back here, ONCE, as a single buffer -- after every per-row list is gone.
+    # Same tradeoff write_artifact() already makes for this exact sidecar (one bounded
+    # allocation sized to the detail file, not N incremental list-reallocations).
     import gzip
-    detail_gz = gzip.compress(detail_bytes, compresslevel=9, mtime=0)
+    detail_gz = gzip.compress(detail_path.read_bytes(), compresslevel=9, mtime=0)
     _manifest_pre["listings_detail.json.gz"] = {"bytes": len(detail_gz),
                                                 "sha256": hashlib.sha256(detail_gz).hexdigest(),
                                                 "records": detail_count}
     _atomic_write_bytes(docs / "listings_detail.json.gz", detail_gz)
     detail_digest = hashlib.sha256(detail_gz).hexdigest()[:16]
-    del detail_gz, detail_bytes
+    del detail_gz
 
     # --- run_meta.json: same shape append_new_rows() writes, minus the fields that need the
     # slim/shard payload regenerated (which this function deliberately does not do) ---

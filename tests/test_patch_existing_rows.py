@@ -282,14 +282,19 @@ def test_a_crash_writing_the_throwaway_plain_fallback_still_banks_the_patch_in_t
     write is not."""
     docs = tmp_path / "docs"
     seed = _seed(docs, n=5)
-    real_atomic_write = wa._atomic_write_bytes
+    real_commit = wa._ArrayFileWriter.commit
 
-    def flaky(path, data):
-        if path.name == "listings_detail.json":
+    def flaky_commit(self):
+        if self.path.name == "listings_detail.json":
             raise OSError(28, "No space left on device")
-        real_atomic_write(path, data)
+        real_commit(self)
 
-    monkeypatch.setattr(wa, "_atomic_write_bytes", flaky)
+    # patch_existing_rows() now streams listings.json/listings_detail.json through
+    # _ArrayFileWriter (2026-11-05 memory fix) instead of a single _atomic_write_bytes call,
+    # so the disk-full simulation has to land on ITS commit step instead -- same failure, same
+    # file, same required outcome: the parts-gate write (which happens, and is durably
+    # committed, earlier and independently) must not be undone by a later display-twin failure.
+    monkeypatch.setattr(wa._ArrayFileWriter, "commit", flaky_commit)
     with pytest.raises(OSError):
         wa.patch_existing_rows({seed[0].dedupe_key(): {"parcel_id": "P0"}}, {"notes": "t"},
                                docs_dir=docs)
