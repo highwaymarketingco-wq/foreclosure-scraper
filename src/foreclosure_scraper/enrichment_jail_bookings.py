@@ -54,11 +54,23 @@ PER-NAME SEARCH ROSTERS (no "show all"; we search each in-scope owner's last nam
     the largest SC jail population. Verified live 2026-07-01: SMITH -> 28 records.
 
 Adding a BULK county = one ROSTERS entry; a SEARCH county = one SEARCH_ROSTERS
-entry, once its vendor endpoint is confirmed. Spartanburg SC has no entry
-because its portal is offline, not because it is walled: the Sheriff's Bookings
-Search 302s to http://mugshots.spartanburgsheriff.org/, whose host stopped
-answering on :80 and :443 (last Internet Archive capture 2026-03-08), and the
-county is not a Zuercher / P2C / JailTracker tenant.
+entry, once its vendor endpoint is confirmed.
+
+RESOLVED 2026-11-05 — Spartanburg SC: the legacy PHP roster this note used to
+describe (host dead since before 2026-03-08) has been superseded. The
+Sheriff's Office quietly migrated onto a new static-HTML gallery at
+mugshots.spartanburgsheriff.org/bookings/ (vendor "spartanburg_mugshots"),
+now covered below via the shared `_fetch_spartanburg_mugshots` fetcher.
+
+ROSTER SYNC 2026-11-05 — this module's own ROSTERS grew from 19 to 31 entries
+to match the national.jail_bookings scraper's 43-county list (the two lists
+serve different purposes — this one feeds the cross-county name-match signal,
+that one lists inmates as leads in their own right — but every BULK vendor
+fetcher is shared verbatim, so a county built there is one import + one
+ROSTERS line here). Added: Randolph, Davidson, Cumberland, Pitt NC; Florence
+SC; Durham, Lee NC; Darlington SC; Orange NC; Richland, Jasper SC; Spartanburg
+SC. `mcso_json` (Mecklenburg) and `catawba_gridview` (Catawba) remain
+custom to THIS module (no equivalent in the scraper) and are untouched.
 
 Sets raw['jail_booking'] (detail) + raw['incarceration'] (so distress_score's
 existing LEGAL incarceration signal, weight 8, picks it up). Free + compliant.
@@ -274,6 +286,18 @@ from .scrapers.national.jail_bookings import (
     _fetch_citizen_connect,
     _fetch_tyler_detail,
     _fetch_tyler_inmate_inquiry,
+    _fetch_randolph_webforms,
+    _fetch_davidson_dhtmlx,
+    _fetch_cumberland_webforms,
+    _fetch_pitt_webforms,
+    _fetch_sheriffapp_ocv,
+    _fetch_durham_webforms,
+    _fetch_dcn_export,
+    _fetch_darlington_dcn,
+    _fetch_orange_pdf_viewer,
+    _fetch_richland_kendo,
+    _fetch_jasper_arcgis,
+    _fetch_spartanburg_mugshots,
 )
 
 log = structlog.get_logger()
@@ -344,6 +368,25 @@ ROSTERS = [
     # Laurens/Oconee SC -- zero new code. Verified live:
     # brunswick-so-nc.zuercherportal.com, 281 in custody.
     ("NC", "Brunswick", "zuercher", "brunswick-so-nc"),
+    # ROSTER SYNC 2026-11-05 (see module docstring) — ported verbatim from
+    # national.jail_bookings.ROSTERS; targets and vendor slugs are that
+    # module's, fetchers imported above.
+    ("NC", "Randolph", "randolph_webforms",
+     "https://legacyweb.randolphcountync.gov/sheriff/confinedinmatesbydate.aspx"),
+    ("NC", "Davidson", "davidson_dhtmlx",
+     "http://www2.co.davidson.nc.us/DCInmates/handler/inmate_data.ashx"),
+    ("NC", "Cumberland", "cumberland_webforms",
+     "https://cumberlandsheriffnc.gov:8000/active_inmates/Inmates.aspx"),
+    ("NC", "Pitt", "pitt_webforms", "https://apps.pittcountync.gov/apps/detention/detainee/"),
+    ("SC", "Florence", "sheriffapp_ocv", "https://www.fcso.org/inmatesearchfeed"),
+    ("NC", "Durham", "durham_webforms", "https://www2.dconc.gov/sheriff/ips"),
+    ("NC", "Lee", "dcn_export", "https://dcn.leecountync.gov/DCN/Inmates"),
+    ("SC", "Darlington", "darlington_dcn", "http://bookings.darlingtonsheriff.org/dcn"),
+    ("NC", "Orange", "orange_pdf_viewer", "https://www.ocsonc.com/detention/current-detainees"),
+    ("SC", "Richland", "richland_kendo", "https://jail.richlandcountysc.gov"),
+    ("SC", "Jasper", "jasper_arcgis",
+     "https://services3.arcgis.com/oJaBluQKw5aLHpzj/arcgis/rest/services/Map2/FeatureServer/3/query"),
+    ("SC", "Spartanburg", "spartanburg_mugshots", "https://mugshots.spartanburgsheriff.org/bookings/"),
 ]
 
 # (state, county, vendor, target) for the PER-NAME search vendors — no bulk
@@ -781,8 +824,35 @@ async def _load_roster(state: str, county: str, vendor: str, target: str,
         recs = await _fetch_mcso_json(target)
     elif vendor == "catawba_gridview":
         recs = await _fetch_catawba_gridview(target)
-    else:
+    elif vendor == "randolph_webforms":
+        recs = await _fetch_randolph_webforms(target)
+    elif vendor == "davidson_dhtmlx":
+        recs = await _fetch_davidson_dhtmlx(target)
+    elif vendor == "cumberland_webforms":
+        recs = await _fetch_cumberland_webforms(target)
+    elif vendor == "pitt_webforms":
+        recs = await _fetch_pitt_webforms(target)
+    elif vendor == "sheriffapp_ocv":
+        recs = await _fetch_sheriffapp_ocv(target)
+    elif vendor == "durham_webforms":
+        recs = await _fetch_durham_webforms(target)
+    elif vendor == "dcn_export":
+        recs = await _fetch_dcn_export(target)
+    elif vendor == "darlington_dcn":
+        recs = await _fetch_darlington_dcn(target)
+    elif vendor == "orange_pdf_viewer":
+        recs = await _fetch_orange_pdf_viewer(target)
+    elif vendor == "richland_kendo":
+        recs = await _fetch_richland_kendo(target)
+    elif vendor == "jasper_arcgis":
+        recs = await _fetch_jasper_arcgis(target)
+    elif vendor == "spartanburg_mugshots":
+        recs = await _fetch_spartanburg_mugshots(target)
+    elif vendor == "p2c_jqgrid":
         recs = await _fetch_p2c_jqgrid(target)
+    else:
+        log.warning("jail.unknown_vendor", county=county, vendor=vendor)
+        recs = []
     index = RosterIndex()
     for rec in recs:
         # One normalised middle for every consumer: a placeholder ("NMN") or a
