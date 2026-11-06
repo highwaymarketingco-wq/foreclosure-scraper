@@ -1,10 +1,10 @@
 # MASTER SOURCE REGISTER
 
-Generated 2026-10-15 00:02 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
+Generated 2026-11-06 22:39 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
 
-- Scrapers in the registry: **281**
+- Scrapers in the registry: **284**
 - Producing rows on the board: **129**
-- Registered but contributing ZERO rows: **152**
+- Registered but contributing ZERO rows: **155**
 - Confirmed real and not yet built: **3**
 - Board read: `data/checkpoint/board.json.gz` (197,890 rows)
 
@@ -57,7 +57,7 @@ Live row counts are what the source actually contributed to the board read above
 | `counties_sc.oconee_flc_assignment` | 585 | Oconee SC (585) | `https://services1.arcgis.com/UOvRn2Rvzysthh3i/arcgis/rest/services/`<br>`https://oconeesc.com/auditor-home/forfeited-land` |
 | `counties_nc.asheville_str_permits` | 583 | Buncombe NC (583) | `https://gis.ashevillenc.gov/server/rest/services/Permits/`<br>`https://gis.ashevillenc.gov/server/rest/services/Permits/HomestayPermitsView/MapServer/5` |
 | `national.landandfarm` | 562 | Polk NC (44), Henderson NC (43), Gaston NC (41) | `https://www.landandfarm.com/search/{state_slug`<br>`https://assets.landandfarm.com` |
-| `counties_nc.nc_its_public_tax` | 530 | Graham NC (511), Onslow NC (19) | `https://tax.onslowcountync.gov/ITSPublicON/TaxBillSearch`<br>`https://www.bttaxpayerportal.com/ITSPublicGR2.0/TaxBillSearch`<br>`https://tax.onslowcountync.gov/ITSPublicON`<br>_+11 more_ |
+| `counties_nc.nc_its_public_tax` | 530 | Graham NC (511), Onslow NC (19) | `https://tax.onslowcountync.gov/ITSPublicON/TaxBillSearch`<br>`https://www.bttaxpayerportal.com/ITSPublicGR2.0/TaxBillSearch`<br>`https://tax.onslowcountync.gov/ITSPublicON`<br>_+12 more_ |
 | `counties_sc.cherokee_delinquent_tax` | 528 | Cherokee SC (528) | `https://www.cherokeecountysc.gov/wp-json/wp/v2/media`<br>`https://www.cherokeecountysc.gov/delinquent-tax/` |
 | `national.landwatch` | 488 | Burke NC (46), Brunswick NC (37), Pender NC (35) | `https://www.landwatch.com/{state_slug`<br>`https://assets.landwatch.com` |
 | `counties_sc.oconee_forfeited_land` | 451 | Oconee SC (451) | `https://services1.arcgis.com/UOvRn2Rvzysthh3i/arcgis/rest/services/`<br>`https://oconeesc.com/auditor-home/forfeited-land` |
@@ -117,7 +117,7 @@ Live row counts are what the source actually contributed to the board read above
 | `law_firms.bell_carrington` | 11 | Spartanburg SC (6), Pickens SC (3), Cherokee SC (1) | `https://docs.google.com/spreadsheets/d/e/`<br>`https://bellcarrington.com/foreclosure-sales/` |
 | `newspapers.aiken_standard` | 11 | Aiken SC (11) | `https://www.postandcourier.com/aikenstandard/classifieds/search/` |
 | `counties_nc.henderson_foreclosure_parcels` | 10 | Henderson NC (10) | `https://www.arcgis.com`<br>`https://hendersoncounty.maps.arcgis.com`<br>`https://experience.arcgis.com/experience/` |
-| `national.jail_bookings` | 10 | Anderson SC (2), Buncombe NC (1), Cleveland NC (1) | `https://ssmugshots.blob`<br>`http://mugshots.spartanburgsheriff.org/`<br>`https://buncombecountyso.policetocitizen.com|23`<br>_+11 more_ |
+| `national.jail_bookings` | 10 | Anderson SC (2), Buncombe NC (1), Cleveland NC (1) | `https://ssmugshots.blob`<br>`https://buncombecountyso.policetocitizen.com|23`<br>`http://74.218.167.200/p2c`<br>_+55 more_ |
 | `newspapers.berkeley_independent` | 9 | Berkeley SC (9) | `https://www.postandcourier.com/berkeley-independent/classifieds/community/announcements/` |
 | `law_firms.mcmichael_taylor_gray` | 6 | Spartanburg SC (2), Gaston NC (1), Cherokee SC (1) | `https://app.powerbi.com/view?r=eyJrIjoiOTQwOTdiYWYtOGQwMy00OGUzLWI4MjktOTczNDc0ODE2ZGY1IiwidCI6IjEzZDFlNzhjLTgyNDgtNGVlYS04OWY3LWQzNGIzZWJkOGM3OSIsImMiOjN9`<br>`https://app.powerbi.com/view?r=eyJrIjoiOTQwOTdiYWYtOGQwMy00OGUzLWI4MjktOTczNDc0ODE2ZGY1Ii` |
 | `law_firms.rogers_townsend` | 6 | Spartanburg SC (4), Oconee SC (1), Anderson SC (1) | `https://rogerstownsend.com/reports/NC_Listings.pdf`<br>`https://rogerstownsend.com/reports/`<br>`https://rogerstownsend.com/reports/SC_Listings.pdf` |
@@ -174,6 +174,7 @@ Registered and importable, contributing nothing to the board read above. A zero 
 | `counties_nc.guilford_tax_foreclosures` | `https://www.guilfordcountync.gov/preview-foreclosures`<br>`https://gcgis.guilfordcountync.gov/arcgis/rest/services/Foreclosure/ForeclosuresPublic/FeatureServer/0`<br>_+1 more_ |
 | `counties_nc.henderson_tax` | `https://www.hendersoncountync.gov/tax/page/tax-foreclosure-sales` |
 | `counties_nc.iredell_delinquent_tax` | `https://maps.iredellcountync.gov/server/rest/services/Data/DelinquentTaxes/MapServer/0`<br>`https://www.iredellcountync.gov/170/Tax-Collections` |
+| `counties_nc.johnston_delinquent_tax_crosswalk` | `https://www.johnstonnc.gov/files/taxoffice/DelinquentTaxPublicRecordsFile`<br>`https://www.johnstonnc.gov/tax2/tcontent.cfm?pid=files` |
 | `counties_nc.kinston_proposed_demolition` | `https://services5.arcgis.com/oHyVM17u2FMyV4oB/arcgis/rest/services/`<br>`https://www.arcgis.com/home/item.html?id=1f297147be8d4427b867f73961bc4bd1` |
 | `counties_nc.lincoln_code_violations` | `https://arcgisserver.lincolncountync.gov/arcgis/rest/services/` |
 | `counties_nc.mcdowell_tax_foreclosure` | `https://mcdowellnc.gov/departments/tax-collections/` |
@@ -247,8 +248,10 @@ Registered and importable, contributing nothing to the board read above. A zero 
 | `counties_sc.sc_coastal_rosters` | `https://www.horrycounty.org/parcelapp/rest/services/HorryCountyGISApp/MapServer/24/query`<br>`https://www.horrycounty.org/parcelapp/rest/services/HorryCountyGISApp/MapServer/22/query`<br>_+4 more_ |
 | `counties_sc.sc_delinquent_tax_list` | `https://cherokeecountysc.gov/delinquent-tax/tax-sale-bidders/`<br>`https://cherokeecountysc.gov/wp-content/uploads/{year` |
 | `counties_sc.sc_dor_delinquent_taxpayers` | `https://mydorway.dor.sc.gov/?link=delinquentind` |
+| `counties_sc.sc_heir_estate_parcel_cache` | _(no literal URL in module)_ |
 | `counties_sc.sc_probate_notices` | `https://{paper.host` |
 | `counties_sc.sc_qpublic` | _(no literal URL in module)_ |
+| `counties_sc.sc_richland_probate` | `https://www7.richlandcountysc.gov/EstateInquiry/main.aspx`<br>`https://www7.richlandcountysc.gov/EstateInquiry/Detail.aspx` |
 | `counties_sc.sc_rod_walled` | `https://acclaimprod.clarendoncountygov.org/acclaimweb`<br>`https://us6.courthousecomputersystems.com/JasperSC` |
 | `counties_sc.sc_tax_walled` | `https://sc-charleston.publicaccessnow.com`<br>`https://www.dorchestercountytaxesonline.com`<br>_+1 more_ |
 | `counties_sc.sumter_surplus` | `https://www.sumtercountysc.gov/online_services/property/surplus_sales.php` |
