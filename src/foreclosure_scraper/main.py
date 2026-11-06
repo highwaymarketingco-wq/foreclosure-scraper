@@ -3830,6 +3830,100 @@ async def run_enrich_tail(st: TailState) -> dict:
     except Exception:
         log.error("transylvania_rollback_exposure.failed", traceback=traceback.format_exc())
 
+    # Transylvania NC already fetches every parcel's full multi-year bill history into its own
+    # raw['transylvania_tax'] (same source as the rollback block just above) but never restated
+    # it into the shared raw['multi_year_delinquent_tax'] key gap_matrix checks -- a pure,
+    # no-network restatement, same shape as the rollback sibling.
+    try:
+        from .enrichment_transylvania_multiyear_tax import enrich_transylvania_multiyear_tax
+        s = enrich_transylvania_multiyear_tax(enriched)
+        if s and s.get("matched"):
+            enrichment_stats["transylvania_multiyear_tax"] = s
+    except Exception:
+        log.error("transylvania_multiyear_tax.failed", traceback=traceback.format_exc())
+
+    # Mecklenburg NC: taxbill.co.mecklenburg.nc.us's live Bill Search (a genuinely separate
+    # source from the county's NCGS 105-369 advertisement already landed) -- per-year bill
+    # history by exact 8-digit parcel, stamping two_year_delinquent / multi_year_delinquent_tax.
+    try:
+        from .enrichment_mecklenburg_tax import enrich_mecklenburg_tax
+        s = await _await_capped(enrich_mecklenburg_tax(enriched), "mecklenburg_tax")
+        if s and s.get("matched"):
+            enrichment_stats["mecklenburg_tax"] = s
+    except Exception:
+        log.error("mecklenburg_tax.failed", traceback=traceback.format_exc())
+
+    # Rowan NC: tax.rowancountync.gov's iasWorld Datalet tax-bill grid by exact parcel_id.
+    try:
+        from .enrichment_rowan_multiyear_tax import enrich_rowan_multiyear_tax
+        s = await _await_capped(enrich_rowan_multiyear_tax(enriched), "rowan_multiyear_tax")
+        if s and s.get("matched"):
+            enrichment_stats["rowan_multiyear_tax"] = s
+    except Exception:
+        log.error("rowan_multiyear_tax.failed", traceback=traceback.format_exc())
+
+    # Anson NC: the shared bttaxpayerportal.com vendor (already read for TaxBillSearch) also
+    # carries a labelled rollback line, restated into raw['rollback_exposure'].
+    try:
+        from .enrichment_anson_rollback_exposure import enrich_anson_rollback_exposure
+        s = await _await_capped(enrich_anson_rollback_exposure(enriched), "anson_rollback_exposure")
+        if s and s.get("matched"):
+            enrichment_stats["anson_rollback_exposure"] = s
+    except Exception:
+        log.error("anson_rollback_exposure.failed", traceback=traceback.format_exc())
+
+    # Greenville SC's own treasurer "Property Tax Search" (a GET shortcut, separate from the
+    # Tax Sale roster and the broken assessor card) -- per-year bill history back to the
+    # mid-1990s, stamping two_year_delinquent / tax_aging_surfaced.
+    try:
+        from .enrichment_greenville_tax import enrich_greenville_tax
+        s = await _await_capped(enrich_greenville_tax(enriched), "greenville_tax")
+        if s and s.get("matched"):
+            enrichment_stats["greenville_tax"] = s
+    except Exception:
+        log.error("greenville_tax.failed", traceback=traceback.format_exc())
+
+    # Pasquotank NC: the county's own annual NCGS 105-369 delinquent-tax PDF, matched by owner
+    # name (unambiguous matches only).
+    try:
+        from .enrichment_pasquotank_delinquent_tax import enrich_pasquotank_delinquent_tax
+        s = await _await_capped(enrich_pasquotank_delinquent_tax(enriched), "pasquotank_tax")
+        if s and s.get("matched"):
+            enrichment_stats["pasquotank_tax"] = s
+    except Exception:
+        log.error("pasquotank_tax.failed", traceback=traceback.format_exc())
+
+    # Florence + Colleton SC: recovers deed book/page the register-chain adapter already
+    # fetches for these two counties but never restated into the shared atty_deed_ref contract
+    # (county_deed_ref.SC_LAYERS didn't name either county).
+    try:
+        from .enrichment_florence_colleton_deed_ref import enrich_florence_colleton_deed_ref
+        s = await _await_capped(enrich_florence_colleton_deed_ref(enriched), "florence_colleton_deed_ref")
+        if s and s.get("matched"):
+            enrichment_stats["florence_colleton_deed_ref"] = s
+    except Exception:
+        log.error("florence_colleton_deed_ref.failed", traceback=traceback.format_exc())
+
+    # Florence SC: web.florenceco.org's own tax-inquiry CGI (current + prior levy and full
+    # delinquent history), matched by zero-padded Map-Block-Parcel.
+    try:
+        from .enrichment_florence_tax_inquiry import enrich_florence_tax_inquiry
+        s = await _await_capped(enrich_florence_tax_inquiry(enriched), "florence_tax_inquiry")
+        if s and s.get("matched"):
+            enrichment_stats["florence_tax_inquiry"] = s
+    except Exception:
+        log.error("florence_tax_inquiry.failed", traceback=traceback.format_exc())
+
+    # Florence SC: pure, no-network restatement of the tax-inquiry block just above into the
+    # shared raw['two_year_delinquent'] contract (same shape as the Dorchester sibling).
+    try:
+        from .enrichment_florence_two_year_delinquent import enrich_florence_two_year_delinquent
+        s = enrich_florence_two_year_delinquent(enriched)
+        if s and s.get("matched"):
+            enrichment_stats["florence_two_year_delinquent"] = s
+    except Exception:
+        log.error("florence_two_year_delinquent.failed", traceback=traceback.format_exc())
+
     # Greenville SC's own parcel-CAMA layer carries a county-computed "ROLLBK" ("Total
     # Rollback:" on the county's own bill page) field this project pulls in bulk via
     # parcel_cache but never restated -- a pure, no-network restatement into the shared
