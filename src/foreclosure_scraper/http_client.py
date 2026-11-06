@@ -569,6 +569,45 @@ async def get_text(
         raise
 
 
+async def post_text(
+    url: str,
+    *,
+    timeout: float = 30.0,
+    headers: dict | None = None,
+    data: dict | None = None,
+) -> str:
+    """POST a URL (plain httpx, through the same throttled `client()`) and return text,
+    with the same transient-5xx retry as `get_text`.
+
+    Added 2026-11-06 for the CourthouseComputerSystems classic-ASP `SearchService.asp`
+    endpoint: the vendor's `us4.courthousecomputersystems.com` host started rejecting
+    GET on that one page with a plain HTTP 405 ("HTTP verb used to access this page is
+    not allowed") while POST with the identical query string answers a clean 200 —
+    confirmed live across every HOSTED_CCHS tenant (county_sweeps.py): all 10 us4
+    tenants 405 on GET / 200 on POST with the real `<SearchResponse>` XML, all 7
+    us3+us5 tenants 200 on GET already and unaffected either way. No impersonation
+    tier here: this is a verb restriction, not a TLS-fingerprint block, and plain
+    httpx POST already clears it on every tenant tested.
+    """
+    h = dict(headers or {})
+    async for attempt in AsyncRetrying(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential_jitter(initial=1, max=10),
+        retry=retry_if_exception(_retryable_get_error),
+        reraise=True,
+    ):
+        with attempt:
+            async with client(timeout=timeout) as c:
+                r = await c.post(url, headers=h, data=data)
+                if r.status_code in (429, 500, 502, 503, 504):
+                    raise httpx.HTTPStatusError(
+                        f"transient {r.status_code}", request=r.request, response=r
+                    )
+                r.raise_for_status()
+                return r.text
+    raise RuntimeError("unreachable")
+
+
 async def _impersonate_fetch_bytes(
     url: str,
     *,

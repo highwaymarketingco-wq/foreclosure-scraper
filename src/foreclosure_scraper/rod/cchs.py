@@ -51,6 +51,23 @@ tier only on a block status code) — the same plain-then-escalate behavior
 `get_text` already offers every other caller — instead of a tier hard-coded
 from whichever side of the flip happened to be true on the day it was last
 probed.
+
+2026-11-06 — A DIFFERENT host-side change, not the Cloudflare flip above:
+us4.courthousecomputersystems.com started answering GET on SearchService.asp
+with a plain HTTP 405 ("HTTP verb used to access this page is not allowed"),
+while POST with the identical query string answers 200 with the real
+<SearchResponse> XML. LIVE-TESTED (OPTIONS + GET + POST) against every one of
+this module's CCHS_COUNTIES tenants: Lincoln, Madison and Henderson (us4) 405
+on GET / 200 on POST; Duplin (us4) likewise; Burke and Cleveland (us5) still
+200 on GET and re-confirmed 200 on POST too (unaffected either way — the same
+live sweep that checked rod/county_sweeps.py's 17 HOSTED_CCHS tenants, where
+all 10 us4 tenants showed the identical symptom and all 7 us3+us5 tenants did
+not). `_search_or_post` (below) retries a 405 via `http_client.post_text`
+(plain httpx — a verb restriction is not a TLS-fingerprint issue, so no
+impersonation tier is needed for the POST) at the same url, used by
+`_get_search_text` (so `_cchs_fetch` and `sweep_loss_instruments` both pick it
+up) and by `search_by_name` directly. A tenant that still works on GET never
+takes the new branch.
 """
 from __future__ import annotations
 
@@ -65,7 +82,7 @@ import structlog
 from dateutil import parser as dateparser
 
 from ..deed_index import DeedInstrument, Party, derive_loss
-from ..http_client import client, get_text
+from ..http_client import client, get_text, post_text
 from ..name_normalize import normalize_name
 from . import deed_stamp
 from .inst_class import LOSS_CLASSES, classify_instrument
@@ -240,6 +257,29 @@ def _parse_rows(xml: str, state: str, county: str, *, sold: bool) -> list[RodDoc
     return list(docs.values())
 
 
+async def _search_or_post(url: str, xhr: dict) -> str:
+    """GET SearchService.asp via get_text(impersonate=True); on a plain HTTP 405
+    ("HTTP verb used to access this page is not allowed") retry the SAME url via
+    POST, which answers a clean 200 with the identical query string.
+
+    2026-11-06: us4.courthousecomputersystems.com started rejecting GET on this
+    one page -- a verb restriction, not a Cloudflare block, so the curl-cffi
+    impersonation tier above has no bearing on it. LIVE-CONFIRMED for every one
+    of this module's own us4 tenants (Lincoln, Madison, Henderson, Duplin): 405
+    on GET, 200 on POST with a real <SearchResponse>; Burke/Cleveland (us5) still
+    200 on GET and were re-confirmed unaffected, so they never take the POST
+    branch here -- nothing changes for them. Raises exactly like a plain
+    get_text() call on any OTHER status (a real 403/429/503 block, a 404, a
+    timeout), so _get_search_text's CchsWall mapping and search_by_name's
+    swallow-to-[] handling are unchanged."""
+    try:
+        return await get_text(url, headers=xhr, timeout=40.0, impersonate=True)
+    except httpx.HTTPStatusError as exc:
+        if exc.response is None or exc.response.status_code != 405:
+            raise
+        return await post_text(url, headers=xhr, timeout=40.0)
+
+
 async def _cchs_fetch(state: str, county: str, instrument_types: str, from_date: datetime,
                       today: datetime, max_docs: int, *, sold: bool) -> list[RodDoc]:
     """Raises CchsWall (defined below, alongside the deed-index sweep's own wall
@@ -335,16 +375,15 @@ async def search_by_name(state: str, county: str, name: str, max_docs: int = 50)
              "resultstype": 1, "maxrecordcount": max_docs, "sortorder": 1,
              "sortfield": "docno", "rangetype": "name"}
         # See _cchs_fetch: plain-first, auto-escalate (tier the host blocks flips
-        # between runs — see module docstring).
-        search_text = await get_text(
-            f"{base}/SearchService.asp?{urlencode(q)}", headers=xhr, timeout=40.0, impersonate=True)
+        # between runs — see module docstring); _search_or_post also retries a
+        # plain HTTP 405 (us4's 2026-11-06 verb restriction) via POST.
+        search_text = await _search_or_post(f"{base}/SearchService.asp?{urlencode(q)}", xhr)
         m = re.search(r"<recordcount>(\d+)</recordcount>", search_text, re.I)
         count = int(m.group(1)) if m else 0
         if count <= 0:
             return []
-        getall_text = await get_text(
-            f"{base}/SearchService.asp?cmd=getall&start=0&offset={min(count, max_docs)}",
-            headers=xhr, timeout=40.0, impersonate=True)
+        getall_text = await _search_or_post(
+            f"{base}/SearchService.asp?cmd=getall&start=0&offset={min(count, max_docs)}", xhr)
         return _parse_rows(getall_text, state, county, sold=False)[:max_docs]
     except Exception as exc:  # noqa: BLE001
         log.warning("cchs.search_by_name_failed", host=host, county=county,
@@ -402,9 +441,11 @@ async def _get_search_text(host: str, url: str, xhr: dict, what: str) -> str:
     tier also got a block code) — this wrapper adapts both to the same
     CchsWall contract the sweep already relies on, and a 200 still gets the
     WALL_TITLE/WALL_MARKER check in case Cloudflare ever serves a soft
-    challenge with a 200 status."""
+    challenge with a 200 status. _search_or_post also retries a plain HTTP 405
+    (us4's 2026-11-06 verb restriction, unrelated to Cloudflare) via POST before
+    either exception type below would otherwise fire."""
     try:
-        text = await get_text(url, headers=xhr, timeout=40.0, impersonate=True)
+        text = await _search_or_post(url, xhr)
     except RuntimeError as exc:
         m = _IMPERSONATE_STATUS_RE.search(str(exc))
         reason = f"HTTP {m.group(1)}" if m else str(exc)

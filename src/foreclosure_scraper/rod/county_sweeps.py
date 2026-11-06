@@ -46,6 +46,23 @@ with a cleanly-spaced request after backing off, so treat the getall step here a
 expected-to-work (same proven call shape as rod/cchs.py) but not yet freshly live-verified in
 isolation. Worth a single, well-spaced spot-check on the next VM run's own natural pacing
 rather than more rapid-fire local testing tonight.
+
+SECOND NAMED EXCEPTION (2026-11-06): us4.courthousecomputersystems.com started answering GET
+on SearchService.asp with a plain HTTP 405 ("HTTP verb used to access this page is not
+allowed") -- not a block code, not a Cloudflare challenge, a different host-side change from
+the 403 above. LIVE-TESTED EVERY ONE of the 17 HOSTED_CCHS tenants (OPTIONS + GET + POST, same
+query shape read() already builds): all 10 us4 tenants (Lincoln, Madison, Henderson, Hertford,
+Hyde, Montgomery, Chowan, Franklin, Camden, Duplin) 405 on GET / 200 on POST with the real
+<SearchResponse> XML (confirmed byte-identical in shape to a working GET's reply); all 7
+us3+us5 tenants (Burke, Cleveland, Caswell, Gates, Dare, Caldwell, Currituck) still 200 on GET
+and ALSO 200 on POST -- POST is safe everywhere tested, GET-405 is specific to the us4 host.
+_impersonated_classic_get now retries a 405 via http_client.post_text (plain httpx; this is a
+verb restriction, not a TLS-fingerprint issue, so no impersonation tier needed for the POST)
+at the identical url instead of hard-coding the us4 county list, so a tenant that still works
+on GET never takes the new branch. rod/cchs.py's _get_search_text (used by _cchs_fetch,
+sweep_loss_instruments and search_by_name for its own overlapping us4 tenants -- Lincoln,
+Madison, Henderson, Duplin) got the identical fix for the identical reason; its us5 tenants
+(Burke, Cleveland) were re-confirmed unaffected in the same live sweep.
 """
 from __future__ import annotations
 
@@ -261,14 +278,37 @@ def _impersonated_classic_get(url: str, headers: dict, timeout: float = 40.0):
     event loop of its own, so asyncio.run() here is safe. Returns a nc_polite.Page so
     read()'s existing status/text-based logic needs no other change either way --
     any failure (a genuine block code, a timeout, or anything else) maps to a non-2xx
-    Page instead of raising, exactly like a real HTTP error response would."""
+    Page instead of raising, exactly like a real HTTP error response would.
+
+    2026-11-06: us4.courthousecomputersystems.com now answers GET on this exact page
+    with a plain HTTP 405 ("HTTP verb used to access this page is not allowed") while
+    POST with the identical query string answers a clean 200 with the real
+    <SearchResponse> XML -- confirmed live for every one of the 10 us4 HOSTED_CCHS
+    tenants (Lincoln, Madison, Henderson, Hertford, Hyde, Montgomery, Chowan,
+    Franklin, Camden, Duplin); the 7 us3+us5 tenants (Burke, Cleveland, Caswell,
+    Gates, Dare, Caldwell, Currituck) still answer GET 200 and were re-confirmed
+    unaffected by POST too. A 405 here retries the SAME url via POST (http_client.
+    post_text, plain httpx -- no impersonation needed, a verb restriction is not a
+    TLS-fingerprint block) instead of hard-coding which host/county needs it, so a
+    tenant that already works on GET never takes this branch and nothing changes
+    for it -- the same escalate-on-signal shape get_text(impersonate=True) already
+    uses for a block code, not a one-time tenant list that could go stale if the
+    vendor flips this again."""
     from .nc_polite import Page
-    from ..http_client import get_text
+    from .. import http_client as HC
     try:
-        text = asyncio.run(get_text(url, headers=headers, timeout=timeout, impersonate=True))
+        text = asyncio.run(HC.get_text(url, headers=headers, timeout=timeout, impersonate=True))
         return Page(status=200, url=url, final_url=url, text=text)
     except httpx.HTTPStatusError as exc:
         code = exc.response.status_code if exc.response is not None else 599
+        if code == 405:
+            try:
+                text = asyncio.run(HC.post_text(url, headers=headers, timeout=timeout))
+                return Page(status=200, url=url, final_url=url, text=text)
+            except Exception as exc2:  # noqa: BLE001 -- the POST fallback also failed; degrade as before
+                m2 = re.search(r"got (\d+)", str(exc2))
+                code2 = int(m2.group(1)) if m2 else 599
+                return Page(status=code2, url=url, final_url=url, text=str(exc2))
         return Page(status=code, url=url, final_url=url, text=str(exc))
     except Exception as exc:  # noqa: BLE001 -- any failure degrades to a Page, never raises
         m = re.search(r"got (\d+)", str(exc))
