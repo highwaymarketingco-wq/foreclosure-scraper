@@ -47,6 +47,8 @@ from __future__ import annotations
 import argparse
 import asyncio
 import contextlib
+import copy
+import json
 import re
 import sys
 import time
@@ -345,6 +347,84 @@ def report(entries, scan, rosters) -> list[str]:
 
 # ---- run ---------------------------------------------------------------------
 
+def _patch_parts_in_place(docs: Path, patches: dict, dry_run: bool = False) -> dict:
+    """Patch specific board rows IN PLACE, one part file at a time, preserving every part's
+    existing row count exactly -- never re-chunks, so it can never self-overwrite a part it
+    hasn't finished reading.
+
+    web_artifact.patch_existing_rows() routes through board_parts.write_parts(), which
+    re-splits the ENTIRE board's row stream into fresh part boundaries sized from
+    run_meta.json's current rows_per_part hint. This board's parts are NOT uniformly sized
+    (an earlier chunk-size change left early parts at ~18,000 rows and later ones at 12,500 --
+    found live 2026-11-06, docs/run_meta.json board_parts.rows_per_part=12500 while
+    docs/board.manifest.json shows parts 000-024ish at 18,000ish and 025-027 at 12,500). Any
+    single hint_rows value write_parts() is given is therefore "wrong" for part of the board:
+    writing new output using that one size produces boundaries that drift from the OLD ones as
+    the stream progresses, and since write_parts() writes new parts into the SAME directory and
+    NAMES it is still reading the old board FROM (no staging directory, no atomic whole-set
+    swap), a drifted boundary means the writer overwrites an old part file before the reader
+    has finished consuming it -- corrupting the read mid-stream. Reproduced twice, identically
+    (same broken byte sizes both times), confirming it is deterministic, not a race with
+    another process. Recovered both times from backups/listings_YYYYMMDD_HHMMSS_parts/ +
+    board_manifest.py --rebuild.
+
+    This sidesteps the whole hazard: each part is read, patched, and (if anything in it
+    changed) written back to ITS OWN existing filename with ITS OWN existing row count --
+    zero re-chunking, so old and new boundaries are always identical and nothing is ever read
+    and written through the same path in the same pass. Parts with no match are left
+    byte-for-byte untouched. Caller must hold the board lock and must call
+    web_artifact.reseal_board(docs, resplit=False) afterward (resplit=False never calls
+    write_parts(), so it cannot hit this same hazard) to bring the manifest's per-part
+    size/sha256 in line with whatever actually changed."""
+    from foreclosure_scraper import board_parts as _bp
+    from foreclosure_scraper.models import Listing as _Listing
+    from foreclosure_scraper.web_artifact import _APPEND_SIG_FIELDS
+    row_enc = json.JSONEncoder(ensure_ascii=False, default=str)
+    remaining = set(patches.keys())
+    touched: list[tuple[str, int]] = []
+    applied = 0
+    dup_keys: set = set()
+    for fp in _bp.list_part_files(docs):
+        blobs: list[bytes] = []
+        changed = False
+        for text in _bp.iter_gz_rows(fp, want_text=True):
+            rec = json.loads(text)
+            key = None
+            if isinstance(rec, dict):
+                light = _Listing.model_construct(**{k: rec.get(k) for k in _APPEND_SIG_FIELDS})
+                try:
+                    key = light.dedupe_key()
+                except Exception:  # noqa: BLE001 - too malformed to key is simply unmatched
+                    key = None
+            if key is not None and key in patches:
+                if key not in remaining:
+                    dup_keys.add(key)  # same identity on >1 row -- apply to every match, log it
+                remaining.discard(key)
+                update = patches[key]
+                raw_update = update.get("raw")
+                if isinstance(raw_update, dict):
+                    raw = rec.get("raw")
+                    if not isinstance(raw, dict):
+                        raw = {}
+                        rec["raw"] = raw
+                    raw.update(raw_update)
+                for field, value in update.items():
+                    if field != "raw":
+                        rec[field] = value
+                blobs.append(row_enc.encode(rec).encode("utf-8"))
+                changed = True
+                applied += 1
+            else:
+                blobs.append(text.encode("utf-8"))
+        if changed:
+            touched.append((fp.name, len(blobs)))
+            if not dry_run:
+                data = _bp.gzip_array(blobs)
+                _bp.atomic_write_bytes(fp, data)
+    return {"touched_parts": touched, "applied": applied,
+            "not_found": sorted(remaining), "duplicate_key_matches": len(dup_keys)}
+
+
 async def _amain(args) -> int:
     entries = select_rosters(args.counties)
     wanted = {(s, c) for s, c, _v, _t in entries}
@@ -370,35 +450,57 @@ async def _amain(args) -> int:
     if not usable:
         print("\nno roster returned any rows; nothing to apply.")
         return 1
-    from foreclosure_scraper.web_artifact import board_lock, load_board, write_artifact
+    from foreclosure_scraper.models import Listing
+    from foreclosure_scraper.web_artifact import board_lock, reseal_board
+    # Scoped, streamed load: only the counties actually being matched this run are ever
+    # validated into Listing objects -- never the whole board. load_board()+write_artifact()
+    # used to sit here; on this board's current size that took 10+ minutes just to load (empirically
+    # timed 2026-11-05 -- 13+ min and still running, memory-bounded but far too slow for a
+    # one-county fix), and both real --apply attempts that hit it never reached the write step
+    # at all.
     with board_lock(REPO, owner="backfill_jail_rosters"):
-        rows = load_board(REPO / "docs")
-        n = len(rows)
+        scoped: list[Listing] = []
+        scanned = 0
+        for rec in iter_board_rows(args.board):
+            scanned += 1
+            county = (rec.get("county") or "").replace(" County", "").strip().title()
+            if (rec.get("state"), county) not in usable:
+                continue
+            try:
+                scoped.append(Listing.model_validate(rec))
+            except Exception:
+                continue  # unparseable row -- not this script's job to fix, skip it
+        before = {id(li): copy.deepcopy(li.raw) for li in scoped}
         gate_stats: dict = {}
-        matched = match_rosters(rows, usable, stats=gate_stats)
+        matched = match_rosters(scoped, usable, stats=gate_stats)
         # Gaston's grid has no booking date or charges; pull them for matched rows only.
         with polite_curl_cffi(gate):
             hydrated = await _hydrate_tyler_hits(matched)
-        assert len(rows) == n
         cleared = gate_stats.get("reeval_conflict_cleared", 0)
         ended = gate_stats.get("reeval_left_roster", 0)
         restored = gate_stats.get("reeval_long_stay_restored", 0)
-        print(f"\nboard rows: {n:,}; flagged {len(matched):,} leads; hydrated {hydrated}; "
+        print(f"\nscanned {scanned:,} board rows, {len(scoped):,} in the targeted counties; "
+              f"flagged {len(matched):,} leads; hydrated {hydrated}; "
               f"refused {gate_stats.get('middle_conflict_rejected', 0):,} (middle-name conflict); "
               f"re-checked {sum(v for k, v in gate_stats.items() if k.startswith('reeval_')):,}: "
               f"cleared {cleared:,}, marked left the roster {ended:,}, "
               f"kept after a long stay {gate_stats.get('reeval_long_stay_kept', 0):,}, "
               f"restored after a long stay {restored:,}")
-        # A refreshed last_confirmed_on_roster date alone is not worth a whole-board write.
-        if not (matched or cleared or ended or restored):
+        patches = {li.dedupe_key(): {"raw": li.raw}
+                   for li in scoped if li.raw != before.get(id(li))}
+        # A refreshed last_confirmed_on_roster date alone is not worth a board write.
+        if not patches:
             print("nothing matched or changed; board not rewritten.")
             return 0
-        write_artifact(rows, {"notes": f"backfill_jail_rosters: {len(matched)} leads flagged, "
-                                       f"{cleared} middle-name conflicts cleared, {ended} marked "
-                                       f"left the roster, {restored} restored after a long stay, "
-                                       f"from {len(usable)} county rosters"},
-                       docs_dir=REPO / "docs")
-        print(f"wrote board: {n:,} rows")
+        result = _patch_parts_in_place(REPO / "docs", patches, dry_run=False)
+        print(f"patched board: {result['applied']:,} rows updated across "
+              f"{len(result['touched_parts']):,} part file(s) "
+              f"({result['not_found']}: not found, "
+              f"{result['duplicate_key_matches']:,} duplicate-key matches)")
+        for name, n in result["touched_parts"]:
+            print(f"  rewrote {name} ({n:,} rows, same as before)")
+        reseal_board(REPO / "docs", resplit=False)
+        print("manifest resealed")
     return 0
 
 
