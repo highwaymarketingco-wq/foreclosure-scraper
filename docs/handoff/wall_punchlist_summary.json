@@ -1,7 +1,7 @@
 {
  "board_rows": 472777,
  "by_category": {
-  "uncovered": 190875,
+  "uncovered": 181448,
   "wall": 20358
  },
  "format_version": 1,
@@ -61,8 +61,8 @@
    "generated_at": "2026-10-17T14:28:27Z"
   },
   "tax_lien": {
-   "entries": 66747,
-   "generated_at": "2026-11-05T19:28:11Z"
+   "entries": 68017,
+   "generated_at": "2026-11-06T18:14:34Z"
   },
   "tax_lien_johnston_static": {
    "entries": 8,
@@ -73,7 +73,7 @@
    "generated_at": "2026-10-17T14:28:27Z"
   }
  },
- "listings": 211233,
+ "listings": 201806,
  "uncovered": {
   "by_scraper_source": {
    "city_websites.charlotte_open_data": 5436,
@@ -92,17 +92,17 @@
    "counties_generic.state_contamination.nc_ust_incidents": 38328,
    "counties_nc.albemarle_observer_tax_lists": 5939,
    "counties_nc.asheville_helene": 698,
-   "counties_nc.gaston_vacant": 21251,
-   "counties_nc.gastonia_code_enforcement": 1124,
+   "counties_nc.gaston_vacant": 21247,
+   "counties_nc.gastonia_code_enforcement": 1125,
    "counties_nc.lincoln_vacant": 14878,
    "counties_nc.nc_county_pdf_delinquent_tax": 3201,
    "counties_nc.polk_tax": 1622,
-   "counties_nc.rutherford_tax": 9142,
    "counties_nc.transylvania_vacant": 10883,
    "counties_sc.charleston_delinquent_tax": 1757,
    "counties_sc.charleston_tax_sale_xlsx": 2393,
    "counties_sc.sc_heir_estate_parcel_cache": 8528,
    "counties_sc.sc_probate_net": 507,
+   "counties_sc.sc_probate_notices.yourpickenscounty": 442,
    "counties_sc.sc_public_index": 2675,
    "counties_sc.sc_public_notices": 643,
    "counties_sc.sc_ust_registry": 15582,
@@ -118,14 +118,14 @@
    "national.usda_properties": 766
   },
   "top_counties": {
+   "NC:cumberland": 2185,
    "NC:durham": 2925,
    "NC:forsyth": 2407,
-   "NC:gaston": 24305,
+   "NC:gaston": 24302,
    "NC:guilford": 4621,
    "NC:lincoln": 16835,
    "NC:mcdowell": 2950,
    "NC:mecklenburg": 9669,
-   "NC:rutherford": 10209,
    "NC:transylvania": 11368,
    "NC:wake": 3880,
    "SC:charleston": 7698,
