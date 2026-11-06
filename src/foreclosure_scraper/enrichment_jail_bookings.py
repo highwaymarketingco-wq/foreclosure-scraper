@@ -387,6 +387,27 @@ ROSTERS = [
     ("SC", "Jasper", "jasper_arcgis",
      "https://services3.arcgis.com/oJaBluQKw5aLHpzj/arcgis/rest/services/Map2/FeatureServer/3/query"),
     ("SC", "Spartanburg", "spartanburg_mugshots", "https://mugshots.spartanburgsheriff.org/bookings/"),
+    # ROSTER SYNC 2026-11-06 -- the 2026-11-05 sync above (19->31) only covered
+    # commit 120c0c77 (13:17). It missed 5cb87592 (11:38, same day), a separate
+    # parallel build that wired 15 MORE counties into the scraper -- all four
+    # vendor types here (zuercher, citizen_connect, p2c_centralsquare,
+    # p2c_jqgrid) are already shared fetchers above, so this is purely the
+    # missing ROSTERS lines, verbatim from national.jail_bookings.ROSTERS.
+    ("SC", "Sumter", "zuercher", "https://portal-sc-sumter-pd.centralsquarecloudgov.com"),
+    ("NC", "Duplin", "citizen_connect", "DuplinCoNC|NC0310000"),
+    ("NC", "Rowan", "p2c_centralsquare", "https://rowancountync.policetocitizen.com|465"),
+    ("NC", "New Hanover", "p2c_jqgrid", "http://p2c.nhcgov.com/p2c"),
+    ("SC", "Colleton", "zuercher", "colleton-so-sc"),
+    ("NC", "Hoke", "zuercher", "hoke-so-nc"),
+    ("SC", "Berkeley", "citizen_connect", "BerkelyCoSC|SC0080000"),
+    ("SC", "Lexington", "p2c_centralsquare", "https://lexingtonsheriffsc.policetocitizen.com|576"),
+    ("NC", "Harnett", "citizen_connect", "HarnettCoNC|NC0430000"),
+    ("NC", "Anson", "citizen_connect", "AnsonCoNC|NC0040000"),
+    ("NC", "Pasquotank", "zuercher", "pasquotank-911-nc"),
+    ("NC", "Cabarrus", "p2c_jqgrid", "https://onlineservices.cabarruscounty.us/p2c"),
+    ("NC", "Iredell", "p2c_jqgrid", "https://p2c.iredellcountync.gov"),
+    ("SC", "Kershaw", "zuercher", "kershaw-so-sc"),
+    ("NC", "Alamance", "p2c_jqgrid", "https://apps.alamance-nc.com/p2c"),
 ]
 
 # (state, county, vendor, target) for the PER-NAME search vendors — no bulk
