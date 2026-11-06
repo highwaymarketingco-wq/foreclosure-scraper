@@ -375,11 +375,25 @@ def _patch_parts_in_place(docs: Path, patches: dict, dry_run: bool = False) -> d
     byte-for-byte untouched. Caller must hold the board lock and must call
     web_artifact.reseal_board(docs, resplit=False) afterward (resplit=False never calls
     write_parts(), so it cannot hit this same hazard) to bring the manifest's per-part
-    size/sha256 in line with whatever actually changed."""
+    size/sha256 in line with whatever actually changed.
+
+    UNSAFE-IDENTITY GUARD (2026-11-06, found live on Guilford NC): Listing.dedupe_key() falls
+    back to f"url:{source_url}" when a row has no parcel_id/street_address/case_number. That
+    fallback is NOT a per-listing identity -- a generic portal-root source_url
+    (https://bcpwa.ncptscloud.com/, seen live) is shared by thousands of unrelated rows across
+    MANY counties. A single Guilford lead matched this way caused its raw['jail_booking'] patch
+    to apply to 11,032 other rows across 6 other counties when this function matched by
+    dedupe_key() across the whole board, exactly as designed -- the bug was the key itself being
+    unsafe, not the matching logic. Any patch keyed by a bare `url:` fallback is therefore
+    dropped here before it can touch a single row, and reported back separately so the caller
+    can see what was skipped and why, rather than it silently vanishing or silently bleeding."""
     from foreclosure_scraper import board_parts as _bp
     from foreclosure_scraper.models import Listing as _Listing
     from foreclosure_scraper.web_artifact import _APPEND_SIG_FIELDS
     row_enc = json.JSONEncoder(ensure_ascii=False, default=str)
+    unsafe_identity_skipped = [k for k in patches if k.startswith("url:")]
+    if unsafe_identity_skipped:
+        patches = {k: v for k, v in patches.items() if not k.startswith("url:")}
     remaining = set(patches.keys())
     touched: list[tuple[str, int]] = []
     applied = 0
@@ -422,7 +436,8 @@ def _patch_parts_in_place(docs: Path, patches: dict, dry_run: bool = False) -> d
                 data = _bp.gzip_array(blobs)
                 _bp.atomic_write_bytes(fp, data)
     return {"touched_parts": touched, "applied": applied,
-            "not_found": sorted(remaining), "duplicate_key_matches": len(dup_keys)}
+            "not_found": sorted(remaining), "duplicate_key_matches": len(dup_keys),
+            "unsafe_identity_skipped": unsafe_identity_skipped}
 
 
 async def _amain(args) -> int:
@@ -497,6 +512,10 @@ async def _amain(args) -> int:
               f"{len(result['touched_parts']):,} part file(s) "
               f"({result['not_found']}: not found, "
               f"{result['duplicate_key_matches']:,} duplicate-key matches)")
+        if result["unsafe_identity_skipped"]:
+            print(f"  REFUSED {len(result['unsafe_identity_skipped'])} match(es) with no stronger "
+                  f"identity than a shared source_url (would have bled across every other row "
+                  f"sharing that URL) -- not applied: {result['unsafe_identity_skipped']}")
         for name, n in result["touched_parts"]:
             print(f"  rewrote {name} ({n:,} rows, same as before)")
         reseal_board(REPO / "docs", resplit=False)

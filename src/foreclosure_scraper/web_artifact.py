@@ -5527,9 +5527,10 @@ def patch_existing_rows(patches: dict[str, dict], summary: dict,
         and is never silent.
 
     Returns {existing, patches, matched, applied, not_found, duplicate_key_matches, written,
-    total_after} -- when `patches` is empty, {existing: None, patches: 0, matched: 0,
-    applied: 0, not_found: 0, duplicate_key_matches: 0, written: False, total_after: None}
-    without touching the board at all. When the board has no rows to patch onto yet (no
+    total_after, unsafe_identity_skipped} -- when `patches` is empty (or becomes empty after the
+    unsafe-identity guard below strips every key out of it), {existing: None, patches: 0,
+    matched: 0, applied: 0, not_found: 0, duplicate_key_matches: 0, written: False,
+    total_after: None} without touching the board at all. When the board has no rows to patch onto yet (no
     listings.json present), every patch is reported `not_found` and nothing is written --
     unlike append_new_rows(), a patch pass has no legitimate "first ever write" case, because
     there is nothing to MUTATE on a board that does not exist.
@@ -5548,9 +5549,20 @@ def patch_existing_rows(patches: dict[str, dict], summary: dict,
     require_board_lock(docs)
     _check_not_changed_since_load(listings_path)
 
+    # UNSAFE-IDENTITY GUARD (2026-11-06, found live on Guilford NC, scripts/backfill_jail_rosters.py):
+    # Listing.dedupe_key() falls back to f"url:{source_url}" when a row has no
+    # parcel_id/street_address/case_number. That fallback is NOT a per-listing identity -- a
+    # generic portal-root source_url can be (and was) shared by thousands of unrelated rows
+    # across many counties, so a patch keyed by it applies to every one of them, not just the
+    # one row the caller actually meant. Drop any such key before it can touch a single row.
+    unsafe_identity_skipped = sorted(k for k in patches if k.startswith("url:"))
+    if unsafe_identity_skipped:
+        patches = {k: v for k, v in patches.items() if not k.startswith("url:")}
+
     if not patches:
         return {"existing": None, "patches": 0, "matched": 0, "applied": 0, "not_found": 0,
-                "duplicate_key_matches": 0, "written": False, "total_after": None}
+                "duplicate_key_matches": 0, "written": False, "total_after": None,
+                "unsafe_identity_skipped": unsafe_identity_skipped}
 
     _raise_if_board_too_large_to_patch(docs)
 
@@ -5560,7 +5572,7 @@ def patch_existing_rows(patches: dict[str, dict], summary: dict,
         # row to MUTATE, so every pending patch is unmatched by definition.
         return {"existing": 0, "patches": len(patches), "matched": 0, "applied": 0,
                 "not_found": len(patches), "duplicate_key_matches": 0, "written": False,
-                "total_after": 0}
+                "total_after": 0, "unsafe_identity_skipped": unsafe_identity_skipped}
 
     pending: dict = dict(patches)
     matched_keys: set = set()
@@ -5655,6 +5667,7 @@ def patch_existing_rows(patches: dict[str, dict], summary: dict,
         "existing": existing_total, "patches": len(patches), "matched": len(matched_keys),
         "applied": applied, "not_found": not_found, "duplicate_key_matches": len(dup_keys),
         "written": False, "total_after": existing_total,
+        "unsafe_identity_skipped": unsafe_identity_skipped,
     }
     if applied == 0:
         # The parts-gate was already (harmlessly) rewritten with identical content above --

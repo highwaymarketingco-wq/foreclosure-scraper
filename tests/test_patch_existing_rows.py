@@ -192,6 +192,30 @@ def test_matches_by_dedupe_key_address_branch_when_no_parcel_exists_yet(tmp_path
     assert rows[0].parcel_id == "P42"
 
 
+def test_a_url_fallback_dedupe_key_is_refused_not_applied_to_every_row_that_shares_it(tmp_path):
+    """Real incident, 2026-11-06 (Guilford NC): a lead with no parcel_id/street_address/
+    case_number falls back to dedupe_key() == f"url:{source_url}" -- not a per-listing identity.
+    A generic portal-root source_url shared by thousands of unrelated rows means a patch keyed
+    by it would apply to every single one of them, not just the one row the caller meant. This
+    must be refused outright, not applied broadly and not silently dropped without saying why."""
+    docs = tmp_path / "docs"
+    shared_url = "https://bcpwa.ncptscloud.com/"
+    seed = [_lead(0, parcel_id=None, street_address=None, source_url=shared_url),
+            _lead(1, parcel_id=None, street_address=None, source_url=shared_url)]
+    wa.write_artifact(seed, {"notes": "seed"}, docs_dir=docs)
+    key = seed[0].dedupe_key()
+    assert key == seed[1].dedupe_key() == f"url:{shared_url}"
+    stats = wa.patch_existing_rows({key: {"raw": {"jail_booking": {"matched_name": "SOMEONE ELSE"}}}},
+                                   {"notes": "t"}, docs_dir=docs)
+    assert stats["unsafe_identity_skipped"] == [key]
+    assert stats["applied"] == 0
+    assert stats["written"] is False
+    rows = wa.load_board(docs)
+    assert all("jail_booking" not in (r.raw or {}) for r in rows), (
+        "a url: fallback key must never patch ANY row, including the one the caller actually meant"
+    )
+
+
 def test_no_match_is_reported_not_found_and_touches_nothing(tmp_path):
     docs = tmp_path / "docs"
     _seed(docs, n=3)
@@ -391,7 +415,7 @@ def test_empty_patches_is_a_no_op_and_touches_nothing(tmp_path):
     stats = wa.patch_existing_rows({}, {"notes": "t"}, docs_dir=docs)
     assert stats == {"existing": None, "patches": 0, "matched": 0, "applied": 0,
                      "not_found": 0, "duplicate_key_matches": 0, "written": False,
-                     "total_after": None}
+                     "total_after": None, "unsafe_identity_skipped": []}
     assert (docs / "listings.json").read_bytes() == before
 
 
@@ -401,7 +425,8 @@ def test_patching_a_board_that_does_not_exist_yet_reports_not_found_and_writes_n
     stats = wa.patch_existing_rows({"addr:1 nowhere st|00000": {"parcel_id": "PX"}},
                                    {"notes": "t"}, docs_dir=docs)
     assert stats == {"existing": 0, "patches": 1, "matched": 0, "applied": 0, "not_found": 1,
-                     "duplicate_key_matches": 0, "written": False, "total_after": 0}
+                     "duplicate_key_matches": 0, "written": False, "total_after": 0,
+                     "unsafe_identity_skipped": []}
     assert not (docs / "listings.json").exists()
 
 

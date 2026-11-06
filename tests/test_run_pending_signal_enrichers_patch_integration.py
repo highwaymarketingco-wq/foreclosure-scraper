@@ -39,8 +39,15 @@ from foreclosure_scraper.models import Listing, ListingType  # noqa: E402
 
 
 def _row(i: int, **kw) -> Listing:
+    # parcel_id gives dedupe_key() its strong (parcel:) branch instead of the url: fallback --
+    # these per-row source_urls are already distinct, so this wasn't a real ambiguity, but
+    # patch_existing_rows() now refuses EVERY url: fallback key outright (2026-11-06, the
+    # Guilford NC incident: that fallback is unsafe whenever it DOES collide across rows, and
+    # there's no cheap way to tell a genuinely-unique one from a shared one in one streaming
+    # pass) -- so a test lead needs a real identity to be patchable at all.
     base = dict(source="src.seed", source_url=f"https://example.test/u{i}",
-                listing_type=ListingType.FORECLOSURE_SALE, state="NC", county="Henderson", raw={})
+                listing_type=ListingType.FORECLOSURE_SALE, state="NC", county="Henderson",
+                parcel_id=f"P{i:06d}", raw={})
     base.update(kw)
     return Listing(**base)
 
