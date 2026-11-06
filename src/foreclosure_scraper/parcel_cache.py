@@ -127,6 +127,34 @@ PARCEL_LAYERS: dict[str, dict] = {
                 "market_value": "COUNTY_TOTAL_VALUE", "acreage": "COUNTY_ACRES",
                 "owner_mailing": "COUNTY_MAILING_ADDRESS"},
     },
+    # --- 2026-11-06: Hoke County NC (gap_matrix heir_estate breadth check). The county's own
+    # ArcGIS Server (maps.hokecounty.org/server/..., not /arcgis/rest/...) hosts a single open
+    # "Parcels" MapServer layer, no token, maxRecordCount 1000 -- _download_rows already pages
+    # by the actual row count returned, so the lower-than-default page cap needs no override.
+    # 29,570 parcels verified live via returnCountOnly. OWNER_NAME retitles decedent parcels
+    # exactly like every other county's roll ("MCKOY, LEE ETTA HEIRS", "MCLEAN, DICKSON ESTATE",
+    # "MCRAE, WILLIE (HEIRS)" all live-sampled); a raw `OWNER_NAME LIKE '%ESTATE%' OR LIKE
+    # '%HEIR%'` came back 387 (before the shared _is_decedent/_excluded_row refinement -- one
+    # live sample already shows a "LIFE ESTATE" row the existing _EXCLUDE tuple correctly drops).
+    # OWNER_NA_1 is a second owner/heir line ("C/O KENDRICK THOMAS", co-owner shares) -- same
+    # multi-owner convention as Georgetown's Owner1/Owner2. MAILING_AD/MAILING__1/CITY/
+    # STATE_OR_C/ZIP_CODE is a full, separate owner-mailing block (confirmed diverging from situs
+    # on absentee-heir rows). No land_use/property-type field exists on this layer -- vacant_lot
+    # is not attempted here. NOTE: this entry feeds the general parcel_cache fast path (owner/
+    # mailing/value/acreage via enrichment_gis_attrs.py), but the gap_matrix heir_estate COLUMN
+    # itself is populated by a SEPARATE mechanism for NC (nc_heir_estate_parcels.py, which reads
+    # enrichment_owner_mailing.COUNTY_GIS, not this PARCEL_LAYERS dict -- no NC analogue of
+    # sc_heir_estate_parcel_cache.py exists yet). Hoke already falls under that scraper's
+    # NC_STATEWIDE_FALLBACK_COUNTIES (queried live against NC OneMap), so whether real
+    # heir_estate rows land for Hoke right now depends on that fallback's own yield, not on this
+    # cache entry -- unaudited here, flagged for the owner rather than assumed either way.
+    "Hoke": {
+        "url": "https://maps.hokecounty.org/server/rest/services/Parcels/MapServer/0/query",
+        "id_fields": ["TWN_PIN"],
+        "map": {"owner": ["OWNER_NAME", "OWNER_NA_1"], "address": "PHY_ADDRES",
+                "owner_mailing": ["MAILING_AD", "MAILING__1", "CITY", "STATE_OR_C", "ZIP_CODE"],
+                "market_value": "COST_TOTAL", "acreage": "TOTAL_ACRE"},
+    },
     # --- SC ---
     "Spartanburg": {
         # board 12-digit id = GISParcelNumber (7102-28-3341.88) with punctuation stripped.
@@ -606,10 +634,23 @@ PARCEL_LAYERS: dict[str, dict] = {
     # (downloaded == returnCountOnly) before a cache file is ever replaced.
     #
     # NOT ADDED, and why (all in the research doc): Richland (custom Leaflet/PHP viewer,
-    # no ArcGIS REST), Kershaw (open Parcels_view is geometry + acres only), Marion /
-    # Williamsburg / Clarendon / Marlboro (WTH "tgis" viewer, no REST), Edgefield /
-    # Fairfield (qPublic behind a Cloudflare challenge), Dorchester (open, but see the
-    # research doc: verified and held back).
+    # no ArcGIS REST -- its OWN host still has none, confirmed again live 2026-11-06; see
+    # the Richland entry below for the DIFFERENT, third-party host that does carry a real
+    # layer), Kershaw (open Parcels_view is geometry + acres only -- still true of the
+    # county's OWN ArcGIS Hub portal, confirmed live 2026-11-06; see the Kershaw entry below
+    # for the same third-party host), Marion / Williamsburg / Clarendon / Marlboro (WTH
+    # "tgis" viewer, no REST), Edgefield / Fairfield (qPublic behind a Cloudflare challenge),
+    # Dorchester (open, but see the research doc: verified and held back).
+    #
+    # 2026-11-06: Cherokee SC re-checked live for the same gap_matrix sweep -- still a genuine
+    # dead end. The county's own GIS page (cherokeecountysc.gov/gis-mapping/gis-parcel-map/)
+    # links out to exactly one parcel source, qpublic.schneidercorp.com/Application.aspx?
+    # App=CherokeeCountySC&Layer=Parcels&PageType=Search, which returns Cloudflare's "Just a
+    # moment..." JS-challenge page (HTTP 403) to a plain request -- the same wall already
+    # documented for Edgefield/Fairfield above. No separate ArcGIS-hosted layer exists for this
+    # county on ArcGIS Online (portal search by name, by bbox, and by the county's likely org
+    # account all came back empty); nc_heir_estate_parcels.py's own docstring already says the
+    # same thing ("SC:Cherokee has no ArcGIS parcel layer at all (qPublic-only)"). Not added.
     # =====================================================================
     "Florence": {
         # 70,098 parcels. TMS is the dashed 5-2-3 form ("00001-04-001") and TMSNODASH the
@@ -1006,6 +1047,84 @@ PARCEL_LAYERS["Georgetown"] = {
             "address": ["StreetNumber", "StreetName"],
             "owner_mailing": ["BillingAddress", "BillingAddress2", "City", "State", "ZipCode"],
             "acreage": "TotalLandArea", "sale_price": "SalePrice", "sale_date": "SaleDate"},
+}
+
+#: RICHLAND + KERSHAW SC, added 2026-11-06 (gap_matrix heir_estate/vacant_lot breadth check).
+#:
+#: NOT the county's own GIS (richlandmaps.com is confirmed -- again, live -- a custom PHP/
+#: Leaflet viewer with no ArcGIS REST of any kind, and Kershaw's own ArcGIS Hub portal
+#: (kershawcountydataportal) publishes only geometry -- Parcels_view is FID/PRSNTP_ID/
+#: taxTotalAc/GlobalID, Addresses_view is a bare address-point layer, neither carries an
+#: owner, value or land-use field; both re-confirmed live, see the "NOT ADDED" block above).
+#:
+#: The REAL source is a THIRD PARTY's public AGOL item: a Fairfield/Kershaw/Richland county
+#: BOUNDARY-LINE RE-ESTABLISHMENT survey (owner account on services9.arcgis.com, not either
+#: county's own GIS org) that bulk-imported each county's CAMA/tax roll to identify affected
+#: parcels. Open, no token, found by searching ArcGIS Online for "title:Parcels AND Kershaw"
+#: (the richlandmaps.com and Kershaw Hub leads above dead-ended first). `created_date` ==
+#: `last_edited_date` on every row sampled (a single bulk load, not a live-synced feed) at
+#: 2025-10-23 (epoch ms 1761243345356) -- a ~1-year-old snapshot, not this project's usual
+#: weekly county refresh; acceptable for owner-of-record text by this file's own standard
+#: (CACHE_VALUE_MAX_AGE_DAYS only gates market_value/tax_value, not owner), but flagged here
+#: for the owner rather than assumed silently fresh. `County` is a clean single-value column
+#: on each sublayer (no cross-county bleed between the three). FeatureServer:
+#:   https://services9.arcgis.com/RvqSyw3diI7dTKo5/arcgis/rest/services/
+#:   Fairfield_Kershaw_Richland_Map_WFL1/FeatureServer -- layer 6 = Richland_Parcels (184,916
+#:   rows), layer 7 = Kershaw_Parcels (43,383 rows); maxRecordCount 2000, pagination supported.
+#:
+#: Richland_Parcels: TMS ("R02700-07-02") is the SAME format richlandmaps.com's own API
+#: already uses for li.parcel_id (enrichment_richland_parcel.py), so this cache should key
+#: against existing Richland board rows without a format mismatch. NAME1/NAME2 are the owner-
+#: of-record + a second heir/C-O line, live-sampled with real decedent hits ("MANIGAULT
+#: LOUISE   HEIRS", "CAMPBELL PETER ESTATE") alongside the usual LIFE-ESTATE/REAL-ESTATE/LLC
+#: noise the shared _is_decedent/_excluded_row classifiers already filter correctly; a raw
+#: `NAME1 LIKE '%ESTATE%' OR LIKE '%HEIR%'` came back 1,523 (before that Python-side
+#: refinement). This directly adds the county to SCHeirEstateParcelCache's auto-discovered
+#: candidate set (state=="SC" + an "owner" field) -- NOT a contradiction of the 2026-10-29
+#: zero-yield finding: that check was against owner text already stamped onto the EXISTING
+#: 2,236 Richland board rows (a specific, narrow distress-source subset); this is the full
+#: ~185K-parcel county roll, a disjoint, much larger population the board has never read
+#: before. Land_Use is a real field name but 100% NULL on every row (confirmed via
+#: returnDistinctValues); I_V ('I'/'V'/''/None) looked like a ready-made improved/vacant flag
+#: but does NOT reliably correlate with Mkt_Val_Structure being populated (two 'V' rows
+#: sampled carried a six-figure structure value) -- not trusted, so vacant_lot is NOT attempted
+#: for Richland here (also not asked for in this sweep).
+#:
+#: Kershaw_Parcels: taxParcelI is the dashed TMS ("003-00-00-048"). taxOwnerNa/taxOwner1/
+#: taxOwner2 are owner-of-record + a second heir/C-O line, live-sampled with real decedent
+#: hits ("MUNGO TILLMAN HEIRS OF", "SEEGARS BEN S ESTATE") past the same noise; raw count 221.
+#: Land_Use is ALSO a real field name that is 100% NULL here (0 of 43,383, confirmed via
+#: returnDistinctValues) -- but taxTotalBl (an Integer despite the county's own `taxBuildin`
+#: TEXT column sitting right next to it, "Residential"/"Church"/None) is a clean building-
+#: value-only field: every sampled row with `taxBuildin` populated carries a matching nonzero
+#: taxTotalBl, and every row with `taxBuildin` None carries taxTotalBl == 0 while M_Value stays
+#: positive (17,681 rows: taxTotalBl = 0 AND M_Value > 0; 25,187 rows: taxTotalBl > 0) -- the
+#: exact "real zero improvement value, real nonzero market value" shape
+#: enrichment_vacant_landuse.py's _VALUE_ONLY_NO_LANDUSE fallback already reads for Sumter/
+#: Williamsburg. Kershaw is added to that set in enrichment_vacant_landuse.py to turn this on.
+PARCEL_LAYERS["Richland"] = {
+    "state": "SC",
+    "url": ("https://services9.arcgis.com/RvqSyw3diI7dTKo5/arcgis/rest/services/"
+            "Fairfield_Kershaw_Richland_Map_WFL1/FeatureServer/6/query"),
+    "where": "County='Richland County'",
+    "id_fields": ["TMS"],
+    "map": {"owner": ["NAME1", "NAME2"], "address": "LOC",
+            "owner_mailing": ["ADDRESS1", "ADDRESS2", "CITY", "STATE", "ZIPCODE"],
+            "market_value": "Total_Mkt_Val", "tax_value": "Taxable_Value",
+            "acreage": "acreage", "sale_price": "SALEPRICE", "sale_date": "SALEDATE"},
+}
+PARCEL_LAYERS["Kershaw"] = {
+    "state": "SC",
+    "url": ("https://services9.arcgis.com/RvqSyw3diI7dTKo5/arcgis/rest/services/"
+            "Fairfield_Kershaw_Richland_Map_WFL1/FeatureServer/7/query"),
+    "where": "County='Kershaw County'",
+    "id_fields": ["taxParcelI"],
+    "map": {"owner": ["taxOwnerNa", "taxOwner1", "taxOwner2"],
+            "address": ["taxLocStre", "taxlocSt1"],
+            "owner_mailing": ["taxMailing", "taxMaili2", "taxMailSta", "taxMaili3"],
+            "market_value": "M_Value", "tax_value": "taxTaxable",
+            "acreage": "taxTotalAc", "improvement_value": "taxTotalBl",
+            "sale_price": "taxSalePri", "sale_date": "taxSaleDat"},
 }
 
 #: 2026-10-07: property facts the already-downloaded county layers publish and the cache used to

@@ -99,7 +99,17 @@ _GREENWOOD_NULL_IMPROVEMENT_EXCLUDED_PROPTYPES = frozenset({"Commercial", "Multi
 # satellite spot-checks: 6/6 clean on <2-acre parcels, 2 more on 30-93 acre tracts
 # inconclusive (not contradicted) for the structural reason a single point can't rule
 # out a building elsewhere on a huge parcel -- see that script's docstring.
-_VALUE_ONLY_NO_LANDUSE = frozenset({"Sumter", "Williamsburg"})
+#
+# 2026-11-06: Kershaw SC, same shape. Its parcel_cache layer (a third-party AGOL item, see
+# parcel_cache.py's Kershaw entry) has a `Land_Use` field that is a real column name but
+# 100% NULL (confirmed live, returnDistinctValues, 0 of 43,383 rows). `improvement_value`
+# maps to `taxTotalBl`, a building-value-ONLY field live-verified against the county's own
+# `taxBuildin` building-TYPE text column sitting next to it: every row with a building type
+# ("Residential", "Church", ...) carries a matching nonzero taxTotalBl, and every row with
+# no building type carries taxTotalBl == 0 while the market-value field (`market_value` /
+# Kershaw's M_Value) stays positive -- 17,681 rows at exactly that "zero improvement, real
+# market value" shape vs. 25,187 improved (taxTotalBl > 0), out of ~42,968 populated rows.
+_VALUE_ONLY_NO_LANDUSE = frozenset({"Sumter", "Williamsburg", "Kershaw"})
 
 
 def _has_cache(memo: dict, county: str, state: str | None) -> bool:
