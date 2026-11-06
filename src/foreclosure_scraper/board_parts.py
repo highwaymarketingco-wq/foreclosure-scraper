@@ -596,70 +596,124 @@ def write_parts(docs, blobs: Iterable[bytes], *, cap: Optional[int] = None,
     2026-10-05). Without it, an iterator is sampled from its first STREAM_SAMPLE_ROWS rows only.
 
     Stale higher-numbered parts (from a longer previous board) are removed AFTER every new part
-    is on disk. Parts are written atomically one by one; the manifest that seals the set is the
-    caller's job, and until it is written the on-disk set disagrees with the old manifest, which
-    the loaders detect."""
+    is on disk. The manifest that seals the set is the caller's job, and until it is written the
+    on-disk set disagrees with the old manifest, which the loaders detect.
+
+    STAGED, NOT WRITTEN DIRECTLY INTO `docs` -- ONLY when the caller takes the DEFAULT writer
+    (2026-11-06, found chasing a real board corruption). When `blobs` itself reads the existing
+    board back out of `docs` -- exactly what web_artifact.patch_existing_rows()'s
+    _rows_for_parts() does, streaming _iter_board_records(docs) as ITS source while this
+    function writes new parts into that SAME docs -- writing straight into
+    `docs/listings_part_NNN.json.gz` as each chunk completes can overwrite a part the source
+    generator has not opened yet. The two share one thread pulling from one generator (the chunk
+    loop below), so whenever this write's rows-per-part differs from the board's actual existing
+    per-part sizes (a stale hint_rows, or just a fresh estimate -- this board has mixed historical
+    chunking, so ANY single hint is wrong for part of it), the new output's part boundaries drift
+    from the old ones as the stream progresses, and the writer can reach part N before the reader
+    has finished consuming old part N's rows. Reproduced 3x on the real board, always the same
+    signature: BoardIntegrityError, a part holding fewer rows than the manifest it was read under
+    says, because its content got replaced mid-read by an unrelated later chunk.
+
+    The fix: with the default writer, every part is written to a staging subdirectory of `docs`
+    first and moved into place (one atomic os.replace per part, same filesystem) only once the
+    ENTIRE source has been consumed -- so nothing under `docs` is ever touched while blobs might
+    still be reading from it. This also makes a crash anywhere during the read/stage phase leave
+    the prior board in `docs` completely untouched (stronger than the old per-part atomicity: a
+    crash after the first part landed used to leave docs in a mixed old/new-boundary state).
+
+    A caller that passes its OWN `write=` is explicitly managing staging/commit itself --
+    web_artifact.write_artifact()'s `_stage_part` is the one example, writing each part to its
+    own `<name>.<pid>.staged.tmp` beside the FINAL path it is given and committing the whole set
+    together with the plain/detail/slim writers afterward. That caller's source is the in-memory
+    `listings` list, never a read of `docs` itself, so it never has this hazard -- and it relies
+    on the path handed to `write` being the true final `docs/<name>`, not a throwaway staging
+    path, so this function leaves that contract (and remove_stale's old immediate timing)
+    completely unchanged whenever `write` is given."""
     docs = Path(docs)
     docs.mkdir(parents=True, exist_ok=True)
     cap = int(cap if cap is not None else max_bytes())
+    stage_self = write is None
     writer = write or atomic_write_bytes
+    stage_dir = None
+    if stage_self:
+        stage_dir = docs / (".write_parts_staging.%d.%x" % (os.getpid(), id(object())))
+        stage_dir.mkdir(parents=True, exist_ok=False)
+    target_dir = stage_dir if stage_self else docs
 
-    if sample_groups is not None:
-        total_known = None
-        groups = list(sample_groups)
-        source = iter(blobs)
-    elif isinstance(blobs, (list, tuple)):
-        total_known = len(blobs)
-        groups = _sample_groups(blobs)
-        source = iter(blobs)
-    else:
-        head = list(itertools.islice(blobs, STREAM_SAMPLE_ROWS))
-        total_known = None
-        groups = [head]
-        source = itertools.chain(head, blobs)
-    n_per = choose_rows_per_part(groups, cap, hint_rows)
+    try:
+        if sample_groups is not None:
+            total_known = None
+            groups = list(sample_groups)
+            source = iter(blobs)
+        elif isinstance(blobs, (list, tuple)):
+            total_known = len(blobs)
+            groups = _sample_groups(blobs)
+            source = iter(blobs)
+        else:
+            head = list(itertools.islice(blobs, STREAM_SAMPLE_ROWS))
+            total_known = None
+            groups = [head]
+            source = itertools.chain(head, blobs)
+        n_per = choose_rows_per_part(groups, cap, hint_rows)
 
-    pending: deque = deque()
-    entries: List[dict] = []
-    row = 0
-    exhausted = False
-    while True:
-        chunk: list = []
-        while len(chunk) < n_per and pending:
-            chunk.append(pending.popleft())
-        if len(chunk) < n_per and not exhausted:
-            more = list(itertools.islice(source, n_per - len(chunk)))
-            if len(more) < n_per - len(chunk):
-                exhausted = True
-            chunk.extend(more)
-        if not chunk:
-            break
-        data = gzip_array(chunk, level=level)
-        while len(data) > cap:
-            if len(chunk) == 1:
-                raise PartTooLargeError("a single board row compresses to %d bytes, over the %d byte "
-                                        "part cap" % (len(data), cap))
-            keep = max(1, min(len(chunk) - 1, int(len(chunk) * (cap / float(len(data))) * 0.94)))
-            pending.extendleft(reversed(chunk[keep:]))
-            chunk = chunk[:keep]
-            n_per = min(n_per, _quantize(keep))
+        pending: deque = deque()
+        entries: List[dict] = []
+        row = 0
+        exhausted = False
+        while True:
+            chunk: list = []
+            while len(chunk) < n_per and pending:
+                chunk.append(pending.popleft())
+            if len(chunk) < n_per and not exhausted:
+                more = list(itertools.islice(source, n_per - len(chunk)))
+                if len(more) < n_per - len(chunk):
+                    exhausted = True
+                chunk.extend(more)
+            if not chunk:
+                break
             data = gzip_array(chunk, level=level)
-        name = part_name(len(entries))
-        writer(docs / name, data)
-        entries.append({"name": name, "start": row, "end": row + len(chunk), "records": len(chunk),
-                        "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()})
-        row += len(chunk)
-        if exhausted and not pending:
-            break
-    if not entries:
-        # an empty board is still a board: one part holding `[]`
-        data = gzip_array([], level=level)
-        writer(docs / part_name(0), data)
-        entries.append({"name": part_name(0), "start": 0, "end": 0, "records": 0,
-                        "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()})
-    if remove_stale:
-        remove_stale_parts(docs, len(entries))
-    return {"entries": entries, "rows_per_part": n_per, "cap": cap, "records": row}
+            while len(data) > cap:
+                if len(chunk) == 1:
+                    raise PartTooLargeError("a single board row compresses to %d bytes, over the %d byte "
+                                            "part cap" % (len(data), cap))
+                keep = max(1, min(len(chunk) - 1, int(len(chunk) * (cap / float(len(data))) * 0.94)))
+                pending.extendleft(reversed(chunk[keep:]))
+                chunk = chunk[:keep]
+                n_per = min(n_per, _quantize(keep))
+                data = gzip_array(chunk, level=level)
+            name = part_name(len(entries))
+            writer(target_dir / name, data)
+            entries.append({"name": name, "start": row, "end": row + len(chunk), "records": len(chunk),
+                            "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()})
+            row += len(chunk)
+            if exhausted and not pending:
+                break
+        if not entries:
+            # an empty board is still a board: one part holding `[]`
+            data = gzip_array([], level=level)
+            writer(target_dir / part_name(0), data)
+            entries.append({"name": part_name(0), "start": 0, "end": 0, "records": 0,
+                            "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()})
+
+        if stage_self:
+            # The source is now fully consumed (including every old part it may have read from
+            # `docs`) -- safe to start overwriting `docs` with the new parts.
+            for e in entries:
+                commit_staged_part(stage_dir / e["name"], docs / e["name"])
+        if remove_stale:
+            remove_stale_parts(docs, len(entries))
+        return {"entries": entries, "rows_per_part": n_per, "cap": cap, "records": row}
+    finally:
+        if stage_dir is not None:
+            for stray in stage_dir.glob("*"):
+                try:
+                    stray.unlink()
+                except OSError:
+                    pass
+            try:
+                stage_dir.rmdir()
+            except OSError:
+                pass
 
 
 def remove_stale_parts(docs, keep_count: int) -> List[str]:

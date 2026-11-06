@@ -213,6 +213,101 @@ def test_a_shrinking_board_removes_the_stale_higher_numbered_parts(tmp_path, mon
     assert not list(tmp_path.glob("*.tmp"))
 
 
+def test_rechunking_from_a_source_that_reads_the_same_docs_dir_never_corrupts_an_unread_part(
+        tmp_path, monkeypatch):
+    """Real-world hazard, found 2026-11-05/06: patch_existing_rows()'s _rows_for_parts() streams
+    the OLD board as its own source (_iter_board_records(docs)) while write_parts(docs, that
+    source, ...) writes NEW parts into that SAME docs directory under the SAME sequential names.
+    If the new chunk size (from a stale hint_rows, or just a fresh estimate) differs from the
+    old board's actual on-disk per-part size, the new output's boundaries drift from the old
+    ones as the stream progresses. Reader and writer share one thread pulling from one
+    generator, so the writer can reach and overwrite a part path the reader has not opened yet
+    -- confirmed live 3x on the real board (always the identical signature: a part holds fewer
+    rows than the manifest it was read under says, because its content got replaced mid-read by
+    an unrelated later chunk of the new output). A reader that then opens that clobbered path
+    either raises BoardIntegrityError (row count no longer matches) or, worse, silently returns
+    the wrong rows. This reproduces the hazard directly (not relying on the natural compression
+    estimate to drift on its own) by handing write_parts() a hint explicitly inside the
+    "keep it" band but numerically different from the real per-part size already on disk --
+    exactly the shape of this board's own history (an earlier chunk-size convention change left
+    early parts at one size, later ones at another, and run_meta.json's stale rows_per_part hint
+    does not reflect either consistently)."""
+    _cap(monkeypatch, 64 * KiB)
+    rows = _rows(8000)
+    old = bp.write_parts(tmp_path, [_enc(r) for r in rows])
+    assert len(old["entries"]) >= 4, "need several parts for a boundary drift to be possible"
+    old_rpp = old["rows_per_part"]
+    before = {p.name: p.read_bytes() for p in _part_paths(tmp_path)}
+
+    # A hint far enough from the real per-part size to force different boundaries, but still
+    # inside choose_rows_per_part()'s own "keep the hint" band relative to a fresh estimate on
+    # the same content/cap (which lands close to old_rpp) -- i.e. a legitimately ACCEPTED hint,
+    # not a wild outlier, matching how a real stale-but-plausible rows_per_part value behaves.
+    mismatched_hint = int(old_rpp * 0.8)
+    assert mismatched_hint != old_rpp
+    old_res = bp.Resolution(tmp_path, [tmp_path / e["name"] for e in old["entries"]], old["entries"], "manifest")
+
+    def source_reading_the_same_docs_dir():
+        # exactly what patch_existing_rows()'s _rows_for_parts() does: stream the existing board
+        # back from `docs`, the SAME directory write_parts() is about to write new parts into.
+        # res= is the real board's already-sealed manifest in production; here it's just the
+        # prior write_parts() call's own entries, so the test needs no manifest file on disk.
+        for text in bp.iter_rows(tmp_path, want_text=True, res=old_res):
+            yield text.encode("utf-8")
+
+    new = bp.write_parts(tmp_path, source_reading_the_same_docs_dir(), hint_rows=mismatched_hint)
+
+    # correctness: every original row survives, in order, nothing lost/duplicated/corrupted --
+    # regardless of whether the new chunking matches the old boundaries.
+    assert new["records"] == 8000
+    texts = []
+    for e in new["entries"]:
+        texts.extend(bp.iter_row_texts(tmp_path / e["name"]))
+    assert texts == [_enc(r) for r in rows], "re-chunking from the board's own prior state must not lose/alter a row"
+    # the board is left internally consistent: every part's real row count matches what the
+    # manifest-equivalent entries say (this is what board_parts.iter_rows()'s own integrity
+    # check verifies on the next read).
+    for e in new["entries"]:
+        n = sum(1 for _ in bp.iter_gz_rows(tmp_path / e["name"]))
+        assert n == e["records"], f"{e['name']} holds {n} rows, entries say {e['records']}"
+
+
+def test_an_interrupted_rechunk_from_the_same_docs_dir_leaves_the_prior_board_fully_untouched(
+        tmp_path, monkeypatch):
+    """The staged-write fix's crash-safety property, stronger than the old code's: since nothing
+    is written to `docs` until the ENTIRE source read is done, a crash partway through a
+    self-referential rechunk (the exact shape patch_existing_rows() does) leaves every original
+    part byte-for-byte as it was -- not just the parts written before the crash point."""
+    _cap(monkeypatch, 64 * KiB)
+    rows = _rows(8000)
+    old = bp.write_parts(tmp_path, [_enc(r) for r in rows])
+    assert len(old["entries"]) >= 4
+    before = {p.name: p.read_bytes() for p in _part_paths(tmp_path)}
+    mismatched_hint = int(old["rows_per_part"] * 0.8)
+
+    real = bp.atomic_write_bytes
+    calls = []
+
+    def dies(path, data):
+        calls.append(path.name)
+        if len(calls) == 2:
+            raise KeyboardInterrupt
+        real(path, data)
+    monkeypatch.setattr(bp, "atomic_write_bytes", dies)
+    old_res = bp.Resolution(tmp_path, [tmp_path / e["name"] for e in old["entries"]], old["entries"], "manifest")
+
+    def source_reading_the_same_docs_dir():
+        for text in bp.iter_rows(tmp_path, want_text=True, res=old_res):
+            yield text.encode("utf-8")
+
+    with pytest.raises(KeyboardInterrupt):
+        bp.write_parts(tmp_path, source_reading_the_same_docs_dir(), hint_rows=mismatched_hint)
+
+    assert not list(tmp_path.glob("*.tmp"))
+    after = {p.name: p.read_bytes() for p in _part_paths(tmp_path)}
+    assert after == before, "a crash mid-rechunk must leave the original board exactly as it was"
+
+
 def test_a_write_that_dies_mid_part_leaves_no_temp_file_and_the_prior_part_intact(tmp_path, monkeypatch):
     _cap(monkeypatch, 12 * KiB)
     bp.write_parts(tmp_path, [_enc(r) for r in _rows(3000)])
