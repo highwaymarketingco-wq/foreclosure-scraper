@@ -52,6 +52,7 @@ from typing import Iterable
 
 import structlog
 from selectolax.parser import HTMLParser
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
@@ -350,6 +351,7 @@ async def _search_one(query: str, category: str) -> list[Listing]:
     """
     try:
         from scrapling.fetchers import StealthyFetcher
+        from playwright.async_api import Error as PlaywrightError, TimeoutError as PlaywrightTimeoutError
     except ImportError:
         log.warning("ncnotices.scrapling_missing")
         return []
@@ -581,10 +583,33 @@ async def _search_one(query: str, category: str) -> list[Listing]:
     last_html_size = 0
     for url in candidate_urls:
         try:
-            result = await StealthyFetcher.async_fetch(
-                url, headless=True, network_idle=True, timeout=90000,
-                page_action=page_action,
-            )
+            # Retried up to 3 times (short exponential-jitter backoff) on a transient
+            # Playwright/Scrapling transport-or-timeout failure -- confirmed 2026-11-07
+            # (gap-sweep): this bare StealthyFetcher.async_fetch() call had zero retry
+            # cushioning, the same gap already fixed tonight for the Column legal-notice
+            # API scrapers, spartan_weekly_legals.py and arcgis_webmap.query_features().
+            # The fallback-URL loop below (3 candidate URL shapes) is NOT an equivalent
+            # retry: on an exception it advances to a DIFFERENT, differently-shaped URL
+            # rather than re-attempting the same request, so a single transient blip on
+            # Search.aspx never got a second try at Search.aspx itself. Scoped to
+            # Playwright's own exception types (not httpx's -- this call never goes
+            # through httpx/http_client) because that is what StealthyFetcher.async_fetch
+            # actually raises on a transient navigation/connection/timeout failure. A real
+            # non-transport failure (e.g. Scrapling's own "Failed to get response" when
+            # the page produced no response at all) is a bare RuntimeError, deliberately
+            # left out of the retry tuple -- retrying on an unqualified RuntimeError would
+            # also catch unrelated state-machine bugs that a retry can never fix.
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type((PlaywrightError, PlaywrightTimeoutError, TimeoutError)),
+                reraise=True,
+            ):
+                with attempt:
+                    result = await StealthyFetcher.async_fetch(
+                        url, headless=True, network_idle=True, timeout=90000,
+                        page_action=page_action,
+                    )
         except Exception as exc:
             log.warning("ncnotices.fetch_fail", query=query, url=url, error=str(exc)[:200])
             continue

@@ -85,6 +85,7 @@ from datetime import datetime
 from typing import Iterable
 
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...config import NC_COUNTIES as _FLIP_FOOTPRINT_NC
@@ -559,6 +560,7 @@ async def fetch_notice_detail(detail_url: str) -> str | None:
     """
     try:
         from scrapling.fetchers import StealthyFetcher
+        from playwright.async_api import Error as PlaywrightError, TimeoutError as PlaywrightTimeoutError
     except ImportError:
         log.warning("nc_notices_counties.scrapling_missing")
         return None
@@ -608,10 +610,17 @@ async def fetch_notice_detail(detail_url: str) -> str | None:
             revealed["html"] = ""
 
     try:
-        await StealthyFetcher.async_fetch(
-            detail_url, headless=True, network_idle=True, timeout=60000,
-            page_action=reveal,
-        )
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((PlaywrightError, PlaywrightTimeoutError, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                await StealthyFetcher.async_fetch(
+                    detail_url, headless=True, network_idle=True, timeout=60000,
+                    page_action=reveal,
+                )
     except Exception as exc:
         log.debug("nc_notices_counties.detail_fetch_fail",
                   url=detail_url[:120], error=str(exc)[:160])
@@ -683,6 +692,7 @@ async def _render_queries() -> list[str]:
     """
     try:
         from scrapling.fetchers import StealthyFetcher
+        from playwright.async_api import Error as PlaywrightError, TimeoutError as PlaywrightTimeoutError
     except ImportError:
         log.warning("nc_notices_counties.scrapling_missing")
         return []
@@ -837,10 +847,17 @@ async def _render_queries() -> list[str]:
                      keyword=keyword, mode=want_mode, days=days, pages=captured)
 
     try:
-        await StealthyFetcher.async_fetch(
-            _BASE, headless=True, network_idle=True,
-            timeout=_RENDER_TIMEOUT_MS, page_action=page_action,
-        )
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((PlaywrightError, PlaywrightTimeoutError, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                await StealthyFetcher.async_fetch(
+                    _BASE, headless=True, network_idle=True,
+                    timeout=_RENDER_TIMEOUT_MS, page_action=page_action,
+                )
     except Exception as exc:
         log.warning("nc_notices_counties.fetch_fail", error=str(exc)[:200])
     log.info("nc_notices_counties.render_done", pages=len(pages), **stats)

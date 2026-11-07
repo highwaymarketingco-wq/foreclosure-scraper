@@ -52,7 +52,9 @@ import os
 import re
 from typing import Iterable, Optional
 
+import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...config import NC_COUNTIES, SC_COUNTIES
@@ -163,7 +165,20 @@ class EchovitaObituaries(BaseScraper):
                 for page in range(1, MAX_PAGES + 1):
                     url = f"{BASE}/us/obituaries/{st}" + (f"?page={page}" if page > 1 else "")
                     try:
-                        html = await pf.get(url)
+                        # Retried up to 3 times (short exponential-jitter backoff) on a transport
+                        # error or timeout only -- a real bad status or wall still raises below,
+                        # unretried. Without this, a single transient blip here previously broke
+                        # the page loop and abandoned every remaining page of this state's listing
+                        # for the run (see module SOURCE-COMPLETENESS AUDIT above: this source has
+                        # no fallback date window, so a degraded run can't self-heal on its own).
+                        async for attempt in AsyncRetrying(
+                            stop=stop_after_attempt(3),
+                            wait=wait_exponential_jitter(initial=1, max=8),
+                            retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                            reraise=True,
+                        ):
+                            with attempt:
+                                html = await pf.get(url)
                     except Walled as w:
                         stats["walled"] = w.reason
                         break
@@ -191,7 +206,19 @@ class EchovitaObituaries(BaseScraper):
                 if c["url"] in read:
                     continue
                 try:
-                    details[c["url"]] = parse_obituary_page(await pf.get(c["url"], content_rx=CONTENT_RX))
+                    # Same retry cushioning as the listing-page fetch above, scoped to this one
+                    # card's detail fetch -- the identical missing-retry defect (shared PoliteFetcher.get(),
+                    # see _obit_common.py), still worth the same fix for robustness even though a
+                    # transient blip here only costs this one card its detail (caught below).
+                    async for attempt in AsyncRetrying(
+                        stop=stop_after_attempt(3),
+                        wait=wait_exponential_jitter(initial=1, max=8),
+                        retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                        reraise=True,
+                    ):
+                        with attempt:
+                            detail_html = await pf.get(c["url"], content_rx=CONTENT_RX)
+                    details[c["url"]] = parse_obituary_page(detail_html)
                     stats["detail"] += 1
                 except Walled as w:
                     stats["walled"] = w.reason

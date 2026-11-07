@@ -37,7 +37,9 @@ import os
 import re
 from typing import Iterable, NamedTuple, Optional
 
+import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...quiet_title.fetch import Walled
@@ -193,7 +195,20 @@ class ObituaryFeeds(BaseScraper):
             for feed in FEEDS:
                 st = stats.setdefault(feed.host, {"items": 0, "rows": 0, "detail": 0, "with_survivors": 0})
                 try:
-                    text = await pf.get(feed.url)
+                    # Retried up to 3 times (short exponential-jitter backoff) on a transport
+                    # error or timeout only -- PoliteFetcher.get() makes one bare httpx call
+                    # with zero retry cushioning, same gap already fixed elsewhere tonight
+                    # (a Column legal-notice API scraper, spartan_weekly_legals.py,
+                    # arcgis_webmap.query_features()). A real Walled/HTTP-status failure still
+                    # raises unretried below.
+                    async for attempt in AsyncRetrying(
+                        stop=stop_after_attempt(3),
+                        wait=wait_exponential_jitter(initial=1, max=8),
+                        retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                        reraise=True,
+                    ):
+                        with attempt:
+                            text = await pf.get(feed.url)
                 except Walled as w:
                     st["walled"] = w.reason
                     continue
@@ -212,7 +227,19 @@ class ObituaryFeeds(BaseScraper):
                     if (feed.detail and not _TRIGGER_HINT.search(body) and details < DETAIL_MAX
                             and link not in known and feed.host not in pf.walled):
                         try:
-                            page = await pf.get(link, content_rx=_CONTENT_START)
+                            # Same retry cushioning as the feed fetch above, around the same
+                            # bare PoliteFetcher.get() call -- a transient blip here only ever
+                            # degrades this one item to its feed excerpt (see the `except
+                            # Exception: pass` below), but should still get the retry.
+                            async for attempt in AsyncRetrying(
+                                stop=stop_after_attempt(3),
+                                wait=wait_exponential_jitter(initial=1, max=8),
+                                retry=retry_if_exception_type(
+                                    (httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                                reraise=True,
+                            ):
+                                with attempt:
+                                    page = await pf.get(link, content_rx=_CONTENT_START)
                             details += 1
                             st["detail"] += 1
                             body = article_text(page) or body

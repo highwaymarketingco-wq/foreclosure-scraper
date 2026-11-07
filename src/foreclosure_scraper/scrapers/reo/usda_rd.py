@@ -224,9 +224,23 @@ async def _enrich_from_detail(c, li: Listing, detail_url: str) -> None:
     full list of fields this recovers (sale_date above all: this scraper
     had NO sale_date anywhere before this fix)."""
     try:
-        r = await asyncio.wait_for(
-            c.get(detail_url, headers=_HEADERS), timeout=_STEP_TIMEOUT_S
-        )
+        # Retried up to 3 times (short exponential-jitter backoff) on a transport
+        # error or timeout -- same gap, same fix as _active_counties/_search_county
+        # above. Narrowest blast radius of the three: ``li`` is appended by the
+        # caller regardless of this call's outcome, so an unretried blip here never
+        # drops a row/county/run -- it only silently loses this one row's optional
+        # enrichment fields (sale_date above all; see module docstring). Still a
+        # real quality regression worth the same retry cushioning.
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                r = await asyncio.wait_for(
+                    c.get(detail_url, headers=_HEADERS), timeout=_STEP_TIMEOUT_S
+                )
         if r.status_code != 200 or len(r.text) < 500:
             return
         fields = _parse_detail_page(r.text)
@@ -407,9 +421,24 @@ async def _search_county(
         "Content-Type": "application/x-www-form-urlencoded",
     }
     try:
-        r = await asyncio.wait_for(
-            c.post(ref, data=form, headers=headers), timeout=_STEP_TIMEOUT_S
-        )
+        # Retried up to 3 times (short exponential-jitter backoff) on a transport
+        # error or timeout -- same gap, same fix as _active_counties above: this
+        # POST runs once per active county inside _fetch_state's per-county loop,
+        # and a bare c.post() here had zero retry cushioning (http_client.client()'s
+        # transport is built with retries=0; callers must wrap their own). A single
+        # transient blip used to permanently zero that one county's listings for the
+        # run, with no fallback date window to self-heal. A real non-200 response is
+        # still treated as empty below, unretried.
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                r = await asyncio.wait_for(
+                    c.post(ref, data=form, headers=headers), timeout=_STEP_TIMEOUT_S
+                )
     except (Exception, asyncio.TimeoutError) as exc:
         log.warning("usda_rd.search_failed", state=state, kind=kind,
                     county=county_code, error=f"{type(exc).__name__}: {str(exc)[:180]}")

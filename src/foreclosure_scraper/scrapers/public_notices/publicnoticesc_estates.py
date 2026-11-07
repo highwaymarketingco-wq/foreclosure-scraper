@@ -42,7 +42,9 @@ import re
 from datetime import datetime
 from typing import Iterable, Optional
 
+import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
@@ -204,7 +206,20 @@ class PublicNoticeSCEstates(BaseScraper):
                     form.update({"__EVENTTARGET": "", "__EVENTARGUMENT": f"",
                                  f"{GRID}$ctl01$btnNext.x": "5", f"{GRID}$ctl01$btnNext.y": "5"})
                     try:
-                        html = await pf.post(session_url, form)
+                        # Retried up to 3 times (short exponential-jitter backoff) on a transport
+                        # error or timeout -- the "next page" postback depends on the prior page's
+                        # rendered hidden-field/button state, so pages can't be fetched out of
+                        # order; a single transient blip here used to end pagination for this
+                        # preset for the rest of the run with zero retry. A real wall (Walled) or
+                        # bad HTTP status is never retried. Mirrors _open_preset's own retry scope.
+                        async for attempt in AsyncRetrying(
+                            stop=stop_after_attempt(3),
+                            wait=wait_exponential_jitter(initial=1, max=8),
+                            retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                            reraise=True,
+                        ):
+                            with attempt:
+                                html = await pf.post(session_url, form)
                     except Walled as w:
                         st["walled"] = w.reason
                         errors.append(w)
