@@ -75,7 +75,9 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Iterable
 
+import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ... import arcgis_webmap as agw
 from ...base_scraper import BaseScraper
@@ -384,7 +386,32 @@ def build_listing(src: dict, layer: agw.MapLayer, attrs: dict,
 
 async def fetch_source(http, src: dict) -> list[Listing]:
     """Walk one county's app -> web map -> filtered layer, then query it."""
-    layers = await agw.walk_layers(http, src["app_item"], portals=src["portals"])
+    # Retried up to 3 times (short exponential-jitter backoff) on a transport error or
+    # timeout -- this call had zero retry cushioning of its own (http_client.client()'s
+    # own docstring: callers must wrap their own AsyncRetrying), and a single transient
+    # blip here currently kills the ENTIRE scrape for this run with no retry at all.
+    # Henderson is registered in DATELESS_OK_SOURCES (no date-window fallback), so a
+    # zeroed run can't self-heal next time -- it just reports an error until someone
+    # notices by hand. Mirrors the proven fix already applied to the other agw call in
+    # this same function (query_attributes/query_features, below) and to the Column
+    # legal-notice API scrapers / spartan_weekly_legals.py.
+    # NOTE: agw.walk_layers() resolves through agw.fetch_item_data(), whose own
+    # portal-fallback loop currently re-raises every per-portal failure -- a transient
+    # transport/timeout error included -- as a plain agw.ArcGisError once ALL configured
+    # portals are exhausted, so this wrapper's exception-type filter only fires on a
+    # transport/timeout error that escapes that loop directly; it does not yet retry the
+    # "every portal hit the same blip" shape. The other half of that fix belongs one
+    # level down, in agw.fetch_item_data() itself -- this call-site wrap is the in-scope
+    # half, and starts protecting the moment that helper preserves the real exception
+    # type on exhaustion.
+    async for attempt in AsyncRetrying(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential_jitter(initial=1, max=8),
+        retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+        reraise=True,
+    ):
+        with attempt:
+            layers = await agw.walk_layers(http, src["app_item"], portals=src["portals"])
     layer = agw.find_layer(layers, src["layer_title"])
     if not layer or not layer.url:
         log.warning("henderson_fc.no_layer", key=src["key"],

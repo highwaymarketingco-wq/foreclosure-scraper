@@ -42,6 +42,7 @@ from typing import Iterable
 
 import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
@@ -161,13 +162,29 @@ class YorkOverageClaims(BaseScraper):
         # 1. Try curl_cffi (impersonates Chrome TLS fingerprint — defeats Cloudflare)
         try:
             from curl_cffi import requests as cc_requests
-            resp = cc_requests.get(
-                PDF_URL,
-                headers=_HEADERS,
-                impersonate="chrome",
-                timeout=30,
-                allow_redirects=True,
-            )
+            # Retried up to 3 times (short exponential-jitter backoff) on a
+            # curl-level transport/timeout error -- this bare call had zero
+            # retry cushioning, so a single transient blip (a connection
+            # reset, a timeout) permanently zeroed this scrape's whole result
+            # for the run (counties_sc.york_overage_claims is in
+            # main.DATELESS_OK_SOURCES, so a zeroed run can't self-heal on a
+            # later run either). cc_requests.get() never raises merely for a
+            # non-200 status (checked manually below), so retrying every
+            # RequestsError here still never retries a real bad HTTP status.
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type((cc_requests.RequestsError, TimeoutError)),
+                reraise=True,
+            ):
+                with attempt:
+                    resp = cc_requests.get(
+                        PDF_URL,
+                        headers=_HEADERS,
+                        impersonate="chrome",
+                        timeout=30,
+                        allow_redirects=True,
+                    )
             if resp.status_code == 200 and len(resp.content) > 1000:
                 pdf_bytes = resp.content
                 log.info("york_overage.fetched_via_curl_cffi",
@@ -181,7 +198,17 @@ class YorkOverageClaims(BaseScraper):
                 async with httpx.AsyncClient(
                     timeout=self.timeout_s, follow_redirects=True
                 ) as c:
-                    resp = await c.get(PDF_URL, headers=_HEADERS)
+                    # Same retry cushioning as attempt 1 above, and for the
+                    # same reason: this is the last chance before fetch()
+                    # gives up and returns an empty list for the whole run.
+                    async for attempt in AsyncRetrying(
+                        stop=stop_after_attempt(3),
+                        wait=wait_exponential_jitter(initial=1, max=8),
+                        retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                        reraise=True,
+                    ):
+                        with attempt:
+                            resp = await c.get(PDF_URL, headers=_HEADERS)
                     if resp.status_code == 200:
                         pdf_bytes = resp.content
                         log.info("york_overage.fetched_via_httpx",

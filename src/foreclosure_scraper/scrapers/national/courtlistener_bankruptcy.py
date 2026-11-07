@@ -66,7 +66,9 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Iterable
 
+import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ..._bankruptcy_city_to_county import KNOWN_CITIES, bankruptcy_county_for
 from ...base_scraper import BaseScraper
@@ -314,11 +316,25 @@ async def _fetch_chapter(c, docket: dict, token: str) -> str:
     bi_url = docket.get("bankruptcy_information")
     if bi_url and isinstance(bi_url, str):
         try:
-            r = await c.get(
-                bi_url,
-                headers={"Authorization": f"Token {token}", "Accept": "application/json"},
-                timeout=10.0,
-            )
+            # Retried up to 3 times (short exponential-jitter backoff) on a
+            # transport error or timeout -- http_client's client() sets
+            # retries=0 on the transport and expects each caller to wrap its
+            # own AsyncRetrying (see http_client.py's client() docstring/
+            # comment). This call had none. A real non-200 status or a
+            # parse failure still falls through to the text-mined fallback
+            # below, unretried, via the enclosing except.
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                reraise=True,
+            ):
+                with attempt:
+                    r = await c.get(
+                        bi_url,
+                        headers={"Authorization": f"Token {token}", "Accept": "application/json"},
+                        timeout=10.0,
+                    )
             if r.status_code == 200:
                 bi = r.json()
                 ch = bi.get("chapter")

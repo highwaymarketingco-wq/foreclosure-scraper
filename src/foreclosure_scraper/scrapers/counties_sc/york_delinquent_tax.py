@@ -19,6 +19,7 @@ from typing import Iterable
 
 import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
@@ -64,7 +65,21 @@ class YorkDelinquentTax(BaseScraper):
                     "resultOffset": offset,
                     "orderByFields": "OBJECTID",
                 }
-                r = client.get(f"{FS_URL}/query", params=params)
+                # Retried up to 3 times (short exponential-jitter backoff) on a transport
+                # error or timeout. This is the only HTTP request the scraper makes, and in
+                # the normal case (page_size=2000 against ~853 total records) the loop body
+                # runs exactly once -- so a single transient network blip here would zero
+                # the entire ~850-listing scrape for the run, with no partial-result
+                # fallback. A real non-200 status is NOT retried: it is not a transport
+                # error, so it falls through to the status-code check below unchanged.
+                async for attempt in AsyncRetrying(
+                    stop=stop_after_attempt(3),
+                    wait=wait_exponential_jitter(initial=1, max=8),
+                    retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                    reraise=True,
+                ):
+                    with attempt:
+                        r = client.get(f"{FS_URL}/query", params=params)
                 if r.status_code != 200:
                     log.warning(
                         "york_tax.arcgis_http_fail",

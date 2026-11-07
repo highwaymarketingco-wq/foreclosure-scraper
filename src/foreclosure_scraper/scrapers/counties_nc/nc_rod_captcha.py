@@ -569,6 +569,7 @@ from urllib.parse import quote, urljoin
 
 import structlog
 from bs4 import BeautifulSoup
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper, OUTCOME_BLOCKED, OUTCOME_OK
 from ...models import Listing, ListingType, PropertyKind
@@ -1130,7 +1131,7 @@ class NcRodCaptchaScraper(BaseScraper):
                     entry_url = cfg["url"]
                     log.info("nc_rod_captcha.fetching", county=county)
 
-                    await page.goto(entry_url, timeout=30000)
+                    await self._goto_with_retry(page, entry_url, timeout=30000)
                     await page.wait_for_load_state("networkidle", timeout=10000)
 
                     gate = cfg["gate"]
@@ -1258,7 +1259,7 @@ class NcRodCaptchaScraper(BaseScraper):
                         continue
 
                     search_url = f"{entry_url}{cfg['search_path']}"
-                    await page.goto(search_url, timeout=30000)
+                    await self._goto_with_retry(page, search_url, timeout=30000)
 
                     cutoff = (datetime.now() - timedelta(days=90))
                     cutoff_str = cutoff.strftime("%m/%d/%Y")
@@ -1311,6 +1312,44 @@ class NcRodCaptchaScraper(BaseScraper):
 
         return results
 
+    async def _goto_with_retry(self, page: Any, url: str, *, timeout: int) -> None:
+        """page.goto() with retry cushioning for a transient Playwright
+        transport/timeout failure -- a connection reset, a DNS blip, a plain
+        timeout. Added because every one of this file's 7 page.goto() call
+        sites was bare: no AsyncRetrying, no manual retry loop, no @retry
+        decorator anywhere in this file. Each goto() already sits inside a
+        try/except that fails soft (drops to the next county/doc-type/
+        related-doc rather than crashing the whole run), but a single
+        transient blip still permanently zeroed that one item's contribution
+        for the run, and because this scraper is registered in
+        main.DATELESS_OK_SOURCES (no fallback date window), a zeroed run
+        could not self-heal later -- it would just silently report an empty/
+        healthy result until someone noticed by hand.
+
+        Same proven AsyncRetrying shape already shipped for this codebase's
+        httpx-based scrapers (arcgis_webmap.query_features(), the Column API
+        scraper, spartan_weekly_legals.py) -- but Playwright raises its OWN
+        exception types, not httpx's. retry_if_exception_type is tuned to
+        playwright.async_api.Error/TimeoutError here, not a copy of the
+        httpx-specific predicate: pasting that verbatim onto a page.goto()
+        would be syntactically fine but functionally a no-op, since it would
+        never actually catch Playwright's own timeout/navigation errors.
+        Playwright's own goto() does not raise on a real bad HTTP status --
+        only on an actual transport/timeout failure -- so this never retries
+        a real non-transport error, same boundary the httpx-based fix
+        observes for a real bad status or an HTTP-200-with-error-body
+        response.
+        """
+        from playwright.async_api import Error as PlaywrightError, TimeoutError as PlaywrightTimeoutError
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((PlaywrightError, PlaywrightTimeoutError, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                await page.goto(url, timeout=timeout)
+
     async def _fetch_durham(self, page: Any, entry_url: str, search_path: str) -> list[Listing]:
         """Durham ROD: disclaimer click-through only, no CAPTCHA (confirmed live
         2026-10-14 -- see module docstring's Durham correction for the full
@@ -1334,7 +1373,7 @@ class NcRodCaptchaScraper(BaseScraper):
 
         search_url = f"{entry_url}{search_path}"
         try:
-            await page.goto(search_url, timeout=30000)
+            await self._goto_with_retry(page, search_url, timeout=30000)
             await page.wait_for_load_state("networkidle", timeout=15000)
 
             cutoff = datetime.now() - timedelta(days=90)
@@ -1381,7 +1420,8 @@ class NcRodCaptchaScraper(BaseScraper):
 
         for pg_num in range(2, pages_to_fetch + 1):
             try:
-                await page.goto(f"{entry_url}/searchResults/{search_id}?page={pg_num}", timeout=20000)
+                await self._goto_with_retry(
+                    page, f"{entry_url}/searchResults/{search_id}?page={pg_num}", timeout=20000)
                 await page.wait_for_load_state("networkidle", timeout=15000)
                 page_html = await page.content()
             except Exception as exc:
@@ -1818,7 +1858,7 @@ class NcRodCaptchaScraper(BaseScraper):
                 # failed Clear Selections control still lets the fields
                 # below get explicitly (re)filled, same defensive shape as
                 # the generic county path's own selector loops.
-                await page.goto(search_url, timeout=30000)
+                await self._goto_with_retry(page, search_url, timeout=30000)
                 await page.wait_for_load_state("networkidle", timeout=15000)
                 try:
                     clear_btn = page.locator("a, button", has_text="Clear Selections").first
@@ -1871,7 +1911,8 @@ class NcRodCaptchaScraper(BaseScraper):
             for pg_num in range(1, min(total_pages, _WAKE_MAX_PAGES) + 1):
                 if pg_num > 1:
                     try:
-                        await page.goto(f"{entry_url}/searchResults/{search_id}?page={pg_num}", timeout=20000)
+                        await self._goto_with_retry(
+                            page, f"{entry_url}/searchResults/{search_id}?page={pg_num}", timeout=20000)
                         await page.wait_for_load_state("networkidle", timeout=15000)
                         html = await page.content()
                     except Exception as exc:
@@ -2004,7 +2045,7 @@ class NcRodCaptchaScraper(BaseScraper):
         `_fetch_wake`."""
         detail_url = f"{entry_url}/document/{docid}?search={search_id}"
         try:
-            await page.goto(detail_url, timeout=20000)
+            await self._goto_with_retry(page, detail_url, timeout=20000)
             await page.wait_for_selector(".related-doc-list", timeout=8000)
         except Exception:
             return []

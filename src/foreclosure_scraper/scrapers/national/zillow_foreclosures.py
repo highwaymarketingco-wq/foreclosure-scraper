@@ -76,6 +76,7 @@ from datetime import datetime
 from typing import Iterable
 
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
@@ -313,6 +314,7 @@ def _parse_page(html: str, state: str, slug: str) -> tuple[list[Listing], int]:
 async def _fetch_state(state: str, slug: str) -> list[Listing]:
     try:
         from scrapling.fetchers import StealthyFetcher
+        from playwright.async_api import Error as PlaywrightError, TimeoutError as PlaywrightTimeoutError
     except ImportError:
         log.warning("zillow.scrapling_missing")
         return []
@@ -326,10 +328,30 @@ async def _fetch_state(state: str, slug: str) -> list[Listing]:
             break
         url = f"{base}/" if page == 1 else f"{base}/{page}_p/"
         try:
-            result = await StealthyFetcher.async_fetch(
-                url, headless=True, network_idle=False, timeout=90000,
-                solve_cloudflare=False,
-            )
+            # FOUND 2026-11-07 (gap-sweep): this bare StealthyFetcher.async_fetch() call
+            # had zero retry cushioning -- the enclosing `for page in range(1, 11)` loop
+            # is pagination, not retry: on any exception it `break`s out of ALL remaining
+            # pages for this state rather than re-attempting the failed one. Page 1 must
+            # succeed to learn total_pages at all, so a single transient blip there
+            # silently zeroed the whole state's result. Scoped to Playwright's own
+            # exception types (not httpx's -- this call never goes through httpx/
+            # http_client) because that is what StealthyFetcher.async_fetch actually
+            # raises on a transient navigation/connection/timeout failure, matching the
+            # same fix already applied to this exact call shape in ncpublicnotices.py.
+            # The `len(html) < 5000` short-page/captcha heuristic below is a real
+            # HTTP-200-with-error-body outcome, not an exception -- deliberately left
+            # un-retried, same as every other instance of this proven pattern.
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type((PlaywrightError, PlaywrightTimeoutError, TimeoutError)),
+                reraise=True,
+            ):
+                with attempt:
+                    result = await StealthyFetcher.async_fetch(
+                        url, headless=True, network_idle=False, timeout=90000,
+                        solve_cloudflare=False,
+                    )
         except Exception as exc:
             log.warning("zillow.fetch_fail", state=state, page=page, error=str(exc)[:200])
             break

@@ -65,7 +65,9 @@ import re
 from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable, NamedTuple, Optional
 
+import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...http_client import client
@@ -277,9 +279,23 @@ def to_listing(g: dict, *, now: Optional[datetime] = None) -> Listing:
 async def _cary_rows(c, feed: Feed, since: datetime) -> list[dict]:
     out, offset = [], 0
     while True:
-        r = await c.get(feed.url, params={"where": cary_where(since), "select": ",".join(feed.fields),
-                                          "limit": 100, "offset": offset, "order_by": "permitnum"},
-                        timeout=60.0)
+        # Retried up to 3 times (short exponential-jitter backoff) on a transport error or
+        # timeout -- the same proven pattern already applied to arcgis_webmap.query_features,
+        # which protects the mecklenburg/greensboro/durham feeds below via fetch_attrs. Cary's
+        # OpenDataSoft endpoint is hit directly here, outside that shared helper, so it had no
+        # retry cushioning of its own: a single transient blip on any page would propagate
+        # before `out` is returned, discarding whatever rows this call had already accumulated.
+        # A real non-200 status is still raised unretried below, never retried.
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                r = await c.get(feed.url, params={"where": cary_where(since), "select": ",".join(feed.fields),
+                                                  "limit": 100, "offset": offset, "order_by": "permitnum"},
+                                timeout=60.0)
         if r.status_code != 200:
             raise RuntimeError(f"cary: HTTP {r.status_code}")
         d = r.json()

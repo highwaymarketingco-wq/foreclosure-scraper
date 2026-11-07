@@ -62,6 +62,7 @@ from urllib.parse import urljoin
 
 import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
@@ -195,7 +196,18 @@ async def _discover_new_docs(c: httpx.AsyncClient, have: set[str]) -> list[tuple
     COUNTY_TAX_URLS sweep layered on top of its curated COUNTY_FLC_DOCS."""
     found: list[tuple[str, str]] = []
     try:
-        resp = await c.get(HUB_URL, headers=_HEADERS)
+        # Retried on a transport error or timeout only -- a bare call with zero
+        # retry cushioning means one transient blip silently defeats this
+        # self-healing new-year discovery for the whole run. A real bad status
+        # is not retried; it still falls through to the except below.
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                resp = await c.get(HUB_URL, headers=_HEADERS)
         resp.raise_for_status()
     except Exception as exc:  # noqa: BLE001
         log.warning("orangeburg_overage.hub_fetch_fail", error=str(exc)[:160])
@@ -236,7 +248,22 @@ class OrangeburgOverageClaims(BaseScraper):
 
             for url, year in docs:
                 try:
-                    resp = await c.get(url, headers=_HEADERS)
+                    # Retried on a transport error or timeout only -- this is the
+                    # call that produces the actual listing rows for this year.
+                    # A bare call with zero retry cushioning means one connection
+                    # reset/timeout permanently drops this year's entire roster
+                    # for the run, and this slug has no fallback date window
+                    # (main.DATELESS_OK_SOURCES) to self-heal later. A real bad
+                    # status is not retried; it still falls through to the
+                    # except below.
+                    async for attempt in AsyncRetrying(
+                        stop=stop_after_attempt(3),
+                        wait=wait_exponential_jitter(initial=1, max=8),
+                        retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                        reraise=True,
+                    ):
+                        with attempt:
+                            resp = await c.get(url, headers=_HEADERS)
                     resp.raise_for_status()
                     data = resp.content
                 except Exception as exc:  # noqa: BLE001

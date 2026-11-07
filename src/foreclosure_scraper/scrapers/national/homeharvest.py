@@ -20,7 +20,9 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Iterable
 
+import requests
 import structlog
+from tenacity import Retrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...config import ALL_COUNTIES
@@ -185,11 +187,36 @@ def _scrape_one_county(seat: str, state: str, county: str) -> list[Listing]:
     # Spartanburg County SC for_sale: 9 rows with the window, 10 without, the same 0.8 s).
     for listing_type, foreclosure in (("for_sale", True), ("pending", True)):
         try:
-            df = scrape_property(
-                location=location,
-                listing_type=listing_type,
-                foreclosure=foreclosure,
-            )
+            # Retried up to 3 times (short exponential-jitter backoff) on a transport
+            # error or timeout -- confirmed 2026-11-07 (bug-shape sweep): this bare call
+            # had zero retry cushioning, same gap already fixed this run for the Column
+            # legal-notice API scraper, spartan_weekly_legals.py, and arcgis_webmap's
+            # query_features(). scrape_property() is HomeHarvest's own function; it hits
+            # Realtor.com's GraphQL API via plain `requests` under the hood
+            # (homeharvest/core/scrapers/realtor/__init__.py: general_search() ->
+            # _graphql_post() -> requests.post(), no timeout set, no wrapping) -- verified
+            # live in the installed package that only handle_location() retries
+            # internally; the actual listing search (general_search(), used on every
+            # page) does not, so a requests.exceptions.ConnectionError/Timeout from one
+            # blip propagates straight up through scrape_property() uncaught. This
+            # function is sync (run in a ThreadPoolExecutor, not native asyncio), hence
+            # tenacity's sync Retrying rather than AsyncRetrying. A real non-transport
+            # failure (e.g. a 403 -> AuthenticationError, or a parse error) still falls
+            # through to the except below unretried, isolated per county/listing_type
+            # same as before.
+            df = None
+            for attempt in Retrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type((requests.exceptions.ConnectionError, requests.exceptions.Timeout, TimeoutError)),
+                reraise=True,
+            ):
+                with attempt:
+                    df = scrape_property(
+                        location=location,
+                        listing_type=listing_type,
+                        foreclosure=foreclosure,
+                    )
             if df is None or len(df) == 0:
                 continue
             for _, row in df.iterrows():

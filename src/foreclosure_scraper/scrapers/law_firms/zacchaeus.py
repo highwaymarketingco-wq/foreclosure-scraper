@@ -101,6 +101,7 @@ from datetime import datetime
 from typing import Iterable
 
 from dateutil import parser as dateparser
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ..._upstate_city_to_county import upstate_county_for
 from ...base_scraper import BaseScraper
@@ -366,6 +367,7 @@ async def _fetch_rows() -> list[dict]:
     """Drive the Blazor grid: agree -> wait -> page through all pages.
     Returns raw row dicts (the parser drops dead/empty ones). [] on failure."""
     try:
+        from patchright.async_api import Error as PatchrightError
         from scrapling.fetchers import StealthyFetcher
     except ImportError:
         return []
@@ -419,15 +421,37 @@ async def _fetch_rows() -> list[dict]:
 
         captured["rows"] = list(seen.values())
 
+    # Retried up to 3 times (short exponential-jitter backoff) on a transport/
+    # navigation/timeout error from the stealth browser -- confirmed 2026-11-07,
+    # same gap already fixed tonight for the Column legal-notice API scrapers,
+    # spartan_weekly_legals.py, and arcgis_webmap.query_features(): this call had
+    # zero retry cushioning, and because law_firms.zacchaeus has no date-window
+    # fallback (main.DATELESS_OK_SOURCES), a single transient blip here silently
+    # zeroed the whole ~21-page grid capture, reported as a healthy empty result.
+    # Scrapling's StealthyFetcher launches and drives the page through `patchright`
+    # under the hood (engines/_browsers/_stealth.py's AsyncStealthySession starts
+    # `patchright.async_api.async_playwright()`, not plain Playwright's) -- a
+    # separate fork with its own distinct Error/TimeoutError classes, so this
+    # targets patchright's exception type rather than copying the httpx tuple the
+    # other three fixes use. A real in-page failure (e.g. the grid never
+    # rendering) does not raise here at all -- page_action already swallows that
+    # internally -- so only a genuine connection/navigation/timeout error retries.
     try:
-        await StealthyFetcher.async_fetch(
-            LISTINGS_URL,
-            headless=True,
-            network_idle=False,
-            timeout=300000,
-            page_action=page_action,
-            solve_cloudflare=False,
-        )
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((PatchrightError, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                await StealthyFetcher.async_fetch(
+                    LISTINGS_URL,
+                    headless=True,
+                    network_idle=False,
+                    timeout=300000,
+                    page_action=page_action,
+                    solve_cloudflare=False,
+                )
     except Exception:
         return []
     return captured["rows"]

@@ -15,6 +15,7 @@ from datetime import datetime
 from typing import Iterable
 
 import structlog
+from tenacity import Retrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
@@ -201,6 +202,7 @@ def _to_listing(row, slug: str) -> Listing | None:
 def _scrape_location(loc: str, slug: str) -> list[Listing]:
     try:
         from homeharvest import scrape_property
+        import requests
     except ImportError:
         return []
     out: list[Listing] = []
@@ -209,12 +211,38 @@ def _scrape_location(loc: str, slug: str) -> list[Listing]:
     for listing_type in ("for_sale",):
         for foreclosure in (True,):
             try:
-                df = scrape_property(
-                    location=loc,
-                    listing_type=listing_type,
-                    foreclosure=foreclosure,
-                    past_days=180,
-                )
+                # scrape_property() -> homeharvest's RealtorScraper.search() ->
+                # general_search() -> self._graphql_post() -> requests.post() to
+                # https://www.realtor.com/frontdoor/graphql. That call has no
+                # retry decorator and no try/except inside homeharvest itself
+                # (unlike handle_location()/get_bulk_prop_details(), which do
+                # retry internally) -- a single transient connection reset or
+                # timeout there used to permanently zero this location's whole
+                # result for the run, silently, via the bare `except Exception:
+                # continue` below. homeharvest calls `requests`, not httpx, and
+                # scrape_property() runs synchronously inside a ThreadPoolExecutor
+                # worker here (see fetch()), so this uses tenacity's sync
+                # Retrying rather than AsyncRetrying, retrying only requests'
+                # own transient transport/timeout exceptions -- never a real
+                # bad HTTP status (e.g. the 403 homeharvest itself raises as
+                # AuthenticationError) and never a parsed-but-empty response.
+                for attempt in Retrying(
+                    stop=stop_after_attempt(3),
+                    wait=wait_exponential_jitter(initial=1, max=8),
+                    retry=retry_if_exception_type((
+                        requests.exceptions.ConnectionError,
+                        requests.exceptions.Timeout,
+                        requests.exceptions.ChunkedEncodingError,
+                    )),
+                    reraise=True,
+                ):
+                    with attempt:
+                        df = scrape_property(
+                            location=loc,
+                            listing_type=listing_type,
+                            foreclosure=foreclosure,
+                            past_days=180,
+                        )
             except Exception:
                 continue
             if df is None or len(df) == 0:

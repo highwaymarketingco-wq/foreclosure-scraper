@@ -98,7 +98,9 @@ from datetime import datetime
 from typing import Iterable, Optional
 from urllib.parse import urljoin
 
+import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...http_client import client
@@ -376,7 +378,20 @@ class JohnstonDelinquentTaxCrosswalk(BaseScraper):
         }
 
     async def _file_url(self, http) -> tuple[str, str]:
-        r = await http.get(FILES_PAGE_URL, headers={"User-Agent": "Mozilla/5.0"}, timeout=30.0)
+        # Retried up to 3 times (short exponential-jitter backoff) on a transport error or
+        # timeout only -- this is the FIRST action fetch() takes, before self.partial has
+        # anything in it, so a single transient blip here previously zeroed the whole run's
+        # output (caught only by fetch()'s outer try/except, which logs and bails with an
+        # empty result). A real non-200 status still raises unretried below.
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                r = await http.get(FILES_PAGE_URL, headers={"User-Agent": "Mozilla/5.0"},
+                                   timeout=30.0)
         r.raise_for_status()
         url = extract_file_url(r.text)
         if not url:
@@ -434,7 +449,19 @@ class JohnstonDelinquentTaxCrosswalk(BaseScraper):
                 log.warning("johnston_tax_crosswalk.files_page_fail", error=str(exc)[:160])
                 return out
             try:
-                r = await http.get(file_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=60.0)
+                # Same retry cushioning as _file_url above, for the same reason: this is the
+                # actual delinquent-tax CSV for the whole scraper, fetched before any crosswalk
+                # work has added to self.partial, so a transient blip here also zeroed the run.
+                async for attempt in AsyncRetrying(
+                    stop=stop_after_attempt(3),
+                    wait=wait_exponential_jitter(initial=1, max=8),
+                    retry=retry_if_exception_type(
+                        (httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                    reraise=True,
+                ):
+                    with attempt:
+                        r = await http.get(file_url, headers={"User-Agent": "Mozilla/5.0"},
+                                           timeout=60.0)
                 r.raise_for_status()
             except Exception as exc:  # noqa: BLE001
                 log.warning("johnston_tax_crosswalk.csv_fail", url=file_url, error=str(exc)[:160])

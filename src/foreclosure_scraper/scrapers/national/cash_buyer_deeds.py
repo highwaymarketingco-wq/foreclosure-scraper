@@ -55,7 +55,9 @@ import re
 from datetime import datetime, timedelta
 from typing import Iterable
 
+import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper, OUTCOME_BLOCKED, OUTCOME_PARTIAL
 from ...models import Listing, ListingType, PropertyKind
@@ -147,7 +149,23 @@ async def _cott_recent(state: str, county: str, days: int) -> list[RodDoc]:
     from ...rod.aumentum import _extract_hidden, _parse_grid
     try:
         async with _client(timeout=30.0) as c:
-            r = await c.get(f"{base}/SrchName.aspx")
+            # Retried up to 3 times (short exponential-jitter backoff) on a transport
+            # error or timeout -- http_client.client()'s own docstring says callers
+            # must wrap their own retries, and this bare call had none: a single
+            # connection reset/timeout here used to be silently swallowed by the
+            # bare except below and converted to a plain [] -- indistinguishable
+            # from this county genuinely having nothing new. Same shape already
+            # fixed elsewhere in this repo (arcgis_webmap.query_features(),
+            # spartan_weekly_legals.py, sc_probate_net.py's own multi-step
+            # postback). A real non-200 status is still checked below, unretried.
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                reraise=True,
+            ):
+                with attempt:
+                    r = await c.get(f"{base}/SrchName.aspx")
             if r.status_code != 200:
                 return []
             html = r.text
@@ -187,8 +205,18 @@ async def _cott_recent(state: str, county: str, days: int) -> list[RodDoc]:
                 "ctl00$cphMain$txtThroughRecordDate": today.strftime("%m/%d/%Y"),
                 "ctl00$cphMain$btnSearch": "Search",
             }
-            r2 = await c.post(f"{base}/SrchName.aspx", data=data,
-                              headers={"Referer": f"{base}/SrchName.aspx"})
+            # Same retry cushioning as the GET above -- the real search POST is
+            # just as exposed to a transient transport/timeout blip, and losing
+            # it zeroes the sweep the exact same silent way.
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                reraise=True,
+            ):
+                with attempt:
+                    r2 = await c.post(f"{base}/SrchName.aspx", data=data,
+                                      headers={"Referer": f"{base}/SrchName.aspx"})
             if r2.status_code != 200:
                 return []
             docs = _parse_grid(r2.text, county, state)
@@ -245,14 +273,50 @@ async def _logan_recent(state: str, county: str, days: int) -> list[RodDoc]:
     try:
         from ...http_client import client as _client
         async with _client(timeout=60.0) as c:
-            await c.get(f"{host}/index.php")
-            acc = await c.post(f"{host}/index.php", data={"Accept": "Accept"})
+            # Retried up to 3 times (short exponential-jitter backoff) on a transport
+            # error or timeout, one retry budget per call -- http_client.client()'s
+            # own docstring says callers must wrap their own retries, and this
+            # three-call session (GET the form, POST to mint a search token, POST
+            # the real search submission) carried none. A single transient blip on
+            # any one of the three used to be swallowed whole by the bare except
+            # below and converted to a plain [] -- silently zeroing this county's
+            # entire cash-buyer sweep for the run, indistinguishable from a
+            # genuinely quiet month, and because this scraper is registered in
+            # main.DATELESS_OK_SOURCES (no fallback date window) that zero could
+            # not even self-heal on a later run. Same shape already fixed
+            # elsewhere in this repo (arcgis_webmap.query_features(),
+            # spartan_weekly_legals.py, sc_probate_net.py's own multi-step
+            # postback). A real bad HTTP status or a missing token is still
+            # checked below, unretried.
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                reraise=True,
+            ):
+                with attempt:
+                    await c.get(f"{host}/index.php")
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                reraise=True,
+            ):
+                with attempt:
+                    acc = await c.post(f"{host}/index.php", data={"Accept": "Accept"})
             m = logan._TOKEN_RE.search(acc.text)
             if not m:
                 return []
             token = m.group(1)
-            r = await c.post(f"{host}/content.php?{token}", content=body,
-                             headers={"Content-Type": "application/x-www-form-urlencoded"})
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                reraise=True,
+            ):
+                with attempt:
+                    r = await c.post(f"{host}/content.php?{token}", content=body,
+                                     headers={"Content-Type": "application/x-www-form-urlencoded"})
             if r.status_code != 200:
                 return []
             docs = logan._parse_records(r.text, state, county)

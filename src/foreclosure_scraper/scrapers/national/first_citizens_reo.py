@@ -39,7 +39,15 @@ from typing import Iterable
 
 import structlog
 from curl_cffi import requests as cf
+from curl_cffi.requests.exceptions import (
+    ConnectionError as CurlConnectionError,
+    ConnectTimeout as CurlConnectTimeout,
+    DNSError as CurlDNSError,
+    ReadTimeout as CurlReadTimeout,
+    Timeout as CurlTimeout,
+)
 from selectolax.parser import HTMLParser
+from tenacity import Retrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ..._coastal_city_to_county import coastal_county_for
@@ -47,6 +55,29 @@ from ..._upstate_city_to_county import upstate_county_for
 from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
+
+# _fetch_json_text's curl-cffi call (below) rolls `cf.get()` directly, not
+# through the project's shared http_client.client()/get_text() helpers (which
+# already have tenacity AsyncRetrying built in) -- so it never got that
+# helper's retry coverage on its own. curl_cffi raises its OWN exception
+# hierarchy under curl_cffi.requests.exceptions, NOT httpx's, so the retry
+# predicate below targets those types explicitly rather than
+# httpx.TransportError/httpx.TimeoutException, which curl_cffi never raises.
+# Listed individually (not relying on the subclass relationships, e.g.
+# ConnectTimeout already subclasses both ConnectionError and Timeout) so this
+# stays correct even if that hierarchy changes upstream. Bare TimeoutError
+# covers an asyncio-level timeout surfacing here directly. Deliberately
+# excludes curl_cffi's HTTPError: this call site never calls
+# .raise_for_status() -- a non-200 status or a too-short body is checked
+# manually (see _fetch_json_text) and must stay a hard stop, never a retry.
+_TRANSIENT_EXC = (
+    CurlConnectionError,
+    CurlConnectTimeout,
+    CurlReadTimeout,
+    CurlTimeout,
+    CurlDNSError,
+    TimeoutError,
+)
 
 URL = "https://www.firstcitizens.com/real-estate"
 JSON_URL = (
@@ -235,12 +266,30 @@ def parse(html: str) -> list[Listing]:
 
 async def _fetch_json_text(url: str) -> str:
     """The free, public JSON feed -- curl-cffi impersonation alone is
-    enough (confirmed live 2026-10-04), no headless browser needed."""
+    enough (confirmed live 2026-10-04), no headless browser needed.
+
+    Found 2026-11-07 (no-retry audit): this call had zero retry cushioning
+    of its own -- a single transient connection reset or timeout permanently
+    zeroed this source's primary path for the whole run, forcing the far
+    more expensive _render_html fallback every time (or, if that also hit a
+    transient blip, returning [] entirely). Retried up to 3 times (short
+    exponential-jitter backoff) on _TRANSIENT_EXC only; a real non-200
+    status or a too-short body is a content decision, not a transport
+    failure, so that check stays OUTSIDE the retry loop below and is never
+    itself a retry trigger -- identical behavior to before this fix."""
     import asyncio
 
     def _sync() -> str:
         try:
-            r = cf.get(url, impersonate="chrome", timeout=20)
+            r = None
+            for attempt in Retrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type(_TRANSIENT_EXC),
+                reraise=True,
+            ):
+                with attempt:
+                    r = cf.get(url, impersonate="chrome", timeout=20)
             if r.status_code == 200 and len(r.text) > 20:
                 return r.text
         except Exception as exc:
@@ -251,13 +300,36 @@ async def _fetch_json_text(url: str) -> str:
 
 async def _render_html(url: str) -> str:
     """Return rendered HTML (not text) — we need the table markup.
-    Fallback path only (see module docstring) -- the JSON feed is primary."""
+    Fallback path only (see module docstring) -- the JSON feed is primary.
+
+    Found 2026-11-07 (no-retry audit): this call also had zero retry
+    cushioning -- a bare try/except Exception that returned "" on ANY
+    failure, transient or not, with no re-attempt and (unlike the primary
+    path) no logging either. Since fetch() only reaches this fallback when
+    the primary JSON path already failed/returned nothing usable, an
+    unretried transient blip HERE was the scrape's last line of defense, and
+    losing it meant the whole run silently returned []. Retried up to 3
+    times (short exponential-jitter backoff) on a transient Playwright
+    navigation-timeout/connection error only -- curl-cffi isn't involved on
+    this path at all, so the predicate targets Playwright's own exception
+    types instead of _TRANSIENT_EXC above. The outer except is otherwise
+    unchanged: any other failure, or the retry budget's own exhaustion,
+    still degrades to "" rather than raising to the caller."""
     import asyncio
 
     def _sync() -> str:
         try:
+            from playwright.sync_api import Error as PlaywrightError, TimeoutError as PlaywrightTimeoutError
             from scrapling.fetchers import StealthyFetcher
-            page = StealthyFetcher.fetch(url, headless=True, timeout=45000, network_idle=True)
+            page = None
+            for attempt in Retrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type((PlaywrightError, PlaywrightTimeoutError, TimeoutError)),
+                reraise=True,
+            ):
+                with attempt:
+                    page = StealthyFetcher.fetch(url, headless=True, timeout=45000, network_idle=True)
             return page.html_content or ""
         except Exception:
             return ""

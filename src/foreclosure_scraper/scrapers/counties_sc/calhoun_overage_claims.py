@@ -63,6 +63,7 @@ from urllib.parse import urljoin
 
 import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
@@ -159,7 +160,22 @@ async def _discover_new_docs(c: httpx.AsyncClient, have: set[str]) -> list[tuple
     written, without a code change."""
     found: list[tuple[str, str]] = []
     try:
-        resp = await c.get(HUB_URL, headers=_HEADERS)
+        # Retried up to 3 times (short exponential-jitter backoff) on a transport
+        # error or timeout -- same gap already fixed tonight for the Column
+        # legal-notice API scrapers, spartan_weekly_legals.py and
+        # arcgis_webmap.query_features(). Lower blast radius than fetch()'s
+        # per-doc loop below (the 3 KNOWN_DOCS are already queued regardless of
+        # whether this hub-page discovery succeeds), but it is a real unprotected
+        # network call and gets the same wrap for consistency. A real non-200
+        # status still raises unretried below.
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                resp = await c.get(HUB_URL, headers=_HEADERS)
         resp.raise_for_status()
     except Exception as exc:  # noqa: BLE001
         log.warning("calhoun_overage.hub_fetch_fail", error=str(exc)[:160])
@@ -202,7 +218,25 @@ class CalhounOverageClaims(BaseScraper):
 
             for url, year in docs:
                 try:
-                    resp = await c.get(url, headers=_HEADERS)
+                    # Retried up to 3 times (short exponential-jitter backoff) on a
+                    # transport error or timeout -- this bare call had zero retry
+                    # cushioning, the same gap already fixed tonight for the Column
+                    # legal-notice API scrapers, spartan_weekly_legals.py and
+                    # arcgis_webmap.query_features(). `docs` is normally just the 3
+                    # hardcoded KNOWN_DOCS, so losing one to a transient blip costs
+                    # up to ~1/3 of the run's rows, and because this slug sits in
+                    # main.DATELESS_OK_SOURCES (no fallback date window) a zeroed
+                    # run cannot self-heal later -- it just silently reports an
+                    # empty/healthy result. A real non-200 status still raises
+                    # unretried below.
+                    async for attempt in AsyncRetrying(
+                        stop=stop_after_attempt(3),
+                        wait=wait_exponential_jitter(initial=1, max=8),
+                        retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                        reraise=True,
+                    ):
+                        with attempt:
+                            resp = await c.get(url, headers=_HEADERS)
                     resp.raise_for_status()
                     data = resp.content
                 except Exception as exc:  # noqa: BLE001

@@ -66,6 +66,7 @@ from datetime import datetime
 from typing import Iterable
 
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
@@ -629,6 +630,7 @@ async def harvest_category_keywords() -> dict[str, str]:
     result set, so fetch() runs only one of them."""
     try:
         from scrapling.fetchers import StealthyFetcher
+        from playwright.async_api import Error as PlaywrightError, TimeoutError as PlaywrightTimeoutError
     except ImportError:
         log.warning("scpublicnotices.scrapling_missing")
         return {}
@@ -648,9 +650,27 @@ async def harvest_category_keywords() -> dict[str, str]:
                 continue
 
     try:
-        await StealthyFetcher.async_fetch(
-            _BASE, headless=True, network_idle=True,
-            timeout=_RENDER_TIMEOUT_MS, page_action=page_action)
+        # Retried up to 3 times (short exponential-jitter backoff) on a transient
+        # Playwright/Scrapling transport-or-timeout failure -- this bare
+        # StealthyFetcher.async_fetch() call had zero retry cushioning, the same
+        # gap already fixed in this repo for arcgis_webmap.query_features(), the
+        # Column legal-notice API scrapers, spartan_weekly_legals.py and
+        # ncpublicnotices._search_one() (the sibling module this file's own
+        # docstring says it mirrors). Scoped to Playwright's own exception types,
+        # not httpx's, because this call never goes through httpx/http_client --
+        # it is Scrapling's browser-driven StealthyFetcher, which raises
+        # Playwright's own exceptions on a transient navigation/connection/
+        # timeout failure.
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((PlaywrightError, PlaywrightTimeoutError, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                await StealthyFetcher.async_fetch(
+                    _BASE, headless=True, network_idle=True,
+                    timeout=_RENDER_TIMEOUT_MS, page_action=page_action)
     except Exception as exc:
         log.warning("scpublicnotices.harvest_fail", error=str(exc)[:200])
     return found
@@ -685,6 +705,7 @@ async def _render_category(cat: str, counties: Iterable[str] = _COUNTIES) -> lis
     """
     try:
         from scrapling.fetchers import StealthyFetcher
+        from playwright.async_api import Error as PlaywrightError, TimeoutError as PlaywrightTimeoutError
     except ImportError:
         log.warning("scpublicnotices.scrapling_missing")
         return []
@@ -740,10 +761,31 @@ async def _render_category(cat: str, counties: Iterable[str] = _COUNTIES) -> lis
                             error=str(exc)[:200])
 
     try:
-        await StealthyFetcher.async_fetch(
-            _BASE, headless=True, network_idle=True,
-            timeout=_RENDER_TIMEOUT_MS, page_action=page_action,
-        )
+        # Retried up to 3 times (short exponential-jitter backoff) on a transient
+        # Playwright/Scrapling transport-or-timeout failure -- this bare
+        # StealthyFetcher.async_fetch() call had zero retry cushioning. One
+        # browser session here drives the ENTIRE category's multi-county/
+        # multi-page sweep via page_action, so a single transient blip
+        # previously zeroed that whole category's leads for the run -- the same
+        # gap already fixed in this repo for arcgis_webmap.query_features(), the
+        # Column legal-notice API scrapers, spartan_weekly_legals.py and
+        # ncpublicnotices._search_one() (the sibling module this file's own
+        # docstring says it mirrors). Scoped to Playwright's own exception
+        # types, not httpx's, because this call never goes through
+        # httpx/http_client -- it is Scrapling's browser-driven StealthyFetcher,
+        # which raises Playwright's own exceptions on a transient
+        # navigation/connection/timeout failure.
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((PlaywrightError, PlaywrightTimeoutError, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                await StealthyFetcher.async_fetch(
+                    _BASE, headless=True, network_idle=True,
+                    timeout=_RENDER_TIMEOUT_MS, page_action=page_action,
+                )
     except Exception as exc:
         log.warning("scpublicnotices.fetch_fail", category=cat, error=str(exc)[:200])
         return rows

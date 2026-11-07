@@ -96,6 +96,7 @@ from typing import Iterable, Optional
 from urllib.parse import urljoin
 
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
@@ -642,6 +643,45 @@ def _parse_date(s: str | None) -> datetime | None:
 # Vendor fetchers — each returns a list of inmate dicts
 # ---------------------------------------------------------------------------
 
+def _vendor_retrying() -> AsyncRetrying:
+    """A fresh AsyncRetrying controller for one vendor fetcher's primary network call.
+
+    FOUND 2026-11-07 (gap-sweep): every vendor fetcher below made its primary network
+    call(s) inside a bare try/except Exception with zero retry cushioning -- the same bug
+    shape already fixed tonight for the Column legal-notice API scrapers,
+    spartan_weekly_legals.py, and arcgis_webmap.query_features(). A single transient
+    connection reset or timeout permanently zeroed that ONE county's entire roster for the
+    run, and since this scraper's slug ("national.jail_bookings") is in
+    main.DATELESS_OK_SOURCES, there is no fallback date window to self-heal on -- a zeroed
+    county just silently reports empty until someone notices by hand.
+
+    This file's HTTP client is curl_cffi (`AsyncSession(impersonate="chrome", ...)`), not
+    httpx -- curl_cffi raises its OWN exception hierarchy
+    (`curl_cffi.requests.exceptions.*`), which does NOT subclass httpx's exceptions or the
+    builtin TimeoutError/ConnectionError (confirmed:
+    `issubclass(curl_cffi.requests.exceptions.Timeout, TimeoutError)` is False). Retrying on
+    httpx.TransportError/TimeoutException here -- the exact tuple used where the shared
+    httpx-based http_client.client() is the transport -- would be silently inert: curl_cffi
+    never raises those types, so nothing would ever actually get retried. The predicate
+    below targets curl_cffi's real transport/timeout exceptions instead: its ConnectionError
+    (DNS failures, resets, SSL errors) and Timeout (covers ConnectTimeout and ReadTimeout) --
+    never a real bad HTTP status (this file never calls raise_for_status(), so a 4xx/5xx
+    response doesn't raise at all) and never a parsed-but-invalid response body
+    (JSONDecodeError, ET.ParseError, etc. -- every fetcher already handles those, unretried,
+    in its own outer try/except). Same 3-attempt short-exponential-jitter-backoff policy as
+    the 3 files above, just translated to this file's actual client's exception types.
+    """
+    from curl_cffi.requests.exceptions import ConnectionError as _CurlConnectionError
+    from curl_cffi.requests.exceptions import Timeout as _CurlTimeout
+
+    return AsyncRetrying(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential_jitter(initial=1, max=8),
+        retry=retry_if_exception_type((_CurlConnectionError, _CurlTimeout, TimeoutError)),
+        reraise=True,
+    )
+
+
 async def _fetch_zuercher(subdomain: str) -> list[dict]:
     """Fetch current in-custody roster from a Zuercher Portal instance.
 
@@ -673,7 +713,9 @@ async def _fetch_zuercher(subdomain: str) -> list[dict]:
     out: list[dict] = []
     try:
         async with AsyncSession(impersonate="chrome", verify=False) as s:
-            r = await s.post(url, json=body, timeout=30)
+            async for attempt in _vendor_retrying():
+                with attempt:
+                    r = await s.post(url, json=body, timeout=30)
             recs = (r.json() or {}).get("records") or []
     except Exception as exc:  # noqa: BLE001
         log.warning("jail_scraper.zuercher_fail", subdomain=subdomain,
@@ -770,15 +812,19 @@ async def _fetch_p2c_jqgrid(base: str) -> list[dict]:
     out: list[dict] = []
     try:
         async with AsyncSession(impersonate="chrome", verify=False) as s:
-            await s.get(f"{base}/jailinmates.aspx", timeout=20)
-            r = await s.post(
-                f"{base}/jqHandler.ashx?op=s",
-                data={
-                    "t": "ii", "_search": "false", "rows": "2000",
-                    "page": "1", "sidx": "disp_name", "sord": "asc",
-                },
-                timeout=30,
-            )
+            async for attempt in _vendor_retrying():
+                with attempt:
+                    await s.get(f"{base}/jailinmates.aspx", timeout=20)
+            async for attempt in _vendor_retrying():
+                with attempt:
+                    r = await s.post(
+                        f"{base}/jqHandler.ashx?op=s",
+                        data={
+                            "t": "ii", "_search": "false", "rows": "2000",
+                            "page": "1", "sidx": "disp_name", "sord": "asc",
+                        },
+                        timeout=30,
+                    )
             rows = (r.json() or {}).get("rows") or []
     except Exception as exc:  # noqa: BLE001
         log.warning("jail_scraper.p2c_jqgrid_fail", base=base,
@@ -913,7 +959,9 @@ async def _fetch_p2c_centralsquare(target: str) -> list[dict]:
 
     async def _discover_list_id(s: "AsyncSession") -> str:
         try:
-            r = await s.get(f"{host}/api/Agency/InitialSettings", timeout=20)
+            async for attempt in _vendor_retrying():
+                with attempt:
+                    r = await s.get(f"{host}/api/Agency/InitialSettings", timeout=20)
             agency_id = (r.json() or {}).get("AgencyId")
             if agency_id:
                 return str(agency_id)
@@ -930,7 +978,9 @@ async def _fetch_p2c_centralsquare(target: str) -> list[dict]:
                 list_id = await _discover_list_id(s)
             api = f"{host}/api/Inmates/{list_id}"
             # 1) Establish XSRF-TOKEN cookie via app-route GET
-            await s.get(f"{host}/en/Inmates", timeout=25)
+            async for attempt in _vendor_retrying():
+                with attempt:
+                    await s.get(f"{host}/en/Inmates", timeout=25)
             token = s.cookies.get("XSRF-TOKEN")
             if not token:
                 log.warning("jail_scraper.p2c_cs_no_token", host=host)
@@ -959,7 +1009,9 @@ async def _fetch_p2c_centralsquare(target: str) -> list[dict]:
                         "Take": page_size, "Skip": skip,
                     },
                 }
-                r = await s.post(api, headers=hdr, json=body, timeout=60)
+                async for attempt in _vendor_retrying():
+                    with attempt:
+                        r = await s.post(api, headers=hdr, json=body, timeout=60)
                 recs = (r.json() or {}).get("Inmates") or []
                 if not recs:
                     break
@@ -1133,9 +1185,13 @@ async def _fetch_citizen_connect(target: str) -> list[dict]:
 
     try:
         async with AsyncSession(impersonate="chrome", verify=False) as s:
-            await s.get(page_url, timeout=30)
-            r = await s.post(api, headers=hdr, timeout=60, data={
-                "JMSAgencyID": jms, "search": "", "agency": "", "sort": "name"})
+            async for attempt in _vendor_retrying():
+                with attempt:
+                    await s.get(page_url, timeout=30)
+            async for attempt in _vendor_retrying():
+                with attempt:
+                    r = await s.post(api, headers=hdr, timeout=60, data={
+                        "JMSAgencyID": jms, "search": "", "agency": "", "sort": "name"})
             body = r.text or ""
             if "booking-card" not in body:
                 log.warning("jail_scraper.citizen_connect_empty", agency=agency)
@@ -1149,8 +1205,10 @@ async def _fetch_citizen_connect(target: str) -> list[dict]:
             pages = min(math.ceil(total / _CC_PAGE_SIZE) if total else 1, 60)
             for page in range(2, pages + 1):
                 await asyncio.sleep(0.3)  # polite pacing
-                pr = await s.post(api, headers=hdr, timeout=60, data={
-                    "IDX": page, "search": "", "agency": "", "sort": "name"})
+                async for attempt in _vendor_retrying():
+                    with attempt:
+                        pr = await s.post(api, headers=hdr, timeout=60, data={
+                            "IDX": page, "search": "", "agency": "", "sort": "name"})
                 recs = _parse_citizen_connect_cards(pr.text or "")
                 if not recs:
                     break
@@ -1283,7 +1341,9 @@ async def _fetch_tyler_inmate_inquiry(base: str, detail_limit: int = 0) -> list[
         async with AsyncSession(impersonate="chrome", verify=False) as s:
             page = 1
             while page <= _TNW_MAX_PAGES:
-                r = await s.get(f"{base}?InCustody=True&Page={page}", timeout=60)
+                async for attempt in _vendor_retrying():
+                    with attempt:
+                        r = await s.get(f"{base}?InCustody=True&Page={page}", timeout=60)
                 body = r.text or ""
                 recs = _parse_tyler_rows(body, base=base)
                 if not recs:
@@ -1409,7 +1469,9 @@ async def _fetch_york_webforms(target: str) -> list[dict]:
     out: list[dict] = []
     try:
         async with AsyncSession(impersonate="chrome", verify=False) as s:
-            r = await s.get(target, timeout=20)
+            async for attempt in _vendor_retrying():
+                with attempt:
+                    r = await s.get(target, timeout=20)
             body = r.text or ""
             out.extend(_parse_york_page(body))
 
@@ -1427,7 +1489,9 @@ async def _fetch_york_webforms(target: str) -> list[dict]:
                     "__EVENTTARGET": page_target, "__EVENTARGUMENT": "",
                     "__VIEWSTATE": vs, "__VIEWSTATEGENERATOR": vsg, "__EVENTVALIDATION": ev,
                 }
-                r = await s.post(target, data=data, timeout=20)
+                async for attempt in _vendor_retrying():
+                    with attempt:
+                        r = await s.post(target, data=data, timeout=20)
                 body = r.text or ""
                 recs = _parse_york_page(body)
                 if not recs:
@@ -1638,7 +1702,9 @@ async def _fetch_randolph_webforms(target: str) -> list[dict]:
     out: list[dict] = []
     try:
         async with AsyncSession(impersonate="chrome", verify=False) as s:
-            r = await s.get(target, timeout=60)
+            async for attempt in _vendor_retrying():
+                with attempt:
+                    r = await s.get(target, timeout=60)
             out = _parse_randolph_page(r.text or "", base=target)
     except Exception as exc:  # noqa: BLE001
         log.warning("jail_scraper.randolph_webforms_fail", target=target,
@@ -1770,10 +1836,12 @@ async def _fetch_davidson_detail_one(session, sem, detail_url: str,
                                       internal_id: str, booking_number: str) -> dict:
     async with sem:
         try:
-            r = await session.get(
-                detail_url, params={"number": internal_id, "curbook": booking_number},
-                timeout=15,
-            )
+            async for attempt in _vendor_retrying():
+                with attempt:
+                    r = await session.get(
+                        detail_url, params={"number": internal_id, "curbook": booking_number},
+                        timeout=15,
+                    )
             return _parse_davidson_detail(r.text or "")
         except Exception as exc:  # noqa: BLE001
             log.warning("jail_scraper.davidson_detail_fail", internal_id=internal_id,
@@ -1815,7 +1883,9 @@ async def _fetch_davidson_dhtmlx(target: str) -> list[dict]:
     out: list[dict] = []
     try:
         async with AsyncSession(impersonate="chrome", verify=False) as s:
-            r = await s.get(target, timeout=20)
+            async for attempt in _vendor_retrying():
+                with attempt:
+                    r = await s.get(target, timeout=20)
             recs = _parse_davidson_list(r.content, target)
 
             try:
@@ -2004,13 +2074,17 @@ async def _fetch_cumberland_webforms(target: str) -> list[dict]:
     try:
         async with AsyncSession(impersonate="chrome", verify=False) as s:
             for letter in _CUMBERLAND_LETTERS:
-                r = await s.get(target, timeout=25)
+                async for attempt in _vendor_retrying():
+                    with attempt:
+                        r = await s.get(target, timeout=25)
                 body = r.text or ""
                 fields = _cumberland_hidden_fields(body)
                 fields["FirstName"] = ""
                 fields["LastName"] = letter
                 fields["SubmitBtn"] = "Submit"
-                r2 = await s.post(target, data=fields, timeout=30)
+                async for attempt in _vendor_retrying():
+                    with attempt:
+                        r2 = await s.post(target, data=fields, timeout=30)
                 body2 = r2.text or ""
                 recs = _parse_cumberland_page(body2)
                 for rec in recs:
@@ -2036,7 +2110,9 @@ async def _fetch_cumberland_webforms(target: str) -> list[dict]:
                     pf["__EVENTTARGET"] = "Incident_GV"
                     pf["__EVENTARGUMENT"] = nxt
                     await asyncio.sleep(0.3)  # polite pacing
-                    rp = await s.post(target, data=pf, timeout=30)
+                    async for attempt in _vendor_retrying():
+                        with attempt:
+                            rp = await s.post(target, data=pf, timeout=30)
                     cur_body = rp.text or ""
                     precs = _parse_cumberland_page(cur_body)
                     if not precs:
@@ -2218,14 +2294,18 @@ async def _fetch_pitt_webforms(target: str) -> list[dict]:
     out: list[dict] = []
     try:
         async with AsyncSession(impersonate="chrome", verify=False) as s:
-            r = await s.get(target, timeout=30)
+            async for attempt in _vendor_retrying():
+                with attempt:
+                    r = await s.get(target, timeout=30)
             body = r.text or ""
 
             fields = _pitt_form_fields(body)
             fields["__EVENTTARGET"] = ""
             fields["__EVENTARGUMENT"] = ""
             fields["ctl00$mainContent$Button3"] = "Get  Detainee"
-            r = await s.post(target, data=fields, timeout=30)
+            async for attempt in _vendor_retrying():
+                with attempt:
+                    r = await s.post(target, data=fields, timeout=30)
             body = r.text or ""
             if "encountered an error during processing" in body:
                 log.warning("jail_scraper.pitt_webforms_search_error", target=target)
@@ -2237,7 +2317,9 @@ async def _fetch_pitt_webforms(target: str) -> list[dict]:
             for k in list(fields):
                 if k.startswith("ctl00$mainContent$ddlPageResults"):
                     fields[k] = "100"
-            r = await s.post(target, data=fields, timeout=30)
+            async for attempt in _vendor_retrying():
+                with attempt:
+                    r = await s.post(target, data=fields, timeout=30)
             body = r.text or ""
             if "encountered an error during processing" in body:
                 log.warning("jail_scraper.pitt_webforms_resize_error", target=target)
@@ -2252,7 +2334,9 @@ async def _fetch_pitt_webforms(target: str) -> list[dict]:
                 fields = _pitt_form_fields(body)
                 fields["__EVENTTARGET"] = "ctl00$mainContent$GridView1"
                 fields["__EVENTARGUMENT"] = f"Page${page_num}"
-                r = await s.post(target, data=fields, timeout=30)
+                async for attempt in _vendor_retrying():
+                    with attempt:
+                        r = await s.post(target, data=fields, timeout=30)
                 body = r.text or ""
                 if "encountered an error during processing" in body:
                     log.warning("jail_scraper.pitt_webforms_page_error",
@@ -2487,12 +2571,14 @@ async def _fetch_sheriffapp_ocv(target: str) -> list[dict]:
         async with AsyncSession(impersonate="chrome", verify=False) as s:
             page = 1
             while True:
-                r = await s.get(
-                    target,
-                    params={"page": page, "limit": 250, "_rsc": "x"},
-                    headers={"RSC": "1"},
-                    timeout=30,
-                )
+                async for attempt in _vendor_retrying():
+                    with attempt:
+                        r = await s.get(
+                            target,
+                            params={"page": page, "limit": 250, "_rsc": "x"},
+                            headers={"RSC": "1"},
+                            timeout=30,
+                        )
                 if r.status_code != 200 or "text/x-component" not in (
                         r.headers.get("content-type") or ""):
                     break
@@ -2669,7 +2755,9 @@ async def _fetch_durham_webforms(target: str) -> list[dict]:
     out: list[dict] = []
     try:
         async with AsyncSession(impersonate="chrome", verify=False) as s:
-            r = await s.get(target, timeout=30)
+            async for attempt in _vendor_retrying():
+                with attempt:
+                    r = await s.get(target, timeout=30)
             body = r.text or ""
             vs = _hidden(body, "__VIEWSTATE")
             vsg = _hidden(body, "__VIEWSTATEGENERATOR")
@@ -2683,8 +2771,10 @@ async def _fetch_durham_webforms(target: str) -> list[dict]:
                 "__VIEWSTATE": vs, "__VIEWSTATEGENERATOR": vsg, "__EVENTVALIDATION": ev,
                 "ddlDateListing": "0", "ddlNameIndex": "All",
             }
-            r2 = await s.post(post_url, data=data, timeout=45,
-                               headers={"Referer": target})
+            async for attempt in _vendor_retrying():
+                with attempt:
+                    r2 = await s.post(post_url, data=data, timeout=45,
+                                       headers={"Referer": target})
             out = _parse_durham_page(r2.text or "")
     except Exception as exc:  # noqa: BLE001
         log.warning("jail_scraper.durham_fail", target=target, error=str(exc)[:120])
@@ -2861,7 +2951,9 @@ async def _fetch_dcn_export(target: str) -> list[dict]:
     out: list[dict] = []
     try:
         async with AsyncSession(impersonate="chrome", verify=False) as s:
-            r = await s.get(target, timeout=30)
+            async for attempt in _vendor_retrying():
+                with attempt:
+                    r = await s.get(target, timeout=30)
             body = r.text or ""
             vs = _hidden(body, "__VIEWSTATE")
             vsg = _hidden(body, "__VIEWSTATEGENERATOR")
@@ -2875,13 +2967,15 @@ async def _fetch_dcn_export(target: str) -> list[dict]:
                 "__VIEWSTATE": vs,
                 "__VIEWSTATEGENERATOR": vsg,
             }
-            er = await s.post(
-                target, data=data, timeout=45,
-                headers={
-                    "Referer": target,
-                    "Content-Type": "application/x-www-form-urlencoded",
-                },
-            )
+            async for attempt in _vendor_retrying():
+                with attempt:
+                    er = await s.post(
+                        target, data=data, timeout=45,
+                        headers={
+                            "Referer": target,
+                            "Content-Type": "application/x-www-form-urlencoded",
+                        },
+                    )
             content = er.content or b""
             if not content.startswith(b"PK"):
                 log.warning("jail_scraper.dcn_export_not_xlsx", target=target,
@@ -2997,7 +3091,9 @@ async def _fetch_darlington_dcn(base: str) -> list[dict]:
     out: list[dict] = []
     try:
         async with AsyncSession(impersonate="chrome", verify=False) as s:
-            r = await s.get(f"{base}/inmates", timeout=30)
+            async for attempt in _vendor_retrying():
+                with attempt:
+                    r = await s.get(f"{base}/inmates", timeout=30)
             body = r.text or ""
 
             def _hidden(name: str) -> str:
@@ -3026,7 +3122,9 @@ async def _fetch_darlington_dcn(base: str) -> list[dict]:
                 "__VIEWSTATE": viewstate,
                 "__VIEWSTATEGENERATOR": viewstategen,
             }
-            xr = await s.post(f"{base}/inmates", data=data, timeout=45)
+            async for attempt in _vendor_retrying():
+                with attempt:
+                    xr = await s.post(f"{base}/inmates", data=data, timeout=45)
             content = xr.content or b""
             if content[:2] != b"PK":
                 log.warning("jail_scraper.darlington_dcn_bad_export", base=base,
@@ -3364,7 +3462,9 @@ async def _fetch_orange_pdf_viewer(target: str) -> list[dict]:
 
     try:
         async with AsyncSession(impersonate="chrome", verify=False) as s:
-            r = await s.get(target, timeout=30)
+            async for attempt in _vendor_retrying():
+                with attempt:
+                    r = await s.get(target, timeout=30)
             body = r.text or ""
 
             pdf_url = None
@@ -3387,7 +3487,9 @@ async def _fetch_orange_pdf_viewer(target: str) -> list[dict]:
                 log.warning("jail_scraper.orange_nc_no_pdf_url", target=target)
                 return []
 
-            pr = await s.get(pdf_url, timeout=45)
+            async for attempt in _vendor_retrying():
+                with attempt:
+                    pr = await s.get(pdf_url, timeout=45)
             if pr.status_code != 200 or not pr.content:
                 log.warning("jail_scraper.orange_nc_pdf_fetch_fail", url=pdf_url,
                             status=pr.status_code)
@@ -3576,7 +3678,9 @@ async def _fetch_richland_kendo(target: str) -> list[dict]:
             form_url = f"{target}/Home/BookingSearchQuery"
             post_url = f"{target}/Home/BookingSearchResult_ASGDCSC"
 
-            r = await s.get(form_url, timeout=20)
+            async for attempt in _vendor_retrying():
+                with attempt:
+                    r = await s.get(form_url, timeout=20)
             body = r.text or ""
             # Defensive only -- live-verified this form carries none today, but
             # carry one through if a future deploy adds anti-forgery protection.
@@ -3590,7 +3694,9 @@ async def _fetch_richland_kendo(target: str) -> list[dict]:
                 }
                 if token_m:
                     data["__RequestVerificationToken"] = token_m.group(1)
-                r = await s.post(post_url, data=data, timeout=30)
+                async for attempt in _vendor_retrying():
+                    with attempt:
+                        r = await s.post(post_url, data=data, timeout=30)
                 resp_body = r.text or ""
                 recs = _parse_richland_rows(resp_body)
 
@@ -3673,7 +3779,9 @@ async def _fetch_jasper_arcgis(target: str) -> list[dict]:
                     "where": "1=1", "outFields": "*", "f": "json",
                     "resultRecordCount": page_size, "resultOffset": offset,
                 }
-                r = await s.get(target, params=params, timeout=30)
+                async for attempt in _vendor_retrying():
+                    with attempt:
+                        r = await s.get(target, params=params, timeout=30)
                 data = r.json() or {}
                 if data.get("error"):
                     log.warning("jail_scraper.jasper_arcgis_error",
@@ -3824,12 +3932,16 @@ async def _fetch_spartanburg_mugshots(target: str) -> list[dict]:
     base = target if target.endswith("/") else target + "/"
     try:
         async with AsyncSession(impersonate="chrome", verify=False) as s:
-            r = await s.get(base, timeout=30)
+            async for attempt in _vendor_retrying():
+                with attempt:
+                    r = await s.get(base, timeout=30)
             cards = _parse_spartanburg_index(r.text or "")
 
             for card in cards:
                 try:
-                    dr = await s.get(urljoin(base, card["href"]), timeout=25)
+                    async for attempt in _vendor_retrying():
+                        with attempt:
+                            dr = await s.get(urljoin(base, card["href"]), timeout=25)
                     fields, offenses = _parse_spartanburg_detail(dr.text or "")
                 except Exception as exc:  # noqa: BLE001
                     log.warning("jail_scraper.spartanburg_detail_fail",

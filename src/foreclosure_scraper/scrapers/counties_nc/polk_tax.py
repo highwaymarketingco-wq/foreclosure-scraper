@@ -81,8 +81,10 @@ import time
 from datetime import datetime
 from typing import Iterable
 
+import httpx
 import structlog
 from dateutil import parser as dateparser
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...http_client import client, get_text_impersonate
@@ -548,7 +550,23 @@ class PolkTaxAuction(BaseScraper):
 
     async def _fetch_auction(self) -> Iterable[Listing]:
         async with client(timeout=20.0) as c:
-            r = await c.get(URL, headers=HEADERS)
+            # Retried up to 3 times (short exponential-jitter backoff) on a transport
+            # error or timeout only -- this bare call had zero retry cushioning, and
+            # fetch() banks self.partial only AFTER this returns, so a single transient
+            # connection reset/timeout here propagated uncaught out of fetch() and
+            # zeroed BOTH the auction rows AND the much larger delinquent-tax-search
+            # path that runs after it in the same run. Since this scraper is registered
+            # in main.DATELESS_OK_SOURCES (no fallback date window), a zeroed run can't
+            # self-heal later. A real non-200 status is still returned as [] below,
+            # unretried.
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                reraise=True,
+            ):
+                with attempt:
+                    r = await c.get(URL, headers=HEADERS)
             if r.status_code != 200:
                 return []
             html = r.text

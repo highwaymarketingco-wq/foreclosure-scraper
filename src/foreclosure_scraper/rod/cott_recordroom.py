@@ -58,7 +58,14 @@ from __future__ import annotations
 import re
 from datetime import datetime, timedelta
 
+import httpx
 import structlog
+from tenacity import (
+    AsyncRetrying,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
 
 from ..http_client import client
 from .models import RodDoc
@@ -290,17 +297,51 @@ async def discover_recent_nods(state: str, county: str, days_back: int = 45,
     seen: set[str] = set()
     try:
         async with client(timeout=60.0) as c:
-            await c.get(f"{base}/guest/Search/records")
-            await c.post(f"{base}/search/Records",
-                         data={"FromDate": fmt(frm), "ThruDate": fmt(today), "Type": "", "Page": "1"},
-                         headers={"X-Requested-With": "XMLHttpRequest"})
+            # Retried up to 3 times (short exponential-jitter backoff) on a transport
+            # error or timeout -- these three calls used to be bare, with the only
+            # guard being the blanket `except Exception` below, which swallows a
+            # transient blip on ANY of them (including a connection reset mid-
+            # pagination after several pages have already been collected into `out`)
+            # and silently returns [] for the WHOLE function, logged only as a
+            # warning. Same gap already fixed tonight for the Column legal-notice API
+            # scrapers, spartan_weekly_legals.py, and arcgis_webmap.query_features() --
+            # http_client-style callers must wrap their own retries; client() itself
+            # deliberately does not (see http_client.py's comment above its
+            # transport's retries=0). A real non-200 status is still handled
+            # unretried below, exactly as before -- only transport/timeout errors are
+            # retried here, never a bad HTTP status or a 200-with-error-body.
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                reraise=True,
+            ):
+                with attempt:
+                    await c.get(f"{base}/guest/Search/records")
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                reraise=True,
+            ):
+                with attempt:
+                    await c.post(f"{base}/search/Records",
+                                 data={"FromDate": fmt(frm), "ThruDate": fmt(today), "Type": "", "Page": "1"},
+                                 headers={"X-Requested-With": "XMLHttpRequest"})
             for start in range(0, max_docs, 100):
                 payload = {"draw": 1, "columns": _columns(),
                            "order": [{"column": 4, "dir": "asc"}],
                            "start": start, "length": 100,
                            "search": {"value": "", "regex": False}, "Filters": []}
-                r = await c.post(f"{base}/Search/Records/Result/", json=payload,
-                                 headers={"X-Requested-With": "XMLHttpRequest"})
+                async for attempt in AsyncRetrying(
+                    stop=stop_after_attempt(3),
+                    wait=wait_exponential_jitter(initial=1, max=8),
+                    retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                    reraise=True,
+                ):
+                    with attempt:
+                        r = await c.post(f"{base}/Search/Records/Result/", json=payload,
+                                         headers={"X-Requested-With": "XMLHttpRequest"})
                 if r.status_code != 200:
                     break
                 try:

@@ -57,6 +57,19 @@ from typing import Iterable
 from xml.etree.ElementTree import iterparse
 
 import structlog
+from curl_cffi.requests.exceptions import (
+    ConnectionError as CurlConnectionError,
+    ConnectTimeout as CurlConnectTimeout,
+    DNSError as CurlDNSError,
+    ReadTimeout as CurlReadTimeout,
+    Timeout as CurlTimeout,
+)
+from tenacity import (
+    AsyncRetrying,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
 
 from ...base_scraper import BaseScraper
 from ...http_client import get_text
@@ -68,6 +81,31 @@ PAGE_URL = "https://www.richlandcountysc.gov/Property-Business/Taxes/Delinquent-
 _NS = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
 _COL_RE = re.compile(r"([A-Z]+)\d+")
 _MONEY = re.compile(r"[\d,]+\.?\d*")
+
+# fetch()'s .xlsx download (below) rolls its own curl_cffi.requests.AsyncSession
+# directly -- per the module docstring above, deliberately bypassing
+# http_client's get_bytes/get_bytes_impersonate (which already have tenacity
+# AsyncRetrying built in) because this WAF-fronted host needs Chrome
+# impersonation those helpers didn't give it. That means none of http_client's
+# retry coverage carries over here -- this file's own call site has to supply
+# its own. curl_cffi raises its OWN exception hierarchy under
+# curl_cffi.requests.exceptions, NOT httpx's (confirmed in this project's venv,
+# curl_cffi 0.13.0), so the retry predicate below targets those types
+# explicitly rather than httpx.TransportError/httpx.TimeoutException, which
+# curl_cffi never raises. Listed individually (not relying on the subclass
+# relationships, e.g. ConnectTimeout already subclasses both ConnectionError
+# and Timeout) so this stays correct even if that hierarchy changes upstream.
+# Bare TimeoutError covers an asyncio-level timeout surfacing here directly.
+# Deliberately excludes curl_cffi's HTTPError -- the call site's
+# r.raise_for_status() must stay a hard stop, never a retry.
+_TRANSIENT_EXC = (
+    CurlConnectionError,
+    CurlConnectTimeout,
+    CurlReadTimeout,
+    CurlTimeout,
+    CurlDNSError,
+    TimeoutError,
+)
 
 
 def _col_to_idx(cell_ref: str) -> int:
@@ -201,9 +239,16 @@ class RichlandFLC(BaseScraper):
         try:
             from curl_cffi.requests import AsyncSession
             async with AsyncSession() as s:
-                r = await s.get(doc_url, impersonate="chrome", timeout=40)
-                r.raise_for_status()
-                data = r.content
+                async for attempt in AsyncRetrying(
+                    stop=stop_after_attempt(3),
+                    wait=wait_exponential_jitter(initial=1, max=8),
+                    retry=retry_if_exception_type(_TRANSIENT_EXC),
+                    reraise=True,
+                ):
+                    with attempt:
+                        r = await s.get(doc_url, impersonate="chrome", timeout=40)
+                        r.raise_for_status()
+                        data = r.content
         except Exception as exc:
             log.warning("richland_flc.download_fail", url=doc_url, error=str(exc)[:160])
             return out

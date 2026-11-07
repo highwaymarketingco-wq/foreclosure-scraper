@@ -29,6 +29,7 @@ from datetime import datetime, timedelta
 
 import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ..http_client import client
 from .models import RodDoc
@@ -132,16 +133,38 @@ def _fmt(d: datetime) -> str:
 async def _search_chunk(c: httpx.AsyncClient, base: str, frm: datetime,
                         to: datetime) -> list[dict]:
     """Run one date-window doc-type search; return the raw grid rows (or [])."""
-    s = await c.post(f"{base}/search/SearchTypeDocType?Length=6", data={
-        "DocTypes": "all", "DocTypesDisplay-input": "All", "DocTypesDisplay": "",
-        "DateRangeList": " ", "RecordDateFrom": _fmt(frm),
-        "DefaultFromDate": "1/1/1828", "RecordDateTo": _fmt(to), "btnSearch": "Search"})
+    # Both POSTs retried up to 3 times (short exponential-jitter backoff) on a
+    # transport error or timeout -- the bare client() call carries no retry of
+    # its own ("callers already wrap their own AsyncRetrying" per
+    # http_client.client's docstring), and a single transient blip here used
+    # to abort the entire multi-chunk sweep via discover_recent_nods's one
+    # outer try/except (which only logs + returns partial/empty results, not
+    # a retry). A real non-200/parse/"ShowError" outcome still returns []
+    # unretried below -- those are genuine terminal outcomes, not blips.
+    async for attempt in AsyncRetrying(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential_jitter(initial=1, max=8),
+        retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+        reraise=True,
+    ):
+        with attempt:
+            s = await c.post(f"{base}/search/SearchTypeDocType?Length=6", data={
+                "DocTypes": "all", "DocTypesDisplay-input": "All", "DocTypesDisplay": "",
+                "DateRangeList": " ", "RecordDateFrom": _fmt(frm),
+                "DefaultFromDate": "1/1/1828", "RecordDateTo": _fmt(to), "btnSearch": "Search"})
     if "ShowError" in s.text or "exceeded" in s.text.lower():
         log.warning("acclaim.window_over_cap", frm=_fmt(frm), to=_fmt(to))
         return []  # window too large for the portal cap; caller uses small windows
-    r = await c.post(f"{base}/Search/GridResults",
-                     data={"page": "1", "size": "2000", "pageSize": "2000"},
-                     headers={"X-Requested-With": "XMLHttpRequest"})
+    async for attempt in AsyncRetrying(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential_jitter(initial=1, max=8),
+        retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+        reraise=True,
+    ):
+        with attempt:
+            r = await c.post(f"{base}/Search/GridResults",
+                             data={"page": "1", "size": "2000", "pageSize": "2000"},
+                             headers={"X-Requested-With": "XMLHttpRequest"})
     if r.status_code != 200 or "json" not in r.headers.get("content-type", "").lower():
         return []
     return r.json().get("data") or []
@@ -162,7 +185,17 @@ async def discover_recent_nods(state: str, county: str, days_back: int = 45,
     try:
         # Shared client => per-host throttle + retry/backoff + rotating UA.
         async with client(timeout=45.0) as c:
-            await c.get(f"{base}/search/SearchTypeDocType")  # session cookie
+            # Retried for the same reason as _search_chunk's calls above -- a
+            # bare client() call has no retry of its own, and this priming
+            # call's cookie is what every chunk in the loop below depends on.
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                reraise=True,
+            ):
+                with attempt:
+                    await c.get(f"{base}/search/SearchTypeDocType")  # session cookie
             cur = today
             first = True
             while cur > earliest and len(out) < max_docs:

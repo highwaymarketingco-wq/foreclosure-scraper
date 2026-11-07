@@ -57,6 +57,7 @@ from urllib.parse import urljoin
 
 import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
@@ -130,7 +131,20 @@ async def _discover_doc_url(c: httpx.AsyncClient) -> str:
     form, not a roster). Falls back to FALLBACK_DOC_URL if the page is
     unreachable or no longer carries a matching link."""
     try:
-        resp = await c.get(HUB_URL, headers=_HEADERS)
+        # Retried up to 3 times (short exponential-jitter backoff) on a transport error or
+        # timeout -- this bare call had zero retry cushioning. A blip here always skips real
+        # link discovery and falls through to FALLBACK_DOC_URL (independently live-verified,
+        # so the scrape still produces rows), but retrying first means a transient hiccup
+        # doesn't needlessly mask a legitimate hub-page URL change. A real bad status is not
+        # a transport/timeout error, so raise_for_status() below stays unretried.
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                resp = await c.get(HUB_URL, headers=_HEADERS)
         resp.raise_for_status()
     except Exception as exc:  # noqa: BLE001
         log.warning("fairfield_overage.hub_fetch_fail", error=str(exc)[:160])
@@ -164,7 +178,23 @@ class FairfieldOverageClaims(BaseScraper):
         async with httpx.AsyncClient(timeout=self.timeout_s, follow_redirects=True) as c:
             doc_url = await _discover_doc_url(c)
             try:
-                resp = await c.get(doc_url, headers=_HEADERS)
+                # Retried up to 3 times (short exponential-jitter backoff) on a transport
+                # error or timeout -- this is the one and only fetch of the actual overage
+                # roster PDF, a true single point of failure: a bare call with zero retry
+                # meant one transient blip (a connection reset, a timeout) permanently zeroed
+                # this scrape's whole result for the run, and because this slug is in
+                # main.DATELESS_OK_SOURCES (no fallback date window), a zeroed run couldn't
+                # self-heal later -- it would just silently report an empty/healthy result
+                # until someone noticed by hand. A real bad status is not a transport/timeout
+                # error, so raise_for_status() below stays unretried.
+                async for attempt in AsyncRetrying(
+                    stop=stop_after_attempt(3),
+                    wait=wait_exponential_jitter(initial=1, max=8),
+                    retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                    reraise=True,
+                ):
+                    with attempt:
+                        resp = await c.get(doc_url, headers=_HEADERS)
                 resp.raise_for_status()
                 data = resp.content
             except Exception as exc:  # noqa: BLE001

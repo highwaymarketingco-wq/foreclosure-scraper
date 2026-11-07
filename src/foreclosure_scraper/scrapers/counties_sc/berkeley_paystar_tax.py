@@ -96,6 +96,7 @@ from typing import Any, Iterable
 
 import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...enrichment_owner_mailing import _is_absentee
@@ -230,13 +231,33 @@ async def _list_all(client: httpx.AsyncClient) -> list[dict]:
     out: list[dict] = []
     page = 1
     while True:
-        r = await client.post(_SEARCH_URL, json={
-            "searchTerm": "",
-            "facetFilters": {"PaymentStatus": ["Unpaid"], "AssetType": ["Real Property"],
-                             "TaxYear": tax_year_filter},
-            "page": page,
-            "pageSize": _PAGE_SIZE,
-        })
+        # Retried up to 3 times (short exponential-jitter backoff) on a transport error or
+        # timeout -- found 2026-11-07: this is the one bare, unretried network call in this
+        # file. No try/except exists anywhere inside _list_all itself, and the only thing
+        # touching it is fetch()'s own single bare `try: rows = await _list_all(client)
+        # except Exception: ... return out` -- crash-containment, not a retry. Because `out`
+        # above is a purely local accumulator, a transient blip on ANY page -- even deep into
+        # pagination after thousands of rows were already fetched -- discards everything
+        # accumulated so far and zeroes the whole run, and because this source is registered
+        # in main.DATELESS_OK_SOURCES (no fallback date window) a zeroed run cannot self-heal
+        # later -- it just silently reports an empty "healthy" result. Same bug shape already
+        # fixed in a Column legal-notice API scraper, spartan_weekly_legals.py, and the shared
+        # arcgis_webmap.query_features(). A real non-200 status or JSON parse failure still
+        # raises unretried below.
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                r = await client.post(_SEARCH_URL, json={
+                    "searchTerm": "",
+                    "facetFilters": {"PaymentStatus": ["Unpaid"], "AssetType": ["Real Property"],
+                                     "TaxYear": tax_year_filter},
+                    "page": page,
+                    "pageSize": _PAGE_SIZE,
+                })
         r.raise_for_status()
         data = (r.json() or {}).get("data") or {}
         results = data.get("results") or []

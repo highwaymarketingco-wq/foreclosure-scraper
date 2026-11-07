@@ -288,7 +288,31 @@ def _to_listing(e: dict, source_url: str, slug: str) -> Listing:
 
 
 async def _json(c, url: str):
-    r = await c.get(url, timeout=60.0)
+    # Retried up to 3 times (short exponential-jitter backoff) on a transport error or
+    # timeout -- found 2026-11-07 (gap-sweep continuation): this is the shared fetch
+    # used by ALL THREE call sites (_geodir_docs, and _fetch_paper()'s "posts" and
+    # "search_html" search-listing loops), and it had zero retry cushioning. Those
+    # callers only catch `except RuntimeError:` -- the RuntimeError raised below for a
+    # bad status or a non-JSON body -- so a genuine httpx.TransportError/TimeoutException
+    # raised by c.get() itself was NEVER caught locally: it propagated straight out of
+    # _geodir_docs()/_fetch_paper(), aborting that paper's ENTIRE scrape (losing every
+    # doc already fetched this run, not just the one page that blipped). Same root cause,
+    # same fix, already applied in this same file to the search_html per-article loop
+    # below (2026-10-17) and earlier to the Column legal-notice API scrapers,
+    # spartan_weekly_legals.py, and arcgis_webmap.query_features(). http_client.client()'s
+    # own docstring says every caller must wrap its own retries, and this bare call never
+    # did. The status-code and JSON-parse checks below are UNCHANGED: a real bad status or
+    # a real non-JSON body still becomes RuntimeError on the first attempt, so callers'
+    # existing `except RuntimeError:` handling keeps working exactly as before.
+    async for attempt in AsyncRetrying(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential_jitter(initial=1, max=8),
+        retry=retry_if_exception_type(
+            (httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+        reraise=True,
+    ):
+        with attempt:
+            r = await c.get(url, timeout=60.0)
     if r.status_code != 200:
         raise RuntimeError(f"HTTP {r.status_code} for {url}")
     try:

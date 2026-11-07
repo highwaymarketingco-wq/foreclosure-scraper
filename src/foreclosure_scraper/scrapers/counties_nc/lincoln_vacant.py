@@ -27,6 +27,7 @@ from datetime import datetime
 from typing import Iterable
 
 import httpx
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...gis_fill import plausible_value
@@ -124,7 +125,27 @@ class LincolnVacant(BaseScraper):
                           "resultRecordCount": str(_PAGE), "resultOffset": str(offset),
                           "orderByFields": "PARCELID", "f": "json"}
                 try:
-                    r = await c.get(QUERY_URL, params=params)
+                    # Retried up to 3 times (short exponential-jitter backoff) on a
+                    # transport error or timeout only -- found 2026-11-07, same gap
+                    # already fixed for gaston_vacant.py, the Column legal-notice API
+                    # scrapers, spartan_weekly_legals.py and arcgis_webmap.query_features():
+                    # this bare httpx.AsyncClient call (verify=False for the host's expired
+                    # TLS cert, so it bypasses the shared, already-retrying http_client)
+                    # had zero retry cushioning, so a single transient blip on any page --
+                    # including offset=0, the FIRST page of every run -- silently zeroed or
+                    # truncated this whole dateless source's output, reported as a healthy
+                    # result since this scraper is in main.DATELESS_OK_SOURCES (no fallback
+                    # date window to self-heal from). A real non-200 status is still left
+                    # alone, unretried, below.
+                    async for attempt in AsyncRetrying(
+                        stop=stop_after_attempt(3),
+                        wait=wait_exponential_jitter(initial=1, max=8),
+                        retry=retry_if_exception_type(
+                            (httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                        reraise=True,
+                    ):
+                        with attempt:
+                            r = await c.get(QUERY_URL, params=params)
                     if r.status_code != 200:
                         break
                     body = r.json()

@@ -103,6 +103,12 @@ from typing import Any, Iterable
 
 import httpx
 import structlog
+from tenacity import (
+    AsyncRetrying,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
 
 from ...base_scraper import BaseScraper
 from ...http_client import client
@@ -431,7 +437,26 @@ def _dedupe_year_label(county: str, year: int) -> str:
 # ArcGIS plumbing
 # ---------------------------------------------------------------------------
 async def _get_json(c: httpx.AsyncClient, url: str, params: dict) -> dict:
-    r = await c.get(url, params=params)
+    # This is the ONLY network call in the file -- every other function here
+    # (_list_services, _resolve_layer, _distinct, _fetch_layer's per-page
+    # pagination loop) funnels through it. http_client.client()'s transport
+    # deliberately sets retries=0 ("callers already wrap their own
+    # AsyncRetrying"), so without this a single transient blip (a connection
+    # reset, a timeout) permanently empties whatever this call was for -- an
+    # entire county's layer discovery, or an entire year's roll mid-
+    # pagination -- and because counties.multi_year_delinquent_tax has no
+    # fallback date window (main.DATELESS_OK_SOURCES), that loss cannot
+    # self-heal on a later run. A real bad status or an HTTP-200-with-error-
+    # body response is never retried -- both are raised below, outside the
+    # retry block.
+    async for attempt in AsyncRetrying(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential_jitter(initial=1, max=8),
+        retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+        reraise=True,
+    ):
+        with attempt:
+            r = await c.get(url, params=params)
     r.raise_for_status()
     data = r.json()
     if isinstance(data, dict) and data.get("error"):

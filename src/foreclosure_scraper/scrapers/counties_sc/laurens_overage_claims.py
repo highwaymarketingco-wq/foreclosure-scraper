@@ -65,6 +65,7 @@ from typing import Iterable, Optional
 
 import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
@@ -325,7 +326,23 @@ class LaurensOverageClaims(BaseScraper):
         async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as c:
             doc_url = await _discover_doc_url(c)
             try:
-                resp = await c.get(doc_url, headers=_HEADERS, timeout=60.0)
+                # Retried up to 3 times (short exponential-jitter backoff) on a transport
+                # error or timeout -- this is the file's one and only fetch of the overage
+                # PDF itself (every row downstream depends on it succeeding), and the slug
+                # is registered in main.py.DATELESS_OK_SOURCES (see the sale_date note
+                # below), so a zeroed run here cannot self-heal via a later date-window
+                # retry -- it would just silently report an empty/healthy result forever.
+                # Same gap already fixed tonight for the Column legal-notice API scrapers,
+                # spartan_weekly_legals.py, and arcgis_webmap.query_features(). A real bad
+                # HTTP status is still raised, unretried, by raise_for_status() below.
+                async for attempt in AsyncRetrying(
+                    stop=stop_after_attempt(3),
+                    wait=wait_exponential_jitter(initial=1, max=8),
+                    retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                    reraise=True,
+                ):
+                    with attempt:
+                        resp = await c.get(doc_url, headers=_HEADERS, timeout=60.0)
                 resp.raise_for_status()
                 data = resp.content
             except Exception as exc:  # noqa: BLE001

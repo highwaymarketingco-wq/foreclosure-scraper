@@ -82,6 +82,7 @@ from typing import Iterable
 
 import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import OUTCOME_PARTIAL, BaseScraper
 from ...models import Listing, ListingType, PropertyKind
@@ -560,30 +561,66 @@ async def fetch_year(client: httpx.AsyncClient, portal: ITSPortal, year: int, *,
         if not fields:
             raise RuntimeError(f"{portal.county}: no search form fields read (legacy build?)")
         hdr = {k: v for k, v in hdr.items() if k != "Content-Type"}
-        p = await client.post(f"{portal.base}/TaxBillSearch/GetSearchTablePartial/", headers=hdr,
-                              data=search_form(fields, year, page_rows))
+        # Retried up to 3 times (short exponential-jitter backoff) on a transport error or
+        # timeout -- this file builds its own raw httpx.AsyncClient with no retry cushioning
+        # of its own; a real bad status still raises unretried below via raise_for_status().
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                p = await client.post(f"{portal.base}/TaxBillSearch/GetSearchTablePartial/", headers=hdr,
+                                      data=search_form(fields, year, page_rows))
         p.raise_for_status()
         cols = grid_columns(p.text)
         if not cols or "TaxYear" not in cols:
             raise RuntimeError(f"{portal.county}: no result grid in the search answer")
         table = (re.findall(r'PopulateTable\("([^"]+)"', p.text) or [table])[0]
     else:
-        p = await client.post(f"{portal.base}/TaxBillSearch/GetSearchTablePartial", headers=hdr,
-                              json={"PageSize": page_rows, "UnpaidBillsOnly": True,
-                                    "TaxYear": str(year)})
+        # Same retry cushioning as the full_model branch above -- a real bad status still
+        # raises unretried below via raise_for_status().
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                p = await client.post(f"{portal.base}/TaxBillSearch/GetSearchTablePartial", headers=hdr,
+                                      json={"PageSize": page_rows, "UnpaidBillsOnly": True,
+                                            "TaxYear": str(year)})
         p.raise_for_status()
     await asyncio.sleep(PACE_S)
     bills: list[dict] = []
     page = 1
     total_pages = 1
     while page <= min(total_pages, MAX_PAGES_PER_YEAR):
+        # Highest-volume call site in this module -- up to MAX_PAGES_PER_YEAR pages per year,
+        # PACE_S apart, for up to YEARS_BACK years per county. Same retry cushioning as the
+        # search-init POST above; a real bad status still raises unretried below.
         if portal.full_model:
-            d = await client.post(f"{portal.base}/TaxBillSearch/GetSearchTableData", headers=hdr,
-                                  data={"Page": str(page), "NumRows": str(page_rows),
-                                        "Table": table, "PostData": ""})
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                reraise=True,
+            ):
+                with attempt:
+                    d = await client.post(f"{portal.base}/TaxBillSearch/GetSearchTableData", headers=hdr,
+                                          data={"Page": str(page), "NumRows": str(page_rows),
+                                                "Table": table, "PostData": ""})
         else:
-            d = await client.post(f"{portal.base}/TaxBillSearch/GetSearchTableData", headers=hdr,
-                                  json={"Page": page, "NumRows": page_rows, "Table": "PayTaxBills"})
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                reraise=True,
+            ):
+                with attempt:
+                    d = await client.post(f"{portal.base}/TaxBillSearch/GetSearchTableData", headers=hdr,
+                                          json={"Page": page, "NumRows": page_rows, "Table": "PayTaxBills"})
         d.raise_for_status()
         try:
             j = d.json()
@@ -660,7 +697,16 @@ class NcItsPublicTax(BaseScraper):
                 read_years: list[int] = []
                 truncated = False
                 try:
-                    r = await client.get(f"{portal.base}/TaxBillSearch")
+                    # Same retry cushioning as fetch_year()'s POSTs -- a real bad status still
+                    # raises unretried below via raise_for_status().
+                    async for attempt in AsyncRetrying(
+                        stop=stop_after_attempt(3),
+                        wait=wait_exponential_jitter(initial=1, max=8),
+                        retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                        reraise=True,
+                    ):
+                        with attempt:
+                            r = await client.get(f"{portal.base}/TaxBillSearch")
                     r.raise_for_status()           # the session cookie
                     if portal.full_model:
                         _FORM_FIELDS[portal.base] = form_fields(r.text)

@@ -64,6 +64,7 @@ from typing import Iterable, Optional
 import httpx
 import structlog
 from selectolax.parser import HTMLParser
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...config import RuntimeConfig
@@ -218,9 +219,27 @@ async def _fetch_detail(client: httpx.AsyncClient, case_no: str, last: str, firs
     params = {"Year": year, "Type": "ES", "Cnty": _RICHLAND_CNTY_CODE, "Seq": seq,
              "Atny": "", "SelectFirstName": first, "SelectLastName": last}
     try:
-        r = await client.get(DETAIL_URL, params=params)
+        # Retried up to 3 times (short exponential-jitter backoff) on a transport error or
+        # timeout -- unlike _search()'s own manual retry loop above, this plain GET (module
+        # docstring) was a single bare attempt with zero retry cushioning. A single transient
+        # connection reset or timeout here used to permanently drop this one case's
+        # PR/attorney contact fields for the run; fetch()'s own caller already treats a
+        # missing detail as non-fatal (a missing detail never drops the probate-notice lead
+        # itself), so this degrades one case's enrichment rather than the whole scrape -- but
+        # a degraded "successful" run still can't self-heal since this source is dateless.
+        # Same bug class already fixed tonight for the Column legal-notice scraper,
+        # spartan_weekly_legals.py, and arcgis_webmap.query_features(). A real bad HTTP
+        # status from raise_for_status() below is still unretried.
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                r = await client.get(DETAIL_URL, params=params)
         r.raise_for_status()
-    except httpx.HTTPError:
+    except Exception:  # noqa: BLE001 - never raises (module docstring); any failure is {}
         return {}
     return _parse_detail(r.text)
 

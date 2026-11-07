@@ -256,9 +256,26 @@ async def _resolve_image_pdf(c, viewer_url: str) -> str | None:
     ``application/pdf`` on 3/3 sampled instruments. Best-effort like the rest
     of this module -- returns None on any failure (wrong host down, shell
     markup changed, no iframe found) rather than raising, so one bad row
-    never breaks the sweep."""
+    never breaks the sweep.
+
+    The GET itself gets retry cushioning (transport/timeout errors only,
+    never a real bad status) -- found 2026-11-07: this call had zero retry
+    cushioning, the same http_client-style gap already fixed in this file's
+    own ``_fetch_type_code``. Lower severity than that one (this is a single
+    per-row image fetch, not a whole type-code's search), so the retry just
+    gives a transient blip a second chance before the existing best-effort
+    ``except`` swallows a failure that persists."""
     try:
-        resp = await c.get(viewer_url)
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type(
+                (httpx.TransportError, httpx.TimeoutException, TimeoutError)
+            ),
+            reraise=True,
+        ):
+            with attempt:
+                resp = await c.get(viewer_url)
     except Exception:
         return None
     if resp.status_code != 200:
@@ -433,8 +450,24 @@ class AndersonAcpassDeeds(BaseScraper):
                     detail: dict = {}
                     if detail_budget > 0:
                         detail_budget -= 1
+                        # Retry cushioning on transport/timeout errors only (never a
+                        # real bad status) -- found 2026-11-07: this per-row detail
+                        # GET had zero retry cushioning, the same http_client-style
+                        # gap already fixed for _fetch_type_code's two POSTs. Per-row
+                        # (not a SPOF): the existing `except Exception: pass` below is
+                        # kept as-is, so a failure that persists past the retry budget
+                        # still just skips this one row's detail, same as before.
                         try:
-                            dr = await c.get(row["detail_url"], headers={"Referer": _SEARCH_CGI})
+                            async for attempt in AsyncRetrying(
+                                stop=stop_after_attempt(3),
+                                wait=wait_exponential_jitter(initial=1, max=8),
+                                retry=retry_if_exception_type(
+                                    (httpx.TransportError, httpx.TimeoutException, TimeoutError)
+                                ),
+                                reraise=True,
+                            ):
+                                with attempt:
+                                    dr = await c.get(row["detail_url"], headers={"Referer": _SEARCH_CGI})
                             if dr.status_code == 200:
                                 detail = _parse_detail(dr.text)
                         except Exception:

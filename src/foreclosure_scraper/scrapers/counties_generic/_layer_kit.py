@@ -86,6 +86,9 @@ import asyncio
 import json as _json
 import math as _math
 
+import httpx
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
+
 
 def point_in_rings(x: float, y: float, rings) -> bool:
     """Even-odd ray cast over every ring (holes included), so a point in a hole is outside."""
@@ -157,7 +160,21 @@ async def match_points(http, layer_url: str, points: list[tuple[float, float]], 
         }
         if distance_m:
             params.update({"distance": str(distance_m), "units": "esriSRUnit_Meter"})
-        r = await http.post(url, data=params, timeout=90.0)
+        # Retried up to 3 times (short exponential-jitter backoff) on a transport error or
+        # timeout only -- a real bad status or an HTTP-200-with-error-body response below is
+        # never retried, same proven pattern as arcgis_webmap.query_features. match_points is
+        # a shared helper (Charleston EnerGov history, Iredell delinquent tax both call it),
+        # so one fix here covers every caller; a transient blip on any one batch used to raise
+        # straight out of match_points unretried, discarding whatever the caller had already
+        # fetched earlier in the same run.
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                r = await http.post(url, data=params, timeout=90.0)
         if r.status_code != 200:
             raise RuntimeError(f"{layer_url}: HTTP {r.status_code}")
         d = r.json()

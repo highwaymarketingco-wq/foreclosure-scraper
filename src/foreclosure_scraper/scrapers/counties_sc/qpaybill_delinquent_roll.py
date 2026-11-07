@@ -154,6 +154,7 @@ from typing import Iterable
 
 import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from html import unescape as html_unescape
 
@@ -746,7 +747,23 @@ async def _walk_prefix(client: httpx.AsyncClient, sub: str, prefix: str,
         page += 1
         before = len(sink)
         try:
-            rows, vs = await _post(client, sub, vs, prefix, page)
+            # Retried up to 3x (short exponential-jitter backoff) on a transport error
+            # or timeout -- this page request had ZERO retry cushioning while the SAME
+            # prefix's own first-page search, a few lines above, already gets one (the
+            # `for attempt in range(3)` loop). A single transient blip here used to
+            # `break` the pager outright, discarding every row still on this prefix's
+            # unread later pages -- rows the prefix's own first page just proved the
+            # portal can serve. Mirrors the pattern already shipped for
+            # arcgis_webmap.query_features() and spartan_weekly_legals. A real bad
+            # status/redirect (QPayBillUnavailable) still raises unretried below.
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                reraise=True,
+            ):
+                with attempt:
+                    rows, vs = await _post(client, sub, vs, prefix, page)
         except Exception as exc:  # noqa: BLE001
             stats["errors"] += 1
             log.warning("qpaybill_roll.page_fail", prefix=prefix, page=page,
@@ -1169,7 +1186,18 @@ async def fetch_details_paced(client: httpx.AsyncClient, sub: str, hrefs: list[s
         m = re.search(r"receiptNo=([^&\"]+)", href)
         receipt = m.group(1) if m else ""
         try:
-            r = await client.get(_detail_url(sub, href))
+            # Same retry cushioning as _walk_prefix's pagination call: a bare
+            # client.get() here had zero retry cushioning, so one transient blip
+            # silently dropped this one parcel's detail fields (appraised value,
+            # owner-occupancy ratio, ...) with nothing but a counter to show it.
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                reraise=True,
+            ):
+                with attempt:
+                    r = await client.get(_detail_url(sub, href))
             d = parse_detail(r.text)
             if d:
                 got[receipt] = d
@@ -1196,7 +1224,17 @@ async def fetch_details(client: httpx.AsyncClient, sub: str, hrefs: list[str],
             receipt = m.group(1)
         async with sem:
             try:
-                r = await client.get(_detail_url(sub, href))
+                # Same retry cushioning as fetch_details_paced's identical call (this
+                # function is this module's own dead-but-same-shape twin -- see its
+                # module docstring; fixed alongside it for robustness).
+                async for attempt in AsyncRetrying(
+                    stop=stop_after_attempt(3),
+                    wait=wait_exponential_jitter(initial=1, max=8),
+                    retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                    reraise=True,
+                ):
+                    with attempt:
+                        r = await client.get(_detail_url(sub, href))
                 d = parse_detail(r.text)
                 if d:
                     got[receipt] = d

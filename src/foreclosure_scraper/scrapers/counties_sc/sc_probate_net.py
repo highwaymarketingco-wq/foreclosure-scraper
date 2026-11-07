@@ -92,6 +92,7 @@ from typing import Iterable
 import httpx
 import structlog
 from selectolax.parser import HTMLParser
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...config import RuntimeConfig
@@ -510,8 +511,23 @@ async def _search_county(
 ) -> list[Listing]:
     """Run one (county, surname) name search via the two-step postback."""
     # Step 1: load the form for hidden fields + session cookie.
-    r0 = await client.get(BASE_URL)
-    r0.raise_for_status()
+    # Retried up to 3 times (short exponential-jitter backoff) on a transport
+    # error or timeout -- the shared httpx.AsyncClient built in fetch() below
+    # carries no retry cushioning of its own (http_client.client()'s own
+    # docstring says callers must wrap their own), so a bare call here used to
+    # let one connection reset/timeout silently sacrifice this entire
+    # (county, surname) sweep's result set. A real bad HTTP status (raised by
+    # raise_for_status() below) is not a transport/timeout error, so it is
+    # never retried -- same shape already fixed in arcgis_webmap.query_features().
+    async for attempt in AsyncRetrying(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential_jitter(initial=1, max=8),
+        retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+        reraise=True,
+    ):
+        with attempt:
+            r0 = await client.get(BASE_URL)
+            r0.raise_for_status()
     fields = _hidden_fields(r0.text)
 
     # Step 2: county-change postback (selects county; flips marriage mode).
@@ -520,8 +536,15 @@ async def _search_county(
     form["__EVENTARGUMENT"] = ""
     form[PRE + "ddlCounties"] = dropdown_value
     form[PRE + "rblPartyType"] = "0"
-    r1 = await client.post(BASE_URL, data=form)
-    r1.raise_for_status()
+    async for attempt in AsyncRetrying(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential_jitter(initial=1, max=8),
+        retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+        reraise=True,
+    ):
+        with attempt:
+            r1 = await client.post(BASE_URL, data=form)
+            r1.raise_for_status()
     fields = _hidden_fields(r1.text)
 
     # Step 3: the search postback.
@@ -534,8 +557,15 @@ async def _search_county(
     form[PRE + "tbMiddleName"] = ""
     form[PRE + "tbCaseNumber"] = ""
     form[PRE + "rblPartyType"] = "0"
-    r2 = await client.post(BASE_URL, data=form)
-    r2.raise_for_status()
+    async for attempt in AsyncRetrying(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential_jitter(initial=1, max=8),
+        retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+        reraise=True,
+    ):
+        with attempt:
+            r2 = await client.post(BASE_URL, data=form)
+            r2.raise_for_status()
 
     parse = _parse_marriage if marriage else _parse_probate
     out = parse(r2.text, county, state)
@@ -560,8 +590,15 @@ async def _search_county(
         pform[PRE + "tbMiddleName"] = ""
         pform[PRE + "tbCaseNumber"] = ""
         pform[PRE + "rblPartyType"] = "0"
-        rp = await client.post(BASE_URL, data=pform)
-        rp.raise_for_status()
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                rp = await client.post(BASE_URL, data=pform)
+                rp.raise_for_status()
         html = rp.text
         out.extend(parse(html, county, state))
     else:

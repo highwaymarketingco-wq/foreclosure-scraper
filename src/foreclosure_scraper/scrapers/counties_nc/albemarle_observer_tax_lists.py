@@ -58,6 +58,7 @@ from typing import Callable, Iterable
 
 import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
@@ -491,7 +492,19 @@ class AlbemarleObserverTaxLists(BaseScraper):
         async with httpx.AsyncClient(headers={"User-Agent": _UA}, timeout=60.0,
                                      follow_redirects=True) as c:
             try:
-                r = await c.get(INDEX_URL)
+                # Retried up to 3 times (short exponential-jitter backoff) on a transport
+                # error or timeout -- this call runs ONCE before the loop over all 9 Target
+                # entries, so an unretried transient blip here used to zero every county's
+                # output for the whole run. A real bad status or malformed JSON still falls
+                # through unretried to the log-and-bail below.
+                async for attempt in AsyncRetrying(
+                    stop=stop_after_attempt(3),
+                    wait=wait_exponential_jitter(initial=1, max=8),
+                    retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                    reraise=True,
+                ):
+                    with attempt:
+                        r = await c.get(INDEX_URL)
                 r.raise_for_status()
                 index = r.json()
             except Exception as exc:  # noqa: BLE001
@@ -505,7 +518,17 @@ class AlbemarleObserverTaxLists(BaseScraper):
                     continue
                 await asyncio.sleep(PACE_S)
                 try:
-                    pr = await c.get(POST_URL.format(id=post["id"]))
+                    # Same retry cushioning as the index call above, scoped to this one
+                    # target: a transient blip here now only costs a retry, not the whole
+                    # county's list (previously dropped via the bare `continue` below).
+                    async for attempt in AsyncRetrying(
+                        stop=stop_after_attempt(3),
+                        wait=wait_exponential_jitter(initial=1, max=8),
+                        retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                        reraise=True,
+                    ):
+                        with attempt:
+                            pr = await c.get(POST_URL.format(id=post["id"]))
                     pr.raise_for_status()
                     content = (pr.json().get("content") or {}).get("rendered") or ""
                 except Exception as exc:  # noqa: BLE001

@@ -463,7 +463,23 @@ class SpartanWeeklyLegals(BaseScraper):
         es_case = None
         if enrich:
             try:
-                d = await c.get(source_url)
+                # Retried up to 3 times (short exponential-jitter backoff) on a transport
+                # error or timeout -- the same proven pattern as the page-list fetch in
+                # fetch() above (fixed 2026-10-16). This per-row detail fetch had zero
+                # retry cushioning of its own: a single transient blip on one row silently
+                # lost that row's enrichment (defendant/sale-date/amount/probate fields),
+                # falling through to whatever the network-free base pass already banked --
+                # non-fatal for the run as a whole, but needlessly so for that one row. A
+                # real bad status or a parse issue still falls through to the bare except
+                # below, unretried.
+                async for attempt in AsyncRetrying(
+                    stop=stop_after_attempt(3),
+                    wait=wait_exponential_jitter(initial=1, max=8),
+                    retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                    reraise=True,
+                ):
+                    with attempt:
+                        d = await c.get(source_url)
                 if d.status_code == 200:
                     body = _clean(d.text)
                     # AUDITED 2026-10-01: the site's TYPE taxonomy collapsed

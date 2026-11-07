@@ -54,6 +54,7 @@ from datetime import datetime
 from typing import Iterable
 
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
@@ -147,6 +148,42 @@ _DRIVER_JS = """async () => {
 }""" % {"max_pages": MAX_PAGES_PER_TAB}
 
 
+async def _evaluate_rows(page) -> dict:
+    """``page.evaluate(_DRIVER_JS)`` with retry cushioning for a transient
+    Playwright-level failure -- a detached frame after the "next page" click,
+    an execution context destroyed by a stray AJAX navigation event, a slow
+    tab-swap. This one call does virtually all of this source's real work
+    (pagination + business-tab switch + table extraction across up to
+    MAX_PAGES_PER_TAB pages), and used to be the actual gap: a hiccup here
+    was swallowed to ``{}`` on the spot, with no log and nothing left for a
+    retry to act on.
+
+    AUDITED 2026-11-07: the retry lives HERE, around this one call, rather
+    than around the outer ``StealthyFetcher.async_fetch()``. Wrapping the
+    outer call would be inert for this failure mode -- Scrapling's own engine
+    wraps its invocation of ``page_action`` in
+    ``except Exception: log.error(...)`` with no re-raise
+    (``scrapling/engines/_browsers/_stealth.py``, confirmed by reading the
+    installed library), so a ``page_action`` failure never reaches
+    ``async_fetch()``'s caller as an exception for an outer wrapper to see.
+    The predicate below is keyed to Playwright's own transient-error types
+    rather than httpx's, since this call stack is Playwright under the hood
+    and never raises httpx.TransportError/httpx.TimeoutException. Raises
+    after the retry budget is exhausted rather than swallowing -- the caller
+    decides how to degrade.
+    """
+    from playwright.async_api import Error as PlaywrightError
+
+    async for attempt in AsyncRetrying(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential_jitter(initial=1, max=8),
+        retry=retry_if_exception_type((PlaywrightError, TimeoutError)),
+        reraise=True,
+    ):
+        with attempt:
+            return await page.evaluate(_DRIVER_JS)
+
+
 async def _render_rows() -> dict[str, list[list[str]]]:
     """Returns {"individual": [...], "business": [...]}, each a list of
     [name, street, city, state, zip, county, amount] rows across ALL pages."""
@@ -159,12 +196,13 @@ async def _render_rows() -> dict[str, list[list[str]]]:
     async def page_action(page):
         try:
             await page.wait_for_load_state("networkidle", timeout=25000)
-        except Exception:
-            pass
+        except Exception as exc:
+            log.debug("sc_state_tax_lien.networkidle_timeout", error=str(exc))
         await page.wait_for_timeout(4000)  # GenTax fills the grid via AJAX
         try:
-            holder["result"] = await page.evaluate(_DRIVER_JS)
-        except Exception:
+            holder["result"] = await _evaluate_rows(page)
+        except Exception as exc:
+            log.error("sc_state_tax_lien.page_evaluate_failed", error=str(exc))
             holder["result"] = {}
 
     try:

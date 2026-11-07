@@ -37,6 +37,7 @@ from typing import Iterable
 
 import structlog
 from selectolax.parser import HTMLParser
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...enrichment_lis_pendens_resolver import SC_COUNTY_BY_CODE
@@ -487,14 +488,37 @@ def _grid_row_count(html: str) -> int:
 async def _fetch_window(fetcher, url: str, county: str,
                         date_from: str, date_to: str) -> str:
     """One StealthyFetcher fetch for a single date window. Returns HTML or ''."""
+    # Local import (mirrors fill_form's own local playwright import above): by the time
+    # this runs, _scrape_county's guarded `from scrapling.fetchers import StealthyFetcher`
+    # has already succeeded, so playwright (a scrapling dependency) is available -- but we
+    # keep it out of the module-level imports so this module stays importable (e.g. for the
+    # pure-function tests in test_sc_public_index_lis_pendens.py) without playwright installed.
+    from playwright.async_api import Error as PlaywrightError, TimeoutError as PlaywrightTimeoutError
+
+    # Retried up to 3 times (short exponential-jitter backoff) on a Playwright/Scrapling
+    # transport-level or timeout failure. This call drives the ENTIRE multi-step ASP.NET
+    # postback flow (disclaimer accept, 3 dropdown postbacks, date range, search submit) as
+    # ONE browser-automation operation via Scrapling's StealthyFetcher, and had zero retry
+    # cushioning of its own -- a bare try/except that logged and returned "" on any failure,
+    # transient or not. A single connection reset / navigation timeout / page crash used to
+    # silently drop that one date sub-window's listings with no re-attempt. A real
+    # non-transient failure still raises unretried below (reraise=True surfaces the original
+    # exception to the existing handler instead of tenacity's own RetryError wrapper).
     try:
-        result = await fetcher.async_fetch(
-            url,
-            headless=True,
-            network_idle=True,
-            timeout=180000,
-            page_action=_build_page_action(county, date_from, date_to),
-        )
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((PlaywrightError, PlaywrightTimeoutError, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                result = await fetcher.async_fetch(
+                    url,
+                    headless=True,
+                    network_idle=True,
+                    timeout=180000,
+                    page_action=_build_page_action(county, date_from, date_to),
+                )
     except Exception as exc:  # noqa: BLE001
         log.warning("scpi.window_fetch_failed", county=county, error=str(exc)[:300])
         return ""

@@ -76,7 +76,9 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from curl_cffi.requests import exceptions as curl_exceptions
 from selectolax.parser import HTMLParser
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
@@ -622,8 +624,22 @@ async def _curl_search_county(county: str) -> list[dict[str, str]]:
     try:
         session = cf.Session()
 
-        # Step 1: GET disclaimer page
-        r1 = await asyncio.to_thread(session.get, base_url, impersonate="chrome", timeout=15)
+        # Step 1: GET disclaimer page. Retried up to 3 times (short exponential-jitter
+        # backoff) on a transport error or timeout -- this call and the accept-POST
+        # below are true single-points-of-failure for Charleston: either one raising
+        # propagates uncaught to this function's own catch-all `except Exception`
+        # below, which zeros Charleston's ENTIRE result for the run on one transient
+        # network blip. A real non-200 status is still handled exactly as before,
+        # unretried.
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type(
+                (curl_exceptions.ConnectionError, curl_exceptions.Timeout, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                r1 = await asyncio.to_thread(session.get, base_url, impersonate="chrome", timeout=15)
         if r1.status_code != 200:
             return []
         await asyncio.sleep(REQUEST_DELAY)
@@ -631,10 +647,18 @@ async def _curl_search_county(county: str) -> list[dict[str, str]]:
         hidden = _get_hidden_fields(r1.text)
         hidden["ctl00$ContentPlaceHolder1$ButtonAccept"] = "Accept"
 
-        # Step 2: POST accept
-        r2 = await asyncio.to_thread(
-            session.post, base_url, data=hidden, impersonate="chrome",
-            timeout=15, allow_redirects=True)
+        # Step 2: POST accept. Same SPOF shape as step 1 above.
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type(
+                (curl_exceptions.ConnectionError, curl_exceptions.Timeout, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                r2 = await asyncio.to_thread(
+                    session.post, base_url, data=hidden, impersonate="chrome",
+                    timeout=15, allow_redirects=True)
         if r2.status_code != 200:
             return []
 
@@ -937,8 +961,23 @@ async def _date_window_search(session, search_url: str, page_html: str, form: di
         if used >= WINDOW_MAX_REQUESTS:
             return None
         used += 1
-        r = await asyncio.to_thread(session.post, search_url, data=data,
-                                    impersonate="chrome", timeout=30)
+        # Retried up to 3 times (short exponential-jitter backoff) on a transport error
+        # or timeout. This call fires up to WINDOW_MAX_REQUESTS times a single run with
+        # no retry cushioning at all -- an exception from any one of those calls
+        # propagated uncaught all the way up through _curl_search_county()'s own
+        # catch-all `except Exception`, which discarded the ENTIRE results list
+        # accumulated so far for Charleston this run, not just this one window. A real
+        # non-200 status is still handled exactly as before, unretried.
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type(
+                (curl_exceptions.ConnectionError, curl_exceptions.Timeout, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                r = await asyncio.to_thread(session.post, search_url, data=data,
+                                            impersonate="chrome", timeout=30)
         await asyncio.sleep(WINDOW_DELAY)
         text = r.text if r.status_code == 200 else ""
         n = _grid_rows(text)

@@ -35,6 +35,7 @@ from typing import Any
 
 import structlog
 from bs4 import BeautifulSoup
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper, OUTCOME_OK
 from ...models import Listing, ListingType, PropertyKind
@@ -280,24 +281,44 @@ class NcUnclaimedScraper(BaseScraper):
             async with httpx.AsyncClient() as client:
                 for surname in surnames:
                     try:
-                        resp = await client.post(
-                            _API,
-                            json={
-                                "lastName": surname,
-                                "firstName": "",
-                                "city": "",
-                                "searchZipCode": "",
-                                "propertyID": "",
-                                "cf-turnstile-response": token,
-                            },
-                            headers={
-                                "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
-                                "Origin": "https://unclaimed.nccash.gov",
-                                "Referer": "https://unclaimed.nccash.gov/app/claim-search",
-                                "Content-Type": "application/json",
-                            },
-                            timeout=30,
-                        )
+                        # Retried up to 3 times (short exponential-jitter backoff) on a
+                        # transport error or timeout -- found 2026-11-07, the same bug shape
+                        # already fixed elsewhere in this repo (arcgis_webmap.query_features,
+                        # spartan_weekly_legals.py): this is a bare httpx.AsyncClient() with
+                        # zero retry cushioning on its POST. A single transient blip
+                        # (connection reset, read timeout) falls into the except below, which
+                        # writes an "error" entry into the searched ledger for this surname --
+                        # and because _candidate_surnames() skips any surname already present
+                        # in that ledger regardless of whether the prior attempt succeeded, got
+                        # a bad status, or merely errored, one network blip would otherwise
+                        # permanently exclude this surname from every future run, not just this
+                        # one. A real bad status or an HTTP-200-with-error-body response still
+                        # falls through to the handling below, unretried.
+                        async for attempt in AsyncRetrying(
+                            stop=stop_after_attempt(3),
+                            wait=wait_exponential_jitter(initial=1, max=8),
+                            retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                            reraise=True,
+                        ):
+                            with attempt:
+                                resp = await client.post(
+                                    _API,
+                                    json={
+                                        "lastName": surname,
+                                        "firstName": "",
+                                        "city": "",
+                                        "searchZipCode": "",
+                                        "propertyID": "",
+                                        "cf-turnstile-response": token,
+                                    },
+                                    headers={
+                                        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
+                                        "Origin": "https://unclaimed.nccash.gov",
+                                        "Referer": "https://unclaimed.nccash.gov/app/claim-search",
+                                        "Content-Type": "application/json",
+                                    },
+                                    timeout=30,
+                                )
                         if resp.status_code == 200:
                             data = resp.json()
                             found = self._parse_api_response(data, surname)

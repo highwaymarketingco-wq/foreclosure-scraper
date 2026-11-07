@@ -33,6 +33,7 @@ from datetime import datetime
 from typing import Iterable
 
 import structlog
+from tenacity import AsyncRetrying, retry_if_result, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
@@ -351,9 +352,23 @@ def parse_kania_text(text: str, url: str = RUTHERFORD_KANIA_URL) -> list[Listing
 
 
 async def _render(url: str) -> str:
+    # fetch_rendered() swallows every network/browser-launch/timeout/bad-status
+    # error internally and always returns "" on failure -- it never raises for
+    # this caller (raise_on_http_failure is never set True here). So the
+    # retryable signal is a falsy result, not an exception type: retry_if_result
+    # is what actually fires here, where retry_if_exception_type would not.
     from ...render import fetch_rendered
     try:
-        return await fetch_rendered(url)
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_result(lambda result: not result),
+        ):
+            with attempt:
+                text = await fetch_rendered(url)
+            if not attempt.retry_state.outcome.failed:
+                attempt.retry_state.set_result(text)
+        return text
     except Exception:
         return ""
 

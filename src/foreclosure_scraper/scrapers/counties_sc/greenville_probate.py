@@ -71,6 +71,7 @@ from typing import Iterable
 import httpx
 import structlog
 from selectolax.parser import HTMLParser
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...config import RuntimeConfig
@@ -238,17 +239,43 @@ def _personal_representative(parties: list[dict[str, str]]) -> dict[str, str] | 
 
 
 async def _search_surname(client: httpx.AsyncClient, surname: str) -> list[dict]:
-    r = await client.get(SEARCH_URL, params={
-        "LastName": surname, "FirstName": "", "MiddleName": "",
-        "PartyType": PARTY_TYPE_ESTATE, "CaseNumber": "",
-    })
+    # Retried up to 3 times (short exponential-jitter backoff) on a transport error or
+    # timeout -- this bare call had zero retry cushioning (same gap already fixed tonight
+    # elsewhere in this repo: the Column legal-notice API scrapers, spartan_weekly_legals.py,
+    # and the shared arcgis_webmap.query_features()). httpx.TimeoutException/TransportError are
+    # both subclasses of httpx.HTTPError, so fetch()'s own `except httpx.HTTPError: continue`
+    # around this call was treating a transient connection reset/timeout the same as a genuine
+    # failure -- silently dropping that one surname's whole result set for the run instead of
+    # retrying. A real bad HTTP status (raise_for_status(), below) still propagates unretried
+    # on the first attempt.
+    async for attempt in AsyncRetrying(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential_jitter(initial=1, max=8),
+        retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+        reraise=True,
+    ):
+        with attempt:
+            r = await client.get(SEARCH_URL, params={
+                "LastName": surname, "FirstName": "", "MiddleName": "",
+                "PartyType": PARTY_TYPE_ESTATE, "CaseNumber": "",
+            })
     r.raise_for_status()
     rows = _parse_results(r.text)
     return rows[:MAX_ROWS_PER_SURNAME]
 
 
 async def _fetch_detail(client: httpx.AsyncClient, case_number: str) -> dict:
-    r = await client.get(DETAIL_URL, params={"CaseNumber": case_number})
+    # Same retry cushioning as _search_surname above, and for the same reason -- see that
+    # function's comment. Each sampled case's detail fetch is otherwise a single unprotected
+    # network call that permanently loses that one case on a transient blip.
+    async for attempt in AsyncRetrying(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential_jitter(initial=1, max=8),
+        retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+        reraise=True,
+    ):
+        with attempt:
+            r = await client.get(DETAIL_URL, params={"CaseNumber": case_number})
     r.raise_for_status()
     return _parse_detail(r.text)
 

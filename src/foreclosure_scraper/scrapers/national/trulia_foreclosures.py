@@ -57,6 +57,7 @@ from datetime import datetime
 from typing import Iterable
 
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
@@ -281,13 +282,34 @@ def _to_listing(h: dict, slug: str) -> Listing | None:
 async def _fetch_page(url: str = URL) -> list[Listing]:
     try:
         from scrapling.fetchers import StealthyFetcher
+        from playwright.async_api import Error as PlaywrightError, TimeoutError as PlaywrightTimeoutError
     except ImportError:
         return []
     try:
-        result = await StealthyFetcher.async_fetch(
-            url, headless=True, network_idle=False, timeout=90000,
-            solve_cloudflare=False,
-        )
+        # FOUND 2026-11-07 (gap-sweep): this bare StealthyFetcher.async_fetch() call
+        # had zero retry cushioning -- a single transient blip permanently zeroed
+        # this variant's ~16 listings for the run. The enclosing per-variant loop in
+        # TruliaForeclosures.fetch() isolates one bad URL from the other 7, but it
+        # is not a retry loop either: it just moves on, it never re-attempts the
+        # failed fetch. This call never goes through httpx/http_client -- it is
+        # Scrapling's browser-driven StealthyFetcher, which raises Playwright's own
+        # exception types (`playwright.async_api.Error` / `TimeoutError`) on a
+        # transient navigation, connection or timeout failure, never httpx's. Scoped
+        # to those types (plus builtin TimeoutError) rather than a verbatim copy of
+        # the httpx-shaped retry= clause used elsewhere in this repo, matching the
+        # identical call shape already fixed the same night in zillow_foreclosures.py
+        # and ncpublicnotices.py.
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((PlaywrightError, PlaywrightTimeoutError, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                result = await StealthyFetcher.async_fetch(
+                    url, headless=True, network_idle=False, timeout=90000,
+                    solve_cloudflare=False,
+                )
     except Exception as exc:
         log.warning("trulia.fetch_failed", url=url, error=str(exc)[:200])
         return []

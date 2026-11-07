@@ -201,7 +201,9 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Iterable, NamedTuple
 
+import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ... import arcgis_webmap as agw
 from ...base_scraper import BaseScraper
@@ -764,7 +766,23 @@ async def fetch_sales_by_pin(http, pins: list[str]) -> dict[str, dict]:
 
 
 async def fetch_tax_sale(http) -> TaxSaleParse:
-    r = await http.get(TAXSALE_URL, timeout=90.0)
+    # Retried up to 3 times (short exponential-jitter backoff) on a transport error or
+    # timeout -- this bare call had zero retry cushioning, and fetch()'s own try/except
+    # around fetch_tax_sale() catches ANY exception once (transient or not) and silently
+    # substitutes an empty TaxSaleParse instead of retrying. That permanently zeroes the
+    # whole tax-sale-roster lane (and the `missing` list that drives fetch_parcels_by_pin's
+    # backfill) for the run on a single transient blip. Same gap already fixed tonight
+    # elsewhere in this repo (a Column legal-notice API scraper, spartan_weekly_legals.py,
+    # and the shared arcgis_webmap.query_features()). A real non-200 status still falls
+    # through to the empty-roster return below, unretried.
+    async for attempt in AsyncRetrying(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential_jitter(initial=1, max=8),
+        retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+        reraise=True,
+    ):
+        with attempt:
+            r = await http.get(TAXSALE_URL, timeout=90.0)
     if r.status_code != 200:
         log.warning("greenville.taxsale_http", status=r.status_code)
         return TaxSaleParse(rows=[], unmapped=0)
@@ -787,10 +805,23 @@ async def probate_search(http, state: dict[str, str], surname: str) -> list[dict
         "ctl00$body$ddl_PartyTypes": PROBATE_PARTY_DECEASED,
         "ctl00$body$btn_Search": "Search",
     })
-    r = await http.post(PROBATE_BASE + "Default.aspx", data=data,
-                        headers={"Content-Type": "application/x-www-form-urlencoded",
-                                 "Referer": PROBATE_BASE + "Default.aspx"},
-                        follow_redirects=True, timeout=90.0)
+    # Same retry cushioning as fetch_tax_sale above, and for the same reason -- this bare
+    # call had zero retry cushioning, and the per-surname caller (collect_probate's `one()`)
+    # catches ANY exception once and records an empty result for that surname instead of
+    # retrying a transient blip. Same gap already fixed tonight elsewhere in this repo (a
+    # Column legal-notice API scraper, spartan_weekly_legals.py, and the shared
+    # arcgis_webmap.query_features()). A real non-200 status still falls through unretried.
+    async for attempt in AsyncRetrying(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential_jitter(initial=1, max=8),
+        retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+        reraise=True,
+    ):
+        with attempt:
+            r = await http.post(PROBATE_BASE + "Default.aspx", data=data,
+                                headers={"Content-Type": "application/x-www-form-urlencoded",
+                                         "Referer": PROBATE_BASE + "Default.aspx"},
+                                follow_redirects=True, timeout=90.0)
     if r.status_code != 200:
         return []
     return parse_probate_rows(r.text)
@@ -800,7 +831,21 @@ async def collect_probate(http, owners_by_surname: dict[str, list[str]],
                           cap: int = 2500) -> dict[str, list[dict[str, str]]]:
     """Surname -> decedent rows, for every surname we actually hold."""
     try:
-        r = await http.get(PROBATE_BASE + "Default.aspx", timeout=60.0)
+        # Same retry cushioning as fetch_tax_sale above, and for the same reason -- this
+        # bare call had zero retry cushioning, and the surrounding try/except catches ANY
+        # exception once (transient or not) and returns {}, silently losing the whole
+        # probate pass for the run. Same gap already fixed tonight elsewhere in this repo
+        # (a Column legal-notice API scraper, spartan_weekly_legals.py, and the shared
+        # arcgis_webmap.query_features()). A genuinely exhausted retry or a non-transport
+        # failure still reaches the except below, unchanged.
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                r = await http.get(PROBATE_BASE + "Default.aspx", timeout=60.0)
     except Exception as exc:  # noqa: BLE001
         log.warning("greenville.probate_form_fail", error=str(exc)[:160])
         return {}

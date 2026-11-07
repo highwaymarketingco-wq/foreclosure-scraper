@@ -54,6 +54,13 @@ from datetime import datetime
 from typing import Iterable
 
 import structlog
+from tenacity import (
+    Retrying,
+    retry_if_exception_type,
+    retry_if_not_exception_type,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
 
 from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
@@ -274,6 +281,8 @@ def _scrape_county(state: str, county: str) -> list[Listing]:
     """Sync HomeHarvest pull → distress-match. Run in thread pool."""
     try:
         from homeharvest import scrape_property
+        from homeharvest.exceptions import AuthenticationError
+        import requests
     except ImportError:
         return []
     out: list[Listing] = []
@@ -283,11 +292,36 @@ def _scrape_county(state: str, county: str) -> list[Listing]:
         # motivated seller) was never read. Live, Polk County NC: 240 rows / 15 distress matches
         # with the window, 534 / 22 without; 3.8 s -> 7.1 s.
         kw = {"past_days": PAST_DAYS} if PAST_DAYS else {}
-        df = scrape_property(
-            location=_distress_location(county, state),
-            listing_type="for_sale",
-            **kw,
-        )
+        # Retried up to 3 times (short exponential-jitter backoff) on a transport error or
+        # timeout (2026-11-07). scrape_property() delegates to homeharvest's RealtorScraper:
+        # search() -> general_search() -> _graphql_post() -> a bare requests.post(), with zero
+        # retry or try/except anywhere in that chain for the first page or any paginated page
+        # (confirmed by reading the installed homeharvest package source -- only
+        # handle_location() carries @retry, and get_bulk_prop_details()'s @retry is dead code
+        # here since Scraper.__init__ hardcodes extra_property_data=False). Without this
+        # wrapper, a single transient connection reset or timeout permanently zeroed this
+        # county's whole result for the run, caught only by the bare `except Exception` below
+        # and logged at debug -- never retried, never visible. Same bug shape already fixed
+        # tonight for the Column legal-notice API scraper, spartan_weekly_legals.py, and
+        # arcgis_webmap.query_features(). Sync Retrying (not AsyncRetrying) because this
+        # function runs in a thread pool (loop.run_in_executor), not an event loop; the
+        # transport here is `requests` (vendored inside homeharvest), not httpx.
+        # AuthenticationError (homeharvest's own real-403/bad-auth signal) is explicitly
+        # excluded from the retry set -- a genuine bad status must still fail on attempt 1.
+        df = None
+        for attempt in Retrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((requests.exceptions.ConnectionError, requests.exceptions.Timeout))
+            & retry_if_not_exception_type(AuthenticationError),
+            reraise=True,
+        ):
+            with attempt:
+                df = scrape_property(
+                    location=_distress_location(county, state),
+                    listing_type="for_sale",
+                    **kw,
+                )
         if df is None or len(df) == 0:
             return out
         for _, row in df.iterrows():

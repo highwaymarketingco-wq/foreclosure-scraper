@@ -91,6 +91,7 @@ from typing import Iterable
 
 import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
@@ -258,8 +259,24 @@ class GreenvilleMIEAdverts(BaseScraper):
                  "with_judgment": 0, "with_tms": 0}
         async with httpx.AsyncClient(timeout=45.0, headers=headers,
                                      follow_redirects=True) as c:
+            # Retried up to 3 times (short exponential-jitter backoff) on a transport
+            # error or timeout -- this bare call had zero retry cushioning, so a single
+            # transient blip (connection reset, DNS hiccup, read timeout) permanently
+            # zeroed this source's entire output for the run. Greenville is in
+            # main.DATELESS_OK_SOURCES (see module docstring), so a zeroed run has no
+            # fallback date window to self-heal -- it would silently report an
+            # empty/healthy result until someone noticed by hand. A real non-404/parse
+            # issue still falls through unretried -- status is never checked here on
+            # purpose (see the DO NOT check r.status_code comment below).
             try:
-                r = await c.get(SITEMAP)
+                async for attempt in AsyncRetrying(
+                    stop=stop_after_attempt(3),
+                    wait=wait_exponential_jitter(initial=1, max=8),
+                    retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                    reraise=True,
+                ):
+                    with attempt:
+                        r = await c.get(SITEMAP)
             except Exception as exc:  # noqa: BLE001
                 log.warning("greenville_mie.sitemap_failed", error=str(exc)[:120])
                 return []
@@ -277,7 +294,24 @@ class GreenvilleMIEAdverts(BaseScraper):
             async def one(u: str) -> None:
                 async with sem:
                     try:
-                        rr = await c.get(u)
+                        # Retried up to 3 times (short exponential-jitter backoff) on a
+                        # transport error or timeout -- only the GET itself, never
+                        # raise_for_status() below: a real bad HTTP status is not a
+                        # transport/timeout error, so it doesn't match the retry
+                        # predicate and reraises immediately on attempt 1, falling
+                        # through to the same except as today (one advert skipped,
+                        # not retried). This stays inside the SAME try as
+                        # raise_for_status() so either failure still only costs this
+                        # one advert -- asyncio.gather() has no return_exceptions=True,
+                        # so letting either escape one() would kill the whole batch.
+                        async for attempt in AsyncRetrying(
+                            stop=stop_after_attempt(3),
+                            wait=wait_exponential_jitter(initial=1, max=8),
+                            retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                            reraise=True,
+                        ):
+                            with attempt:
+                                rr = await c.get(u)
                         rr.raise_for_status()
                     except Exception:  # noqa: BLE001
                         stats["errors"] += 1

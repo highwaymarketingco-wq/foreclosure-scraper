@@ -68,11 +68,48 @@ from datetime import datetime
 from typing import Iterable
 
 import structlog
+from curl_cffi.requests.exceptions import (
+    ConnectionError as CurlConnectionError,
+    ConnectTimeout as CurlConnectTimeout,
+    DNSError as CurlDNSError,
+    ReadTimeout as CurlReadTimeout,
+    Timeout as CurlTimeout,
+)
+from tenacity import (
+    AsyncRetrying,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
 
 from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
+
+# This file rolls its own curl_cffi.requests.AsyncSession directly (see
+# _get_session_and_token below) instead of going through the project's shared
+# http_client.client() helper, which has tenacity AsyncRetrying built in -- so
+# none of this file's three real network calls get that helper's protection.
+# curl_cffi raises its OWN exception hierarchy under
+# curl_cffi.requests.exceptions, NOT httpx's -- confirmed in this project's
+# venv (curl_cffi 0.15.0) -- so the retry predicate below targets those types
+# explicitly rather than httpx.TransportError/httpx.TimeoutException, which
+# curl_cffi never raises. Listed individually (not relying on the subclass
+# relationships, e.g. ConnectTimeout already subclasses both ConnectionError
+# and Timeout) so this stays correct even if that hierarchy changes upstream.
+# Bare TimeoutError covers an asyncio-level timeout surfacing here directly.
+# Deliberately excludes curl_cffi's HTTPError (this file never calls
+# .raise_for_status(); a non-200 status or a 200-with-bad-JSON is checked
+# manually and must stay a hard stop, never a retry).
+_TRANSIENT_EXC = (
+    CurlConnectionError,
+    CurlConnectTimeout,
+    CurlReadTimeout,
+    CurlTimeout,
+    CurlDNSError,
+    TimeoutError,
+)
 
 SEARCH_PAGE_URL = "https://www.bid4assets.com/v5/search"
 API_URL = "https://www.bid4assets.com/api/search/process"
@@ -203,7 +240,14 @@ async def _fetch_description_fields(s, aid: int) -> dict:
     the Deed-or-Lien / Sale-Type fields the search API never returns. Never
     raises -- a failure here must never drop or block the listing itself."""
     try:
-        r = await s.get(f"https://www.bid4assets.com/auction/description/{aid}", timeout=20)
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type(_TRANSIENT_EXC),
+            reraise=True,
+        ):
+            with attempt:
+                r = await s.get(f"https://www.bid4assets.com/auction/description/{aid}", timeout=20)
         if r.status_code != 200 or not r.text:
             return {}
         text = _TAG_RE.sub("", r.text)
@@ -227,12 +271,26 @@ async def _get_session_and_token():
     session's cookies (incl. the Akamai Bot Manager cookies -- satisfied by
     curl_cffi's Chrome impersonation with no challenge, confirmed live).
     Returns (session, token) or (session, None) on failure -- caller must
-    close the session either way."""
+    close the session either way.
+
+    This is the single most severe call site in the file: fetch() returns []
+    immediately once `token` comes back falsy, before the per-state (NC, SC)
+    loop ever starts -- one unretried transient blip here used to zero BOTH
+    states' output for the whole run. Now gets 3 attempts with jittered
+    backoff against curl_cffi's own transport/timeout exceptions; a real bad
+    status still falls straight through to the unchanged (s, None) path."""
     from curl_cffi.requests import AsyncSession
 
     s = AsyncSession(impersonate="chrome")
     try:
-        r = await s.get(SEARCH_PAGE_URL, timeout=30)
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type(_TRANSIENT_EXC),
+            reraise=True,
+        ):
+            with attempt:
+                r = await s.get(SEARCH_PAGE_URL, timeout=30)
     except Exception as exc:
         log.warning("bid4assets.token_page_fail", error=str(exc)[:200])
         return s, None
@@ -252,7 +310,14 @@ async def _fetch_state(s, token: str, state: str, slug: str) -> list[Listing]:
         body = _build_body(state, page)
         url = f"{API_URL}?take={PAGE_SIZE}&skip={skip}&page={page}&pageSize={PAGE_SIZE}"
         try:
-            r = await s.post(url, json=body, headers=headers, timeout=30)
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type(_TRANSIENT_EXC),
+                reraise=True,
+            ):
+                with attempt:
+                    r = await s.post(url, json=body, headers=headers, timeout=30)
         except Exception as exc:
             log.warning("bid4assets.fetch_failed", state=state, page=page, error=str(exc)[:200])
             break

@@ -216,6 +216,7 @@ from typing import Any, Iterable
 import httpx
 import structlog
 from selectolax.parser import HTMLParser
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ... import arcgis_webmap as agw
 from ...base_scraper import BaseScraper
@@ -348,9 +349,25 @@ async def _query_bbox(http: httpx.AsyncClient, xmin: float, xmax: float,
     A capped PARENT cell's markers are never handed to `on_leaf` (its children
     re-fetch the same properties), which also avoids double-processing.
     """
-    resp = await http.post(POLYGON_URL, data=_bbox_body(xmin, xmax, ymin, ymax),
-                            headers={"X-Requested-With": "XMLHttpRequest",
-                                     "Referer": LOCATOR_URL})
+    # Retried up to 3 times (short exponential-jitter backoff) on a transport error or
+    # timeout -- this is the sole mechanism that fetches every case in the city
+    # (recursive quad-tree subdivision whenever a cell hits PAGE_CAP), and it had zero
+    # retry cushioning: a single transient blip on any one call propagates up through
+    # every ancestor await, aborting ALL remaining siblings/cousins in the traversal,
+    # not just that one leaf's data. Same gap already fixed tonight for the Column
+    # legal-notice API scrapers, spartan_weekly_legals.py, and arcgis_webmap.query_features.
+    # A real non-200 (including an HTTP-200-with-error-body shape) still raises unretried
+    # below -- raise_for_status() stays OUTSIDE the retry predicate's concern.
+    async for attempt in AsyncRetrying(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential_jitter(initial=1, max=8),
+        retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+        reraise=True,
+    ):
+        with attempt:
+            resp = await http.post(POLYGON_URL, data=_bbox_body(xmin, xmax, ymin, ymax),
+                                    headers={"X-Requested-With": "XMLHttpRequest",
+                                             "Referer": LOCATOR_URL})
     resp.raise_for_status()
     markers = parse_polygon_response(resp.json())
     log.info("gastonia_code.leaf", depth=depth, count=len(markers),
@@ -622,7 +639,17 @@ class GastoniaCodeEnforcement(BaseScraper):
 
         async with client(timeout=30.0) as http:
             # Session handshake (cookie only) -- anonymous, not a login/CAPTCHA wall.
-            await http.get(LOCATOR_URL)
+            # Retried on transport/timeout errors (same gap as _query_bbox above): this
+            # fires exactly once, before anything has been added to self.partial, so an
+            # unretried transient failure here guarantees zero output for the whole run.
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                reraise=True,
+            ):
+                with attempt:
+                    await http.get(LOCATOR_URL)
 
             async def _on_leaf(markers: list[dict]) -> None:
                 # Process THIS leaf's properties immediately and append to

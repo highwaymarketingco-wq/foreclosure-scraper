@@ -71,6 +71,7 @@ from typing import Any
 
 import structlog
 from bs4 import BeautifulSoup
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper, OUTCOME_OK
 from ...models import Listing, ListingType, PropertyKind
@@ -231,6 +232,89 @@ def _to_listing(slug: str, row: dict[str, Any]) -> Listing:
     )
 
 
+# ---------------------------------------------------------------------------
+# Retry cushioning for the guest-session + search-submission chain.
+#
+# fetch() below drives one unbroken, wholly unretried sequence of one-shot
+# Playwright actions -- goto -> Guest click -> Date Range click -> Index
+# Type select -> Search click -> networkidle -- that the entire scrape
+# depends on. None of them had any retry cushioning: a single transient
+# transport/timeout blip on any one of them propagated straight out of
+# fetch()'s own try block, was caught only by its blanket
+# ``except Exception`` (nc_rowan_cott.error), and fell through to
+# ``return results`` -- empty, since rows are only appended after the
+# search has already succeeded. Because this source is registered in
+# main.DATELESS_OK_SOURCES (no fallback date window), a zeroed run can't
+# self-heal later; it just reports an empty/healthy result until someone
+# notices by hand. Same root cause, same AsyncRetrying shape, already
+# fixed for this codebase's other Playwright scrapers (nc_rod_captcha.py,
+# nc_ecourts_estates.py, sc_public_index.py) and for its httpx-based ones
+# before that (arcgis_webmap.query_features(), the Column API scraper,
+# spartan_weekly_legals.py) -- Playwright raises its OWN Error/TimeoutError,
+# not httpx's, so the retry predicate below is tuned to those instead.
+#
+# None of this touches the three early "page-logic" branches in fetch()
+# (no_guest_button / no_date_tab / no_search_button) -- those are
+# synchronous ``locator.count()`` checks against the already-loaded DOM,
+# not network-dependent actions, and a 0-count there is a real "this
+# site's layout changed" signal, not a transport error. They stay bare
+# and return immediately, unchanged by this fix.
+# ---------------------------------------------------------------------------
+
+async def _goto_with_retry(page: Any, url: str, *, timeout: int) -> None:
+    """page.goto() with retry cushioning for a transient Playwright
+    transport/timeout failure (connection reset, DNS blip, a plain
+    timeout) -- see the module note above this function."""
+    from playwright.async_api import Error as PlaywrightError, TimeoutError as PlaywrightTimeoutError
+    async for attempt in AsyncRetrying(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential_jitter(initial=1, max=8),
+        retry=retry_if_exception_type((PlaywrightError, PlaywrightTimeoutError, TimeoutError)),
+        reraise=True,
+    ):
+        with attempt:
+            await page.goto(url, timeout=timeout)
+
+
+async def _click_with_retry(locator: Any) -> None:
+    """locator.click() with the same retry cushioning as _goto_with_retry
+    above -- see the module note above it. Covers this file's three click
+    sites (Guest sign-in, Date Range tab, Search), each a link in the same
+    unbroken chain. No explicit timeout is passed here, matching every one
+    of this file's original bare ``.click()`` calls (Playwright's own
+    default applies, unchanged by this fix)."""
+    from playwright.async_api import Error as PlaywrightError, TimeoutError as PlaywrightTimeoutError
+    async for attempt in AsyncRetrying(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential_jitter(initial=1, max=8),
+        retry=retry_if_exception_type((PlaywrightError, PlaywrightTimeoutError, TimeoutError)),
+        reraise=True,
+    ):
+        with attempt:
+            await locator.click()
+
+
+async def _select_option_with_retry(page: Any, selector: str, *, label: str) -> None:
+    """page.select_option() with the same retry cushioning as
+    _goto_with_retry above -- see the module note above it. fetch()'s own
+    surrounding try/except still treats ANY exception here as non-fatal
+    (falls through to date-filling and Search with Index Type left unset)
+    -- unchanged by this fix. This only adds retry cushioning so a
+    transient blip doesn't immediately fall into that soft-fail path; a
+    real non-transient failure, or a transient one that never clears
+    within the retry budget, still reaches fetch()'s except block exactly
+    as before."""
+    from playwright.async_api import Error as PlaywrightError, TimeoutError as PlaywrightTimeoutError
+    async for attempt in AsyncRetrying(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential_jitter(initial=1, max=8),
+        retry=retry_if_exception_type((PlaywrightError, PlaywrightTimeoutError, TimeoutError)),
+        reraise=True,
+    ):
+        with attempt:
+            await page.select_option(selector, label=label)
+
+
 class NcRowanCottScraper(BaseScraper):
     """Rowan County NC deeds — Cott eSearch via Playwright (guest session)."""
 
@@ -258,14 +342,14 @@ class NcRowanCottScraper(BaseScraper):
                 page = await browser.new_page()
                 log.info("nc_rowan_cott.fetching")
 
-                await page.goto(_URL, timeout=30000)
+                await _goto_with_retry(page, _URL, timeout=30000)
                 await page.wait_for_load_state("domcontentloaded", timeout=20000)
 
                 guest_btn = page.locator(
                     "button:has-text('Sign in as a Guest'), input[value*='Guest' i]"
                 )
                 if await guest_btn.count() > 0:
-                    await guest_btn.first.click()
+                    await _click_with_retry(guest_btn.first)
                     await page.wait_for_load_state("domcontentloaded", timeout=20000)
                 else:
                     log.warning("nc_rowan_cott.no_guest_button")
@@ -277,7 +361,7 @@ class NcRowanCottScraper(BaseScraper):
                 if await date_tab.count() == 0:
                     log.warning("nc_rowan_cott.no_date_tab")
                     return results
-                await date_tab.first.click()
+                await _click_with_retry(date_tab.first)
                 await page.wait_for_load_state("domcontentloaded", timeout=20000)
 
                 # Index Type is an ASP.NET listbox wired to onchange ->
@@ -289,8 +373,8 @@ class NcRowanCottScraper(BaseScraper):
                 # unselected here -- see module docstring; filtered in Python
                 # via _is_deed_kind after the real grid HTML comes back.
                 try:
-                    await page.select_option(
-                        "select[id$='lbIndexTypes']", label="CONSOLIDATED REAL PROPERTY"
+                    await _select_option_with_retry(
+                        page, "select[id$='lbIndexTypes']", label="CONSOLIDATED REAL PROPERTY"
                     )
                 except Exception as exc:
                     log.warning("nc_rowan_cott.index_type_select_failed", error=str(exc)[:160])
@@ -325,7 +409,7 @@ class NcRowanCottScraper(BaseScraper):
                 if await search_btn.count() == 0:
                     log.warning("nc_rowan_cott.no_search_button")
                     return results
-                await search_btn.first.click()
+                await _click_with_retry(search_btn.first)
                 await page.wait_for_load_state("networkidle", timeout=20000)
 
                 html = await page.content()

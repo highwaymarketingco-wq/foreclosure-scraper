@@ -29,7 +29,9 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Iterable, Optional
 
+import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...http_client import client
@@ -122,14 +124,38 @@ class RowanDelinquentTax(BaseScraper):
             return []
         from .._xlsx_stdlib import read_rows
         async with client(timeout=90.0) as c:
-            r = await c.get(PAGE)
+            # Retried up to 3 times (short exponential-jitter backoff) on a transport
+            # error or timeout only -- the bare http_client.client() call has zero retry
+            # of its own (its transport is built with retries=0; callers must wrap their
+            # own AsyncRetrying). This page fetch and the xlsx download below are this
+            # scraper's ENTIRE network surface for the run, and the second URL is only
+            # known once this page is parsed, so a single transient blip on either call
+            # used to permanently zero this source's whole output. Since this slug is in
+            # main.DATELESS_OK_SOURCES (no fallback date window), a zeroed run couldn't
+            # self-heal later -- it just silently reported an empty/healthy result. A
+            # real non-200 status is still raised below, unretried.
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                reraise=True,
+            ):
+                with attempt:
+                    r = await c.get(PAGE)
             if r.status_code != 200:
                 raise RuntimeError(f"rowan page HTTP {r.status_code}")
             found = newest_xls(r.text)
             if not found:
                 raise RuntimeError("rowan: no 'Download <year> List (XLS)' link on the page")
             year, url = found
-            x = await c.get(url, timeout=120.0)
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                reraise=True,
+            ):
+                with attempt:
+                    x = await c.get(url, timeout=120.0)
             if x.status_code != 200:
                 raise RuntimeError(f"rowan xlsx HTTP {x.status_code}")
         recs = rows_from_sheet(read_rows(x.content))

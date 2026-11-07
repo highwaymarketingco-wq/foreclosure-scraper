@@ -261,7 +261,26 @@ async def _fetch_detail_page(http: Any, agency: Any, case_id: Any, party_seq: An
     if not url:
         return {}
     try:
-        r = await http.get(url, headers={"Referer": PAGE_URL})
+        # Same retry cushioning as both call sites in HorryProbate.fetch() above,
+        # and for the same reason: a bare client() call has zero retry cushioning
+        # of its own (see http_client.client()'s own docstring). This site is a
+        # per-item loop, not a single point of failure for the whole scrape --
+        # every listing's core fields are already banked via self.partial before
+        # this enrichment pass runs, and _enrich_with_detail_pages caps it -- but
+        # a transient blip here still permanently loses that one case's
+        # decedent-address/personal-representative enrichment with zero chance
+        # to self-heal within the run, so it gets the same tenacity wrap for
+        # robustness/consistency with the rest of the file. A real non-200 or
+        # parse failure is unaffected -- only a transport-level failure gets a
+        # second chance.
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                r = await http.get(url, headers={"Referer": PAGE_URL})
         html = r.text if r.status_code == 200 else None
     except Exception as exc:  # noqa: BLE001 - deliberately broad, see docstring
         log.debug("horry_probate.detail_fetch_failed", url=url, error=str(exc)[:160])

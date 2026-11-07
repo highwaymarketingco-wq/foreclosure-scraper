@@ -18,6 +18,7 @@ from typing import Iterable
 
 import structlog
 from selectolax.parser import HTMLParser
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...http_client import get_text_impersonate
@@ -382,6 +383,10 @@ async def _fetch_county(
 ) -> list[Listing]:
     try:
         from scrapling.fetchers import StealthyFetcher
+        from patchright.async_api import (
+            Error as PlaywrightError,
+            TimeoutError as PlaywrightTimeoutError,
+        )
     except ImportError:
         log.warning("landandfarm.scrapling_missing")
         return []
@@ -391,14 +396,38 @@ async def _fetch_county(
     detail_fetches_done = 0
     for page in range(1, MAX_PAGES + 1):
         url = base_url if page == 1 else f"{base_url}?page={page}"
+        # This is a direct Scrapling/patchright headless-browser call, not
+        # the shared http_client.py wrapper -- none of that module's
+        # AsyncRetrying applies here. Scrapling's own AsyncStealthySession
+        # already retries internally (default retries=3, 1s apart, on any
+        # Exception) before a failure ever reaches us, but once that
+        # budget is exhausted this loop had zero further retry and broke
+        # immediately, abandoning every remaining page for this county for
+        # the whole run. national.landandfarm has no sale/auction date, so
+        # it's in main.DATELESS_OK_SOURCES -- a county zeroed by one blip
+        # gets no fallback-date-window backfill; it just looks like a
+        # silent, healthy "no new listings" result. Retry only
+        # transport/timeout-shaped errors: a real non-transient failure
+        # (e.g. Scrapling's own "Failed to get response"/"Request failed"
+        # RuntimeError once ITS OWN retries are exhausted) should still
+        # fail fast rather than be retried again here.
         try:
-            result = await StealthyFetcher.async_fetch(
-                url,
-                headless=True,
-                network_idle=False,
-                timeout=60000,
-                solve_cloudflare=False,
-            )
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type(
+                    (PlaywrightError, PlaywrightTimeoutError, TimeoutError)
+                ),
+                reraise=True,
+            ):
+                with attempt:
+                    result = await StealthyFetcher.async_fetch(
+                        url,
+                        headless=True,
+                        network_idle=False,
+                        timeout=60000,
+                        solve_cloudflare=False,
+                    )
         except Exception as exc:
             log.warning(
                 "landandfarm.fetch_fail",

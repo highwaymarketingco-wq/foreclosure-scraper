@@ -70,7 +70,9 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Iterable
 
+import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ... import arcgis_webmap as agw
 from ...base_scraper import BaseScraper
@@ -138,8 +140,25 @@ async def _fetch_attachments(c, object_ids: list[int]) -> dict[int, list[str]]:
     for i in range(0, len(object_ids), _ATTACH_CHUNK):
         chunk = object_ids[i:i + _ATTACH_CHUNK]
         try:
-            r = await c.get(_ATTACH_URL, params={
-                "objectIds": ",".join(str(x) for x in chunk), "f": "json"})
+            # Retried up to 3 times (short exponential-jitter backoff) on a transport
+            # error or timeout only -- this call bypasses arcgis_webmap.query_features
+            # entirely (it hits queryAttachments directly on the bare http_client.client()
+            # handed in from fetch()), so it gets none of that shared helper's
+            # AsyncRetrying. http_client.client() itself sets retries=0 on the transport
+            # ("callers already wrap their own AsyncRetrying"), so this bare call had zero
+            # retry cushioning -- a single transient blip could zero every case photo for
+            # the run with no retry ever attempted. A real non-200 status or parse failure
+            # still falls through unretried below (the outer except), and a chunk that
+            # exhausts its retry budget still only costs that chunk's photos, not the run.
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential_jitter(initial=1, max=8),
+                retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                reraise=True,
+            ):
+                with attempt:
+                    r = await c.get(_ATTACH_URL, params={
+                        "objectIds": ",".join(str(x) for x in chunk), "f": "json"})
             if r.status_code != 200:
                 continue
             groups = (r.json() or {}).get("attachmentGroups") or []

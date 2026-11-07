@@ -71,6 +71,7 @@ from datetime import datetime
 from typing import Iterable
 
 import httpx
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
@@ -444,9 +445,24 @@ class TransylvaniaDelinquentTax(BaseScraper):
         try:
             async with httpx.AsyncClient(timeout=90.0, follow_redirects=True,
                                          headers=_HEADERS) as c:
-                # (1) seed the session cookie -- once, not per year
+                # (1) seed the session cookie -- once, not per year. Retried up to 3
+                # times (short exponential-jitter backoff) on a transport error or timeout --
+                # this was a bare single-attempt try/except with zero retry cushioning, and
+                # because fetch() swallows the exception into `return []` itself, a single
+                # transient blip used to permanently zero the WHOLE run (no years, no bills,
+                # no enrichment) with no fallback date window to self-heal
+                # (main.DATELESS_OK_SOURCES). Same bug shape already fixed tonight in the
+                # Column legal-notice API scraper, spartan_weekly_legals.py and the shared
+                # arcgis_webmap.query_features().
                 try:
-                    await c.get(BASE)
+                    async for attempt in AsyncRetrying(
+                        stop=stop_after_attempt(3),
+                        wait=wait_exponential_jitter(initial=1, max=8),
+                        retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                        reraise=True,
+                    ):
+                        with attempt:
+                            await c.get(BASE)
                 except Exception:  # noqa: BLE001
                     return []
 
@@ -457,12 +473,24 @@ class TransylvaniaDelinquentTax(BaseScraper):
                 all_rows: list[dict] = []
                 consecutive_empty = 0
                 for year in years:
+                    # Retried up to 3 times on a transport error or timeout -- these two
+                    # sequential, dependent calls (store the search criteria, then read the
+                    # data back) had zero retry of their own. A transient blip here used to
+                    # count as a genuinely empty year toward _CONSECUTIVE_EMPTY_STOP, risking
+                    # a silent early truncation of the multi-year back-read.
                     try:
-                        await c.post(BASE + "/GetSearchTablePartial/",
-                                    json=_search_model(str(year)))
-                        data_model = {"Page": 1, "NumRows": 5000, "SortBy": "AccountName1",
-                                     "SortOrder": "Asc", "Table": "PayTaxBills", "PostData": ""}
-                        r = await c.post(BASE + "/GetSearchTableData", json=data_model)
+                        async for attempt in AsyncRetrying(
+                            stop=stop_after_attempt(3),
+                            wait=wait_exponential_jitter(initial=1, max=8),
+                            retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                            reraise=True,
+                        ):
+                            with attempt:
+                                await c.post(BASE + "/GetSearchTablePartial/",
+                                            json=_search_model(str(year)))
+                                data_model = {"Page": 1, "NumRows": 5000, "SortBy": "AccountName1",
+                                             "SortOrder": "Asc", "Table": "PayTaxBills", "PostData": ""}
+                                r = await c.post(BASE + "/GetSearchTableData", json=data_model)
                         rows = (r.json().get("rows", []) or []
                                if r.status_code == 200
                                and r.headers.get("content-type", "").startswith("application/json")
@@ -500,9 +528,20 @@ class TransylvaniaDelinquentTax(BaseScraper):
                         return
                     year, bill_no = rid.split("/", 1)
                     async with sem:
+                        # Retried up to 3 times on a transport error or timeout -- this
+                        # per-parcel detail POST had zero retry of its own; a transient blip
+                        # here used to drop that one parcel's owner-mailing/parcel/value
+                        # enrichment for no reason (every other parcel unaffected).
                         try:
-                            d = await c.post(BASE + "/ViewTaxBill",
-                                             json={"taxYear": year, "billNumber": bill_no})
+                            async for attempt in AsyncRetrying(
+                                stop=stop_after_attempt(3),
+                                wait=wait_exponential_jitter(initial=1, max=8),
+                                retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                                reraise=True,
+                            ):
+                                with attempt:
+                                    d = await c.post(BASE + "/ViewTaxBill",
+                                                     json={"taxYear": year, "billNumber": bill_no})
                             if d.status_code == 200 and d.text:
                                 details[key] = _parse_detail(d.text)
                         except Exception:  # noqa: BLE001

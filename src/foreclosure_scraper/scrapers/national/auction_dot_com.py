@@ -171,6 +171,12 @@ from datetime import datetime
 from typing import Iterable
 
 import structlog
+from tenacity import (
+    AsyncRetrying,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
 
 from ..._upstate_city_to_county import KNOWN_CITIES, upstate_county_for
 from ...base_scraper import BaseScraper
@@ -514,6 +520,7 @@ def _extract_page(html: str, state: str) -> dict[str, Listing]:
 async def _render(url: str) -> str:
     try:
         from scrapling.fetchers import StealthyFetcher
+        from playwright.async_api import TimeoutError as PlaywrightTimeoutError
     except ImportError:
         log.warning("auction_dot_com.scrapling_missing")
         return ""
@@ -532,11 +539,45 @@ async def _render(url: str) -> str:
         except Exception:
             pass
 
+    # FIX 2026-11-07 (network-resilience audit): this is the ONLY fetch
+    # primitive in the module -- _fetch_state (the main per-state listing
+    # loop) and _fetch_reo_ids (the REO cross-reference loop) each call it
+    # once per page and `break` the instant it returns "". Per the module
+    # docstring, auction.com has no URL-addressable pagination and embeds a
+    # state's ENTIRE result set on page 1, so the first _render call for a
+    # state is effectively that state's whole scrape. This used to be a
+    # bare try/except that caught any exception and gave up immediately
+    # with zero retry of its own.
+    #
+    # This call goes through Scrapling's StealthyFetcher (a Playwright
+    # wrapper), never httpx, so it never raises httpx's exception types --
+    # the retry predicate instead targets the real transient/timeout
+    # exceptions this stack actually raises: the builtin TimeoutError
+    # (Scrapling itself raises this directly for page-pool contention, see
+    # its engines/_browsers/_base.py _get_page) and Playwright's own
+    # TimeoutError (a stalled navigation/selector wait -- Scrapling already
+    # retries this internally up to its own StealthConfig.retries, default
+    # 3, but re-raises the final attempt's exception once THAT budget is
+    # exhausted, which is exactly what this outer layer now cushions, and
+    # also covers a transient failure during browser/session startup,
+    # which sits outside Scrapling's own per-navigation retry loop
+    # entirely). A structural Scrapling/Playwright error (closed context,
+    # bad selector, its own "Failed to get response" RuntimeError, etc.) is
+    # not in this tuple and still fails immediately on attempt 1, falling
+    # straight through to the same unretried except-and-give-up below as
+    # before.
     try:
-        result = await StealthyFetcher.async_fetch(
-            url, headless=True, network_idle=True, timeout=120000,
-            page_action=page_action,
-        )
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((TimeoutError, PlaywrightTimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                result = await StealthyFetcher.async_fetch(
+                    url, headless=True, network_idle=True, timeout=120000,
+                    page_action=page_action,
+                )
     except Exception as exc:
         log.warning("auction_dot_com.fetch_fail", url=url,
                     error=str(exc)[:200])
