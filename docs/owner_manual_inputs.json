@@ -1,6 +1,6 @@
 {
- "generated": "2026-10-31 14:51 EDT",
- "commit": "edd6470e",
+ "generated": "2026-11-06 17:27 EST",
+ "commit": "60181489",
  "fingerprint": {
   "inputs": {
    "docs/walls_register.json": "fe0651e20d9ef95d",
@@ -23,7 +23,9 @@
    "docs/gap_matrix/gap_matrix_2026-10-23.json": "d34a8f9a5d8727b0",
    "docs/gap_matrix/gap_matrix_2026-10-24.json": "0e63df8a7792956b",
    "docs/gap_matrix/gap_matrix_2026-10-28.json": "45bddf0d13bb66b2",
-   "docs/gap_matrix/county_signal_coverage_2026-10-24.csv": "109ea26af29ccf77"
+   "docs/gap_matrix/gap_matrix_2026-11-03.json": "a35fa4541a9e2841",
+   "docs/gap_matrix/gap_matrix_2026-11-04.json": "e8bf42e1386d7d5a",
+   "docs/gap_matrix/county_signal_coverage_2026-11-04.csv": "c9b6b3990746a005"
   },
   "adapters": [
    "NC|Alamance|nc_cott_v4|FORECLOSURE_NC_COTT_ROD|off",
@@ -244,9 +246,19 @@
    "date": "2026-10-28"
   },
   {
-   "path": "docs/gap_matrix/county_signal_coverage_2026-10-24.csv",
-   "sha": "109ea26af29ccf77",
-   "date": "2026-10-24 14:59 (file time)"
+   "path": "docs/gap_matrix/gap_matrix_2026-11-03.json",
+   "sha": "a35fa4541a9e2841",
+   "date": "2026-11-03"
+  },
+  {
+   "path": "docs/gap_matrix/gap_matrix_2026-11-04.json",
+   "sha": "e8bf42e1386d7d5a",
+   "date": "2026-11-04"
+  },
+  {
+   "path": "docs/gap_matrix/county_signal_coverage_2026-11-04.csv",
+   "sha": "c9b6b3990746a005",
+   "date": "2026-11-04 17:02 (file time)"
   }
  ],
  "run_meta": {
