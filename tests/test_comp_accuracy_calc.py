@@ -82,15 +82,38 @@ def test_ppsf_usable_rejects_only_a_known_size_mismatch():
 def test_scraped_comps_arv_ignores_a_known_size_mismatched_comp():
     """Same shape as the live case (SC|Laurens|901-11-02-007: a HOT subject priced off comps
     2.2x-3.3x smaller, no adjusted_ppsf). Calls _arv_signals directly -- compute()'s own
-    county-calibration layer is a separate, unrelated adjustment this fix doesn't touch."""
+    county-calibration layer is a separate, unrelated adjustment this fix doesn't touch.
+
+    2026-11-07 (valuation-hot-arv-supported, gap-sweep wave 7 follow-up): the original version
+    of this test asserted the BUG -- that when every comp is rejected for a known size mismatch,
+    _arv_signals fell back to the comp_median_ppsf scalar computed from those SAME undersized
+    comps, resurrecting the exact number the size-ratio guard exists to block. With no other
+    ARV signal available (no recorded/ratio/zestimate/tax/bid), the correct behavior is no
+    comp-based ARV from this tier at all -- falling through every later tier to the function's
+    final "no data" return."""
     comps = [{"price_per_sqft": 95, "sqft": 900, "geo_anchored": True},
              {"price_per_sqft": 100, "sqft": 1050, "geo_anchored": True},
              {"price_per_sqft": 90, "sqft": 1200, "geo_anchored": True}]
     li = Listing(source="x", source_url="u", listing_type=ListingType.FORECLOSURE_SALE, state="SC",
                  county="Laurens", living_sqft=2800, raw={"comps": comps, "comp_median_ppsf": 60.0})
     expected, low, high, conf, notes = calc._arv_signals(li)
-    # all 3 comps are a known size mismatch (2.3x-3.1x), so none fed the median: the scalar
-    # comp_median_ppsf fallback is used instead of the (wrong, much higher) per-comp prices.
+    # all 3 comps are a known size mismatch (2.3x-3.1x) -- no comp-based ARV, and nothing else
+    # on this bare listing to fall back to either.
+    assert expected is None
+    assert low is None and high is None
+    assert any("Insufficient data for ARV" in n for n in notes)
+
+
+def test_scraped_comps_arv_still_uses_the_scalar_when_comps_carry_no_price_at_all():
+    """Distinguishes the two ways `ppsfs` can end up empty: when a comp has no price_per_sqft/
+    adjusted_ppsf AT ALL, that's a data-completeness gap, not a verified size mismatch -- the
+    comp_median_ppsf scalar is still legitimate to use. Regression guard for the 2026-11-07 fix
+    above: it must not over-correct and start refusing this case too."""
+    comps = [{"sqft": 900, "geo_anchored": True},
+             {"sqft": 1050, "geo_anchored": True}]
+    li = Listing(source="x", source_url="u", listing_type=ListingType.FORECLOSURE_SALE, state="SC",
+                 county="Laurens", living_sqft=2800, raw={"comps": comps, "comp_median_ppsf": 60.0})
+    expected, low, high, conf, notes = calc._arv_signals(li)
     assert expected == round(60.0 * 2800, -2)
     assert any("only 0 comp" in n for n in notes)
 

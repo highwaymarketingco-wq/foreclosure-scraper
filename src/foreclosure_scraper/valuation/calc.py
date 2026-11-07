@@ -1423,47 +1423,59 @@ def _arv_signals(li: Listing, refused: list | None = None
         # and low/high (min/max) from it, so the headline ARV can never fall
         # outside its own band (Pass-2 fix: expected used the comp_median_ppsf
         # scalar while the band used this adjusted series — a different base).
+        priced_comps = [c for c in comps if c.get("adjusted_ppsf") or c.get("price_per_sqft")]
         ppsfs = sorted((c.get("adjusted_ppsf") or c["price_per_sqft"])
-                       for c in comps if (c.get("adjusted_ppsf") or c.get("price_per_sqft"))
-                       and _ppsf_usable(c, arv_sqft))
+                       for c in priced_comps if _ppsf_usable(c, arv_sqft))
         if ppsfs:
             median_ppsf = ppsfs[len(ppsfs) // 2]
-        else:
-            # No usable per-comp $/sqft — fall back to the supplied median scalar.
+        elif not priced_comps:
+            # No comp carries its own per-comp price at all — a data-completeness
+            # gap, not a verified size mismatch, so the supplied aggregate scalar
+            # is still usable.
             median_ppsf = float(comp_ppsf)
-        expected = median_ppsf * arv_sqft
-        notes.append(
-            f"ARV from {len(comps)} zip-matched sold comps × subject sqft "
-            f"(${median_ppsf:,.0f}/sqft × {sqft_lbl})"
-        )
-        if len(ppsfs) >= 3:
-            low = round(ppsfs[0] * arv_sqft, -2)
-            high = round(ppsfs[-1] * arv_sqft, -2)
         else:
-            low = round(expected * 0.90, -2)
-            high = round(expected * 1.10, -2)
-        # Clamp the rounded headline into [low,high] so it always sits inside its
-        # own band even if rounding or a fallback base nudges it out.
-        expected = min(max(round(expected, -2), low), high)
-        # Comp-QUALITY gate: scraped comps are only HIGH-confidence when there
-        # are enough of them, they're geographically anchored (not county-wide),
-        # and they actually agree. A single far/stale comp is not bankable.
-        conf = "HIGH"
-        reasons = []
-        # A footprint-estimated sqft CAPS ARV at MEDIUM (never HIGH) — a bounded
-        # estimate, not bankable GLA. The >8000 footprint reject + plausibility
-        # band already drop garbage, so MEDIUM (not LOW) is the right confidence.
-        if sqft_est:
-            conf, reasons = "MEDIUM", reasons + ["living sqft is a footprint-based ESTIMATE"]
-        if len(ppsfs) < 3:
-            conf, reasons = ("LOW" if conf == "LOW" else "MEDIUM"), reasons + [f"only {len(ppsfs)} comp(s)"]
-        if comps and not comps[0].get("geo_anchored", True):
-            conf, reasons = ("LOW" if conf == "LOW" else "MEDIUM"), reasons + ["county-wide comps (no local anchor)"]
-        if len(ppsfs) >= 2 and ppsfs[0] > 0 and ppsfs[-1] / ppsfs[0] >= 1.6:
-            conf, reasons = ("LOW" if conf == "LOW" else "MEDIUM"), reasons + ["comps disagree (wide $/sqft spread)"]
-        if reasons:
-            notes.append(f"ARV confidence lowered to {conf}: " + "; ".join(reasons))
-        return round(expected, -2), low, high, conf, notes
+            # Every priced comp was rejected by _ppsf_usable for a genuine size
+            # mismatch. comp_median_ppsf is the SAME ungated aggregate built from
+            # these same comps — falling back to it here would resurrect the
+            # exact bad ARV this guard exists to block (valuation-hot-arv-
+            # supported, 2026-11-07: a 4,590 sqft subject priced off 1,404-2,075
+            # sqft comps slipped through this exact path). No comp-based ARV for
+            # this subject's size; fall through to Tier 1b / assessed-value.
+            median_ppsf = None
+        if median_ppsf is not None:
+            expected = median_ppsf * arv_sqft
+            notes.append(
+                f"ARV from {len(comps)} zip-matched sold comps × subject sqft "
+                f"(${median_ppsf:,.0f}/sqft × {sqft_lbl})"
+            )
+            if len(ppsfs) >= 3:
+                low = round(ppsfs[0] * arv_sqft, -2)
+                high = round(ppsfs[-1] * arv_sqft, -2)
+            else:
+                low = round(expected * 0.90, -2)
+                high = round(expected * 1.10, -2)
+            # Clamp the rounded headline into [low,high] so it always sits inside its
+            # own band even if rounding or a fallback base nudges it out.
+            expected = min(max(round(expected, -2), low), high)
+            # Comp-QUALITY gate: scraped comps are only HIGH-confidence when there
+            # are enough of them, they're geographically anchored (not county-wide),
+            # and they actually agree. A single far/stale comp is not bankable.
+            conf = "HIGH"
+            reasons = []
+            # A footprint-estimated sqft CAPS ARV at MEDIUM (never HIGH) — a bounded
+            # estimate, not bankable GLA. The >8000 footprint reject + plausibility
+            # band already drop garbage, so MEDIUM (not LOW) is the right confidence.
+            if sqft_est:
+                conf, reasons = "MEDIUM", reasons + ["living sqft is a footprint-based ESTIMATE"]
+            if len(ppsfs) < 3:
+                conf, reasons = ("LOW" if conf == "LOW" else "MEDIUM"), reasons + [f"only {len(ppsfs)} comp(s)"]
+            if comps and not comps[0].get("geo_anchored", True):
+                conf, reasons = ("LOW" if conf == "LOW" else "MEDIUM"), reasons + ["county-wide comps (no local anchor)"]
+            if len(ppsfs) >= 2 and ppsfs[0] > 0 and ppsfs[-1] / ppsfs[0] >= 1.6:
+                conf, reasons = ("LOW" if conf == "LOW" else "MEDIUM"), reasons + ["comps disagree (wide $/sqft spread)"]
+            if reasons:
+                notes.append(f"ARV confidence lowered to {conf}: " + "; ".join(reasons))
+            return round(expected, -2), low, high, conf, notes
 
     # Tier 1b: RECORDED sale-to-assessment RATIO comps (enrichment_recorded_sales).
     # Buncombe/Anderson publish a full sales roll but NO heated sqft anywhere in
