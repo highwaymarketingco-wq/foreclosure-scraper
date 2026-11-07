@@ -1,7 +1,7 @@
 {
  "board_rows": 472777,
  "by_category": {
-  "uncovered": 181448,
+  "uncovered": 181443,
   "wall": 20358
  },
  "format_version": 1,
@@ -61,8 +61,8 @@
    "generated_at": "2026-10-17T14:28:27Z"
   },
   "tax_lien": {
-   "entries": 68017,
-   "generated_at": "2026-11-06T18:14:34Z"
+   "entries": 68815,
+   "generated_at": "2026-11-07T01:51:12Z"
   },
   "tax_lien_johnston_static": {
    "entries": 8,
@@ -73,7 +73,7 @@
    "generated_at": "2026-10-17T14:28:27Z"
   }
  },
- "listings": 201806,
+ "listings": 201801,
  "uncovered": {
   "by_scraper_source": {
    "city_websites.charlotte_open_data": 5436,
@@ -103,11 +103,11 @@
    "counties_sc.sc_heir_estate_parcel_cache": 8528,
    "counties_sc.sc_probate_net": 507,
    "counties_sc.sc_probate_notices.yourpickenscounty": 442,
-   "counties_sc.sc_public_index": 2675,
+   "counties_sc.sc_public_index": 2674,
    "counties_sc.sc_public_notices": 643,
    "counties_sc.sc_ust_registry": 15582,
    "counties_sc.spartanburg_condemned": 1492,
-   "counties_sc.spartanburg_vacant": 4223,
+   "counties_sc.spartanburg_vacant": 4220,
    "courtlistener.recap": 730,
    "national.distressed": 4777,
    "national.hud_reac_inspection": 816,
@@ -131,8 +131,8 @@
    "SC:charleston": 7698,
    "SC:colleton": 2200,
    "SC:pickens": 2399,
-   "SC:richland": 2202,
-   "SC:spartanburg": 11125
+   "SC:richland": 2201,
+   "SC:spartanburg": 11121
   }
  },
  "wall": {
