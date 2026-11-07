@@ -56,6 +56,8 @@ from datetime import datetime
 from typing import Iterable, Optional
 
 import structlog
+from playwright.async_api import Error as PlaywrightError, TimeoutError as PlaywrightTimeoutError
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
@@ -336,8 +338,26 @@ async def _drive_estate_search(page, counties: list[str], lookback_days: int) ->
         log.warning("nc_ecourts_estates.pretoken_fail", error=str(exc)[:160])
 
     # Step 1: land on Smart Search.
+    # Retried up to 3 times (short exponential-jitter backoff) on a Playwright
+    # transport/timeout error -- this bare page.goto had zero retry cushioning.
+    # It gates ALL 20 TARGET_COUNTIES before any per-county work starts, and
+    # because this source is in DATELESS_OK_SOURCES (no fallback date window)
+    # a single transient navigation blip would silently zero the whole run,
+    # reported as a healthy-empty result with no self-heal -- the same gap
+    # already fixed tonight for the Column legal-notice API scraper,
+    # spartan_weekly_legals.py, and arcgis_webmap.query_features(). Playwright's
+    # own Error/TimeoutError plus a bare stdlib TimeoutError are retried (matches
+    # the precedent in nc_notices_counties.py / ncpublicnotices.py); any other
+    # exception still aborts immediately below, unretried.
     try:
-        await page.goto(SEARCH_URL, wait_until="networkidle", timeout=45000)
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((PlaywrightError, PlaywrightTimeoutError, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                await page.goto(SEARCH_URL, wait_until="networkidle", timeout=45000)
     except Exception as exc:  # noqa: BLE001
         log.warning("nc_ecourts_estates.land_fail", error=str(exc)[:200])
         return rows
@@ -452,8 +472,21 @@ async def _solve_waf(page) -> bool:
 
 
 async def _wait_search_form(page) -> bool:
+    # Retried up to 3 times (short exponential-jitter backoff) on a Playwright
+    # transport/timeout error -- same single-point-of-failure shape as Step 1's
+    # page.goto in _drive_estate_search above: a bare call with zero retry
+    # cushioning aborts the whole run on one transient blip. Playwright's own
+    # Error/TimeoutError plus a bare stdlib TimeoutError are retried; any other
+    # exception still returns False immediately below, unretried.
     try:
-        await page.wait_for_selector('#caseCriteria_SearchCriteria', timeout=15000)
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((PlaywrightError, PlaywrightTimeoutError, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                await page.wait_for_selector('#caseCriteria_SearchCriteria', timeout=15000)
         return True
     except Exception:
         return False
@@ -467,24 +500,40 @@ async def _select_case_category(page, labels: tuple[str, ...]) -> bool:
     `labels` and select it, firing change so the SPA updates the filter.
     """
     labels_lc = [l.lower() for l in labels]
+    # Retried up to 3 times (short exponential-jitter backoff) on a Playwright
+    # transport/timeout error -- same single-point-of-failure shape as the
+    # page.goto / page.wait_for_selector sites above: a bare page.evaluate
+    # with zero retry cushioning aborts the whole run
+    # (category_select_failed_abort) on one transient blip. Playwright's own
+    # Error/TimeoutError plus a bare stdlib TimeoutError are retried; any other
+    # exception still returns False immediately below, unretried.
     try:
-        return bool(await page.evaluate(
-            """(labels) => {
-                const sels = [...document.querySelectorAll('select')];
-                for (const s of sels) {
-                    for (const o of s.options) {
-                        const t = (o.text || '').toLowerCase();
-                        if (labels.some(l => t.includes(l))) {
-                            s.value = o.value;
-                            s.dispatchEvent(new Event('change', {bubbles:true}));
-                            return true;
+        result = None
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((PlaywrightError, PlaywrightTimeoutError, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                result = await page.evaluate(
+                    """(labels) => {
+                        const sels = [...document.querySelectorAll('select')];
+                        for (const s of sels) {
+                            for (const o of s.options) {
+                                const t = (o.text || '').toLowerCase();
+                                if (labels.some(l => t.includes(l))) {
+                                    s.value = o.value;
+                                    s.dispatchEvent(new Event('change', {bubbles:true}));
+                                    return true;
+                                }
+                            }
                         }
-                    }
-                }
-                return false;
-            }""",
-            labels_lc,
-        ))
+                        return false;
+                    }""",
+                    labels_lc,
+                )
+        return bool(result)
     except Exception as exc:  # noqa: BLE001
         log.debug("nc_ecourts_estates.category_select_fail", error=str(exc)[:160])
         return False
