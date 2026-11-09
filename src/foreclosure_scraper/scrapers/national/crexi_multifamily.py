@@ -131,6 +131,19 @@ DETAIL_PHOTO_BUDGET_S = float(
 # Max real photos to keep per listing, matching freddie_homesteps.py's cap.
 GALLERY_CAP = 8
 
+# ---------------------------------------------------------------------------
+# Detail-page field hydration (price / units / broker / cap rate)
+# ---------------------------------------------------------------------------
+# Cap on how many detail pages to fetch for field hydration per run. Each
+# detail render takes the same ~20-90s stealth fetch as a search-grid page.
+# Default 20 total across both states; only listings missing price/units
+# (the highest-value missing fields) are selected; cap keeps a single run
+# from becoming a marathon. Override via env.
+DETAIL_HYDRATE_CAP = int(os.environ.get("CREXI_MULTIFAMILY_HYDRATE_CAP", "20"))
+DETAIL_HYDRATE_BUDGET_S = float(
+    os.environ.get("CREXI_MULTIFAMILY_HYDRATE_BUDGET_S", "600")
+)
+
 # /properties/<id>/<slug>
 DETAIL_RE = re.compile(r"/properties/(\d+)/([a-z0-9][a-z0-9-]*)")
 # "126-units" / "58-unit" / "14 unit" within a slug
@@ -439,6 +452,109 @@ async def _fetch_detail_photos(pid: str, detail_url: str) -> list[str]:
         return []
 
 
+# ---------------------------------------------------------------------------
+# Detail-page field extraction: price / units / broker / cap rate
+# ---------------------------------------------------------------------------
+
+# Price: "$1,234,567" or "$1.2M" or "1,234,567" anywhere in page text.
+_PRICE_RE = re.compile(r"\$\s*([\d,]+(?:\.\d+)?)\s*([MmKk])?")
+# Cap rate: "5.25%" or "5.25 %" near the word "cap"
+_CAP_RE = re.compile(r"(?:cap\s*rate)[^\d]{0,20}([\d]{1,2}\.[\d]{1,2})\s*%", re.I)
+# Broker/agent name: "Listed by John Smith" or "Broker: Jane Doe" etc.
+_BROKER_RE = re.compile(
+    r"(?:listed\s+by|broker(?:age)?|listing\s+(?:agent|broker|contact))[:\s]+([A-Z][A-Za-z '&,-]{2,60})",
+    re.I,
+)
+# Units: "52 Units" / "52-Unit" anywhere on the page
+_UNITS_PAGE_RE = re.compile(r"(\d{1,4})\s*[-\u2013]?\s*[Uu]nits?\b")
+
+
+def _parse_detail_fields(html: str, pid: str) -> dict:
+    """Extract price / units / broker / cap_rate from a rendered detail page.
+
+    Returns a dict with any of {price, units, broker, cap_rate} that could be
+    parsed. All keys are optional — missing = not found, never fabricated.
+    """
+    out: dict = {}
+
+    # Visible text from the page (better than raw HTML for regex matching)
+    try:
+        from selectolax.parser import HTMLParser as _HP
+        tree = _HP(html)
+        text = tree.body.text(separator=" ") if tree.body else html
+    except Exception:
+        text = html
+
+    # Price — look for the LARGEST dollar figure on the page (the listing
+    # price / ask). Filter out obviously tiny numbers (<10k = likely not a
+    # property price) and implausibly large ones (>$1B).
+    prices: list[float] = []
+    for m in _PRICE_RE.finditer(text):
+        try:
+            val = float(m.group(1).replace(",", ""))
+            suffix = (m.group(2) or "").upper()
+            if suffix == "M":
+                val *= 1_000_000
+            elif suffix == "K":
+                val *= 1_000
+            if 10_000 <= val <= 1_000_000_000:
+                prices.append(val)
+        except (ValueError, TypeError):
+            pass
+    if prices:
+        out["price"] = max(prices)  # largest figure = listing ask
+
+    # Cap rate
+    cm = _CAP_RE.search(text)
+    if cm:
+        try:
+            out["cap_rate"] = float(cm.group(1))
+        except (ValueError, TypeError):
+            pass
+
+    # Units — largest figure on the page (slug may already have one; this
+    # overwrites with the more authoritative labeled count from the detail)
+    unit_matches: list[int] = []
+    for um in _UNITS_PAGE_RE.finditer(text):
+        try:
+            unit_matches.append(int(um.group(1)))
+        except (ValueError, TypeError):
+            pass
+    if unit_matches:
+        out["units"] = max(unit_matches)
+
+    # Broker / listing agent name
+    bm = _BROKER_RE.search(text)
+    if bm:
+        name = bm.group(1).strip().rstrip(".,;")
+        if 3 <= len(name) <= 60:
+            out["broker"] = name
+
+    return out
+
+
+async def _hydrate_detail_fields(pid: str, detail_url: str) -> dict:
+    """Render the detail page and extract price/units/broker/cap_rate.
+
+    Degrades to {} on any failure — a field-hydration failure must never
+    drop the listing or raise.
+    """
+    try:
+        html, final = await _render(detail_url)
+    except Exception as exc:
+        log.warning("crexi_multifamily.hydrate_render_failed", pid=pid,
+                    error=str(exc)[:160])
+        return {}
+    if not html or not _is_listing_page(final):
+        return {}
+    try:
+        return _parse_detail_fields(html, pid)
+    except Exception as exc:
+        log.warning("crexi_multifamily.hydrate_parse_failed", pid=pid,
+                    error=str(exc)[:160])
+        return {}
+
+
 async def _fetch_state(state: str, state_prefix: str,
                        pages_cap: int) -> dict[str, Listing]:
     out: dict[str, Listing] = {}
@@ -492,11 +608,12 @@ class CrexiMultifamily(BaseScraper):
     # 2 states x PAGES_CAP pages x up-to-ATTEMPTS renders at ~90s each for the
     # search grid (common path ~4 renders, ~360s), PLUS the bounded photo-
     # gallery enrichment pass added 2026-10-13 (up to DETAIL_PHOTO_BUDGET_S =
-    # 240s more, each render costing the same ~20-90s stealth fetch as a
-    # search page). Bumped from 600s to 900s to give the enrichment pass real
-    # room without routinely tripping the soft timeout on the common path; if
-    # it ever does, self.partial still ships whatever was banked so far.
-    timeout_s = 900.0
+    # 240s more), PLUS the detail field-hydration pass added 2026-11-09 (up
+    # to DETAIL_HYDRATE_BUDGET_S = 600s more, only triggered when listings
+    # lack price/units). Bumped from 900s to 1500s to give both enrichment
+    # passes room; self.partial ships whatever is banked if the soft timeout
+    # fires mid-run so listings are never silently lost.
+    timeout_s = 1500.0
 
     async def fetch(self) -> Iterable[Listing]:
         pages_cap = int(
@@ -554,6 +671,97 @@ class CrexiMultifamily(BaseScraper):
             log.info("crexi_multifamily.photo_enrichment_done", state=state,
                      attempted=min(len(state_listings), DETAIL_PHOTO_CAP),
                      enriched=enriched)
+
+        # -----------------------------------------------------------------
+        # Capped detail-page field hydration: price / units / broker / cap
+        # rate. Added 2026-11-09 to hydrate the fields that the search-grid
+        # slug capture cannot provide.
+        #
+        # Selection policy: listings where raw["loopnet"]["units"] is None
+        # (slug had no unit count — highest value to fix) OR where the
+        # listing has no opening_bid/market_value yet. Capped at
+        # DETAIL_HYDRATE_CAP total and DETAIL_HYDRATE_BUDGET_S seconds.
+        # Only listings that survived the photo pass (already in merged) are
+        # eligible — no double-render of a listing that just had photos
+        # fetched (we'd be re-rendering the same page). Re-use the already-
+        # fetched HTML is not possible here (photos and fields are fetched
+        # from the same page, but the two passes are intentionally separate
+        # so either can be disabled independently).
+        # -----------------------------------------------------------------
+        hydrate_deadline = time.monotonic() + DETAIL_HYDRATE_BUDGET_S
+        # Build candidate list: listings missing units or price, ordered so
+        # those missing both come first (most value to hydrate).
+        candidates: list[tuple[int, Listing]] = []
+        for li in merged.values():
+            loopnet = li.raw.get("loopnet") or {}
+            has_units = loopnet.get("units") is not None
+            has_price = li.opening_bid is not None or li.market_value is not None
+            if not has_units or not has_price:
+                # Score: 2 if missing both, 1 if missing one
+                score = (0 if has_units else 1) + (0 if has_price else 1)
+                candidates.append((score, li))
+        candidates.sort(key=lambda t: -t[0])  # highest-need first
+        hydrate_eligible = [li for _, li in candidates[:DETAIL_HYDRATE_CAP]]
+
+        hydrated = 0
+        for li in hydrate_eligible:
+            if time.monotonic() > hydrate_deadline:
+                log.info("crexi_multifamily.hydrate_budget_spent",
+                         hydrated=hydrated)
+                break
+            loopnet = li.raw.get("loopnet") or {}
+            pid = loopnet.get("crexi_id")
+            if not pid or not li.source_url:
+                continue
+            try:
+                fields = await _hydrate_detail_fields(pid, li.source_url)
+            except Exception as exc:
+                log.warning("crexi_multifamily.hydrate_failed",
+                            pid=pid, error=str(exc)[:160])
+                continue
+            if not fields:
+                continue
+
+            # Wire price -> opening_bid (primary) or market_value (fallback)
+            price = fields.get("price")
+            if price:
+                if li.opening_bid is None:
+                    li.opening_bid = price
+                elif li.market_value is None:
+                    li.market_value = price
+                loopnet["price"] = price
+
+            # Wire units -> loopnet["units"] (overrides slug-parsed estimate)
+            if fields.get("units") is not None:
+                loopnet["units"] = fields["units"]
+                # Also update the description to reflect the authoritative count
+                if li.description:
+                    li.description = re.sub(
+                        r"\s*—\s*\d+\s*units?", "", li.description
+                    ) + f" — {fields['units']} units"
+
+            # Wire broker -> trustee (convention: broker = party acting on
+            # seller's behalf, closest model in schema is trustee for CRE)
+            if fields.get("broker") and li.trustee is None:
+                li.trustee = fields["broker"]
+                loopnet["broker"] = fields["broker"]
+
+            # Cap rate stays in raw
+            if fields.get("cap_rate") is not None:
+                loopnet["cap_rate"] = fields["cap_rate"]
+
+            # Write back the updated loopnet block
+            li.raw["loopnet"] = loopnet
+            hydrated += 1
+            log.debug("crexi_multifamily.hydrated", pid=pid,
+                      price=fields.get("price"), units=fields.get("units"),
+                      broker=fields.get("broker"), cap_rate=fields.get("cap_rate"))
+
+            # Re-bank after each hydration
+            self.partial[:] = list(merged.values())
+
+        log.info("crexi_multifamily.hydrate_done",
+                 eligible=len(hydrate_eligible), hydrated=hydrated)
 
         out = list(merged.values())
         log.info("crexi_multifamily.done", total=len(out))
