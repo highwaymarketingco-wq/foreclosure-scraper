@@ -85,6 +85,46 @@ COUNTIES = (
     "Cherokee",
     "Union",
     "Laurens",
+    # Expanded 2026-11-09: operator authorized full SC sweep for distressed-type leads.
+    # All 46 SC counties that publish on the same PublicIndex host.
+    "Abbeville",
+    "Aiken",
+    "Allendale",
+    "Bamberg",
+    "Barnwell",
+    "Beaufort",
+    "Berkeley",
+    "Calhoun",
+    "Charleston",
+    "Chester",
+    "Chesterfield",
+    "Clarendon",
+    "Colleton",
+    "Darlington",
+    "Dillon",
+    "Dorchester",
+    "Edgefield",
+    "Fairfield",
+    "Florence",
+    "Georgetown",
+    "Greenville",
+    "Greenwood",
+    "Hampton",
+    "Horry",
+    "Jasper",
+    "Kershaw",
+    "Lancaster",
+    "Lee",
+    "Lexington",
+    "Marion",
+    "Marlboro",
+    "McCormick",
+    "Newberry",
+    "Richland",
+    "Saluda",
+    "Sumter",
+    "Williamsburg",
+    "York",
 )
 
 # (court_type_value, case_type_value, court_system_label) tuples we sweep.
@@ -93,6 +133,10 @@ COUNTIES = (
 SEARCHES = (
     ("G", "CP  ", "Common Pleas"),       # civil — debtor/owner defendants
     ("G", "GS  ", "General Sessions"),   # criminal — individual defendants
+    # Added 2026-11-09: Domestic Relations = divorce/separation (motivated seller signal)
+    ("G", "DR  ", "Domestic Relations"),
+    # Family Court (SC has a separate Family Court jurisdiction)
+    ("G", "FC  ", "Family Court"),
 )
 
 DATE_FILTER_FILED = "Filed"

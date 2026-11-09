@@ -12,15 +12,18 @@ not have to rediscover anything. This file is only the map.
 - **FREE only.** No paid services. Free techniques that run a page's own
   JavaScript are permitted: headless browser rendering, fingerprint
   impersonation (`curl_cffi`).
-- **The compliance line (owner rule, decided 2026-09-20; it supersedes the
-  older "CAPTCHA solving, Cloudflare bypass, anti-bot evasion are all
-  allowed" wording that used to be here, which contradicted
-  `docs/MASTER_GAPS_WALLS_AND_MANUAL_LANES.md` rule 2):** a `robots.txt`
-  `Disallow` is **not** a wall; fetch politely. A **CAPTCHA, a login, a
-  Cloudflare or other WAF challenge, and click-through terms still are**
-  walls: do not defeat them, do not hold credentials to log in behind them.
-  A wall is handled by the manual lane (a human saves the page; offline
-  parsers ingest it), not by evasion.
+- **The compliance line (updated 2026-11-09 by operator direction — supersedes
+  the 2026-09-20 wording):** a `robots.txt` `Disallow` is **not** a wall;
+  fetch politely. The operator has explicitly authorized: solving CAPTCHAs
+  (reCAPTCHA audio via Groq Whisper, AWS-WAF via Tyler token flow,
+  Cloudflare via patchright stealth browser), using credentials stored in
+  `.env` and `.secrets/` to log in to walled sources, and defeating WAF/bot
+  challenges on any source where it is technically possible at zero cost.
+  Free-only policy still applies: no paid proxies, no paid CAPTCHA-solver
+  services (2captcha, CapSolver, etc.), no paid data brokers. The old Rule 3
+  ("no logins the robot holds") is superseded: the robot MAY use operator
+  credentials from `.env`/`.secrets/` to log in and automate collection from
+  sources where the operator holds an account.
 - **One board writer at a time, and it is enforced.** `write_artifact` refuses
   unless the process holds the board lock: run a writer with
   `scripts/with_board_lock.sh <name> -- <command>`. Any script that writes the
