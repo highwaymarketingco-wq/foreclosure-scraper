@@ -4215,7 +4215,7 @@ def reseal_board(docs_dir: Path | str = "docs", *, resplit: bool = False,
 # back (2026-09-19). Every committed board is also in git history and the live
 # board is the newest state; 3 still covers the "a bad write just landed" case
 # the backup exists for. Override with BOARD_BACKUP_KEEP.
-_BACKUP_KEEP = max(1, int(os.environ.get("BOARD_BACKUP_KEEP", "3")))
+_BACKUP_KEEP = int(os.environ.get("BOARD_BACKUP_KEEP", "3"))  # 0 = skip backup
 
 
 def _backup_listings_board(listings_path: Path, backup_dir: Path, ts: str) -> Path:
@@ -4371,17 +4371,20 @@ def _count_guard_and_backup(docs: Path, listings_path: Path, new_count: int, sum
         _accepted_intentional = _intentional
         # --- timestamped backup ---
         _ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-        try:
-            _dest = _backup_listings_board(listings_path, _backup_dir, _ts)
-            if (docs / "listings_detail.json").exists():
-                shutil.copy2(docs / "listings_detail.json",
-                             _backup_dir / f"listings_detail_{_ts}.json")
-            elif (docs / "listings_detail.json.gz").exists():
-                shutil.copy2(docs / "listings_detail.json.gz",
-                             _backup_dir / f"listings_detail_{_ts}.json.gz")
-            log.info("web_artifact.backup_saved", path=str(_dest))
-        except Exception:  # noqa: BLE001 - backup failure must not block the write
-            log.warning("web_artifact.backup_failed", exc_info=True)
+        if _BACKUP_KEEP > 0:
+            try:
+                _dest = _backup_listings_board(listings_path, _backup_dir, _ts)
+                if (docs / "listings_detail.json").exists():
+                    shutil.copy2(docs / "listings_detail.json",
+                                 _backup_dir / f"listings_detail_{_ts}.json")
+                elif (docs / "listings_detail.json.gz").exists():
+                    shutil.copy2(docs / "listings_detail.json.gz",
+                                 _backup_dir / f"listings_detail_{_ts}.json.gz")
+                log.info("web_artifact.backup_saved", path=str(_dest))
+            except Exception:  # noqa: BLE001 - backup failure must not block the write
+                log.warning("web_artifact.backup_failed", exc_info=True)
+        else:
+            log.info("web_artifact.backup_skipped", reason="BOARD_BACKUP_KEEP=0")
         # --- prune old backups (keep the newest _BACKUP_KEEP of each) ---
         # Bug found 2026-09-17: the sibling-cleanup below rsplit() the main
         # file's stem on "_" to derive a prefix meant to also catch its
