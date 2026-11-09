@@ -37,7 +37,13 @@ _LAYER = (
     "https://services.arcgis.com/VTyQ9soqVukalItT/arcgis/rest/services/"
     "Multifamily_Properties_Assisted/FeatureServer/0/query"
 )
-_OUT = "PROPERTY_ID,PROPERTY_NAME_TEXT,STD_ADDR,STD_CITY,STD_ST,STD_ZIP5"
+_OUT = (
+    "PROPERTY_ID,PROPERTY_NAME_TEXT,STD_ADDR,STD_CITY,STD_ST,STD_ZIP5,"
+    "TOTAL_UNIT_COUNT,TOTAL_ASSISTED_UNIT_COUNT,"
+    "PROPERTY_ON_SITE_PHONE_NUMBER,MGMT_CONTACT_MAIN_PHN_NBR,"
+    "MGMT_CONTACT_EMAIL_TEXT,MGMT_AGENT_ORG_NAME,"
+    "REAC_LAST_INSPECTION_SCORE,REAC_LAST_INSPECTION_DATE"
+)
 
 
 def _has_real_address(li: Listing) -> bool:
@@ -79,6 +85,14 @@ async def _build_index() -> dict[str, dict]:
             "zip": (a.get("STD_ZIP5") or "").strip() or None,
             "lat": g.get("y"),
             "lng": g.get("x"),
+            "total_units": a.get("TOTAL_UNIT_COUNT"),
+            "assisted_units": a.get("TOTAL_ASSISTED_UNIT_COUNT"),
+            "site_phone": (a.get("PROPERTY_ON_SITE_PHONE_NUMBER") or "").strip() or None,
+            "mgmt_phone": (a.get("MGMT_CONTACT_MAIN_PHN_NBR") or "").strip() or None,
+            "mgmt_email": (a.get("MGMT_CONTACT_EMAIL_TEXT") or "").strip() or None,
+            "mgmt_org": (a.get("MGMT_AGENT_ORG_NAME") or "").strip() or None,
+            "reac_score": a.get("REAC_LAST_INSPECTION_SCORE"),
+            "reac_date_ms": a.get("REAC_LAST_INSPECTION_DATE"),
         }
     return idx
 
@@ -124,9 +138,34 @@ async def enrich_hud_reac_address(listings: Iterable[Listing]) -> dict:
             li.longitude = float(hit["lng"])
         if not isinstance(li.raw, dict):
             li.raw = {}
-        li.raw.setdefault("reac", {})["hud_address_source"] = "Multifamily_Properties_Assisted"
+        reac = li.raw.setdefault("reac", {})
+        reac["hud_address_source"] = "Multifamily_Properties_Assisted"
+        # Wire additional fields from the ArcGIS layer
+        if hit["total_units"] is not None:
+            reac["total_units"] = hit["total_units"]
+            # unit_count is the standard first-class field name in this codebase
+            li.raw.setdefault("unit_count", hit["total_units"])
+        if hit["assisted_units"] is not None:
+            reac["assisted_units"] = hit["assisted_units"]
+        # Phone: prefer on-site phone; fall back to mgmt phone
+        site_ph = hit["site_phone"]
+        mgmt_ph = hit["mgmt_phone"]
+        if site_ph:
+            reac.setdefault("site_phone", site_ph)
+        if mgmt_ph:
+            reac.setdefault("mgmt_phone", mgmt_ph)
+        # Management contact
+        if hit["mgmt_email"]:
+            reac.setdefault("mgmt_email", hit["mgmt_email"])
+        if hit["mgmt_org"]:
+            reac.setdefault("mgmt_org", hit["mgmt_org"])
+        # ArcGIS-layer REAC score (overrides if available and not already set)
+        if hit["reac_score"] is not None:
+            reac.setdefault("arcgis_reac_score", hit["reac_score"])
         matched += 1
 
     log.info("hud_reac_addr.done", matched=matched, geo_filled=geo_filled,
              targets=len(targets))
-    return {"matched": matched, "geo_filled": geo_filled, "targets": len(targets)}
+    return {"matched": matched, "geo_filled": geo_filled, "targets": len(targets),
+            "new_fields": ["total_units", "assisted_units", "site_phone",
+                           "mgmt_phone", "mgmt_email", "mgmt_org", "arcgis_reac_score"]}

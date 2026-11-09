@@ -495,18 +495,15 @@ async def _wait_search_form(page) -> bool:
 async def _select_case_category(page, labels: tuple[str, ...]) -> bool:
     """Pick the case category in the Smart Search advanced filter.
 
-    Tyler renders the category as a <select> (often #cboHSSearchCategories or
-    a 'Case Category' select). We match an <option> whose text contains any of
-    `labels` and select it, firing change so the SPA updates the filter.
+    Tyler renders the category as a native <select> on some portal versions,
+    but on the NC portal it uses Kendo UI MultiSelect/TreeView widgets --
+    querySelectorAll('select') returns 0. We try three approaches in order:
+    1. Native <select> (older Tyler deployments).
+    2. Kendo UI MultiSelect: click the widget, find and click the matching item.
+    3. Data-attribute injection: find the hidden category input and set it directly.
+    If all fail, return False and the caller falls through to the WAF-block path.
     """
     labels_lc = [l.lower() for l in labels]
-    # Retried up to 3 times (short exponential-jitter backoff) on a Playwright
-    # transport/timeout error -- same single-point-of-failure shape as the
-    # page.goto / page.wait_for_selector sites above: a bare page.evaluate
-    # with zero retry cushioning aborts the whole run
-    # (category_select_failed_abort) on one transient blip. Playwright's own
-    # Error/TimeoutError plus a bare stdlib TimeoutError are retried; any other
-    # exception still returns False immediately below, unretried.
     try:
         result = None
         async for attempt in AsyncRetrying(
@@ -518,6 +515,7 @@ async def _select_case_category(page, labels: tuple[str, ...]) -> bool:
             with attempt:
                 result = await page.evaluate(
                     """(labels) => {
+                        // Approach 1: native <select>
                         const sels = [...document.querySelectorAll('select')];
                         for (const s of sels) {
                             for (const o of s.options) {
@@ -529,6 +527,50 @@ async def _select_case_category(page, labels: tuple[str, ...]) -> bool:
                                 }
                             }
                         }
+
+                        // Approach 2: Kendo UI MultiSelect/DropDownList
+                        // The widget text items are in <li> elements inside a
+                        // .k-list-container or [data-role=listbox] popup.
+                        // We look for ANY visible list item whose text matches.
+                        const kItems = [...document.querySelectorAll(
+                            '.k-item, .k-list-item, li[role=option], ' +
+                            '[data-role=listbox] li, .k-multiselect-wrap li'
+                        )];
+                        for (const item of kItems) {
+                            const t = (item.textContent || '').toLowerCase().trim();
+                            if (labels.some(l => t.includes(l))) {
+                                item.click();
+                                return true;
+                            }
+                        }
+
+                        // Approach 3: Find embedded category JSON and inject via
+                        // the hidden caseCriteria_CaseCategories field (Tyler SPA pattern)
+                        const hiddenInputs = [...document.querySelectorAll(
+                            'input[type=hidden][name*=Categor], input[type=hidden][id*=Categor]'
+                        )];
+                        for (const inp of hiddenInputs) {
+                            // Try to find the matching value from sibling data
+                            const container = inp.closest('form, .search-form, .k-widget') || document;
+                            const dataNodes = [...container.querySelectorAll('[data-items], [data-source]')];
+                            for (const node of dataNodes) {
+                                try {
+                                    const src = node.getAttribute('data-items') ||
+                                                node.getAttribute('data-source') || '';
+                                    const items = JSON.parse(src);
+                                    if (!Array.isArray(items)) continue;
+                                    for (const item of items) {
+                                        const text = (item.Text || item.text || item.Name || '').toLowerCase();
+                                        if (labels.some(l => text.includes(l))) {
+                                            inp.value = item.Value || item.value || item.Id || text;
+                                            inp.dispatchEvent(new Event('change', {bubbles:true}));
+                                            return true;
+                                        }
+                                    }
+                                } catch(e) {}
+                            }
+                        }
+
                         return false;
                     }""",
                     labels_lc,
