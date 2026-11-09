@@ -2877,6 +2877,22 @@ async def run() -> int:
     except Exception:
         log.error("sos_agent.failed", traceback=traceback.format_exc())
 
+    # SC SOS business entity status — for SC LLC-owned listings, look up
+    # dissolution/revocation status on businessfilings.sc.gov via patchright +
+    # Groq Whisper audio-CAPTCHA solver. ONE browser session per run, all names
+    # loop through it. Gated OFF by default (SC_SOS_ENTITY=1). Mac-only: residential
+    # IP gives much better reCAPTCHA solve rates than datacenter IPs.
+    if os.environ.get("SC_SOS_ENTITY") == "1":
+        try:
+            from .scrapers.national.sc_sos_entity import enrich_sc_sos_entity
+            s = await _await_capped(
+                enrich_sc_sos_entity(enriched), "sc_sos_entity", default_s=2400
+            )
+            if s:
+                enrichment_stats["sc_sos_entity"] = s
+        except Exception:
+            log.error("sc_sos_entity.failed", traceback=traceback.format_exc())
+
     # qPayBill county tax portal — fills the per-parcel delinquent tax BALANCE the
     # tax-sale-LIST scrapers can't (SC Spartanburg etc. publish parcel+owner but no
     # amount). Network-heavy per-surname query, so self-gates on QPAYBILL_TAX=1;

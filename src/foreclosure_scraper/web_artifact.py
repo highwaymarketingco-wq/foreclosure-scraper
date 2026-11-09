@@ -2379,7 +2379,8 @@ RAW_KEEP = {
     "red_flags": "*",                  # unified red flag array [{severity, type, description, source}]
     "sos_dissolution": "*",            # NC SOS LLC dissolution status
     "sos_screen": "*",                 # {checked, status, checked_at}: a completed SOS lookup that was
-                                       # NOT dissolved/admin_dissolved/suspended -- "checked" for the gap
+                                       # matrix, never a positive hit (that stays sos_dissolution/sos_status only)
+    "sc_sos_entity": "*",              # SC SOS entity status (dissolution/revocation) for SC LLC-owned leads
                                        # matrix, never a positive hit (that stays sos_dissolution/sos_status only)
     "tax_aging_surfaced": "*",         # surfaced tax aging status for all listings
     # 2026-10-03: real sibling key scripts/surface_tax_aging.py always wrote alongside
