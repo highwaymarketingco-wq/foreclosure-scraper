@@ -357,7 +357,7 @@ class CherokeeDelinquentTaxScraper(BaseScraper):
 
         if not media_items:
             self.last_outcome = OUTCOME_ZERO
-            return
+            return self.partial
 
         log.info("cherokee_delinquent_tax.media_found", count=len(media_items),
                  page_links_not_in_media_search=len(page_new))
@@ -415,6 +415,7 @@ class CherokeeDelinquentTaxScraper(BaseScraper):
 
         # Step 3: Emit listings (dedupe by TMS)
         seen: set[str] = set()
+        out = self.partial
         for row in all_rows:
             tms = row.get("tms", "")
             owner = row.get("owner", "")
@@ -439,7 +440,7 @@ class CherokeeDelinquentTaxScraper(BaseScraper):
             # on a leading digit -- Spartanburg's FLC list audit this same
             # session found that guard incorrectly nulls real situs text.
             desc = row.get("description")
-            yield Listing(
+            out.append(Listing(
                 source=self.slug,
                 source_url=WP_MEDIA_URL,
                 county="Cherokee",
@@ -455,6 +456,7 @@ class CherokeeDelinquentTaxScraper(BaseScraper):
                     "description": desc,
                     "item_number": row.get("item"),
                 },
-            )
+            ))
 
         self.last_outcome = OUTCOME_OK if all_rows else OUTCOME_ZERO
+        return out

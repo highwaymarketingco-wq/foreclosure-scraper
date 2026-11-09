@@ -94,7 +94,7 @@ def _run_fetch(monkeypatch):
     monkeypatch.setattr(mod, "_extract_pdf_text", lambda data: SAMPLE_TEXT)
 
     async def collect():
-        return [li async for li in CherokeeDelinquentTaxScraper().fetch()]
+        return list(await CherokeeDelinquentTaxScraper().fetch())
 
     return asyncio.run(collect())
 
