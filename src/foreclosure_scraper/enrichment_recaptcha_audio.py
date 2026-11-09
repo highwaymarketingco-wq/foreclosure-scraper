@@ -95,7 +95,13 @@ async def _get_whisper_model():
 # ---------------------------------------------------------------------------
 
 async def transcribe_audio(audio_path: str) -> str:
-    """Transcribe an audio file with faster-whisper, return the text.
+    """Transcribe an audio file — tries Groq Whisper first (if key available),
+    falls back to local faster-whisper.
+
+    Groq Whisper is preferred: it uses the same proven technique that cleared
+    reCAPTCHA v2 on businessfilings.sc.gov (48 real rows, 2026-10-12) and
+    runs the same whisper-large-v3 model but on Groq's GPU, with a tighter
+    reCAPTCHA-specific prompt.
 
     Args:
         audio_path: Path to the downloaded audio file (mp3/wav).
@@ -103,6 +109,53 @@ async def transcribe_audio(audio_path: str) -> str:
     Returns:
         The transcribed text (lowercased, stripped).
     """
+    # Try Groq first
+    groq_key = os.environ.get("GROQ_API_KEY", "")
+    if not groq_key:
+        for path in ["~/.secrets/groq_api_key.txt", ".secrets/groq_api_key.txt"]:
+            try:
+                with open(os.path.expanduser(path)) as f:
+                    groq_key = f.read().strip()
+                if groq_key:
+                    break
+            except Exception:
+                pass
+
+    if groq_key:
+        try:
+            import httpx as _httpx
+            with open(audio_path, "rb") as af:
+                audio_bytes = af.read()
+            content_type = "audio/wav" if audio_path.endswith(".wav") else "audio/mpeg"
+            files = {
+                "file": (os.path.basename(audio_path), audio_bytes, content_type),
+                "model": (None, "whisper-large-v3"),
+                "language": (None, "en"),
+                "response_format": (None, "json"),
+                "temperature": (None, "0"),
+                "prompt": (
+                    None,
+                    "A distorted robotic voice reads a sequence of numbers and "
+                    "single letters. Transcribe ONLY the numbers and letters, "
+                    "nothing else. Example: 7 3 9 2 5 1",
+                ),
+            }
+            async with _httpx.AsyncClient(timeout=30) as c:
+                resp = await c.post(
+                    "https://api.groq.com/openai/v1/audio/transcriptions",
+                    headers={"Authorization": f"Bearer {groq_key}"},
+                    files=files,
+                )
+            if resp.status_code == 200:
+                text = resp.json().get("text", "").strip().lower()
+                log.info("recaptcha.transcribed_groq", text=text)
+                return text
+            else:
+                log.warning("recaptcha.groq_error", status=resp.status_code)
+        except Exception as exc:
+            log.warning("recaptcha.groq_exception", error=str(exc)[:120])
+
+    # Fall back to local faster-whisper
     model = await _get_whisper_model()
 
     def _transcribe():
@@ -117,7 +170,7 @@ async def transcribe_audio(audio_path: str) -> str:
         return text
 
     text = await asyncio.to_thread(_transcribe)
-    log.info("recaptcha.transcribed", text=text, audio=audio_path)
+    log.info("recaptcha.transcribed_local", text=text, audio=audio_path)
     return text
 
 
