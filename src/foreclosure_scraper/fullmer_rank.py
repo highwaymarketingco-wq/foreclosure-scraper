@@ -305,18 +305,41 @@ def _owner_count(li: Listing) -> int:
     ways -- more owners means more risk AND a cheaper entry per share, because a
     disengaged co-heir sells an interest for $500-$2,000.
 
-    KNOWN GAP, left as-is (Dirty Deeds synthesis numeric-rules section): "Count
-    probates, not heirs (three post-deceased heirs each with a spouse and three
-    kids is 12 heirs and 3 probates)." This function has no heir-enumeration or
-    probate-count field to draw on -- there is no scraper anywhere in this repo
-    that lists individual heirs by name (confirmed: no `heirs`/`heir_names` raw
-    key exists) -- so it counts separator-joined NAMES on the county's own
-    owner_name/defendant string, which is already closer to "how many parties
-    does the county show" than to a full heir enumeration. The "et al"/"heirs"
-    branch below is a bare sentinel (unknown-but-many, scored as 4), not a real
-    count, and cannot be corrected into a probate count without new data. Do not
-    reinterpret the sentinel as a literal owner count elsewhere in this module.
+    Prefers a real resolved heir count when one exists: `raw['heir_candidates']`
+    (built by enrichment_heir_candidates.py, the PUBLISHED form -- owner decision
+    2026-10-07) lists named heir/PR candidates with a `relation`; we count entries
+    whose relation is in `PUBLISHABLE_HEIR_RELATIONS` (the same filter
+    call_ready.estate_fact() uses for its published `heirs` count). This was
+    previously wired nowhere in this module despite existing on the board.
+
+    REMAINING GAP (Dirty Deeds synthesis numeric-rules section): "Count probates,
+    not heirs (three post-deceased heirs each with a spouse and three kids is 12
+    heirs and 3 probates)." Even the real heir-candidate count above is a HEIR
+    count, not a PROBATE count -- there is still no probate-count field in this
+    repo, so a row with a large resolved heir list still overstates probate
+    complexity relative to Dirty Deeds' own framing. Only once no heir-candidate
+    data resolves for the row do we fall back to the old proxy: separator-joined
+    NAMES on the county's own owner_name/defendant string, which is closer to
+    "how many parties does the county show" than to a heir enumeration. The
+    "et al"/"heirs" branch below is a bare sentinel (unknown-but-many, scored as
+    4), not a real count, and cannot be corrected into a probate count without
+    new data. Do not reinterpret the sentinel as a literal owner count elsewhere
+    in this module.
     """
+    from .enrichment_heir_candidates import PUBLISHABLE_HEIR_RELATIONS
+
+    hc = _raw(li).get("heir_candidates")
+    if isinstance(hc, list):
+        resolved = 0
+        for c in hc:
+            if not isinstance(c, dict):
+                continue
+            rel = str(c.get("relation") or "").strip().lower()
+            if rel in PUBLISHABLE_HEIR_RELATIONS:
+                resolved += 1
+        if resolved > 0:
+            return resolved
+
     parts = []
     for f in (li.owner_name, li.defendant):
         s = (f or "").strip()

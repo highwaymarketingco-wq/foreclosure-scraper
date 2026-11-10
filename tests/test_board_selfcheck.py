@@ -296,11 +296,21 @@ def test_arv_over_2m_with_max_bid_is_flagged(tmp_path):
 
 def test_contradicted_arv_deal_verdict_and_equity_are_flagged(tmp_path):
     mod = _load_selfcheck()
-    flag = next(iter(mod.CONTRADICTED))
-    board = [_row("P1", {"arv_flags": [flag], "deal_status": "GREAT"}, equity_value=75_000)]
+    # 2026-11-10: deal_status is as-is-anchored now, so only an AS_IS_CONTRADICTED flag
+    # (not just any ARV-contradicted flag) should withhold it -- equity is still
+    # ARV-anchored, so any ARV-contradicted flag still withholds that one.
+    arv_only_flag = next(f for f in mod.CONTRADICTED if f not in mod.AS_IS_CONTRADICTED)
+    as_is_flag = next(iter(mod.AS_IS_CONTRADICTED))
+
+    board = [_row("P1", {"arv_flags": [arv_only_flag], "deal_status": "GREAT"}, equity_value=75_000)]
     inv = {i["name"]: i for i in mod.invariants(board)}
-    assert inv["no deal verdict on a contradicted ARV"]["count"] == 1
+    assert inv["no deal verdict on a contradicted as-is anchor"]["count"] == 0
     assert inv["no equity on a contradicted ARV"]["count"] == 1
+
+    board2 = [_row("P1", {"arv_flags": [as_is_flag], "deal_status": "GREAT"}, equity_value=75_000)]
+    inv2 = {i["name"]: i for i in mod.invariants(board2)}
+    assert inv2["no deal verdict on a contradicted as-is anchor"]["count"] == 1
+    assert inv2["no equity on a contradicted ARV"]["count"] == 1
 
 
 # ===========================================================================
@@ -402,18 +412,21 @@ def _old_invariants(board: list) -> list[dict]:
     whole-board-list pattern in the script itself."""
     mod = _load_selfcheck()
     CONTRADICTED, MONEY_FIELDS = mod.CONTRADICTED, mod.MONEY_FIELDS
+    AS_IS_CONTRADICTED = mod.AS_IS_CONTRADICTED
     FUSION_THRESHOLD = mod.FUSION_THRESHOLD
     _calc, _identifier = mod._calc, mod._identifier
 
     out = []
     contra = [r for r in board if any(f in (_calc(r).get("arv_flags") or [])
                                       for f in CONTRADICTED)]
+    as_is_contra = [r for r in board if any(f in (_calc(r).get("arv_flags") or [])
+                                            for f in AS_IS_CONTRADICTED)]
     for field in MONEY_FIELDS:
         bad = [r for r in contra if _calc(r).get(field)]
         out.append({"name": f"no {field} on a contradicted ARV", "count": len(bad),
                     "must_be": 0, "ok": not bad})
-    bad = [r for r in contra if _calc(r).get("deal_status")]
-    out.append({"name": "no deal verdict on a contradicted ARV", "count": len(bad),
+    bad = [r for r in as_is_contra if _calc(r).get("deal_status")]
+    out.append({"name": "no deal verdict on a contradicted as-is anchor", "count": len(bad),
                 "must_be": 0, "ok": not bad})
     bad = [r for r in contra if (((r.get("raw") or {}).get("equity") or {}).get("value"))]
     out.append({"name": "no equity on a contradicted ARV", "count": len(bad),

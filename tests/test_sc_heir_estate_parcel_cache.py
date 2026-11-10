@@ -46,8 +46,9 @@ def fake_county(tmp_path, monkeypatch):
         dict(id="200-02-02", owner="ESTATE OF JANE DOE", address="2 OAK ST",
              owner_mailing=None, acreage=2.0, market_value=90000.0, tax_value=70000.0,
              land_use="101"),
-        # Noise this classifier must drop: LIFE ESTATE (space) and LIFE-ESTATE
-        # (hyphen, the 2026-10-19 Greenville finding).
+        # 2026-11-10: LIFE ESTATE (space) and LIFE-ESTATE (hyphen, the 2026-10-19
+        # Greenville finding) are a real lead type now, not noise -- kept and
+        # tagged life_estate, never probate/estate (the owner hasn't died).
         dict(id="300-03-03", owner="JONES MARY LIFE ESTATE", address="3 ELM ST",
              owner_mailing=None, acreage=1.5, market_value=60000.0, tax_value=50000.0,
              land_use="101"),
@@ -99,13 +100,23 @@ def test_fetch_keeps_real_decedent_rows_and_drops_noise(fake_county):
     s.partial = []
     rows = asyncio.run(s.fetch())
     owners = {li.defendant for li in rows}
-    assert owners == {"SMITH JOHN HEIRS", "ESTATE OF JANE DOE"}
+    assert owners == {"SMITH JOHN HEIRS", "ESTATE OF JANE DOE",
+                       "JONES MARY LIFE ESTATE", "CLARK LOTTIE B (LIFE-ESTATE)"}
+    life_estate_owners = {"JONES MARY LIFE ESTATE", "CLARK LOTTIE B (LIFE-ESTATE)"}
     for li in rows:
         assert li.listing_type == ListingType.ESTATE_LEAD
         assert li.state == "SC"
         assert li.raw["heir_estate"]["owner_of_record"] == li.defendant
-        assert li.raw["relationship_signal"]["kind"] == "probate"
         assert li.source == m.SCHeirEstateParcelCache.slug
+        if li.defendant in life_estate_owners:
+            assert li.raw["relationship_signal"]["kind"] == "life_estate"
+            assert li.raw["heir_estate"]["match"] == "life_estate"
+            assert li.raw["heir_estate"]["life_estate"] is True
+            assert li.raw["life_events"] == ["life_estate"]
+        else:
+            assert li.raw["relationship_signal"]["kind"] == "probate"
+            assert li.raw["heir_estate"].get("life_estate") is False
+            assert "life_events" not in li.raw
 
 
 def test_fetch_sets_parcel_id_from_the_deduped_id(fake_county):
@@ -121,7 +132,7 @@ def test_fetch_run_stats_count_rows_and_county(fake_county):
     s.partial = []
     asyncio.run(s.fetch())
     assert s.run_stats["counties"] == 1
-    assert s.run_stats["kept"] == 2
+    assert s.run_stats["kept"] == 4  # 2026-11-10: + the 2 life-estate rows, no longer noise
     assert s.run_stats["rows_read"] == 6  # 7 raw rows, 1 collapsed id-variant
 
 

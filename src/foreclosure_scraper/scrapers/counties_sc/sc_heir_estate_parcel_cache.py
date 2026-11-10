@@ -15,14 +15,19 @@ Live-sampled all 18 (`scripts/` scratch scan, 2026-10-19, pure local, zero netwo
 with the SAME classifiers nc_heir_estate_parcels.py uses (`_is_decedent`/
 `_excluded_row`, imported here, not reimplemented): ~8,100 real decedent-titled
 parcels after exclusions, cleanly separated from noise (LLC/HOA/church/bank names,
-"LIFE ESTATE"/"REAL ESTATE"/"ESTATES" false positives). Greenville alone came back to
-38 after fixing a real gap the sampling found in the shared classifier (Greenville's
-cache spells it "LIFE-ESTATE", hyphen, which the old `_EXCLUDE` tuple's literal
-"LIFE ESTATE" substring never matched -- see that module's 2026-10-19 comment) --
-matching the ~40 Greenville parcels an entirely separate live check already found and
-reported in project_gap_matrix_sweep1_2026-10-18.md. That match is the calibration
-check for this module: the same signal, read a different way, lands on the same
-number.
+"REAL ESTATE"/"ESTATES" false positives). Greenville alone came back to 38 after
+fixing a real gap the sampling found in the shared classifier (Greenville's cache
+spells it "LIFE-ESTATE", hyphen -- see that module's 2026-10-19 comment) -- matching
+the ~40 Greenville parcels an entirely separate live check already found and reported
+in project_gap_matrix_sweep1_2026-10-18.md. That match is the calibration check for
+this module: the same signal, read a different way, lands on the same number.
+
+UPDATE 2026-11-10: nc_heir_estate_parcels.py's `_EXCLUDE` no longer discards
+"LIFE ESTATE"/"LIFE-ESTATE" as noise -- DPA treats a living life-tenant as a real,
+distinct lead type (buying a remainderman's future interest), not noise. Since this
+module imports that file's `_excluded_row` directly rather than reimplementing it,
+life-estate rows from these 18 counties now pass through here too; see `_is_life_estate`
+below for how they're tagged (never as `"probate"`/`"estate"` -- the owner hasn't died).
 
 Pure-local, no network, no rate-limit risk: reads a SQLite file already on disk. Each
 physical parcel is indexed under 1-3 id-format variants in the cache (one row per
@@ -44,6 +49,7 @@ from ..counties_nc.nc_heir_estate_parcels import (
     _excluded_row,
     _heir_names,
     _is_decedent,
+    _is_life_estate,
     _HEIR_TOKEN,
 )
 
@@ -171,7 +177,9 @@ class SCHeirEstateParcelCache(BaseScraper):
                 if not owner:
                     continue
                 owner_fields = [owner]
-                if not _is_decedent(owner_fields) or _excluded_row(owner_fields):
+                is_life_estate = _is_life_estate(owner_fields)
+                if not is_life_estate and (
+                        not _is_decedent(owner_fields) or _excluded_row(owner_fields)):
                     continue
                 mailing = rec.get("owner_mailing")
                 mail = str(mailing).strip() if mailing else None
@@ -196,8 +204,11 @@ class SCHeirEstateParcelCache(BaseScraper):
                     parcel_id=(str(rec["_id"]).strip() if rec.get("_id") else None),
                     defendant=owner,
                     sale_date=_parse_iso_date(rec.get("sale_date")),
-                    description=f"Heir/estate owner of record ({owner}) in "
-                                f"{county} County, SC",
+                    description=(
+                        f"Life estate owner of record ({owner}) in {county} County, SC"
+                        if is_life_estate else
+                        f"Heir/estate owner of record ({owner}) in {county} County, SC"
+                    ),
                     first_seen=datetime.utcnow(),
                     last_seen=datetime.utcnow(),
                     raw={
@@ -205,14 +216,18 @@ class SCHeirEstateParcelCache(BaseScraper):
                             "owner_of_record": owner,
                             "heir_names": _heir_names(owner_fields),
                             "mailing": mail,
-                            "match": "heirs" if _HEIR_TOKEN.search(owner) else "estate",
+                            "match": ("life_estate" if is_life_estate else
+                                       "heirs" if _HEIR_TOKEN.search(owner) else "estate"),
+                            "life_estate": is_life_estate,
                             "source": "parcel_cache",
                         },
                         "relationship_signal": {
-                            "kind": "probate",
-                            "keyword": "heir_estate_owner_of_record",
+                            "kind": "life_estate" if is_life_estate else "probate",
+                            "keyword": ("life_estate_owner_of_record" if is_life_estate else
+                                        "heir_estate_owner_of_record"),
                             "source": self.slug,
                         },
+                        **({"life_events": ["life_estate"]} if is_life_estate else {}),
                     },
                 )
                 out.append(li)

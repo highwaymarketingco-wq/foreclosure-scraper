@@ -4,12 +4,44 @@ Grades are computed from data we already have (or that the calc produces).
 Each dimension is a 0-100 score, then mapped:
   90+: A   80-89: B   65-79: C   50-64: D   <50: F
 
-This module ALSO owns the ARV TRUST GATE (see the block below): the single
-decision about whether a valuation is solid enough to publish a verdict and a
-bid off. It lives here because the letter grade and the deal verdict are the
-same claim at two resolutions, and splitting that decision across two files is
-exactly how the board came to withhold the letter while still printing
-"GREAT — max bid $1,271,200" on the same row.
+THE PRIMARY VERDICT IS AS-IS ANCHORED, NOT ARV ANCHORED (re-pointed
+2026-11-10). The coaching program this pipeline is built for (Distressed
+Property Advisors / DPA) has one repeated rule: never price or grade off ARV,
+as-is value only. `deal_status` (calc.py) and the `financial`/`overall`
+letter (this file) are now driven by calc.py's AS-IS offer band
+(`as_is_value` / `offer_low` / `offer_target` / `offer_max`, built from the
+county's own 100%-basis appraisal via `_anchor_value`) — see
+`_financial_score` and `as_is_trust` below. `bid_to_arv_pct` / `max_bid_70` /
+`roi_pct` remain a clearly SECONDARY, clearly-labeled flip-upside figure: DPA
+operators doing a flip still want it, so it is still computed and still shown,
+but it no longer anchors the trust/grade verdict.
+
+This module owns TWO trust gates, not one, and they protect different
+things:
+  `arv_trust` / `apply_arv_trust_gate`  — protects the SECONDARY, ARV-derived
+      money (`ARV_DERIVED_MONEY_FIELDS`) from a bad or missing ARV. Unchanged.
+  `as_is_trust` (new)                   — protects the PRIMARY, as-is-anchored
+      verdict (`ARV_VERDICT_FIELDS`: deal_status/deal_message/haircut_needed)
+      from a bad or missing AS-IS ANCHOR. This is the re-pointing: before this
+      change, ANY `arv_flags` entry withheld the verdict even when the flag
+      said nothing about the anchor the as-is verdict would have used -- which
+      is exactly backwards once the verdict stops being ARV-derived. See
+      `as_is_trust`'s own comment for which flags actually earned a seat in
+      its (deliberately narrow) sets.
+Both gates still run from the one shared seam (`apply_arv_trust_gate`, called
+from `grade()`), so every one of the 13 producers of `raw['calc']` gets both
+for free, same as before.
+
+THE INCIDENT THAT PROVED THE OLD DESIGN WRONG, preserved because the numbers
+are still the ground truth for why either gate exists: 3646 Summer Rd,
+Henderson NC -- an ARV 7.4x the county's own $230,200 appraisal -- published
+"GREAT, ROI 192.6%, max bid $1,271,200" while a separate guard correctly
+withheld the LETTER grade on that same row. Splitting the decision across two
+files is how that happened. Under the new design the verdict is built from
+the $230,200 anchor directly and `arv_above_anchor` (an ARV-vs-anchor
+disagreement, not a defect IN the anchor) no longer has any say over it --
+see the Henderson trace in the fix's own report / commit message for the
+worked-through before/after.
 """
 from __future__ import annotations
 
@@ -376,6 +408,103 @@ def arv_trust(arv_flags, arv_expected, arv_withheld=None) -> str:
     return _TRUST_OK
 
 
+# ===========================================================================
+# AS-IS TRUST GATE (added 2026-11-10) — protects the now-PRIMARY, as-is-
+# anchored verdict (`ARV_VERDICT_FIELDS`) from a bad or missing AS-IS ANCHOR.
+# This is the re-pointed half of the ARV trust gate's mechanism: same shape
+# (withheld/contradicted/weak/ok classify into the same field-nulling idiom
+# in `apply_arv_trust_gate` / `gate_calc_dict`), different question.
+#
+# DELIBERATELY NARROW, and that narrowness is the whole fix. Most of
+# ARV_FLAGS_CONTRADICTED / ARV_FLAGS_WEAK_EVIDENCE are about the ARV's OWN
+# construction (a comp pool, a $/sqft tier, a bid-proxy multiple) or about the
+# ARV disagreeing WITH the county anchor (`arv_above_anchor` and friends) --
+# neither claim says the anchor itself (`calc._anchor_value`: county market
+# value / assessor appraised value / tax value) is wrong. Gating the as-is
+# verdict on those would reproduce the exact Henderson defect one layer down:
+# withholding a verdict that was never built from the thing that is flagged.
+# Only two flags actually impugn the anchor `as_is_value` is built from:
+AS_IS_FLAGS_CONTRADICTED = frozenset({
+    # The SAME county figure is stamped on many parcels -- see
+    # ARV_FLAGS_CONTRADICTED's own comment (SHARED_ANCHOR_FLAG,
+    # enrichment_board_qa._retract_shared_anchor). It is not an appraisal of
+    # THIS property, so it cannot anchor an as-is offer on this property
+    # either -- the same fact that disqualifies it as an ARV anchor.
+    "anchor_shared_across_parcels",
+    # The assessor row is a mis-joined commercial parcel. In practice
+    # `_anchor_value` already vetoes this before `as_is_value` is ever set
+    # (`_commercial_building_type`), so WITHHELD (missing input, below) fires
+    # first on the live path. Listed anyway, not for redundancy's own sake,
+    # but so a future caller that reads `as_is_value` off an OLDER/legacy
+    # serialized dict (built before that veto existed, or by some other
+    # writer) still fails safe instead of silently trusting a known-bad join.
+    "cama_class_mismatch",
+})
+# Both of the above are also in ARV_FLAGS_CONTRADICTED -- enforced, not just
+# commented, so the two vocabularies cannot quietly drift apart.
+assert AS_IS_FLAGS_CONTRADICTED <= ARV_FLAGS_CONTRADICTED
+
+AS_IS_FLAGS_WEAK = frozenset({
+    # `_anchor_value` took the FIRST of (market_value, appraised_value,
+    # tax_value) without asking whether the other two agree -- see
+    # COUNTY_VALUE_DISAGREE_MULT in calc.py. The figure `as_is_value` ended up
+    # holding was picked by field order, not by evidence, which is exactly
+    # the "knife-edge verdict cannot survive this ambiguity" case the WEAK
+    # tier exists for everywhere else in this file. The dollars (offer bands)
+    # stay -- same rule as every other WEAK flag -- because the magnitude is
+    # not disputed, only which of two agreeing-adjacent records was chosen.
+    "county_values_disagree",
+})
+assert AS_IS_FLAGS_WEAK <= ARV_FLAGS_WEAK_EVIDENCE
+
+# Deliberately NOT "any unrecognised flag fails safe to weak" the way
+# `arv_trust` does. `arv_trust`'s fail-safe default is correct there because
+# EVERY flag in calc.py's vocabulary is about the ARV, so an unknown one is
+# presumed to be too. Here most of that same vocabulary is explicitly NOT
+# about the anchor (`bid_proxy_arv`, `comp_kind_mismatch`, every land-comp
+# flag, ...) -- defaulting an unrecognised flag to WEAK here would silently
+# re-couple the as-is verdict to ARV-only noise, i.e. undo this fix by
+# default the next time V1 adds a flag to calc.py. A future flag that SHOULD
+# gate the as-is verdict has to be named in one of the two sets above, same
+# as `anchor_shared_across_parcels` / `cama_class_mismatch` were.
+def as_is_trust(arv_flags, as_is_value) -> str:
+    """Classify the AS-IS anchor's trust: 'withheld' | 'contradicted' | 'weak' | 'ok'.
+
+    Pure function, same contract as `arv_trust` (reads the serialized dict's
+    fields, no re-computation), and reads the SAME `arv_flags` list calc.py
+    already emits -- one flag vocabulary, not two -- but only the AS_IS_*
+    subsets above change the answer.
+    """
+    flags = set(arv_flags or ())
+    if as_is_value is None:
+        # No county market/appraised/tax figure at all (or a legacy dict from
+        # before this field existed): nothing to verify a verdict against, so
+        # any verdict sitting in the dict is unsupported and must not survive.
+        return _TRUST_WITHHELD
+    if flags & AS_IS_FLAGS_CONTRADICTED:
+        return _TRUST_CONTRADICTED
+    if flags & AS_IS_FLAGS_WEAK:
+        return _TRUST_WEAK
+    return _TRUST_OK
+
+
+def _asis_gate_note(level: str) -> str:
+    if level == _TRUST_WITHHELD:
+        return (
+            "No deal verdict published: there is no as-is anchor (county "
+            "market/appraised/tax value) to measure the bid against. The "
+            "flip-side ARV figures below, if present, are a SECONDARY upside "
+            "estimate only -- this operator does not price off ARV."
+        )
+    return (
+        "No deal verdict published: the as-is anchor this verdict is built "
+        "from is flagged -- the county record the offer band rests on does "
+        "not reliably describe this exact property. The as-is offer band is "
+        "still shown because the magnitude is not disputed, only which "
+        "record was used."
+    )
+
+
 # ---------------------------------------------------------------------------
 # ANOMALY FLAGS — the second path into the same contradiction.
 #
@@ -445,33 +574,87 @@ def _merge_flags(existing, new) -> list[str]:
 
 
 def _gate_note(level: str, flags) -> str:
+    """Note text for the SECONDARY (ARV-derived money) gate only -- WITHHELD or
+    CONTRADICTED. Since the re-pointing, WEAK no longer makes this gate touch
+    anything (it only ever acted on money for CONTRADICTED/WITHHELD; see
+    as_is_trust for what now happens to the verdict on a WEAK anchor), so this
+    function no longer has a third branch to speak for.
+    """
     named = ", ".join(sorted(flags)) or "an unnamed sanity flag"
     if level == _TRUST_WITHHELD:
         return (
-            "No max bid, ROI, profit or deal verdict published: there is no ARV "
-            "to derive them from."
-        )
-    if level == _TRUST_CONTRADICTED:
-        return (
-            f"No max bid, ROI, profit or deal verdict published: this ARV is "
-            f"flagged {named}, which means another record (or the arithmetic "
-            f"itself) contradicts it. Every one of those figures is the ARV "
-            f"restated, so publishing them would dress an unverified number up "
-            f"as a bidding instruction. The ARV and its range are still shown "
-            f"so the disagreement is visible — verify the parcel, then re-run "
-            f"the math yourself."
+            "No max bid, ROI, profit, wholesale MAO/spread or total investment "
+            "published: there is no ARV to derive them from. (This operator's "
+            "as-is deal verdict, if any, is unaffected — it is not built from "
+            "the ARV; see as_is_trust.)"
         )
     return (
-        f"No deal verdict published: this ARV is flagged {named}, so the "
-        f"evidence behind it does not describe this exact property. Max bid "
-        f"and ROI are still shown because the magnitude is not disputed, but "
-        f"treat them as a band, not a number — a GREAT/PASS call turns on a "
-        f"5% margin and this ARV is not that precise."
+        f"No max bid, ROI, profit, wholesale MAO/spread or total investment "
+        f"published: this ARV is flagged {named}, which means another record "
+        f"(or the arithmetic itself) contradicts it. Every one of those "
+        f"figures is the ARV restated, so publishing them would dress an "
+        f"unverified number up as a flip-upside estimate. The ARV and its "
+        f"range are still shown so the disagreement is visible — verify the "
+        f"parcel, then re-run the math yourself. (The as-is deal verdict, if "
+        f"any, is unaffected by this flag unless it ALSO trips as_is_trust.)"
     )
 
 
+def _null_fields(c: "_calc.Calc", fields) -> bool:
+    """setattr(c, f, None) for every field in `fields` that is currently set.
+    Returns whether anything actually changed, so callers only log/note on a
+    real transition (idempotence: a second pass over an already-gated `c`
+    costs one `getattr` per field and appends nothing)."""
+    touched = False
+    for f in fields:
+        if getattr(c, f, None) is not None:
+            setattr(c, f, None)
+            touched = True
+    return touched
+
+
+def _append_note(c: "_calc.Calc", note: str) -> None:
+    if c.notes is None:
+        c.notes = []
+    if note not in c.notes:
+        c.notes.append(note)
+
+
+def _pop_fields(calc: dict, fields) -> bool:
+    """Dict-mirror of `_null_fields`: delete (not null) each field, matching
+    calc.to_dict()'s own shape. Returns whether anything was actually popped."""
+    touched = False
+    for f in fields:
+        if calc.pop(f, None) is not None:
+            touched = True
+    return touched
+
+
+def _append_note_dict(calc: dict, note: str) -> None:
+    notes = calc.setdefault("notes", [])
+    if isinstance(notes, list) and note not in notes:
+        notes.append(note)
+
+
 def apply_arv_trust_gate(c: "_calc.Calc", opening_bid=None) -> str:
-    """Withhold whatever `c`'s ARV cannot support. Mutates `c`; idempotent.
+    """Withhold whatever `c`'s ARV, or separately its AS-IS anchor, cannot
+    support. Mutates `c`; idempotent.
+
+    Runs BOTH trust gates from the one shared seam (see the module
+    docstring's "TWO trust gates" section):
+      - `arv_trust`   gates the SECONDARY, ARV-derived money
+        (`ARV_DERIVED_MONEY_FIELDS`: max_bid_70, roi_pct, ...) — unchanged.
+      - `as_is_trust` gates the PRIMARY, as-is-anchored verdict
+        (`ARV_VERDICT_FIELDS`: deal_status, deal_message, haircut_needed) —
+        the 2026-11-10 re-pointing. An ARV-only defect (`arv_above_anchor`,
+        `bid_proxy_arv`, a bad comp pool, ...) no longer withholds this: the
+        verdict was never built from the ARV, so a flaw IN the ARV is not a
+        reason to distrust it. Only a flaw in the county anchor itself does
+        (`as_is_trust`'s own AS_IS_FLAGS_* sets).
+    The two answers are independent and may disagree — a lead can keep a real
+    deal_status while its flip-side ARV figures are withheld (the Henderson
+    shape this fixes), or the reverse (a clean comp-built ARV but no county
+    anchor at all to build an as-is offer from).
 
     Called at the top of `grade()`, which is the ONE seam every producer of
     `raw['calc']` shares: all 13 call sites in this repo run
@@ -479,17 +662,20 @@ def apply_arv_trust_gate(c: "_calc.Calc", opening_bid=None) -> str:
     gating here reaches the board no matter which script wrote it. It is not
     in valuation/calc.py because that module's contract is "compute the
     numbers"; this is the separate decision about which of them may be shown,
-    and it needs the same flag vocabulary the letter grade uses.
+    and it needs the same flag vocabulary both the verdict and the letter use.
 
     calc.to_dict() drops None values, so a withheld field simply does not
     appear in raw['calc'] — the dashboard, the CSV export and the sheet all
     render nothing rather than a zero.
 
-    Returns the trust level so callers can log or branch on it.
+    Returns the ARV trust level (not the as-is one) — unchanged contract:
+    `_regate_equity_after_grade` keys off this return value because
+    `raw['equity']` is ARV-derived (`arv - payoff - liens`), never
+    as-is-derived, so it must keep following the ARV gate specifically.
 
     `opening_bid` is optional and only feeds the placeholder-bid anomaly test;
     pass it whenever the Listing is at hand (grade() does). Anomaly flags are
-    derived and merged into `c.arv_flags` FIRST, so the gate below sees them —
+    derived and merged into `c.arv_flags` FIRST, so both gates below see them —
     that is the whole of the E3 fix, and it is why the anomalous branch in
     `grade()` no longer needs a withholding rule of its own.
     """
@@ -498,32 +684,30 @@ def apply_arv_trust_gate(c: "_calc.Calc", opening_bid=None) -> str:
     if _anom:
         c.arv_flags = _merge_flags(getattr(c, "arv_flags", None), _anom)
     flags = set(getattr(c, "arv_flags", None) or ())
+
+    # ---- SECONDARY: the ARV-derived flip-upside money -----------------------
     level = arv_trust(flags, getattr(c, "arv_expected", None),
                       getattr(c, "arv_withheld", None))
-    if level == _TRUST_OK:
-        return level
-
-    fields = ARV_VERDICT_FIELDS
-    # WITHHELD is included on purpose even though calc already produces nothing
-    # here (measured: 0 of 531 withheld board rows carry a derived figure).
-    # That cleanliness is a side effect of every downstream block being written
-    # `if out.arv_expected` — an implicit coupling in a file this module does
-    # not own. Enforcing it explicitly costs one comparison and means a future
-    # refactor of calc.py cannot quietly reopen the worst version of this bug:
-    # a confident bid beside an ARV the engine refused to print.
+    # WITHHELD is included on purpose even though calc already produces
+    # nothing here (measured: 0 of 531 withheld board rows carry a derived
+    # figure). That cleanliness is a side effect of every downstream block
+    # being written `if out.arv_expected` — an implicit coupling in a file
+    # this module does not own. Enforcing it explicitly costs one comparison
+    # and means a future refactor of calc.py cannot quietly reopen the worst
+    # version of this bug: a confident bid beside an ARV the engine refused
+    # to print. (WEAK deliberately takes no action here any more — it used
+    # to also null the verdict; that is now as_is_trust's call, below, and
+    # ARV-WEAK alone says nothing about the as-is anchor.)
     if level in (_TRUST_CONTRADICTED, _TRUST_WITHHELD):
-        fields = fields + ARV_DERIVED_MONEY_FIELDS
-    touched = False
-    for f in fields:
-        if getattr(c, f, None) is not None:
-            setattr(c, f, None)
-            touched = True
-    if touched:
-        note = _gate_note(level, flags)
-        if c.notes is None:
-            c.notes = []
-        if note not in c.notes:
-            c.notes.append(note)
+        if _null_fields(c, ARV_DERIVED_MONEY_FIELDS):
+            _append_note(c, _gate_note(level, flags))
+
+    # ---- PRIMARY: the as-is-anchored verdict --------------------------------
+    asis_level = as_is_trust(flags, getattr(c, "as_is_value", None))
+    if asis_level != _TRUST_OK:
+        if _null_fields(c, ARV_VERDICT_FIELDS):
+            _append_note(c, _asis_gate_note(asis_level))
+
     return level
 
 
@@ -578,14 +762,18 @@ def _regate_equity_after_grade(li: Listing, level: str, c: "_calc.Calc") -> None
 
 
 def gate_calc_dict(calc: dict) -> str:
-    """The same gate applied to an already-serialized `raw['calc']` block.
+    """The same TWO gates (see `apply_arv_trust_gate`) applied to an
+    already-serialized `raw['calc']` block.
 
     Belt and braces for two real cases: a board carried over from a run that
-    predates this gate, and any future writer that serializes a Calc without
-    going through `grade()`. Shares the flag sets and the field lists with
-    `apply_arv_trust_gate` above, so the two can never drift — a reader/writer
-    split is what let `geo_imprecise_comps` and `bid_proxy_arv` go unwarned in
-    the dashboard for months.
+    predates this gate (or predates the 2026-11-10 re-pointing), and any
+    future writer that serializes a Calc without going through `grade()` —
+    `enrichment_board_qa._retract_shared_anchor` is exactly such a caller,
+    and it depends on this function nulling `deal_status` for
+    `anchor_shared_across_parcels` via `as_is_trust`, below. Shares the flag
+    sets and the field lists with `apply_arv_trust_gate` above, so the two
+    can never drift — a reader/writer split is what let `geo_imprecise_comps`
+    and `bid_proxy_arv` go unwarned in the dashboard for months.
 
     Deletes rather than nulls, to match calc.to_dict()'s own shape.
     """
@@ -598,22 +786,20 @@ def gate_calc_dict(calc: dict) -> str:
     _anom = anomaly_flags(calc.get("arv_expected"), calc.get("roi_pct"))
     if _anom:
         calc["arv_flags"] = _merge_flags(calc.get("arv_flags"), _anom)
-    level = arv_trust(calc.get("arv_flags"), calc.get("arv_expected"),
-                      calc.get("arv_withheld"))
-    if level == _TRUST_OK:
-        return level
-    fields = ARV_VERDICT_FIELDS
+    flags = calc.get("arv_flags")
+
+    # ---- SECONDARY: the ARV-derived flip-upside money -----------------------
+    level = arv_trust(flags, calc.get("arv_expected"), calc.get("arv_withheld"))
     if level in (_TRUST_CONTRADICTED, _TRUST_WITHHELD):
-        fields = fields + ARV_DERIVED_MONEY_FIELDS
-    touched = False
-    for f in fields:
-        if calc.pop(f, None) is not None:
-            touched = True
-    if touched:
-        note = _gate_note(level, set(calc.get("arv_flags") or ()))
-        notes = calc.setdefault("notes", [])
-        if isinstance(notes, list) and note not in notes:
-            notes.append(note)
+        if _pop_fields(calc, ARV_DERIVED_MONEY_FIELDS):
+            _append_note_dict(calc, _gate_note(level, set(flags or ())))
+
+    # ---- PRIMARY: the as-is-anchored verdict --------------------------------
+    asis_level = as_is_trust(flags, calc.get("as_is_value"))
+    if asis_level != _TRUST_OK:
+        if _pop_fields(calc, ARV_VERDICT_FIELDS):
+            _append_note_dict(calc, _asis_gate_note(asis_level))
+
     return level
 
 
@@ -645,52 +831,44 @@ def _letter(score: int) -> str:
 
 
 def _financial_score(li: Listing, c: _calc.Calc) -> tuple[int, str]:
-    """Bid relative to (max_bid_70, ARV, rehab). 70% rule sits at score 80."""
-    if not (li.opening_bid and c.arv_expected):
-        return 50, "no bid or ARV — neutral"
-    # A bid-derived ARV makes bid_to_arv a CONSTANT (bid / (bid × 2.4) is always
-    # 0.4167), so this function would be scoring its own arithmetic. Measured:
-    # 316 of the board's 405 bid-proxy leads graded exactly C and 33 graded B,
-    # purely from where that constant lands on the ladder below. Neutral is the
-    # honest score — we have no independent read on this deal's economics.
-    #
-    # Widened from bid_proxy_arv alone to the whole CONTRADICTED set. The
-    # overall letter is already withheld on these (see `grade` below), but the
-    # per-dimension `financial` letter still publishes, and it is 100% a
-    # function of bid/ARV — so a contradicted ARV was still emitting a
-    # confident financial grade on 3,025 board leads through the side door.
-    _bad = set(getattr(c, "arv_flags", None) or ()) & ARV_FLAGS_CONTRADICTED
+    """Bid relative to the AS-IS offer band (DPA's 10/30/50% rule). PRIMARY
+    financial lens as of 2026-11-10 — see the module docstring. Every
+    boundary below is one of calc.py's own named AS_IS_OFFER_* constants, not
+    an invented number, so this ladder and the as-is offer band shown on the
+    card can never silently disagree about what "target" or "max" means.
+
+    bid_to_arv_pct / max_bid_70 / roi_pct are the SECONDARY flip-upside
+    figures (still computed, still shown) and deliberately do NOT feed this
+    score any more — not even as the ROI bonus/penalty the old version had.
+    Re-introducing any ARV-derived modifier here would put ARV influence back
+    into the one score DPA's rule says must never carry it, just one step
+    removed from the Henderson defect instead of absent.
+    """
+    if not (li.opening_bid and c.as_is_value):
+        return 50, "no bid or as-is anchor value — neutral"
+    # Mirrors the old bid_proxy_arv guard's INTENT (don't score a lead's own
+    # circular arithmetic) but keyed on AS_IS_FLAGS_CONTRADICTED, not the full
+    # ARV set: `as_is_value` is never built from the bid (see `_anchor_value`
+    # and `as_is_trust`'s own comment), so the ARV-side flags that guard
+    # against THAT circularity (bid_proxy_arv, comp-pool defects, ...) have
+    # nothing to say about this score. Only a flaw in the anchor itself does.
+    _bad = set(getattr(c, "arv_flags", None) or ()) & AS_IS_FLAGS_CONTRADICTED
     if _bad:
-        return 50, ("ARV is contradicted (" + ", ".join(sorted(_bad))
+        return 50, ("the as-is anchor is contradicted (" + ", ".join(sorted(_bad))
                     + ") — no independent price signal")
     bid = li.opening_bid
-    bid_to_arv = bid / c.arv_expected
-    rehab = c.rehab_expected or 0
-    fees = c.arv_expected * 0.07
-    spread = c.arv_expected - bid - rehab - fees   # rough profit if bought at bid
-    spread_pct = spread / c.arv_expected if c.arv_expected else 0
+    bid_to_asis = bid / c.as_is_value
 
-    if bid_to_arv <= 0.30:
-        s, why = 98, f"Bid is {bid_to_arv*100:.0f}% of ARV — exceptional"
-    elif bid_to_arv <= 0.40:
-        s, why = 92, f"Bid {bid_to_arv*100:.0f}% of ARV — strong upside"
-    elif bid_to_arv <= 0.55:
-        s, why = 85, f"Bid {bid_to_arv*100:.0f}% of ARV — within 70% rule"
-    elif bid_to_arv <= 0.70:
-        s, why = 70, f"Bid {bid_to_arv*100:.0f}% of ARV — at 70% rule"
-    elif bid_to_arv <= 0.85:
-        s, why = 55, f"Bid {bid_to_arv*100:.0f}% of ARV — thin margin"
-    elif bid_to_arv <= 1.0:
-        s, why = 35, f"Bid {bid_to_arv*100:.0f}% of ARV — almost retail"
+    if bid_to_asis <= _calc.AS_IS_OFFER_LOW_PCT:
+        s, why = 95, f"Bid is {bid_to_asis*100:.0f}% of as-is value — at/under DPA's low offer"
+    elif bid_to_asis <= _calc.AS_IS_OFFER_TARGET_PCT:
+        s, why = 85, f"Bid {bid_to_asis*100:.0f}% of as-is value — at/under DPA's target offer"
+    elif bid_to_asis <= _calc.AS_IS_OFFER_MAX_PCT:
+        s, why = 65, f"Bid {bid_to_asis*100:.0f}% of as-is value — within DPA's max offer"
+    elif bid_to_asis <= _calc.AS_IS_RESALE_PCT:
+        s, why = 35, f"Bid {bid_to_asis*100:.0f}% of as-is value — above DPA's max offer"
     else:
-        s, why = 15, f"Bid {bid_to_arv*100:.0f}% of ARV — overpriced"
-
-    # ROI bonus / penalty
-    if c.roi_pct is not None:
-        if c.roi_pct >= 30:
-            s += 3
-        elif c.roi_pct < 10:
-            s -= 5
+        s, why = 15, f"Bid {bid_to_asis*100:.0f}% of as-is value — at/above as-is resale value"
     return max(0, min(100, s)), why
 
 
@@ -888,12 +1066,15 @@ def grade(li: Listing, c: _calc.Calc | None = None) -> Grade:
     # main.py, rentcast.py and the eleven refresh scripts at once. See
     # apply_arv_trust_gate's docstring.
     #
-    # The gate NULLS roi_pct on the tier it blanks, and the anomalous branch
-    # below is defined on the ROI. So capture the pre-gate figures first: read
-    # them afterwards and a lead whose ROI was 829% looks like a lead with no
-    # ROI, which would quietly stop unrating exactly the rows this is about.
-    _pre_roi = getattr(c, "roi_pct", None)
-    _pre_arv = getattr(c, "arv_expected", None)
+    # 2026-11-10: no pre-gate ROI/ARV capture is needed any more. Before the
+    # as-is re-pointing, the letter's own anomaly test (below) re-derived the
+    # ROI/ARV-magnitude condition directly, because it had to fire AFTER the
+    # gate had already nulled roi_pct/arv_expected on the tier it blanks — so
+    # it needed the pre-gate figures or it would silently stop unrating the
+    # rows this was about. The letter no longer tests ROI/ARV magnitude at
+    # all (see `anomalous` below): it tests `arv_flags` membership, and the
+    # gate never clears flags, only the money/verdict fields built from them,
+    # so there is nothing left to capture ahead of the gate call.
     _trust_level = apply_arv_trust_gate(c, opening_bid=li.opening_bid)
     # Equity incident 2026-10-01 (9 rows, then 671): a targeted recompute (any
     # script that runs compute()+grade() over a SUBSET of the board, e.g.
@@ -922,10 +1103,16 @@ def grade(li: Listing, c: _calc.Calc | None = None) -> Grade:
     # 2026-06-19: WITHHOLD the overall letter when there's no real financial
     # basis. A data-less listing got financial=50 ("neutral" C) and the
     # property/location baselines floated the overall to a confident C/D — a
-    # misleading grade on a row we know nothing about. Rate it only when we have
-    # an opening bid OR a non-proxy (HIGH/MEDIUM-confidence) ARV.
-    arv_conf = getattr(c, "arv_confidence", None)
-    assessable = bool(li.opening_bid) or bool(c.arv_expected and arv_conf in ("HIGH", "MEDIUM"))
+    # misleading grade on a row we know nothing about.
+    #
+    # 2026-11-10: re-pointed from "an opening bid OR a non-proxy ARV" to "an
+    # opening bid OR an as-is anchor value" — `_financial_score` above now
+    # keys on `as_is_value`, not `arv_expected`/`arv_confidence`, so THAT is
+    # the figure that makes a financial basis real. `arv_confidence` (the
+    # ARV-method confidence: comp-grounded vs proxy) no longer has anything to
+    # do with whether the PRIMARY letter is assessable — it still matters for
+    # the secondary ARV figures, gated separately by `arv_trust`.
+    assessable = bool(li.opening_bid) or bool(c.as_is_value)
     if not assessable:
         return Grade(
             overall=None, overall_score=0,
@@ -933,56 +1120,36 @@ def grade(li: Listing, c: _calc.Calc | None = None) -> Grade:
             property=_letter(ps), property_score=ps,
             location=_letter(ls), location_score=ls,
             risk=_letter(rs), risk_score=rs,
-            rationale=["Unrated — insufficient valuation data (no bid / only proxy ARV)", pn, ln, rn],
+            rationale=["Unrated — insufficient valuation data (no bid / no as-is anchor value)", pn, ln, rn],
         )
-    # 2026-06-19: also WITHHOLD when the deal-math is anomalous (garbage-in). A
-    # tiny placeholder opening bid (<5% of ARV — an upset/opening figure, not the
-    # real acquisition cost) or an implausible ARV (>$2M in these rural counties =
-    # a comp error) produces an absurd ROI (e.g. 1300%). Presenting that as a
-    # confident 'B' misrepresents it — rate it 'unrated' instead.
+    # 2026-06-19 / 2026-08-10: also WITHHOLD when the deal-math is anomalous.
     #
-    # 2026-08-10: this branch is no longer the ONLY consequence of an anomaly.
-    # apply_arv_trust_gate above has already turned the same three tests into
+    # 2026-11-10: re-pointed. The original test re-derived "ROI > 400% / ARV >
+    # $2M / bid < 5% of ARV" directly from the PRE-gate figures, because those
+    # are exactly the three tests `apply_arv_trust_gate` already turns into
     # `arv_above_plausible_max` / `arv_implies_implausible_roi` /
-    # `placeholder_opening_bid` and withheld the verdict (and, for the first
-    # two, the money) off them — so the letter and the verdict can no longer
-    # disagree about the same row. What is left here is the letter, computed
-    # from the PRE-gate figures so the test still fires after the gate has
-    # nulled them.
-    roi = _pre_roi
-    # A letter grade is 40% financial, and the financial score is entirely a
-    # function of ARV. When calc's own sanity band says the ARV is not
-    # trustworthy, a confident letter launders that doubt into a recommendation.
-    #
-    # This reads ARV_FLAGS_CONTRADICTED — the SAME set that withholds the max
-    # bid and the deal verdict — rather than a second hand-maintained list. The
-    # letter and the verdict are the same claim at two resolutions; when they
-    # were defined separately the board withheld the letter and printed
-    # "GREAT, max bid $1,271,200" on the identical row. One definition, or the
-    # two drift again.
-    #
-    # `cama_class_mismatch` joined the set (+173 leads unrated): the assessor row
-    # joined to those leads is a commercial building, so the parcel join is
-    # known-wrong and the cross-check that does run against it is explicitly
-    # `trusted=False`.
-    #
-    # Still deliberately excluded: `geo_imprecise_comps` and `stale_sale_floor`
-    # (ARV_FLAGS_WEAK_EVIDENCE). Real problems, but 6,086 leads, already handled
-    # by a capped confidence and a data-quality caveat — unrating a quarter of
-    # the board for a coordinate-precision problem is the "do not gut the normal
-    # case" line. They lose the verdict (above), not the letter.
-    suspect_arv = set(getattr(c, "arv_flags", None) or []) & ARV_FLAGS_CONTRADICTED
-    anomalous = (
-        (roi is not None and roi > ANOMALY_ROI_MAX)
-        or (_pre_arv and _pre_arv > ANOMALY_ARV_MAX)
-        or (li.opening_bid and _pre_arv
-            and li.opening_bid < ANOMALY_BID_FLOOR_PCT * _pre_arv)
-        or bool(suspect_arv)
-    )
+    # `placeholder_opening_bid` — all three ARV-and-ROI-specific, i.e. about
+    # the flip lens, not the as-is one. Re-running them here to gate the
+    # PRIMARY (as-is) letter was the same conflation this whole fix removes:
+    # an ARV/ROI anomaly says nothing about whether the as-is anchor is good.
+    # What is left here reads `AS_IS_FLAGS_CONTRADICTED | AS_IS_FLAGS_WEAK` —
+    # the SAME narrow sets `as_is_trust` uses to withhold `deal_status` —
+    # rather than a second hand-maintained list, for the same reason the old
+    # code reused ARV_FLAGS_CONTRADICTED: the letter and the verdict are the
+    # same claim at two resolutions, and defining the gate twice is exactly
+    # how Henderson shipped "GREAT" beside a withheld letter in the first
+    # place. `anomaly_flags()` itself (the ROI/$2M/placeholder-bid tests)
+    # keeps running unchanged, in `apply_arv_trust_gate`, and keeps correctly
+    # withholding the SECONDARY max_bid_70/roi_pct/deal_status-via-ARV... no —
+    # deal_status is no longer ARV's to withhold at all; those three anomaly
+    # flags still null the secondary money (they are members of
+    # ARV_FLAGS_CONTRADICTED), they simply no longer reach this letter.
+    suspect_asis = set(getattr(c, "arv_flags", None) or []) & (
+        AS_IS_FLAGS_CONTRADICTED | AS_IS_FLAGS_WEAK)
+    anomalous = bool(suspect_asis)
     if anomalous:
-        why = ("Unrated — ARV failed a sanity check ("
-               + ", ".join(sorted(suspect_arv)) + ")") if suspect_arv else \
-              "Unrated — anomalous valuation (placeholder bid or implausible ARV)"
+        why = ("Unrated — the as-is anchor failed a sanity check ("
+               + ", ".join(sorted(suspect_asis)) + ")")
         return Grade(
             overall=None, overall_score=0,
             financial=_letter(fs), financial_score=fs,

@@ -435,8 +435,17 @@ def test_exclusions_sit_on_the_first_owner_field_only():
 
 
 def test_an_excluded_phrase_on_a_second_field_still_drops_the_row():
-    assert m._excluded_row(["SMITH JOHN HEIRS", "LIFE ESTATE"])
+    assert m._excluded_row(["SMITH JOHN HEIRS", "REAL ESTATE"])
     assert not m._excluded_row(["SMITH JOHN HEIRS", None])
+
+
+def test_life_estate_on_a_second_field_is_detected_not_excluded():
+    # 2026-11-10: LIFE ESTATE moved out of _EXCLUDE -- it's a real lead type now,
+    # tagged via _is_life_estate rather than dropped by _excluded_row.
+    assert not m._excluded_row(["SMITH JOHN HEIRS", "LIFE ESTATE"])
+    assert m._is_life_estate(["SMITH JOHN HEIRS", "LIFE ESTATE"])
+    assert m._is_life_estate(["JONES MARY LIFE-ESTATE"])
+    assert not m._is_life_estate(["SMITH JOHN HEIRS"])
 
 
 def _drive(monkeypatch, rows_by_page, fields, cap=3):

@@ -295,7 +295,8 @@ def _parse_records(html: str, state: str, county: str) -> list[RodDoc]:
 
 async def discover_recent_nods(state: str, county: str, days_back: int = 45,
                                max_docs: int = 400, *,
-                               fetch_images: bool = False) -> list[RodDoc]:
+                               fetch_images: bool = False,
+                               extra_codes: tuple[str, ...] = ()) -> list[RodDoc]:
     """Sweep recent Logan recordings for distress instrument types.
 
     `fetch_images=True` additionally downloads each row's free `view_image.php`
@@ -304,6 +305,14 @@ async def discover_recent_nods(state: str, county: str, days_back: int = 45,
     `raw['logan']['image']`. Best-effort per row: a fetch that fails, or a row
     with no image key, just carries no `image` -- the sweep itself never fails
     because of it.
+
+    `extra_codes` ADDS instrument-type codes to the swept set alongside
+    `DISTRESS_CODES` (e.g. rod/merp_detector.py's unverified candidate codes
+    for a recorded Medicaid estate-recovery claim). Purely additive and
+    backward-compatible: the default `()` sweeps exactly the codes this
+    function always has. Per this module's own docstring, a code a county's
+    deployment doesn't recognize "just doesn't match" -- it does not error or
+    change what the existing DISTRESS_CODES rows return.
     """
     host = LOGAN_COUNTIES.get((state, county))
     if not host:
@@ -311,7 +320,8 @@ async def discover_recent_nods(state: str, county: str, days_back: int = 45,
     today = datetime.utcnow()
     frm = today - timedelta(days=max(1, days_back))
     fmt = lambda d: f"{d.month:02d}/{d.day:02d}/{d.year}"  # noqa: E731
-    codes = "&".join(f"instType[InstCodes][{c}]={c}" for c in DISTRESS_CODES)
+    all_codes = dict.fromkeys((*DISTRESS_CODES, *extra_codes))  # de-duped, order kept
+    codes = "&".join(f"instType[InstCodes][{c}]={c}" for c in all_codes)
     body = (f"searchType=it&start_date={fmt(frm)}&end_date={fmt(today)}&{codes}")
     try:
         async with client(timeout=60.0) as c:

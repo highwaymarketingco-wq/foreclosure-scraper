@@ -9,6 +9,18 @@ Outputs (per listing):
   roi_pct                                 — profit / total_investment * 100
   cash_on_cash_pct                        — profit / cash_down (if 25% down + 75% loan)
   confidence                              — HIGH / MEDIUM / LOW based on data quality
+
+  as_is_value / offer_low / offer_target / offer_max — DPA's as-is offer band
+    (10/30/50% of the county's own 100%-basis appraisal; see AS_IS_* below).
+  est_resale_as_is / est_gross_margin     — as-is resale and the margin left
+    after the target buy and a flat cleanup cost.
+  deal_status / deal_message / haircut_needed — the PRIMARY investor verdict
+    (re-pointed 2026-11-10): driven by the AS-IS band above, NOT by ARV/
+    max_bid_70 — DPA's own rule is "never price off ARV, as-is value only".
+    max_bid_70 / roi_pct / bid_to_arv_pct above remain a clearly SECONDARY
+    flip-upside figure for operators who do want the ARV-based upside; they
+    no longer anchor this verdict. See valuation/grading.py's module
+    docstring for the Henderson NC incident this fixes.
 """
 from __future__ import annotations
 
@@ -2410,6 +2422,11 @@ def compute(li: Listing) -> Calc:
     # _anchor_value is the county 100%-basis figure and deliberately EXCLUDES
     # assessed_value - in SC that is a 4%/6% statutory ratio, so pricing off it
     # understates the property several-fold.
+    #
+    # PRIMARY as of 2026-11-10: `offer_target`/`offer_max` below are what the
+    # "Deal status" block further down now compares `bid` against -- this is
+    # no longer a side figure. See that block's own comment and
+    # grading.py's module docstring for why.
     _av, _asrc = _anchor_value(li)
     if _av and _av > 0:
         out.as_is_value = float(_av)
@@ -2648,47 +2665,67 @@ def compute(li: Listing) -> Calc:
     # upgrade above).
     out.arv_confidence = arv_conf
 
-    # ---- Deal status: investor's actionable verdict ----------------------
-    # Frames the listing in terms a flipper actually decides on:
-    #   GREAT       — listing price is below the 70% rule max bid (rare, snap-up)
-    #   OK          — listing price right at max bid (margin OK, do diligence)
-    #   NEGOTIATE   — listing price above max bid; specifies haircut needed
-    #   PASS        — math doesn't work even at $0 acquisition
+    # ---- Deal status: investor's actionable verdict (AS-IS ANCHORED) ------
+    # Re-pointed 2026-11-10. DPA'S CORE RULE: never price or grade off ARV —
+    # as-is value only. This used to be `bid <= max_bid_70 * 0.95`, i.e. 100%
+    # a function of the comp-built ARV (see grading.py's module docstring for
+    # the incident that proved that wrong: 3646 Summer Rd, Henderson NC
+    # published GREAT off a max_bid_70 built on an ARV 7.4x the county's own
+    # $230,200 appraisal). It now compares the bid against the AS-IS OFFER
+    # BAND computed above from `_anchor_value(li)` — the county's own
+    # 100%-basis figure, entirely independent of any comp-built ARV:
+    #   GREAT     — bid at/under DPA's 30% TARGET offer (a good as-is price)
+    #   OK        — above target but at/under DPA's 50% MAX offer (workable)
+    #   NEGOTIATE — above the 50% MAX offer; haircut_needed is the gap to it
+    #   PASS      — the as-is economics don't clear even AT the target price
+    #               (est_gross_margin <= 0) — dead by DPA's own rule
+    #       regardless of what is being asked
     #
-    # SUPPRESSED when the ARV was itself derived from this same opening bid: the
-    # comparison "is the bid below the max viable bid?" reduces to "is 1 < 1.8?"
-    # and answers GREAT every time. See BID_PROXY_MARKER above.
-    if "bid_proxy_arv" in (out.arv_flags or []):
-        out.notes.append(
-            "No deal verdict: the ARV here is a multiple of the opening bid itself, so "
-            "comparing the bid against it would grade the arithmetic rather than the "
-            "property. Needs comps or a county value before a buy/pass call is meaningful."
-        )
-    elif out.max_bid_70 is not None and bid is not None and bid > 0:
-        if out.max_bid_70 <= 0:
+    # `max_bid_70` / `roi_pct` / `bid_to_arv_pct` / `wholesale_*` above are
+    # UNCHANGED and remain exactly what they were: a clearly SECONDARY,
+    # flip-upside figure DPA operators doing a flip still want to see. They
+    # no longer drive this verdict, but they are not deleted, and they keep
+    # their own ARV trust gate (grading.apply_arv_trust_gate /
+    # ARV_DERIVED_MONEY_FIELDS) unchanged.
+    #
+    # No `bid_proxy_arv` special-case here any more. That guard existed
+    # because an ARV built as `bid x 2.4` makes bid/ARV a circular constant
+    # (see BID_PROXY_MARKER above) — but `as_is_value` is never built from
+    # `opening_bid` at all (`_anchor_value` reads only market_value /
+    # cama.appraised_value / tax_value), so that specific circularity cannot
+    # occur on the as-is path. `bid_proxy_arv` still correctly withholds the
+    # SECONDARY max_bid_70/roi_pct figures, via the unchanged ARV trust gate.
+    if out.as_is_value and bid is not None and bid > 0:
+        if out.est_gross_margin is not None and out.est_gross_margin <= 0:
             out.deal_status = "PASS"
             out.deal_message = (
-                f"Math doesn't work — ARV ${out.arv_expected or 0:,.0f} minus "
-                f"rehab ${out.rehab_expected or 0:,.0f} leaves no margin even at $0 acquisition."
+                f"Math doesn't work even at DPA's target offer — as-is value "
+                f"${out.as_is_value:,.0f}, resold as-is at "
+                f"${out.est_resale_as_is or 0:,.0f}, leaves no margin over the "
+                f"${out.offer_target:,.0f} target buy plus cleanup."
             )
-        elif bid <= out.max_bid_70 * 0.95:
+        elif bid <= out.offer_target:
             out.deal_status = "GREAT"
             out.deal_message = (
-                f"List ${bid:,.0f} is below max viable bid ${out.max_bid_70:,.0f}. "
-                f"Solid margin if specs are accurate — verify."
+                f"List ${bid:,.0f} is at/under DPA's target as-is offer "
+                f"${out.offer_target:,.0f} ({AS_IS_OFFER_TARGET_PCT * 100:.0f}% of "
+                f"the ${out.as_is_value:,.0f} as-is value). Solid as-is margin — "
+                f"verify the county figure before bidding."
             )
-        elif bid <= out.max_bid_70 * 1.05:
+        elif bid <= out.offer_max:
             out.deal_status = "OK"
             out.deal_message = (
-                f"List ${bid:,.0f} is right at max viable bid ${out.max_bid_70:,.0f}. "
-                f"Tight but workable — do diligence."
+                f"List ${bid:,.0f} is above DPA's target but at/under the max "
+                f"as-is offer ${out.offer_max:,.0f} ({AS_IS_OFFER_MAX_PCT * 100:.0f}% "
+                f"of the ${out.as_is_value:,.0f} as-is value). Workable, thinner "
+                f"margin — do diligence."
             )
         else:
-            out.haircut_needed = round(bid - out.max_bid_70, -2)
+            out.haircut_needed = round(bid - out.offer_max, -2)
             out.deal_status = "NEGOTIATE"
             out.deal_message = (
-                f"List ${bid:,.0f} is ${out.haircut_needed:,.0f} above max viable "
-                f"bid ${out.max_bid_70:,.0f}. Negotiate down or pass."
+                f"List ${bid:,.0f} is ${out.haircut_needed:,.0f} above DPA's max "
+                f"as-is offer ${out.offer_max:,.0f}. Negotiate down or pass."
             )
 
     # ---- Buy-and-hold (rental) verdict ----------------------------------

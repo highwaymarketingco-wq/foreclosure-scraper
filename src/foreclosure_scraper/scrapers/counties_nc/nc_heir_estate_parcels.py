@@ -53,8 +53,8 @@ COUNTY_GIS parcel layer is confirmed to return hits.
 
 Distress signal: emits ListingType.ESTATE_LEAD with raw['relationship_signal']
 = {kind: 'probate'} so distress_score scores it (LIFE_EVENT). Dateless — routed
-via DATELESS_OK_SOURCES. LIFE ESTATE is excluded (that is an estate-planning deed
-on a LIVING owner, not a decedent).
+via DATELESS_OK_SOURCES. LIFE ESTATE (a living life-tenant, not a decedent) is
+its OWN signal, not noise -- see the 2026-11-10 note above _EXCLUDE below.
 """
 from __future__ import annotations
 
@@ -107,19 +107,47 @@ _STATEWIDE_CONCURRENCY = 10
 # HEIRS/HEIR/HEIR OF; ESTATE catches singular "<name> ESTATE"/"ESTATE OF".
 _MATCH_TOKENS = ("HEIR", "ESTATE")
 # SQL-level exclusions. Plural "ESTATES" + "REAL ESTATE" are almost always a
-# subdivision/HOA/brokerage, not a decedent; "LIFE ESTATE" is a living owner.
+# subdivision/HOA/brokerage, not a decedent -- true noise, unrelated to a life
+# estate, and still excluded below unchanged.
 #
 # 2026-10-19: "LIFE-ESTATE" (hyphen, no space) found live while sampling SC
 # parcel_cache owner columns for a new cache-based producer (sc_heir_estate_
 # parcel_cache.py). Greenville's cache spells it this way on 74 rows ("CLARK
 # LOTTIE B (LIFE-ESTATE)") and Hampton's on 2 -- the literal-substring
-# "LIFE ESTATE" (space) never matches a hyphen, so both slipped through as
-# false decedent hits (Greenville's corrected yield: 38, matching the ~40
-# already found and reported via a separate live check in
-# project_gap_matrix_sweep1_2026-10-18.md). Listed as its own entry rather
-# than loosening the "LIFE ESTATE" match to `LIFE.ESTATE` so the SQL-side
-# NOT LIKE clauses in `_where()` stay literal, simple substring checks.
-_EXCLUDE = ("LIFE ESTATE", "LIFE-ESTATE", "REAL ESTATE", "ESTATES")
+# "LIFE ESTATE" (space) never matched a hyphen, so both slipped through as
+# false decedent hits at the time (Greenville's corrected yield then: 38,
+# matching the ~40 already found and reported via a separate live check in
+# project_gap_matrix_sweep1_2026-10-18.md).
+#
+# 2026-11-10: LIFE ESTATE / LIFE-ESTATE pulled back OUT of this exclusion.
+# A life estate names a LIVING life-tenant, not a decedent -- but the
+# coaching program this board is built around (DPA) treats "buy the
+# remainderman's future interest while an elderly life-tenant still occupies
+# the property" as a real, repeatable, buyable lead type. So a parcel that
+# matched ONLY on "LIFE ESTATE" was being thrown away here as noise when it
+# is actually a distinct motivated-seller signal, not a false positive. It
+# is no longer excluded at either the SQL or the Python layer -- see
+# `_LIFE_ESTATE_RE` / `_is_life_estate()` below, which tag it instead of
+# dropping it: raw['heir_estate']['match'] = "life_estate" (+ a plain
+# raw['heir_estate']['life_estate'] bool) and raw['relationship_signal']
+# ['kind'] = "life_estate", NOT "probate" (the owner has not died), plus
+# raw['life_events'] = ["life_estate"] -- the SAME tag enrichment_life_events.py
+# already writes for this exact concept elsewhere (scanned off owner_name
+# there; set directly here since this producer already knows it with
+# certainty), which distress_score.py's existing "life_estate" -> LIFE_EVENT
+# rule (weight 8) was already reading and waiting on. REAL ESTATE and
+# ESTATES (plural) are a DIFFERENT false-positive source (a subdivision/HOA/
+# brokerage name) with nothing to do with a life estate, so both stay
+# excluded below, unchanged.
+#
+# Side effect to know about: sc_heir_estate_parcel_cache.py imports this
+# file's `_excluded_row` directly, so this same change also stops IT from
+# discarding LIFE-ESTATE rows (its own docstring's "corrected yield: 38"
+# count will grow once this lands) -- that producer was NOT touched here to
+# brand those rows "life_estate" the same way; its own match/relationship_
+# signal write-up still unconditionally says "estate"/"probate". Flagged as
+# a follow-up, not fixed in this change (see this fix's own report).
+_EXCLUDE = ("REAL ESTATE", "ESTATES")
 
 #: Rows read per county per run. Was a flat 80 with no order and no offset, so every run
 #: re-read the same arbitrary first 80 of ~10.9k matching parcels across the 19 county
@@ -275,9 +303,28 @@ _EXCLUDE_RE = re.compile("|".join(re.escape(x) for x in _EXCLUDE), re.I)
 
 
 def _excluded_row(owner_fields: list[str]) -> bool:
-    """Any owner field carrying LIFE ESTATE / REAL ESTATE / ESTATES: the row is out, the
-    rule the SQL used to apply to every field (see _where)."""
+    """Any owner field carrying REAL ESTATE / ESTATES (subdivision/HOA/brokerage noise;
+    LIFE ESTATE is handled separately now, see _is_life_estate below): the row is out,
+    the rule the SQL used to apply to every field (see _where)."""
     return any(_EXCLUDE_RE.search(f or "") for f in owner_fields)
+
+
+# LIFE ESTATE / LIFE-ESTATE: a DIFFERENT signal from the decedent/heir rows above (the
+# named owner is explicitly STILL ALIVE -- a life tenant), so it gets its own detector
+# rather than reusing `_is_decedent`/`_excluded_row`: those no longer remove it (see the
+# 2026-11-10 note above _EXCLUDE) but also have no way to tell it apart from a genuine
+# decedent row (both contain a bare `ESTATE` token), and `_is_decedent`'s entity-suffix
+# guard exists to keep LLCs/trusts/etc OUT of the HEIR/ESTATE match, not to judge a
+# life-tenant. Same `\bLIFE\s*EST`-shaped pattern enrichment_life_events.py /
+# enrichment_owner_name_signal.py already use for this exact concept elsewhere in the
+# codebase; `[\s-]*` additionally covers the hyphen spelling from the 2026-10-19 note
+# above (and a no-separator "LIFEESTATE").
+_LIFE_ESTATE_RE = re.compile(r"\bLIFE[\s-]*ESTATE\b", re.I)
+
+
+def _is_life_estate(owner_fields: list[str]) -> bool:
+    """Any owner field naming a life estate -- a living life-tenant, not a decedent."""
+    return any(_LIFE_ESTATE_RE.search(f or "") for f in owner_fields)
 
 
 def _pick_value_field(layer_meta: dict) -> str | None:
@@ -513,7 +560,16 @@ class NCHeirEstateParcels(BaseScraper):
         out: list[Listing] = []
         for rank, attrs in enumerate(rows, 1):
             owner_fields = _owner_fields(spec, attrs)
-            if not owner_fields or not _is_decedent(owner_fields) or _excluded_row(owner_fields):
+            if not owner_fields:
+                continue
+            # LIFE ESTATE rows are their OWN signal (2026-11-10 note above _EXCLUDE) and
+            # are judged on that alone: _is_decedent/_excluded_row are decedent-shaped
+            # heuristics that do not apply to a living life-tenant, so a life-estate hit
+            # must never be run through them and risk being silently dropped on grounds
+            # that were never meant for it (e.g. _is_decedent's entity-suffix guard).
+            is_life_estate = _is_life_estate(owner_fields)
+            if not is_life_estate and (
+                    not _is_decedent(owner_fields) or _excluded_row(owner_fields)):
                 continue
             owner = _owner_display(owner_fields)
             if not owner:
@@ -532,6 +588,23 @@ class NCHeirEstateParcels(BaseScraper):
                     care_of = re.sub(r"\s+", " ", _html(str(cv))).strip() or None
             facts = _parcel_facts(spec, attrs)
             legal = next((str(facts[k]) for k in _LEGAL_FIELDS if facts.get(k)), None)
+            # LIFE ESTATE is a living-owner signal, not a decedent one: tag it distinctly
+            # everywhere the decedent/heir path tags a row below, instead of reusing
+            # "probate" (which would misreport a living life-tenant as deceased).
+            if is_life_estate:
+                match = "life_estate"
+                relationship_signal = {
+                    "kind": "life_estate",
+                    "keyword": "life_estate_owner_of_record",
+                    "source": self.slug,
+                }
+            else:
+                match = "heirs" if _HEIR_TOKEN.search(owner) else "estate"
+                relationship_signal = {
+                    "kind": "probate",
+                    "keyword": "heir_estate_owner_of_record",
+                    "source": self.slug,
+                }
             li = Listing(
                 source=self.slug,
                 source_url=spec["url"],
@@ -557,7 +630,10 @@ class NCHeirEstateParcels(BaseScraper):
                         "heir_names": _heir_names(owner_fields),
                         "mailing": mail,
                         "care_of": care_of,
-                        "match": "heirs" if _HEIR_TOKEN.search(owner) else "estate",
+                        "match": match,
+                        # Plain boolean so a filter never has to know "life_estate" is
+                        # one of the values `match` above can carry.
+                        "life_estate": is_life_estate,
                         # 2026-10-07: the layer's own total value (the ranking key), the
                         # row's place in its county's value-ranked read, and the cap.
                         **({"value": _num(attrs.get(value_field)), "value_field": value_field,
@@ -565,12 +641,16 @@ class NCHeirEstateParcels(BaseScraper):
                         "per_county_cap": _PER_COUNTY_CAP,
                         **({"parcel_facts": facts} if facts else {}),
                     },
-                    # Score as a probate/life-event distress signal.
-                    "relationship_signal": {
-                        "kind": "probate",
-                        "keyword": "heir_estate_owner_of_record",
-                        "source": self.slug,
-                    },
+                    # Score as a probate/life-event distress signal (life estate gets its
+                    # own "life_estate" kind above instead -- see is_life_estate).
+                    "relationship_signal": relationship_signal,
+                    # Same raw['life_events'] shape enrichment_life_events.py already
+                    # writes for this exact token (there, scanned off owner_name; here,
+                    # set directly since this producer already knows it with certainty).
+                    # Feeds distress_score.py's existing "life_estate" -> LIFE_EVENT
+                    # (weight 8) rule, which was already live and waiting on a producer
+                    # to populate this key for this signal.
+                    **({"life_events": ["life_estate"]} if is_life_estate else {}),
                 },
             )
             out.append(li)
