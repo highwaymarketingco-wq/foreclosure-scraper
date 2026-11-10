@@ -354,6 +354,45 @@ def test_no_detail_leaves_the_listing_clean():
     li = _to_listings("Barnwell", [_row("045-00-00-021.03", "2025", 130.55)])[0]
     assert li.tax_value is None and li.acreage is None
     assert "detail" not in li.raw["qpaybill_roll"]
+
+
+# --------------------------------------------------------------------------- #
+# 2026-11-10: the detail page's "Homestead Exemption:" line (SC's statutory
+# age-65+/disabled/blind relief, SC Code 12-37-250) was already parsed into
+# det['homestead_exemption'] but never promoted past raw['qpaybill_roll']['detail'] --
+# distress_score.py's senior_exemption signal reads the TOP-LEVEL raw['tax_relief']
+# key, which this source never wrote. Same shape as enrichment_tax_relief.py's
+# lexington_sc/york_sc classify paths (gap_matrix's lt_elderly_disabled column is a
+# different, listing_type-only check this does NOT move -- see enrichment_tax_relief.py's
+# own module docstring history for why that distinction matters).
+
+def test_a_nonzero_homestead_exemption_is_promoted_to_tax_relief():
+    r = _row("045-00-00-021.03", "2025", 130.55)
+    r["detail"] = {"homestead_exemption": 50000.0, "residential_exemption": 0.0}
+    li = _to_listings("Barnwell", [r])[0]
+    assert li.raw["tax_relief"] == {"kind": "homestead_exemption",
+                                    "basis": "sc_homestead_age65_disabled",
+                                    "deferred_value": None, "county": "Barnwell",
+                                    "homestead_exemption_amount": 50000.0}
+
+
+def test_a_zero_homestead_exemption_stamps_nothing():
+    """0.0 means the county's own bill says no relief is applied -- not unknown. Must not
+    be confused with the field being absent (no detail yet), which also stamps nothing but
+    for a different reason."""
+    r = _row("045-00-00-021.03", "2025", 130.55)
+    r["detail"] = {"homestead_exemption": 0.0, "residential_exemption": 12.40}
+    li = _to_listings("Barnwell", [r])[0]
+    assert "tax_relief" not in li.raw
+
+
+def test_residential_exemption_alone_does_not_stamp_tax_relief():
+    """Residential (4%-legal-residence) exemption is open to ANY owner-occupant, not just
+    age/disability -- it must never be read as the homestead signal."""
+    r = _row("045-00-00-021.03", "2025", 130.55)
+    r["detail"] = {"residential_exemption": 26.11}
+    li = _to_listings("Barnwell", [r])[0]
+    assert "tax_relief" not in li.raw
     assert "owner_mailing" not in li.raw
 
 

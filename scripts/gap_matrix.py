@@ -780,9 +780,21 @@ SPECS: dict[str, Spec] = {
                                  statewide=(("NC", "derived"), ("SC", "derived")),
                                  doc="raw.bankruptcy_tax_combo present; checked = tax roll read"),
     "condemned": Spec(_S, "county", "code", ledger="vacant_structure",
+                      # 2026-11-10 (vacant/condemned coverage-gap research pass): three real
+                      # producers were missing from this tuple entirely -- gastonia_code_
+                      # enforcement.py, kinston_proposed_demolition.py and rocky_mount_blight_
+                      # survey.py each write a literal raw["condemned"]=True on a real subset of
+                      # their rows (confirmed by reading each file's own code, not inferred from
+                      # its docstring), so Gaston/Lenoir/Nash/Edgecombe were reading as unbuilt
+                      # here despite having real, already-running code. kinston and rocky_mount
+                      # were already correctly in the "vacancy" producers tuple below -- this was
+                      # a condemned-tuple-specific omission, not a missing module.
                       producers=("scrapers/city_websites/charlotte_open_data.py",
                                  "scrapers/counties_generic/arcgis_distress_layers.py",
                                  "scrapers/counties_nc/hendersonville_vacant_structures.py",
+                                 "scrapers/counties_nc/gastonia_code_enforcement.py",
+                                 "scrapers/counties_nc/kinston_proposed_demolition.py",
+                                 "scrapers/counties_nc/rocky_mount_blight_survey.py",
                                  "scrapers/counties_sc/spartanburg_city_condemned.py",
                                  "scrapers/counties_sc/spartanburg_condemned.py"),
                       doc="raw.condemned is true"),
@@ -926,15 +938,28 @@ SPECS: dict[str, Spec] = {
                     producers=("scrapers/counties_sc/sc_public_notices.py",),
                     doc="raw.probate names a decedent, es_case_number or nc_estate_file_no"),
     "vacancy": Spec(_S, "row", "code", ledger="vacant_structure",
+                    # 2026-11-10: gastonia_code_enforcement.py also writes a real raw["vacancy"]
+                    # block on a subset of its case types (confirmed by reading the file, not its
+                    # docstring's older "code_vacancy" terminology) -- a fourth tiny source, not
+                    # the 3 the 2026-10-17 sweep's ambiguity note below counted.
                     producers=("scrapers/counties_nc/hendersonville_vacant_structures.py",
                                "scrapers/counties_nc/rocky_mount_blight_survey.py",
-                               "scrapers/counties_nc/kinston_proposed_demolition.py"),
+                               "scrapers/counties_nc/kinston_proposed_demolition.py",
+                               "scrapers/counties_nc/gastonia_code_enforcement.py"),
                     doc="raw.vacancy.vacant/boarded_up/utility_status truthy; checked = vacancy wrapper",
                     ambiguity="a code-officer vacant-structure registry is a rare open-data product; only "
-                             "these 3 tiny city/county sources exist in all of NC+SC (2026-10-17 gap-sweep)"),
+                             "4 tiny city/county sources exist in all of NC+SC as of 2026-11-10 (was 3 at "
+                             "the 2026-10-17 gap-sweep; gastonia_code_enforcement.py added since, and was "
+                             "always missing from this tuple)"),
     "code_enforcement": Spec(_S, "row", "code", ledger="code_enforcement",
+                             # 2026-11-10: gastonia_code_enforcement.py was missing from this tuple too
+                             # (same omission as the condemned/vacancy tuples above) -- Gaston never read
+                             # as built here despite the module's own comment explicitly tracking this
+                             # exact column's literal requirement (see the file's gap_matrix.py reference
+                             # near its raw["code_enforcement"] assignment).
                              producers=("enrichment_code_enforcement.py", "enrichment_charlotte_code.py",
                                         "enrichment_greensboro_code.py", "scrapers/counties_nc/asheville_code_enforcement.py",
+                                        "scrapers/counties_nc/gastonia_code_enforcement.py",
                                         "scrapers/counties_generic/arcgis_distress_layers.py"),
                              doc="raw.code_enforcement condemned/has_open/severe (or True); checked = wrapper present"),
     "deed_chain_has_history": Spec(_F, "row", "gis_deed", producers=("enrichment_deed_chain.py",),

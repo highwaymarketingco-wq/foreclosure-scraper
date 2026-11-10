@@ -148,6 +148,35 @@ def test_a_record_with_no_parcel_is_not_a_lead():
     assert to_listing("Pickens", {**REAL, "ParcelNumber": None}) is None
 
 
+# --------------------------------------------------------------------------- #
+# 2026-11-10: CountyValues.HomesteadExemption (SC's statutory age-65+/disabled/blind
+# relief, SC Code 12-37-250) was already copied into raw['catalis_roll']['homestead_exemption']
+# but never promoted to the TOP-LEVEL raw['tax_relief'] key distress_score.py's
+# senior_exemption signal reads. Same shape as enrichment_tax_relief.py's lexington_sc/
+# york_sc classify paths. REAL's own HomesteadExemption is 0.0 (the live Pickens sample
+# this fixture is verbatim from carries no relief) -- that stays a negative control below.
+
+def test_a_nonzero_homestead_exemption_is_promoted_to_tax_relief():
+    rec = {**REAL, "CountyValues": {**REAL["CountyValues"], "HomesteadExemption": 50000.0}}
+    li = to_listing("Pickens", rec)
+    assert li.raw["tax_relief"] == {"kind": "homestead_exemption",
+                                    "basis": "sc_homestead_age65_disabled",
+                                    "deferred_value": None, "county": "Pickens",
+                                    "homestead_exemption_amount": 50000.0}
+
+
+def test_the_real_pickens_sample_has_no_relief_and_stamps_nothing():
+    assert to_listing("Pickens", REAL).raw["catalis_roll"]["homestead_exemption"] == 0.0
+    assert "tax_relief" not in to_listing("Pickens", REAL).raw
+
+
+def test_legal_residence_exemption_alone_does_not_stamp_tax_relief():
+    """LegalResidenceExemption is SC's 4%-owner-occupied special assessment, open to ANY
+    owner-occupant -- it must never be read as the age/disability homestead signal."""
+    rec = {**REAL, "CountyValues": {**REAL["CountyValues"], "LegalResidenceExemption": 15.0}}
+    assert "tax_relief" not in to_listing("Pickens", rec).raw
+
+
 def test_billing_id_keeps_multi_year_rows_distinct():
     """A parcel delinquent for three years arrives as three records; keying on BillingID
     is what stops them collapsing into one."""

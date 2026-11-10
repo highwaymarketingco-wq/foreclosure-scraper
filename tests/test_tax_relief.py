@@ -111,6 +111,22 @@ def test_york_sc_homestead_and_farm_are_distinct_kinds():
     assert mod._classify(cfg, {"HOMESTEAD": "N", "LandUseDesc": "RESIDENTIAL"}) is None
 
 
+def test_homestead_exemption_kind_scores_as_senior_exemption():
+    """2026-11-10: found while wiring qpaybill/catalis's own HomesteadExemption field --
+    distress_score.py's senior_exemption check only ever matched kind in ("elderly",
+    "disabled", "blind"), so York's and Lexington's own homestead_exemption hits (wired
+    2026-10-02 and 2026-10-30) never scored either. kind=="homestead_exemption" must score
+    the same as Buncombe's elderly/disabled/blind -- it is the identical real-world fact
+    (a hard, county-recorded age/disability exemption) under SC's own statute name."""
+    from foreclosure_scraper.distress_score import _signals_for
+    li = _lead(state="SC", county="York",
+              raw={"tax_relief": {"kind": "homestead_exemption",
+                                  "basis": "sc_homestead_age65_disabled",
+                                  "deferred_value": None, "county": "York"}})
+    names = [n for n, _c, _w in _signals_for(li)]
+    assert "senior_exemption" in names
+
+
 # --------------------------------------------------------------------------
 # enrich_tax_relief — end to end, _query monkeypatched
 # --------------------------------------------------------------------------

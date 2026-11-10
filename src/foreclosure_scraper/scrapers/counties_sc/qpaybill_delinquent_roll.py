@@ -1360,6 +1360,26 @@ def _to_listings(county: str, rows: list[dict]) -> list[Listing]:
             # board_persist from re-inheriting it as the property address from a prior row).
             raw_owner_mailing = {**(raw_owner_mailing or {"source": "qpaybill_address_cell"}),
                                  "mailing": listed_pobox}
+        # SC statutory age-65+/disabled/blind homestead exemption (SC Code 12-37-250): the
+        # detail page's "Homestead Exemption:" dollar line is the SAME statute
+        # enrichment_tax_relief.py's York/Lexington GIS-layer flags cover (HOMESTEAD='Y' /
+        # Homestead='YES'), just sourced here from the tax bill's own exemption line item
+        # instead of a parcel-layer flag. parse_detail() has captured det['homestead_exemption']
+        # since 2026-10-04, but it never left this module's own raw['qpaybill_roll']['detail']
+        # nest, so distress_score.py's senior_exemption signal (reads the TOP-LEVEL
+        # raw['tax_relief'] key) never saw it in any of this source's 19 counties. Distinct
+        # from det['residential_exemption'] (SC's 4%-legal-residence special assessment ratio,
+        # open to ANY owner-occupant regardless of age/disability) -- only a nonzero HOMESTEAD
+        # figure is this specific relief. Same shape enrichment_tax_relief.py's lexington_sc/
+        # york_sc classify paths write (kind/basis/deferred_value/county); the actual dollar
+        # amount is reported under its own key rather than folded into deferred_value, which
+        # means something else there (a present-use rollback liability, not a homestead
+        # exemption) -- "report the real number", never overload a field's meaning.
+        tax_relief = None
+        if det.get("homestead_exemption"):
+            tax_relief = {"kind": "homestead_exemption", "basis": "sc_homestead_age65_disabled",
+                         "deferred_value": None, "county": county,
+                         "homestead_exemption_amount": det["homestead_exemption"]}
         out.append(Listing(
             source="counties_sc.qpaybill_delinquent_roll",
             source_url=_url(QPAYBILL_SUBS[county]),
@@ -1403,6 +1423,11 @@ def _to_listings(county: str, rows: list[dict]) -> list[Listing]:
             # the shape enrichment_lead_signals.py's absentee_owner check reads
             # (raw['owner_mailing']['absentee']), via mailing_shape.mailing_of().
             **({"owner_mailing": raw_owner_mailing} if raw_owner_mailing else {}),
+            # Top-level raw key, NOT nested under qpaybill_roll -- distress_score.py's
+            # senior_exemption signal and enrichment_tax_relief.py's own shape both read
+            # raw['tax_relief'] at the top level (see the comment above tax_relief's
+            # computation).
+            **({"tax_relief": tax_relief} if tax_relief else {}),
             },
             tax_value=det.get("appraised_value"),
             assessed_value=det.get("assessed_value"),

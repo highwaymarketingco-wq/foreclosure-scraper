@@ -144,3 +144,40 @@ def test_fullmer_rank_years_delinquent_still_rejects_untouched_default():
     yrs, two_plus = years_delinquent(li)
     assert yrs is None
     assert two_plus is False
+
+
+def test_multi_year_delinquent_tax_surfaces_tax_aging_with_no_balance_anywhere():
+    """2026-11-10: the <county>_multiyear_tax.py family (Iredell, Catawba, Cabarrus, Gaston,
+    Nash, Pender, Randolph, Transylvania, Wake, + the generic ustaxdata/its_public/ptscloud/
+    qpaybill variants) all write this one shared raw['multi_year_delinquent_tax'] key, never
+    raw['tax_owed'] itself. enrich_tax_owed() only creates raw['tax_owed'] when some tax-ish
+    block exposes a positive dollar balance; a block whose bills carry years but no parseable
+    balance (total_due here is None, the real-world Iredell-grid shape a 2026-10-29 investigation
+    flagged as "tax_owed design n/a") used to leave this function with neither nc_ptscloud nor
+    tax_owed to look at, so it never even tried tax_year_status() -- despite that function
+    already being able to derive years_delinquent from this exact block generically. This is the
+    regression guard for that fix: no tax_owed, no nc_ptscloud, balance-less multi_year_
+    delinquent_tax block, real years_delinquent surfaced anyway."""
+    li = _li({"multi_year_delinquent_tax": {
+        "years": [CURRENT_YEAR - 2, CURRENT_YEAR - 1], "years_delinquent": 2,
+        "unpaid_bill_years": 2, "total_due": None, "total_owed": None, "year": CURRENT_YEAR - 1,
+    }})
+    assert "tax_owed" not in li.raw and "nc_ptscloud_delinquent_tax" not in li.raw
+    stats = enrich_tax_aging([li])
+    assert stats["surfaced"] == 1
+    assert stats["by_source"]["multi_year_delinquent_tax"] == 1
+    surf = li.raw["tax_aging_surfaced"]
+    assert surf["source"] == "multi_year_delinquent_tax"
+    assert surf["years_delinquent"] == 2
+    assert li.raw["tax_aging_high"] is True
+
+
+def test_two_year_delinquent_alone_does_not_surface_tax_aging():
+    """two_year_delinquent is a count-only, no-dollar, no-years-list derived flag (and is itself
+    excluded from tax_year_status()'s source scan, _DERIVED_TAX_BLOCKS) -- it must NOT trip the
+    new multi_year_delinquent_tax branch. A row with only this block stays a genuine gap, not a
+    false positive."""
+    li = _li({"two_year_delinquent": {"is_two_year_plus": True, "years": 2, "source": "some_vendor"}})
+    stats = enrich_tax_aging([li])
+    assert stats["surfaced"] == 0
+    assert "tax_aging_surfaced" not in li.raw

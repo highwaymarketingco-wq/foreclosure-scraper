@@ -1,9 +1,10 @@
-"""Demolition permits in the four largest NC metros that publish them: Mecklenburg (Charlotte and
-its towns), Greensboro, Durham and Cary.
+"""Demolition permits in the five largest NC metros that publish them: Mecklenburg (Charlotte and
+its towns), Greensboro, Durham, Cary and Wake County (Raleigh and its towns).
 
 SOURCES (Greensboro/Durham/Cary read live 2026-10-07; Mecklenburg RE-VERIFIED 2026-10-14 after its
-GIS backend moved -- see the dated note below. Counts are ALL-TIME now; the 730-day window that
-used to gate the fetch itself is gone, see "DATE COVERAGE" below)
+GIS backend moved -- see the dated note below. Wake added 2026-11-10, read live that day. Counts
+are ALL-TIME now; the 730-day window that used to gate the fetch itself is gone, see "DATE
+COVERAGE" below)
   mecklenburg  meckgis.mecklenburgcountync.gov BuildingPermits FeatureServer/0, 482,384 permits
                county-wide (Charlotte, Huntersville, Matthews, Cornelius, Mint Hill, ...), updated
                daily. 2026-10-14: the old `AccelaAllPermits` service and all its field names
@@ -34,6 +35,22 @@ used to gate the fetch itself is gone, see "DATE COVERAGE" below)
   cary         data.townofcary.org OpenDataSoft "permit-applications", 87,184 permits;
                'BLDG - DEMOLISH - SNGL FAM HOME (B645)' + 'BLDG NON RES DEMOLITION (B649)' 442
                all-time, 138 in the old 730-day window (69% excluded).
+  wake         maps.wake.gov Inspections/Building_Permits/0 (the whole county's EnerGov permit
+               history, 129,587 rows all-time), PERMIT_TYPE='Demolition Permit' -- 1,221 all-time,
+               940 after dropping Void/Withdrawn (live-verified 2026-11-10, most recent issued
+               2026-11-07). WORK_CLASS carries no 'Demolition' value on this layer at all (its
+               values are Residential/Commercial/Duplex/etc. building categories); PERMIT_TYPE is
+               the field that actually isolates demolitions, unlike every other feed here which
+               keys off WORK_CLASS or a free-text description. No owner-name field exists on this
+               layer, same situation as durham above -- MAILING_ADDRESS/CITY/STATE/POSTAL_CODE is
+               the applicant's mailing block (owner_mailing), and PIN is the only locator (no situs
+               address field either), so this feed carries no `address` role, same as durham's.
+               DISTRICT ('Raleigh', 'Zebulon', 'Wake County' for unincorporated, ...) is mapped to
+               `city` as an approximation -- it is the permit's routing jurisdiction, not a
+               geocoded municipality, so an unincorporated row surfaces literally as city='Wake
+               County'. Using APPLICATION_DATE, not ISSUE_DATE, for the date role and the `since`
+               floor: ISSUE_DATE is null on every Withdrawn row sampled (never issued), while
+               APPLICATION_DATE is populated on every row including Withdrawn ones.
 
 WHAT A ROW MEANS
     A property with a demolition permit applied for or issued, ever (see DATE COVERAGE), cancelled
@@ -146,6 +163,23 @@ FEEDS: tuple[Feed, ...] = (
           "address": "originaladdress1", "city": "originalcity", "zip": "originalzip",
           "parcel": "pin", "owner": "ownername", "mail": ("owneraddress1", "ownerzip"),
           "type": "permittypedesc"}),
+    # Added 2026-11-10 (vacant/condemned coverage-gap research pass). Wake's countywide EnerGov
+    # permit layer carries every permit type, not just demolitions -- see arcgis_where's wake
+    # branch for the PERMIT_TYPE filter. No owner-name or situs-address field exists, same gap
+    # durham already has in this exact FEEDS list: parcel (PIN) is the only locator, and the
+    # "mail" block is the applicant's mailing address, not the property's. See the module
+    # docstring's SOURCES entry for the live-verified counts and the APPLICATION_DATE-over-
+    # ISSUE_DATE reasoning.
+    Feed("wake", "Wake", None,
+         "https://maps.wake.gov/arcgis/rest/services/Inspections/Building_Permits/MapServer/0",
+         "https://www.wakegov.com/departments-government/development-services/inspections-permits",
+         ("PERMIT_NUMBER", "PERMIT_TYPE", "PERMIT_STATUS", "APPLICATION_DATE", "DESCRIPTION",
+          "MAILING_ADDRESS", "MAILING_CITY", "MAILING_STATE", "MAILING_POSTAL_CODE",
+          "DISTRICT", "PIN"),
+         {"permit": "PERMIT_NUMBER", "status": "PERMIT_STATUS", "date": "APPLICATION_DATE",
+          "parcel": "PIN", "city": "DISTRICT",
+          "mail": ("MAILING_ADDRESS", "MAILING_CITY", "MAILING_STATE", "MAILING_POSTAL_CODE"),
+          "mail_state": "MAILING_STATE", "type": "PERMIT_TYPE"}),
 )
 
 CARY_TYPES = ("BLDG - DEMOLISH - SNGL FAM HOME (B645)", "BLDG NON RES DEMOLITION (B649)")
@@ -164,6 +198,12 @@ def arcgis_where(feed: Feed, since: Optional[datetime]) -> str:
     if feed.name == "greensboro":
         base = "ApplicationType LIKE 'Total Demolish%'"
         return base if since is None else f"{base} AND IssuedDate >= DATE '{since:%Y-%m-%d}'"
+    if feed.name == "wake":
+        # The layer carries every Wake County permit type (129,587 rows); PERMIT_TYPE is the
+        # one field that isolates demolitions (see the module docstring's wake SOURCES note --
+        # WORK_CLASS never carries a 'Demolition' value on this layer at all).
+        base = "PERMIT_TYPE='Demolition Permit'"
+        return base if since is None else f"{base} AND APPLICATION_DATE >= DATE '{since:%Y-%m-%d}'"
     return "1=1" if since is None else f"ISSUE_DATE >= DATE '{since:%Y-%m-%d}'"
 
 
@@ -308,7 +348,8 @@ async def _cary_rows(c, feed: Feed, since: datetime) -> list[dict]:
 
 #: Volume safety cap per feed (not a date filter): well above every feed's measured
 #: all-time count (mecklenburg 13,992, greensboro 3,023, durham 2,923, cary 442 as of
-#: 2026-10-14) with room to grow, so a WHERE clause with no date floor still can't pull an
+#: 2026-10-14; wake 1,221 demolition-type rows out of 129,587 total permits as of 2026-11-10)
+#: with room to grow, so a WHERE clause with no date floor still can't pull an
 #: unbounded amount if a feed's volume changes unexpectedly. Matches this codebase's
 #: existing convention for an all-time/dateless query (see e.g. greenville_hard_distress).
 _MAX_RECORDS_PER_FEED = 50_000
@@ -316,7 +357,7 @@ _MAX_RECORDS_PER_FEED = 50_000
 
 class NCMetroDemolitionPermits(BaseScraper):
     slug = SLUG
-    name = "NC metro demolition permits (Mecklenburg, Greensboro, Durham, Cary)"
+    name = "NC metro demolition permits (Mecklenburg, Greensboro, Durham, Cary, Wake)"
     category = "city_distress"
     expected_min_count = 0
 

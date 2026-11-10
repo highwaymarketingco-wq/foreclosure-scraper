@@ -441,6 +441,16 @@ def test_built_in_code_known_false_positives_not_silently_fixed():
         a real SC Cherokee producer exists, but the regex is state-blind (it only checks whether
         the literal word "Cherokee" appears, not which state tuple it's paired with), so it also
         credits NC's unrelated Cherokee County with the same real entry.
+
+    2026-11-10 UPDATE: the "previously-known Gaston/condemned rejection-comment false positive"
+    this docstring used to also pin down is GONE, not regressed -- gastonia_code_enforcement.py
+    (a real raw["condemned"]=True producer, confirmed by reading its code, missing from this
+    tuple until the vacant/condemned coverage-gap research pass that day) was added to
+    SPECS["condemned"].producers, and `county="Gaston"` is real code in that file, not a comment
+    or docstring example. ('NC', 'Gaston') crediting 'condemned' now is a true positive, the
+    opposite of the Moore/Davidson/Cherokee cases above, and belongs in
+    test_built_in_code_drops_arcgis_distress_layers_false_credit_for_condemned_and_code_enforcement
+    -style end-to-end assertions, not here.
     """
     condemned_files = [gm.PKG / f for f in gm.SPECS["condemned"].producers if (gm.PKG / f).exists()]
     jail_files = [gm.PKG / f for f in gm.SPECS["jail_booking"].producers if (gm.PKG / f).exists()]
@@ -458,7 +468,27 @@ def test_built_in_code_known_false_positives_not_silently_fixed():
     )
     # the two FPs comment-stripping DOES fix must stay fixed
     assert ("NC", "Lee") not in jail_counties and ("SC", "Lee") not in jail_counties
-    assert ("NC", "Gaston") not in condemned_counties
+    # Gaston is now a TRUE positive here (see 2026-11-10 UPDATE above) -- a real producer, not a
+    # stale rejection comment.
+    assert ("NC", "Gaston") in condemned_counties
+
+
+def test_condemned_and_code_enforcement_producers_include_gastonia_kinston_rocky_mount():
+    """2026-11-10 vacant/condemned coverage-gap research pass: three real raw["condemned"]/
+    raw["vacancy"]/raw["code_enforcement"] writers were missing from these producer tuples
+    entirely (confirmed by reading each file's own code, not its docstring) -- Gaston/Lenoir/
+    Nash/Edgecombe read as unbuilt despite real, already-running code. Same bug class, same fix
+    shape, as test_vacancy_producers_cover_all_three_real_writers above (that one was wave 5;
+    this is the same omission recurring in two more tuples plus a fourth writer vacancy itself
+    had not yet picked up)."""
+    condemned = gm.SPECS["condemned"].producers
+    vacancy = gm.SPECS["vacancy"].producers
+    code_enf = gm.SPECS["code_enforcement"].producers
+    assert any("gastonia_code_enforcement" in p for p in condemned)
+    assert any("kinston_proposed_demolition" in p for p in condemned)
+    assert any("rocky_mount_blight_survey" in p for p in condemned)
+    assert any("gastonia_code_enforcement" in p for p in vacancy)
+    assert any("gastonia_code_enforcement" in p for p in code_enf)
 
 
 def test_arcgis_distress_layers_credit_respects_process_and_condemned_fields():
@@ -473,14 +503,22 @@ def test_arcgis_distress_layers_credit_respects_process_and_condemned_fields():
     Lincoln/Guilford/Durham/Richland each have a real process='code_enforcement' entry but, same as
     Richland's own already-investigated case, ZERO condemned=True entry, yet were also credited
     'built' for condemned. _arcgis_distress_layers_credit() reads the LAYERS registry's own fields
-    directly instead."""
+    directly instead.
+
+    2026-11-10 UPDATE: Guilford dropped out of code_enforcement's expected set. greensboro_code_
+    housing (this test's 5th layer, Guilford's only process='code_enforcement' entry in this file)
+    was REMOVED 2026-10-28 -- the file's own dated comment explains why (a 665-row "active" set
+    whose newest case number was 2+ years stale, the sync had simply stopped) -- so this test went
+    stale against that change rather than being updated alongside it. Guilford is correctly absent
+    now; it has no other code_enforcement producer anywhere in the codebase."""
     credit = gm._arcgis_distress_layers_credit()
     # only York's rockhill_code_demolition sets condemned=True in this entire file
     assert credit["condemned"] == {("SC", "York")}
-    # the 5 real process="code_enforcement" layers (columbia_code_vacant_boarded, greensboro_code_housing,
-    # durham_open_code_violations, lincoln_code_violations, rockhill_code_housing/_exterior_major)
+    # the 4 real process="code_enforcement" layers left after greensboro_code_housing's 2026-10-28
+    # removal (columbia_code_vacant_boarded, durham_open_code_violations, lincoln_code_violations,
+    # rockhill_code_housing/_exterior_major)
     assert credit["code_enforcement"] == {
-        ("SC", "Richland"), ("NC", "Guilford"), ("NC", "Durham"), ("NC", "Lincoln"), ("SC", "York"),
+        ("SC", "Richland"), ("NC", "Durham"), ("NC", "Lincoln"), ("SC", "York"),
     }
 
 
@@ -488,7 +526,14 @@ def test_built_in_code_drops_arcgis_distress_layers_false_credit_for_condemned_a
     """End-to-end: built_in_code()'s real output for 'condemned' no longer credits a county whose
     only textual evidence in arcgis_distress_layers.py is an entry tagged a different process (the
     exact mislabel mechanism the test above pins down), while counties with a genuine producer --
-    in this file or another -- keep their credit."""
+    in this file or another -- keep their credit.
+
+    2026-11-10 UPDATE: Guilford moved from "has code_enforcement" to "has neither" -- its only
+    code_enforcement producer, greensboro_code_housing, was REMOVED 2026-10-28 as stale (see
+    test_arcgis_distress_layers_credit_respects_process_and_condemned_fields's dated note above).
+    Gaston also joined this test's world: gastonia_code_enforcement.py (missing from the condemned/
+    code_enforcement producer tuples until the 2026-11-10 coverage-gap pass) now genuinely credits
+    it for both."""
     built = gm.built_in_code()
     # false positives removed: named in the file, but on an unrelated-process entry only
     for st, co in (("NC", "Transylvania"), ("NC", "Buncombe"), ("NC", "Burke"), ("NC", "New Hanover"),
@@ -497,19 +542,22 @@ def test_built_in_code_drops_arcgis_distress_layers_false_credit_for_condemned_a
     for st, co in (("NC", "Transylvania"), ("NC", "Burke"), ("SC", "Greenville"), ("SC", "Greenwood"),
                    ("SC", "Laurens"), ("SC", "Pickens")):
         assert (st, co) not in built["code_enforcement"], f"{st}/{co} has no code_enforcement entry anywhere"
+    # Guilford has neither signal now -- its only producer is gone, not merely mislabeled.
+    assert ("NC", "Guilford") not in built["condemned"] and ("NC", "Guilford") not in built["code_enforcement"]
     # real producers (in this file, via condemned=True / process='code_enforcement', or via another
     # file entirely) keep their credit
     assert ("SC", "York") in built["condemned"] and ("SC", "York") in built["code_enforcement"]
     assert ("SC", "Spartanburg") in built["condemned"]            # spartanburg_condemned.py
     assert ("NC", "Henderson") in built["condemned"]              # hendersonville_vacant_structures.py
     assert ("NC", "Mecklenburg") in built["condemned"]            # charlotte_open_data.py
+    assert ("NC", "Gaston") in built["condemned"]                 # gastonia_code_enforcement.py (added 2026-11-10)
+    assert ("NC", "Gaston") in built["code_enforcement"]          # gastonia_code_enforcement.py (added 2026-11-10)
     assert ("NC", "Lincoln") in built["code_enforcement"]         # lincoln_code_violations (this file)
-    assert ("NC", "Guilford") in built["code_enforcement"]        # greensboro_code_housing (this file)
     assert ("NC", "Durham") in built["code_enforcement"]          # durham_open_code_violations (this file)
     assert ("NC", "Buncombe") in built["code_enforcement"]        # asheville_code_enforcement.py (a DIFFERENT file)
-    # Guilford/Lincoln/Durham DO have a real code_enforcement producer but, same as Richland, no
+    # Lincoln/Durham DO have a real code_enforcement producer but, same as Richland, no
     # condemned=True entry -- the narrower, opposite-direction half of the same mislabel
-    for st, co in (("NC", "Guilford"), ("NC", "Lincoln"), ("NC", "Durham"), ("SC", "Richland")):
+    for st, co in (("NC", "Lincoln"), ("NC", "Durham"), ("SC", "Richland")):
         assert (st, co) not in built["condemned"], f"{st}/{co} has a code_enforcement entry, not a condemned one"
 
 
@@ -852,25 +900,28 @@ def test_nc_quiet_title_is_read_by_nc_heir_notices():
         assert johnston[0] == "free" and "Column" in johnston[2]
         alleghany = gm.source_status(spec, "NC", m[("NC", "Alleghany")])
         assert alleghany[0] == "walled" and "Column" in alleghany[1]
-        # 25 NC counties with no Column paper, plus 28 SC counties outside column_legal_notices's
-        # active 18-county SC estate-lane loop (gap-sweep wave 2, 2026-10-16)
-        assert len(spec.statewide_except) == 25 + 28
+        # 25 NC counties with no Column paper, plus 27 SC counties outside column_legal_notices's
+        # active 19-county SC estate-lane loop (grew from 18 after the 2026-10-23 re-probe added
+        # one more county back in; gap-sweep wave 2, 2026-10-16)
+        assert len(spec.statewide_except) == 25 + 27
     assert gm.source_status(gm.SPECS["heir_naming_publication"], "SC", None)[2].startswith("statewide: SC estate")
 
 
 def test_sc_quiet_title_only_reaches_column_legal_notices_18_county_footprint():
     # column_legal_notices's SC estate lane only queries SC_FOOTPRINT + SC_DISTRESSED_ONLY +
-    # SC_PROBATE_EXTRA_COUNTIES (18 of 46 counties); the rest were dropped after a one-time
-    # 2026-10-02 probe found zero notices there. Before this fix, gap_matrix.py claimed blanket
-    # SC statewide coverage with no exception, so those 28 counties showed an unsatisfiable
-    # "run it for this county" built-but-low-yield gap forever (gap-sweep wave 2, 2026-10-16).
+    # SC_PROBATE_EXTRA_COUNTIES -- 18 of 46 counties originally, now 19 of 46 after the
+    # 2026-10-23 re-probe added one back in; the rest were dropped after a one-time 2026-10-02
+    # probe found zero notices there, then re-confirmed empty on re-probe. Before the original
+    # fix, gap_matrix.py claimed blanket SC statewide coverage with no exception, so those
+    # excluded counties showed an unsatisfiable "run it for this county" built-but-low-yield gap
+    # forever (gap-sweep wave 2, 2026-10-16).
     m = gm.load_matrix(gm.REPO / "docs" / "county_records" / "county_records_matrix.json")
     for col in ("quiet_title", "heir_naming_publication"):
         spec = gm.SPECS[col]
         greenville = gm.source_status(spec, "SC", m[("SC", "Greenville")])  # SC_PROBATE_EXTRA_COUNTIES
         assert greenville[0] == "free" and "SC estate" in greenville[2]
-        abbeville = gm.source_status(spec, "SC", m[("SC", "Abbeville")])  # not in the active 18
-        assert abbeville[0] == "walled" and "18 of 46" in abbeville[1]
+        abbeville = gm.source_status(spec, "SC", m[("SC", "Abbeville")])  # not in the active 19
+        assert abbeville[0] == "walled" and "19 of 46" in abbeville[1]
 
 
 def test_ledger_signals_accepts_several_verifier_signals():

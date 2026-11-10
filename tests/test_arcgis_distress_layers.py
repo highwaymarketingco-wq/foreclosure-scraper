@@ -375,6 +375,49 @@ def test_zero_or_missing_own_coordinates_are_not_used():
     assert M._to_listing(base, lay).latitude is None
 
 
+# --- 2026-11-10 vacant/condemned coverage-gap research pass: greenville_city_demolition_permits
+# (City of Greenville SC building permits, PERMIT_TYPE DEMR/DEMC). Fixture row below is real,
+# trimmed to the fields this layer reads, live 2026-11-10 (permit 2600004610, 8 Manning St).
+
+def test_greenville_city_demolition_permits_filters_to_demr_and_demc_only():
+    lay = _layer("greenville_city_demolition_permits")
+    assert lay.where == "PERMIT_TYPE IN ('DEMR','DEMC')"
+    assert lay.state == "SC" and lay.county == "Greenville"
+
+
+def test_greenville_city_demolition_permits_maps_owner_address_and_description():
+    lay = _layer("greenville_city_demolition_permits")
+    li = M._to_listing({
+        "PERMIT_NUM": "2600004610", "PERMIT_TYPE": "DEMR",
+        "APPLIC_DESCRIPTION": "DEMOLITION, RESIDENTIAL SINGLE FAMILY        ",
+        "BP_STATUS": "IS", "STREETADDRESS": "8   MANNING ST  ",
+        "OWNER_NAME": "FABANWO JOHN I                ",
+        "OWNER_ADDR": "FABANWO REBECCA D             ",
+        "OWNER_ADDR2": "8 MANNING ST                  ",
+        "OWNER_ZIP": "29601    ", "NewIssueDate": 1794114000000,
+    }, lay)
+    assert li.state == "SC" and li.county == "Greenville"
+    assert li.street_address == "8   MANNING ST"
+    assert li.owner_name == "FABANWO JOHN I"
+    assert "DEMOLITION, RESIDENTIAL SINGLE FAMILY" in li.description
+    assert li.raw["owner_mailing"]["mailing"] == "FABANWO REBECCA D 8 MANNING ST"
+
+
+def test_greenville_city_demolition_permits_is_a_permit_not_a_condemnation():
+    """Owner/contractor-FILED permits (CONTRACTOR_NAME is sometimes literally 'HOME OWNER' in
+    the live data) are not the same signal as a city condemnation order -- same distinction
+    new_hanover_demolition_permits already draws, and for the same reason: `condemned` and
+    `code_enforcement` must stay unset here or this would silently inflate those two columns
+    with a different, weaker signal type."""
+    lay = _layer("greenville_city_demolition_permits")
+    assert lay.condemned is False
+    li = M._to_listing({"PERMIT_NUM": "1", "STREETADDRESS": "1 TEST ST",
+                        "APPLIC_DESCRIPTION": "DEMOLITION, RESIDENTIAL SINGLE FAMILY"}, lay)
+    assert "condemned" not in li.raw
+    assert "code_enforcement" not in li.raw
+    assert li.raw["arcgis_distress"]  # still a real, read lead -- just not these two columns
+
+
 def test_an_ssn_like_column_never_reaches_the_raw_block():
     li = M._to_listing({"PIN": "0000000000003", "OWNAM1": "SAMPLE", "STRNUM": "1",
                         "LOCATE": "TEST", "TCSSN1": "000-00-0000"},

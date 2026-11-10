@@ -415,6 +415,22 @@ def to_listing(county: str, rec: dict) -> Listing | None:
     if total_due:
         raw["tax_owed"] = {"balance": total_due, "kind": "delinquent_tax", "source": SLUG,
                            "year": year, "basis": "own_record"}
+    # SC statutory age-65+/disabled/blind homestead exemption (SC Code 12-37-250) -- the same
+    # relief enrichment_tax_relief.py's York/Lexington GIS-layer HOMESTEAD flags cover.
+    # CountyValues.HomesteadExemption is this API's own dollar exemption line item, already
+    # carried in `catalis` above (homestead_exemption key) since this source's own addition,
+    # but never promoted to the TOP-LEVEL raw['tax_relief'] key distress_score.py's
+    # senior_exemption signal actually reads. Distinct from LegalResidenceExemption (SC's 4%
+    # owner-occupied special-assessment ratio, open to ANY owner-occupant, not just age or
+    # disability) -- only a nonzero HOMESTEAD figure is this specific relief. Same shape
+    # enrichment_tax_relief.py's lexington_sc/york_sc classify paths write (kind/basis/
+    # deferred_value/county); the real dollar amount goes under its own key rather than
+    # deferred_value, which means a present-use rollback liability in that shape, not a
+    # homestead exemption -- report the real number, never overload a field's meaning.
+    if cv.get("HomesteadExemption"):
+        raw["tax_relief"] = {"kind": "homestead_exemption", "basis": "sc_homestead_age65_disabled",
+                             "deferred_value": None, "county": county,
+                             "homestead_exemption_amount": cv.get("HomesteadExemption")}
     return Listing(
         source=SLUG,
         source_url=CATALIS_COUNTIES[county][1],

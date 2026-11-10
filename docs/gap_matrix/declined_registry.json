@@ -116,6 +116,46 @@
       "state": "SC", "county": "Richland", "column": "atty_obituary_match",
       "reason": "Same round-3 sweep (see the Mecklenburg entry above and funeral_home_rss.py's module docstring) -- one of the 15 populous NC/SC counties checked with zero usable hits.",
       "confirmed_date": "2026-09-28", "confidence": "high"
+    },
+    {
+      "state": "NC", "county": null, "column": "lt_tax_sale_overage",
+      "reason": "NC tax-foreclosure sales are JUDICIAL (G.S. 105-374 in rem, or power-of-sale under G.S. 45-21.31 for mortgage-style tax foreclosures); any excess-over-debt proceeds are deposited with the CLERK OF SUPERIOR COURT inside that specific foreclosure special-proceeding's own case file, not published by the county tax office as a roster. Claiming requires a motion/petition referencing that case number (G.S. 45-21.31/105-374(q)); there is no county-wide or statewide published list of who has surplus -- confirmed independently two ways: (1) this repo's own gap_matrix.py Spec for this column already carries the ambiguity note 'SC counties publish excess-funds lists; NC clerks hold surplus without a published list', and (2) fresh 2026-11-10 web research (NC probate/estate-law firm Q&A content, a dozen+ independent articles) converges on the same claim-by-petition-to-the-case-file process with no published roster. After ~1 year unclaimed, money can migrate to the NC State Treasurer's generic Unclaimed Property Division (116B-62) -- a DIFFERENT, non-tax-sale-specific statewide database (bank accounts, uncashed checks, etc.), not a fix for this column; scraping it would need heavy filtering and is a separate future signal, not this one. This makes the 101 NC rows the gap matrix flags 'sourced-not-built' for lt_tax_sale_overage a heuristic false-positive (the matrix treats 'county has SOME tax source in county_records_matrix.json' as 'sourced' for every tax-family column, including this one, without checking that source actually publishes an overage list). Verified directly against the structural rule (judicial-foreclosure routing), not independently re-checked clerk-by-clerk for all 100 NC counties -- a county-specific override still wins if one clerk turns out to publish a list anyway.",
+      "confirmed_date": "2026-11-10", "confidence": "medium"
+    },
+    {
+      "state": "SC", "county": "Oconee", "column": "lt_tax_sale_overage",
+      "reason": "Live-fetched https://oconeesc.com/delinquent-tax/tax-sale-information/overage-information 2026-11-10 (HTTP 200, no login/CAPTCHA): the page is PROCESS INFO ONLY, no itemized list. It states the delinquent tax office MAILS certified notification letters to anyone with available overage, and anyone else must CALL (864-638-4147) to inquire -- there is no roster of names/parcels/amounts on the page or linked from it.",
+      "confirmed_date": "2026-11-10", "confidence": "high"
+    },
+    {
+      "state": "SC", "county": "Greenville", "column": "lt_tax_sale_overage",
+      "reason": "The gap matrix's own 'source' pointer for this cell, https://greenvillecountysc.gov/TaxCollector/pdf/taxsaleoverbid.pdf, was live-fetched and text-extracted 2026-11-10 (HTTP 200, application/pdf): it is a static 'INSTRUCTIONS FOR FILING CLAIM FOR TAX SALE OVERAGE' form (dated 5/11/2017), not an itemized list -- no names, parcels or dollar amounts anywhere in the document. No other overage-list link found on the Tax Collector's TaxSaleProcedures/TaxSaleFAQ pages.",
+      "confirmed_date": "2026-11-10", "confidence": "high"
+    },
+    {
+      "state": "SC", "county": "Bamberg", "column": "lt_tax_sale_overage",
+      "reason": "Live-fetched https://www.bambergcounty.sc.gov/overage-claims 2026-11-10 (HTTP 200 after a 301 from the www-less host, no login/CAPTCHA): page is claim-filing instructions only (links to an Agreement-and-Release claim FORM PDF), no itemized list of names/parcels/amounts.",
+      "confirmed_date": "2026-11-10", "confidence": "high"
+    },
+    {
+      "state": "SC", "county": "Jasper", "column": "lt_tax_sale_overage",
+      "reason": "Live-fetched https://jaspercountysc.gov/services/taxes/delinquent-tax-collection 2026-11-10 (HTTP 200): no document/PDF links at all on the page, no overage list. Page says the tax-sale property list itself is sold on paper ($0.50/page) at the Tax Collector's office; an overage list would require a phone call (843-717-3610) or a FOIA request, not a public scrape target.",
+      "confirmed_date": "2026-11-10", "confidence": "high"
+    },
+    {
+      "state": "SC", "county": "Berkeley", "column": "lt_tax_sale_overage",
+      "reason": "A third-party aggregator claims Berkeley publishes 'an unclaimed tax sale overage list by owner name including bid amount and overage', but every Berkeley County path tried live 2026-11-10 with a full Chrome UA (both WebFetch and curl) -- berkeleycountysc.gov/departments/delinquent-tax/, taxsale.berkeleycountysc.gov/, and berkeleycountysc.gov/?s=overage -- returned HTTP 403 (Cloudflare/WAF, not a wrong URL: all three independent paths on the same host blocked identically). This cell should read 'walled (bot check (Cloudflare/WAF))', not 'sourced-not-built'; the gap matrix has not re-detected the wall. No free/no-CAPTCHA path confirmed as of this date.",
+      "confirmed_date": "2026-11-10", "confidence": "high"
+    },
+    {
+      "state": "SC", "county": "Dorchester", "column": "lt_tax_sale_overage",
+      "reason": "https://www.dorchestercountysc.gov/departments/delinquent-tax-collector returned HTTP 403 live 2026-11-10 (WebFetch, full browser UA) -- Cloudflare/WAF wall, same class as Berkeley above. Not re-tried via curl this session; re-verify before building.",
+      "confirmed_date": "2026-11-10", "confidence": "medium"
+    },
+    {
+      "state": "SC", "county": "Kershaw", "column": "lt_tax_sale_overage",
+      "reason": "Every kershaw.sc.gov path tried live 2026-11-10 with a full Chrome UA -- the Treasurer 'delinquent-matters' page and both 'showpublisheddocument' doc IDs (17179, 9876) surfaced by search as the county's Tax Sale List/Guide -- returned HTTP 403 (Cloudflare/WAF, consistent across 3 independent paths on the same host). Walled, not sourced-not-built.",
+      "confirmed_date": "2026-11-10", "confidence": "high"
     }
   ]
 }

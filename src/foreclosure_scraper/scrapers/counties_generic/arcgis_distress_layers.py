@@ -820,6 +820,132 @@ LAYERS: tuple[Layer, ...] = (
         source_page="https://www.greenwoodsc.gov/departments/assessor",
     ),
     # ------------------------------------------------------------------
+    # 2026-11-10 vacant/condemned coverage-gap research pass. The `vacant`/`vacancy`/`condemned`
+    # columns are real, narrow and genuinely unbuilt in all but a handful of counties -- see
+    # gap_matrix.py's own precise LAYERS-scanning credit functions (_arcgis_distress_layers_credit)
+    # for why a blanket text match over this file can't fake county coverage for them. City of
+    # Greenville SC's building-permit layer
+    # (InfoHUB/BuildingPermits_PriorTwoYears), live-verified 2026-11-10: a rolling "prior two
+    # years" feed, metadata says updated every evening Mon-Fri, min/max NewIssueDate 2024-01-02 to
+    # 2026-11-07 (i.e. current as of 3 days before this entry was added). PERMIT_TYPE codes DEMR
+    # (residential demolition) + DEMC (commercial demolition), 326 rows live-counted, none of them
+    # BP_STATUS values that read as void/cancelled (only 'CL' closed/complete and 'IS' issued seen
+    # across the full 326). Unlike every entry above, this layer carries OWNER_NAME, OWNER_ADDR/
+    # OWNER_ADDR2/OWNER_ZIP, STREETADDRESS and a real description ("DEMOLITION, RESIDENTIAL SINGLE
+    # FAMILY") all on one row -- richer than most of this file's layers, not thinner. Greenville
+    # County already has one leg (greenville_unpaid_tax_parcels, tax delinquency only, above); this
+    # is the city's own program and the county's first demolition/vacant-structure-adjacent signal.
+    # LABEL: these are owner/contractor-FILED permits (CONTRACTOR_NAME sometimes literally "HOME
+    # OWNER" in the live sample), not a city condemnation order, so `condemned` is deliberately NOT
+    # set here -- same call already made for new_hanover_demolition_permits above, and for the
+    # same reason: a voluntary teardown application is a real distress signal (raw["demolition_
+    # permit"]-flavored `arcgis_distress`) but not literally "the city condemned this structure".
+    # No OWNER_STATE field exists (only OWNER_ZIP), so mail_state is left unset -- the owner's
+    # mailing is assumed in-state (SC) the same way an absent mail_state defaults everywhere else
+    # in this file; out_of_state simply reads False for this layer rather than being asserted.
+    Layer(
+        slug="greenville_city_demolition_permits",
+        state="SC", county="Greenville",
+        url=("https://citygis.greenvillesc.gov/arcgis/rest/services/InfoHUB/"
+             "BuildingPermits_PriorTwoYears/MapServer/0"),
+        listing_type=ListingType.DISTRESSED,
+        where="PERMIT_TYPE IN ('DEMR','DEMC')",
+        fields=("PERMIT_NUM", "PERMIT_TYPE", "APPLIC_DESCRIPTION", "BP_STATUS",
+                "STREETADDRESS", "OWNER_NAME", "OWNER_ADDR", "OWNER_ADDR2", "OWNER_ZIP",
+                "NewIssueDate"),
+        situs="STREETADDRESS", owner_last="OWNER_NAME",
+        mailing_parts=("OWNER_ADDR", "OWNER_ADDR2"), mailing_source="greenville_city_demolition_permits",
+        detail="APPLIC_DESCRIPTION", process="demolition_permit",
+        source_page="https://www.greenvillesc.gov/237/Building-Codes-Enforcement",
+    ),
+    # ------------------------------------------------------------------
+    # 2026-11-10 non-footprint code/vacant discovery pass, ROUND 3 (triggered by a fresh
+    # gap_matrix run flagging code_enforcement specifically -- not vacant/condemned, the
+    # concurrent pass just above this one -- "no source known" in 133/146 counties; continues
+    # the Round 1/2 research above, not a repeat of it). Checked every city/county this file
+    # does not already cover for CODE_ENFORCEMENT, plus live sibling-service sweeps of the 3
+    # ArcGIS Online orgs this file already trusts (Spartanburg's HoRra3ATPLGmyjn6 -- 195
+    # services, Buncombe's VLA0ImJ33zhtGEaP -- 600 services, Greenville County's gcgis.org).
+    # No new code_enforcement Layer entries resulted -- same deliverable-is-the-research-note
+    # convention as Round 2. (Greenville SC city is not in the "nothing found" list below
+    # because the demolition_permit layer directly above landed the same day, independently,
+    # on a citygis.greenvillesc.gov path -- InfoHUB/BuildingPermits_PriorTwoYears -- that this
+    # pass's own Greenville checks, GeneralData/AddressSearch/Essentials/Cityworks, did not
+    # cover; see that entry's own comment, not this one, for its evidence.)
+    #
+    # ALREADY COVERED ELSEWHERE (confirmed by grep, not re-added here):
+    #   Charlotte/Mecklenburg -- gis.charlottenc.gov/arcgis/rest/services/HNS/ carries 6 real,
+    #     rich case-level layers (CodeEnforcementNewAndOpenCases/ClosedCases/CasesAll/
+    #     OrderstoDemolish/ServiceAreas/Code_Enforcement_Parking_Violations), but Mecklenburg
+    #     already has scrapers/city_websites/charlotte_open_data.py + enrichment_charlotte_code.py
+    #     reading this exact host -- a Layer() here would double-count, not add coverage.
+    #   Wake County/Raleigh -- services1.arcgis.com/a7CWfuGP5ZnLYE7I/.../codecases_90days_test/
+    #     FeatureServer/0 is real and live (434 rows; CASE_NUMBER/STREET_ADDRESS/CASE_TYPE/
+    #     CASE_STATUS/DESCRIPTION, no owner/PII field at all), found via catalog.data.gov's
+    #     "code cases past 90 days" harvest record -- but scrapers/counties_nc/wake_code_cases.py
+    #     already reads it (matches the gap_matrix's Wake row: built-but-low-yield at 63%, the
+    #     best yield of any county in the whole matrix -- not actually a gap).
+    #   Asheville/Buncombe -- scrapers/counties_nc/asheville_code_enforcement.py already wired;
+    #     live-swept Buncombe's full 600-service AGOL org for a second code/violation layer and
+    #     found none (the only "code"-matching names are parcel CLASS CODES and zip codes).
+    #   Gastonia/Gaston -- scrapers/counties_nc/gastonia_code_enforcement.py already wired.
+    #
+    # LIVE, REAL, BUT REJECTED (verified with an actual query, not just a name match):
+    #   Spartanburg (city) SC -- live-swept its full 195-service AGOL org for a second hit beyond
+    #     the 3 already wired here: the only code-named sibling, "Code_Enforcement_Inspection_
+    #     Zones", turns out to be a mislabeled/repurposed service -- its actual live schema is
+    #     FireStations point data (FID/Id only), not code-enforcement anything.
+    #     "City_Owned_and_Vacant_Properties" on the same org is real CAMA-backed vacant-property
+    #     data, but it is the exact URL scrapers/counties_sc/spartanburg_vacant.py already reads
+    #     (confirmed by grep) -- not net-new, and it was never tagged process="code_enforcement"
+    #     anyway (a different raw key).
+    #   Sumter (city) SC -- gis.sumter-sc.com/CodeEnforcement/CodeEnforcementZone/MapServer/0 is
+    #     live, but its own metadata (uniqueValue renderer keyed on officer-zone "Name": "Shaw
+    #     AFB", "Zone 1" etc., geometryType polygon) confirms it is an enforcement-OFFICER-ZONE
+    #     boundary layer, same rejection class as this file's existing Gaston/Anderson/Alamance/
+    #     Pitt boundary-only rejections -- no case data, no address, no violation.
+    #   Anderson (city) SC -- re-verified gis.cityofandersonsc.com/MunicipalBusiness/
+    #     CodeEnforcement/MapServer/0 live (this file's own opening docstring already rejected it
+    #     once): still only 10 total rows (9 Open/1 Closed), Address/OwnerName/TMS null on every
+    #     row but one obvious test record ("Test 1"/"123"/"There is trash spilling out of the
+    #     dumpster behind city hall."). Unchanged dead stub, confirmed not fixed since the
+    #     original rejection.
+    #   Catawba County NC (covers Hickory) -- arcgis2.catawbacountync.gov/energov/
+    #     energov_code_compliance/MapServer answers live HTTP 200 with body
+    #     {"error":{"code":499,"message":"Token Required"}} -- an explicit login/token wall, same
+    #     rejection class as Berkeley/Goose Creek's walls already documented above.
+    #   Charleston County SC -- gisccapps.charlestoncounty.org/.../ENERGOV/energov_history/
+    #     FeatureServer is live and has a real "CodeManagement" module among its 5 MODULENAME
+    #     values, but the layer's own schema (MODULENAME/CASEID/CASENUMBER/WORKCLASS/CASETYPE/
+    #     SPATIALID, confirmed by live field list + a 50-row sample) is a cross-module GIS-SYNC
+    #     AUDIT TRAIL, not the case record itself -- no address, no owner, no violation text,
+    #     nothing this module's _to_listing could turn into a located property.
+    #   Greenville County SC (gcgis.org, already hosts greenville_unpaid_tax_parcels) -- live-
+    #     swept every folder: SmartGov/SmartGov_ParcelConnector is a parcel lookup, not case data;
+    #     Community_Development/CommDev_Data/FeatureServer answers live HTTP 500 (broken server
+    #     config, re-checked twice, not a flake).
+    #
+    # CHECKED, NOTHING PUBLIC FOUND AT ALL (no ArcGIS REST endpoint of any kind, after checking
+    # each city's own GIS host, its county's host, and an ArcGIS-Hub/catalog.data.gov search):
+    #   Charleston (city) SC -- gis.charleston-sc.gov's only public service is a police dataset
+    #     (PDI_Data). Winston-Salem/Forsyth County NC -- maps.co.forsyth.nc.us has only a
+    #     boundary-shaped "Code Enforcement Territories" layer and an explicitly-test Accela
+    #     service. High Point NC -- only an explicitly "not officially published" neighborhood
+    #     layer. Fayetteville NC -- the city's own code-enforcement page links a static
+    #     spreadsheet, not a service. Wilmington/New Hanover NC -- geohub.wilmingtonnc.gov's only
+    #     candidates are a zone-boundary layer inside a service literally named "EnerGovTest" and
+    #     an unconfirmed ZoningEnforcement MapServer. Lancaster SC, Chester SC, Fort Mill SC,
+    #     North Charleston SC, Mount Pleasant SC, Summerville SC, Florence SC, Beaufort SC,
+    #     Georgetown SC, Aiken SC, Hickory NC, Jacksonville NC -- no ArcGIS REST host surfaced for
+    #     any of these.
+    #
+    # Durham aside (not pursued -- out of this pass's scope): webgis.durhamnc.gov/server/rest/
+    # services/PublicServices/Inspections/MapServer, a sibling of the already-wired
+    # durham_open_code_violations host, carries a live "Demolition Permits" point layer --
+    # permit data, a different raw key (demolition_permit) than code_enforcement, and Durham is
+    # not a gap-matrix "no source known" county anyway. Flagged for whoever next works
+    # demolition_permit breadth, not added here.
+    # ------------------------------------------------------------------
 ) + tuple(
     # ---------------------------------------------------------------------
     # COUNTY-OWNED / SURPLUS inventory.

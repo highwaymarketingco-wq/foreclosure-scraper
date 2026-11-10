@@ -33,6 +33,35 @@ Pure-local, no network, no rate-limit risk: reads a SQLite file already on disk.
 physical parcel is indexed under 1-3 id-format variants in the cache (one row per
 variant) -- rows are deduped on (owner, address, acreage, market_value, tax_value,
 sale_date) before classification so one parcel emits exactly one Listing.
+
+2026-11-10 AUDIT -- gap_matrix flagged heir/estate detection as "built-but-low-yield"
+across most of the footprint and asked whether this module's county coverage is a
+too-narrow hardcoded list. It is not: `_candidate_counties()` has NO hardcoded list at
+all, by design (see its own docstring) -- it already auto-tracks every SC entry
+`parcel_cache` carries with an "owner" field, 23 counties as of this check (grew from
+the 2026-10-19 sample's 18/20 on its own, zero code changes, as parcel_cache itself
+gained Kershaw/Richland since). The registry worth widening, if any, is
+`parcel_cache.PARCEL_LAYERS`/`SC_DUAL_LAYERS` itself, a different file than this one.
+
+Re-checked the remaining ~13 SC counties with no parcel_cache entry at all (Abbeville,
+Allendale, Bamberg, Chesterfield, Clarendon, Dillon, Edgefield, Fairfield, Lee, Marion,
+Marlboro, McCormick, Newberry): a uniform statewide "Parcels - SC - <County>" ArcGIS
+Online catalog (org "GDITAdmin") covering all 46 SC counties looked like an easy add,
+but live-checked dead -- every item now 403s "Subscription is canceled, the item is
+not accessible". Not addable without fresh, county-by-county discovery of each one's
+OWN live GIS, same as every other county here was originally found. See the sibling
+nc_heir_estate_parcels.py's own 2026-11-10 note for the live-GIS-side half of this
+same audit, including a second, independent re-confirmation that Anderson's owner
+field is genuinely null (not just stale) under parcel_cache's own "OWNER" mapping.
+
+NOTE for a future editor: `_candidate_counties()`'s `cfg.get("state") == "SC"` check
+only matches PARCEL_LAYERS entries that carry an explicit "state" key (used for
+DUAL_STATE_COUNTIES disambiguation). Anderson/Laurens/Oconee/Pickens/Spartanburg all
+have "owner" mapped in PARCEL_LAYERS too but carry state=None (they don't need
+disambiguating) and so never surface as a candidate here. Harmless today only because
+4 of those 5 are already covered live by nc_heir_estate_parcels.py's _HEIR_COUNTIES
+and the 5th (Anderson) is the confirmed dead end above -- but widening this filter
+without ALSO widening _ALREADY_LIVE_COVERED would silently double-source those 4.
 """
 from __future__ import annotations
 

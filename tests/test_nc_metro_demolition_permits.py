@@ -38,11 +38,13 @@ GSO_URL = ("https://gis.greensboro-nc.gov/arcgis/rest/services/OpenGateCity/"
 DURHAM_URL = ("https://webgis2.durhamnc.gov/server/rest/services/PublicServices/"
               "Inspections/MapServer/10")
 CARY_URL = "https://data.townofcary.org/api/explore/v2.1/catalog/datasets/permit-applications/records"
+WAKE_URL = "https://maps.wake.gov/arcgis/rest/services/Inspections/Building_Permits/MapServer/0"
 
 MECK_FEED = next(f for f in m.FEEDS if f.name == "mecklenburg")
 GSO_FEED = next(f for f in m.FEEDS if f.name == "greensboro")
 DURHAM_FEED = next(f for f in m.FEEDS if f.name == "durham")
 CARY_FEED = next(f for f in m.FEEDS if f.name == "cary")
+WAKE_FEED = next(f for f in m.FEEDS if f.name == "wake")
 
 
 # --------------------------------------------------------------------------- arcgis_where / cary_where
@@ -63,6 +65,24 @@ def test_mecklenburg_where_adds_a_date_floor_only_when_since_is_given():
 def test_greensboro_and_durham_where_drop_the_date_floor_by_default():
     assert m.arcgis_where(GSO_FEED, None) == "ApplicationType LIKE 'Total Demolish%'"
     assert m.arcgis_where(DURHAM_FEED, None) == "1=1"
+
+
+def test_wake_where_filters_to_the_demolition_permit_type_with_no_date_floor_by_default():
+    """The layer carries every Wake County permit type (129,587 rows, live 2026-11-10);
+    PERMIT_TYPE is the only field that isolates demolitions here -- unlike every other feed
+    in this module, WORK_CLASS never carries a 'Demolition' value on this layer at all."""
+    where = m.arcgis_where(WAKE_FEED, None)
+    assert where == "PERMIT_TYPE='Demolition Permit'"
+    assert "DATE" not in where
+
+
+def test_wake_where_adds_a_date_floor_on_application_date_not_issue_date():
+    """ISSUE_DATE is null on every Withdrawn row (never issued); APPLICATION_DATE is
+    populated on every row, dead or alive, so that is the field both the date role and the
+    `since` floor use."""
+    since = datetime(2024, 11, 10, tzinfo=timezone.utc)
+    assert m.arcgis_where(WAKE_FEED, since) == (
+        "PERMIT_TYPE='Demolition Permit' AND APPLICATION_DATE >= DATE '2024-11-10'")
 
 
 def test_greensboro_and_durham_where_keep_the_old_shape_when_since_is_given():
@@ -161,6 +181,31 @@ CARY_2026 = {
     "permittypedesc": "BLDG - DEMOLISH - SNGL FAM HOME (B645)",
     "ownername": "ROE ANN", "owneraddress1": "50 CHAPEL HILL RD", "ownerzip": "27511",
 }
+#   WAKE_2001 / WAKE_2026  maps.wake.gov Inspections/Building_Permits/0, measured oldest
+#                      "Demolition Permit"-type row still PERMIT_STATUS='Complete' (2001-01-22)
+#                      and a current one (2026-08-18); WAKE_WITHDRAWN is a real Withdrawn row
+#                      (2018-10-16) that must be dropped regardless of its age.
+WAKE_2001 = {
+    "PERMIT_NUMBER": "0012298", "PERMIT_TYPE": "Demolition Permit", "PERMIT_STATUS": "Complete",
+    "APPLICATION_DATE": 980121600000,                                 # 2001-01-22
+    "DESCRIPTION": "401 S CROSS MIDDLE CREEK TO R ON SCOTT RD ( DEMO. OF CONVENTIONAL SFD)",
+    "MAILING_ADDRESS": "5320 SCOTT RD", "MAILING_CITY": None, "MAILING_STATE": "NC",
+    "MAILING_POSTAL_CODE": None, "DISTRICT": "Wake County", "PIN": "0688347488",
+}
+WAKE_2026 = {
+    "PERMIT_NUMBER": "DPR-178143-2026", "PERMIT_TYPE": "Demolition Permit", "PERMIT_STATUS": "Complete",
+    "APPLICATION_DATE": 1787011200000,                                # 2026-08-18
+    "DESCRIPTION": "Complete demolition of small dilapidated brick building",
+    "MAILING_ADDRESS": "9225 HONEYCUTT RD", "MAILING_CITY": "RALEIGH", "MAILING_STATE": "NC",
+    "MAILING_POSTAL_CODE": "27615", "DISTRICT": "Wake County", "PIN": "1718157465",
+}
+WAKE_WITHDRAWN = {
+    "PERMIT_NUMBER": "DPR-007809-2018", "PERMIT_TYPE": "Demolition Permit", "PERMIT_STATUS": "Withdrawn",
+    "APPLICATION_DATE": 1539648000000,                                # 2018-10-16
+    "DESCRIPTION": "Demolition of Building",
+    "MAILING_ADDRESS": "405 PEACE ST", "MAILING_CITY": "RALEIGH", "MAILING_STATE": "NC",
+    "MAILING_POSTAL_CODE": "27603", "DISTRICT": "Raleigh", "PIN": "1704517838",
+}
 
 
 def test_mecklenburg_legacy_1991_row_becomes_a_listing_with_its_real_type_tag():
@@ -183,9 +228,31 @@ def test_mecklenburg_current_2025_row_is_only_identifiable_via_permitdesc_and_st
     assert li.raw["demolition_permit"]["permits"][0]["date"] == "2025-03-05"
 
 
+def test_wake_row_has_no_address_field_parcel_locates_it_same_as_durham():
+    """Wake's layer has no situs-address column at all (only PIN + the applicant's
+    MAILING_* block) -- same gap durham already has in this exact FEEDS list."""
+    [g] = m.group_permits(WAKE_FEED, [WAKE_2026])
+    li = m.to_listing(g)
+    assert li.parcel_id == "1718157465"
+    assert li.street_address is None
+    assert li.county == "Wake" and li.state == "NC"
+    assert li.raw["demolition_permit"]["latest_date"] == "2026-08-18"
+    # MAILING_* is the applicant's mailing block, not the property's -- owner_mailing, not situs.
+    assert li.raw["owner_mailing"]["mailing"] == "9225 HONEYCUTT RD RALEIGH NC 27615"
+
+
+def test_wake_withdrawn_permit_is_dropped_regardless_of_age():
+    """`group_permits`'s shared _DEAD filter (cancel|withdraw|void|denied) applies to every
+    feed uniformly -- a 2018 Withdrawn Wake row must not survive just because nothing else
+    in this module's date logic would have excluded it."""
+    groups = m.group_permits(WAKE_FEED, [WAKE_WITHDRAWN])
+    assert groups == []
+
+
 @pytest.mark.parametrize("feed,old_row,new_row,old_date", [
     (GSO_FEED, GSO_1997, GSO_2026, "1997-08-04"),
     (DURHAM_FEED, DURHAM_2007, DURHAM_2026, "2007-10-25"),
+    (WAKE_FEED, WAKE_2001, WAKE_2026, "2001-01-22"),
 ])
 def test_an_old_row_far_outside_the_old_730_day_window_still_becomes_a_listing(feed, old_row, new_row, old_date):
     """`group_permits`/`to_listing` apply no date logic of their own -- whatever rows the
@@ -240,6 +307,7 @@ def _combined_transport():
     meck = _arcgis_handler([MECK_LEGACY_1991, MECK_CURRENT_2025], "issuedate")
     gso = _arcgis_handler([GSO_1997, GSO_2026], "IssuedDate")
     durham = _arcgis_handler([DURHAM_2007, DURHAM_2026], "ISSUE_DATE")
+    wake = _arcgis_handler([WAKE_2001, WAKE_2026], "APPLICATION_DATE")
 
     def handler(request: httpx.Request) -> httpx.Response:
         url = str(request.url)
@@ -256,6 +324,8 @@ def _combined_transport():
             if cutoff_mo:
                 rows = [r for r in rows if r["applieddate"] >= cutoff_mo.group(1)]
             return httpx.Response(200, json={"results": rows, "total_count": len(rows)})
+        if WAKE_URL in url:
+            return wake(request)
         return httpx.Response(404, json={"error": f"no route for {url}"})
     return httpx.MockTransport(handler)
 
@@ -279,7 +349,8 @@ def test_fetch_with_no_date_floor_includes_decades_old_permits(_patched_client, 
     assert "1997-08-04" in by_feed["greensboro"] and "2026-09-24" in by_feed["greensboro"]
     assert "2007-10-25" in by_feed["durham"] and "2026-10-08" in by_feed["durham"]
     assert "2019-09-10" in by_feed["cary"] and "2026-09-01" in by_feed["cary"]
-    assert len(out) == 8          # 2 rows x 4 feeds, nothing filtered
+    assert "2001-01-22" in by_feed["wake"] and "2026-08-18" in by_feed["wake"]
+    assert len(out) == 10         # 2 rows x 5 feeds, nothing filtered
 
 
 def test_fetch_with_an_explicit_days_window_still_drops_the_old_rows(_patched_client, monkeypatch):
@@ -289,5 +360,5 @@ def test_fetch_with_an_explicit_days_window_still_drops_the_old_rows(_patched_cl
     out = asyncio.run(m.NCMetroDemolitionPermits().fetch())
     dates = {li.raw["demolition_permit"]["latest_date"] for li in out}
     assert "1991-04-11" not in dates and "1997-08-04" not in dates
-    assert "2007-10-25" not in dates and "2019-09-10" not in dates
-    assert len(out) == 4          # only the 4 "current" rows survive the 730-day floor
+    assert "2007-10-25" not in dates and "2019-09-10" not in dates and "2001-01-22" not in dates
+    assert len(out) == 5          # only the 5 "current" rows survive the 730-day floor

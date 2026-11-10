@@ -962,7 +962,17 @@ def _collect(li: Listing, prior_price: Optional[float], today: date) -> _Collect
         sig.append(("str_permit_lapsed", "FINANCIAL", 12, REC))
     tr = r.get("tax_relief")
     if isinstance(tr, dict):
-        if tr.get("kind") in ("elderly", "disabled", "blind"):
+        # "homestead_exemption" (SC's age-65+/disabled/blind relief, SC Code 12-37-250 --
+        # enrichment_tax_relief.py's york_sc/lexington_sc classify paths, and
+        # qpaybill_delinquent_roll.py / sc_catalis_delinquent_roll.py's own detail-page
+        # HomesteadExemption field) models the exact same real-world fact as NC's "elderly"/
+        # "disabled"/"blind" kinds (Buncombe's Exempt code) -- a hard, county-recorded
+        # age/disability exemption -- just under SC's own statute and kind name. 2026-11-10:
+        # found missing here while wiring qpaybill/catalis's own HomesteadExemption field,
+        # which meant York's and Lexington's EXISTING tax_relief hits (wired since 2026-10-02
+        # and 2026-10-30 respectively) never scored either -- the same raw-key-shape gap
+        # test_gis_exempt_tax_relief_bridge.py's bridge fixed for gis_exempt the same way.
+        if tr.get("kind") in ("elderly", "disabled", "blind", "homestead_exemption"):
             # senior/disabled owner-occupant: equity-rich, motivated by health/
             # downsizing/estate transition.
             sig.append(("senior_exemption", "LIFE_EVENT", 8, REC))

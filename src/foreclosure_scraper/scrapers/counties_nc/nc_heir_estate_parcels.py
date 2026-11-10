@@ -55,6 +55,44 @@ Distress signal: emits ListingType.ESTATE_LEAD with raw['relationship_signal']
 = {kind: 'probate'} so distress_score scores it (LIFE_EVENT). Dateless — routed
 via DATELESS_OK_SOURCES. LIFE ESTATE (a living life-tenant, not a decedent) is
 its OWN signal, not noise -- see the 2026-11-10 note above _EXCLUDE below.
+
+  2026-11-10 AUDIT — gap_matrix flagged the owner/heir-retitling columns as
+  "built-but-low-yield" across ~148 counties and asked whether `_HEIR_COUNTIES`
+  (11 NC + 8 SC) is a too-narrow hardcoded list sitting on a much bigger
+  unused registry. It is NOT, for NC: `_HEIR_COUNTIES` is only the
+  dedicated-layer subset. `fetch()` ALSO runs every other NC county through
+  NC_STATEWIDE_FALLBACK_COUNTIES (see the 2026-10-02 EXTENSION above), so NC
+  coverage via this module is already 100/100 counties -- `_HEIR_COUNTIES`
+  alone looks narrow only if you don't read `fetch()`'s second loop. Nothing
+  to widen there.
+
+  For SC, re-verified Anderson a second, independent way: `enrichment_owner_
+  mailing.COUNTY_GIS["SC:Anderson"]` (this module's registry) already
+  documents its owner column (TAXOWNSTR) as always-null; live-queried
+  `parcel_cache.PARCEL_LAYERS["Anderson"]` instead (a DIFFERENT registry,
+  DIFFERENT field name -- "OWNER", not TAXOWNSTR, same underlying
+  gis.cityofandersonsc.com layer) against the already-cached 208,476-row
+  SQLite snapshot: 0 of 208,476 rows have a non-null/non-empty owner under
+  EITHER field name. Confirms Anderson's exclusion from both registries is
+  correct, not a stale guess -- this is a Water Utilities parcels layer, not
+  the assessor's CAMA/ownership roll.
+
+  Checked whether the state's remaining ~13 small SC counties with NO
+  GIS-owner source anywhere in this project (Abbeville, Allendale, Bamberg,
+  Chesterfield, Clarendon, Dillon, Edgefield, Fairfield, Lee, Marion,
+  Marlboro, McCormick, Newberry) have an addable layer. Found one promising
+  lead -- ArcGIS Online org "GDITAdmin" publishes a uniform "Parcels - SC -
+  <County> County" Feature Service for ALL 46 SC counties, which looked
+  exactly like the missing "SC OneMap" this module's NC side already has.
+  Live-checked it (`sharing/rest/content/items/<id>?f=json` for Newberry/
+  Fairfield/Marion/Abbeville's item ids): every one now answers HTTP 403
+  "Subscription is canceled, the item is not accessible" -- that whole
+  catalog is dead, not a usable source at any freshness. These 13 counties
+  remain genuinely unbuilt; each needs its own live GIS/assessor-site
+  discovery from scratch, the same way every other county in this module's
+  registries was originally found -- not a registry-widening fix. See the
+  sibling sc_heir_estate_parcel_cache.py's own 2026-11-10 note for the SC
+  parcel_cache-side half of this same audit.
 """
 from __future__ import annotations
 
