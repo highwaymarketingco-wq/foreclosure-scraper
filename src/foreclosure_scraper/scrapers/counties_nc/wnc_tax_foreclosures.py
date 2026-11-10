@@ -44,6 +44,26 @@ WordPress-nonce feed or civicplus's own parser through a generic
 `<table>`-on-the-county's-own-site heuristic, and it does not need to: the
 real data already lands on the board via those dedicated sources.
 
+YANCEY GAP CLOSED (2026-11-10 coverage audit). Re-verified live: Yancey is
+still 0 in both this module and Kania's feed for actual tax-foreclosure
+AUCTION rows -- the above paragraph is still accurate for that specific
+signal. But Yancey's own Finance Office page (not the Tax Department page
+COUNTY_TAX_PAGES was missing) carries a second, separate, real ``<table>``:
+"Yancey County Surplus Properties" -- county-held parcels (taken after an
+earlier unsold tax foreclosure) now being resold by sealed bid, the exact
+same category this module already treats as TAX_SALE for Avery's "Property
+For Sale" page above. Confirmed live: a real 3-column table (PIN, address or
+lot description, acreage), 6 rows today, explicitly NOT a fabrication risk --
+the page itself states "This is NOT a list of current tax foreclosures."
+Added as a ``COUNTY_TAX_PAGES`` direct read, same mechanism as Madison's
+entry; the existing ``<tr>``/``<td>`` regex parser needed no changes to read
+it (parcel anchors on the 15-digit PIN, no code path change). The stale
+"Yancey... DENIED" note in docs/MASTER_GAPS_WALLS_AND_MANUAL_LANES.md was
+never actually wired into any scope filter for this listing type (TAX_SALE is
+not in main._FLIP_LISTING_TYPES, so it already rides in_scope_distressed(),
+which does not apply SCOPE_DENY_COUNTIES) -- it was pure stale documentation,
+corrected in that doc, not touched in config.py.
+
 FOUND 2026-09-15 (background triage agent, this codebase's zero-row-
 scraper audit; confirmed by hand): Madison County's own homepage links
 to `lrcpwa.ncptscloud.com`, which reliably ConnectTimeouts -- and despite
@@ -113,8 +133,18 @@ COUNTIES: dict[str, str] = {
 #: on 2026-10-08). The real page is Tax Administration -> "Tax Foreclosure Sales" (live 2026-10-08:
 #: process text only, no sale list posted, a genuine 0; the county says sales are advertised in
 #: the newspaper and "may be posted to the County's website").
+#:
+#: Yancey added 2026-11-10 (coverage audit). Its homepage is 2 clicks from the real Tax
+#: Department page (Home -> /101/Departments -> /172/Tax-Department), too deep for this module's
+#: 1-hop homepage crawl, and that page has no sale table anyway (PDFs + a webtaxpay.com payment
+#: portal link only). The real table lives on a THIRD page, Finance Office
+#: (/174/Finance-Office): "Yancey County Surplus Properties", 6 real rows live today (PIN,
+#: address/lot, acreage) -- county-held parcels from an earlier unsold tax foreclosure, same
+#: category as Avery's "Property For Sale" page above. See the module docstring's "YANCEY GAP
+#: CLOSED" note for the full live-verification trail.
 COUNTY_TAX_PAGES: dict[str, list[str]] = {
     "Madison": ["https://www.madisoncountync.gov/tax-foreclosure-sale.html"],
+    "Yancey": ["https://www.yanceycountync.gov/174/Finance-Office"],
 }
 
 #: Link targets that never hold an HTML sale table: vendor tax apps (JavaScript SPAs), payment
