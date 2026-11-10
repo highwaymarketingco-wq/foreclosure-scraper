@@ -1047,6 +1047,33 @@ DATELESS_OK_SOURCES = {
     # stops re-finding the same filing).
     "counties_nc.nc_rowan_cott",    # Rowan NC deed-index sweep (Cott eSearch) -- recorded filing, no sale date
     "national.nc_unclaimed",        # NC unclaimed-property per-surname search -- standing claim, no sale date
+    # 2026-11-10 zero-row PIPELINE triage: both confirmed live with real in-footprint
+    # rows that never reached the board. Listing() in each scraper is correct --
+    # _active_only() was deleting every row before dedupe for lack of a whitelist
+    # entry, the exact shape as every other entry in this set.
+    #
+    # Henderson NC's page carries ONE free-text sale date/time that applies to
+    # every parcel in the table (DATE_RE on the prose above it) -- but live-verified
+    # 2026-11-10 the current prose is just the standing authorization/location text
+    # ("Sales are conducted on the courthouse steps at 200 North Grove St..."), no
+    # date at all, so sale_date is None for all 15-18 live rows. The docket itself
+    # (a parcel scheduled for tax foreclosure, taxes unpaid) is a standing condition
+    # until a sale date is actually set, same reasoning as every other NC/SC
+    # delinquent-tax source above; a minority of future runs WILL carry a real
+    # parsed sale_date once the county posts one, so this entry only matters for
+    # the (currently 100%) dateless rest -- same shape as Wake/Edgecombe above.
+    "counties_nc.henderson_tax",
+    # scpublicnotices.com's search-results grid only shows a ~300-400 char
+    # TRUNCATED preview per notice (see the module's own "CONSEQUENCE FOR FIELD
+    # COVERAGE" docstring section) -- the actual sale date almost always sits past
+    # the truncation point, so _sale_date() returns None for the large majority of
+    # rows, LIS_PENDENS (filed, no sale date yet -- same reasoning as the already-
+    # whitelisted counties_sc.sc_public_index_lis_pendens / nc_ecourts_lis_pendens)
+    # and FORECLOSURE_SALE alike. NOT covered by the publicnoticesc_estates entry
+    # above -- that is a different sibling module, and the prefix check only
+    # widens matching for slugs starting with "public_notices.publicnoticesc_estates.",
+    # never the bare slug here.
+    "public_notices.publicnoticesc",
 }
 
 
@@ -4608,6 +4635,18 @@ async def run_enrich_tail(st: TailState) -> dict:
         if s and "skipped" not in s: enrichment_stats["heir_candidates"] = s
     except Exception:
         log.error("heir_candidates.failed", traceback=traceback.format_exc())
+
+    # Fraud-against-an-heir detection (DPA master_sources_and_signals.md item B.20: forged
+    # deeds / fake POA / impersonation at closing) -- cross-references raw['deed_chain'] against
+    # raw['heir_candidates'] and the recorded date of death. MUST run here, not inside
+    # enrich_deed_chain's own per-row pass above: heir_candidates does not exist yet at that
+    # point in the pipeline. Detection only -- not wired into distress_score.py or any ListingType.
+    try:
+        from .enrichment_deed_chain import enrich_fraud_signals
+        s = enrich_fraud_signals(enriched)
+        if s and s.get("stamped"): enrichment_stats["fraud_signals"] = s
+    except Exception:
+        log.error("fraud_signals.failed", traceback=traceback.format_exc())
 
     # Legal-description multi-lot / deeded-vs-assessor acreage mismatch
     # (Dirty Deeds Tier A #9) — a regex pass over legal_description/

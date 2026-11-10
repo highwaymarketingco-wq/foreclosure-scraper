@@ -211,9 +211,39 @@ def main() -> int:
         if r.get("county"):
             by_src_county[r.get("source")][f"{r['county']} {r.get('state','')}".strip()] += 1
 
+    # Board-row count for a class slug, PREFIX-AWARE for the "<base>.<suffix>"
+    # dynamic-slug convention. counties_sc.sc_probate_notices ships every row
+    # tagged with a per-paper slug ("counties_sc.sc_probate_notices.yourpickenscounty",
+    # ".laurenscountyadvertiser", ".gaffneyledger") and NEVER the bare class slug --
+    # same convention main._active_only() already special-cases with its own
+    # startswith(f"{base}.") fallback (see that function's docstring). An
+    # exact-match-only counts.get(c.slug) found this source "zero" (2026-11-10
+    # false alarm, chased into a whole zero-row-triage cycle) despite 920 real
+    # rows sitting on the board that day, split across its 3 children -- the bare
+    # string is never a Counter key at all for this one family. Falls back to the
+    # prefix sum only when the exact match is empty, so every other (ordinary,
+    # single-slug) source's count is untouched.
+    def _board_count(slug: str) -> int:
+        n = counts.get(slug, 0)
+        if n:
+            return n
+        prefix = slug + "."
+        return sum(v for k, v in counts.items() if k and k.startswith(prefix))
+
+    def _board_county_counts(slug: str) -> collections.Counter:
+        exact = by_src_county.get(slug)
+        if exact:
+            return exact
+        merged: collections.Counter = collections.Counter()
+        prefix = slug + "."
+        for k, c in by_src_county.items():
+            if k and k.startswith(prefix):
+                merged.update(c)
+        return merged
+
     classes = sorted(discover(), key=lambda c: c.slug)
-    live = [c for c in classes if counts.get(c.slug)]
-    zero = [c for c in classes if not counts.get(c.slug)]
+    live = [c for c in classes if _board_count(c.slug)]
+    zero = [c for c in classes if not _board_count(c.slug)]
 
     L = []
     w = L.append
@@ -246,13 +276,13 @@ def main() -> int:
     w("")
     w("| Slug | Rows | Top counties | URLs in the module |")
     w("|---|---:|---|---|")
-    for c in sorted(live, key=lambda x: -counts[x.slug]):
+    for c in sorted(live, key=lambda x: -_board_count(x.slug)):
         urls = module_urls(c)
         shown = "<br>".join(f"`{u}`" for u in urls[:3]) or "_(no literal URL in module)_"
         if len(urls) > 3:
             shown += f"<br>_+{len(urls) - 3} more_"
-        top = ", ".join(f"{k} ({v})" for k, v in by_src_county[c.slug].most_common(3)) or "-"
-        w(f"| `{c.slug}` | {counts[c.slug]:,} | {top} | {shown} |")
+        top = ", ".join(f"{k} ({v})" for k, v in _board_county_counts(c.slug).most_common(3)) or "-"
+        w(f"| `{c.slug}` | {_board_count(c.slug):,} | {top} | {shown} |")
     w("")
     w("## 2. Built but producing zero rows")
     w("")

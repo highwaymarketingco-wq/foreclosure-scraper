@@ -22,7 +22,7 @@ that was already gathered by network enrichers into a unified timeline.
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Iterable, Optional
 
 import structlog
@@ -448,4 +448,186 @@ def enrich_deed_chain(listings: Iterable[Listing], *, shared_pts: Optional[set] 
         "with_chain_breaks": has_breaks,
         "skipped_fallback_point": skipped_fallback_point,
         "cleared_fallback_point": cleared_fallback_point,
+    }
+
+
+# --------------------------------------------------------------------------- fraud against an heir
+#
+# DPA master_sources_and_signals.md item B.20 names this narrowly: forged deeds / fake POA /
+# impersonation at closing, verified via notary records, litigation, and identity cross-checks.
+# This is DETECTION ONLY, cross-referencing data two enrichers already gathered -- deed_chain
+# (this module) and heir_candidates (enrichment_heir_candidates.py) -- plus death_fact() from
+# call_ready.py. It is deliberately NOT wired into distress_score.py or any ListingType; scoring
+# integration is a separate decision.
+#
+# Must run AFTER both enrich_deed_chain() AND enrich_heir_candidates() have stamped their raw
+# fields on every row. It is NOT called from this module's own per-row loop above: main.py runs
+# enrich_heir_candidates() well after enrich_deed_chain(), so raw['heir_candidates'] does not exist
+# yet during that loop. main.py instead calls enrich_fraud_signals() as its own separate pass,
+# right after the heir_candidates block, where both are already present together on the row.
+
+# A transfer within this many days of the recorded date of death counts as near-death timing.
+_NEAR_DEATH_DAYS = 90
+# Second, broader undervalue threshold vs. the four fixed nominal prices in _LOVE_AND_AFFECTION
+# above: a deed price under half the county's own 100%-basis appraisal. Kept as a separate signal
+# -- a transfer _LOVE_AND_AFFECTION already catches is reported under that stricter check, not
+# duplicated here.
+_UNDERVALUE_RATIO = 0.5
+
+
+def _transfer_date_obj(date_str: Any) -> Optional[date]:
+    """A day-precision date for a transfer's `date` field, or None for a partial date (bare year
+    or year-month, which _parse_date can also return) that cannot support a 90-day comparison."""
+    s = str(date_str or "")
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", s):
+        return None
+    try:
+        return datetime.strptime(s, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+def _name_tokens(name: Any) -> frozenset:
+    words = re.sub(r"[^\w\s]", " ", str(name or "")).upper().split()
+    return frozenset(w for w in words if len(w) > 1)  # drop bare initials
+
+
+def _names_match(heir_name: Any, grantor: Any) -> bool:
+    """Same person on both sides, allowing for a given/surname order flip or a dropped middle
+    name/initial -- a deed grantor string and a heir-candidate name are read from different
+    sources and rarely format identically. Requires >=2 real words on each side so a one-word
+    grantor (a bare surname, an entity fragment) never counts as a match."""
+    a, b = _name_tokens(heir_name), _name_tokens(grantor)
+    if len(a) < 2 or len(b) < 2:
+        return False
+    return a == b or a <= b or b <= a
+
+
+def _fraud_signals_for(li: Listing) -> Optional[dict]:
+    """fraud-against-an-heir detection for one row. Pure read over raw['deed_chain'],
+    raw['heir_candidates'] and death_fact(li) -- nothing here is fetched or computed elsewhere.
+    Returns None when there is no deed chain to evaluate (nothing to cross-reference), matching
+    enrich_deed_chain's own rule of only stamping rows that have real chain data."""
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    chain = raw.get("deed_chain")
+    transfers = chain.get("transfers") if isinstance(chain, dict) else None
+    if not isinstance(transfers, list) or not transfers:
+        return None
+
+    from .call_ready import death_fact
+    from .enrichment_heir_candidates import PUBLISHABLE_HEIR_RELATIONS
+    from .fullmer_rank import cad_value
+
+    details: dict[str, Any] = {}
+
+    # 1. Near-death timing: a transfer within _NEAR_DEATH_DAYS of the recorded date of death.
+    # Both sides need day precision -- a transfer or death date that only resolved to a bare
+    # year or year-month cannot support a 90-day comparison, so it is skipped, not guessed at.
+    near_death = False
+    dod_str = (death_fact(li) or {}).get("date_of_death")
+    dod = _transfer_date_obj(dod_str)
+    if dod is not None:
+        for r in transfers:
+            td = _transfer_date_obj(r.get("date"))
+            if td is None:
+                continue
+            days = abs((td - dod).days)
+            if days <= _NEAR_DEATH_DAYS:
+                near_death = True
+                details["near_death_transfer"] = {
+                    "transfer_date": r.get("date"), "death_date": dod_str, "days": days,
+                }
+                break
+
+    # 2. Co-heir cutout: >=2 publishable-tier heir candidates AND exactly 1 of them matches a
+    # transfer's grantor. The >=2 heir-count gate alone is not corroboration (heir_candidates is
+    # admittedly incomplete per its own docstring) -- the grantor match is required too, and
+    # "exactly 1" is what separates a targeted cutout from an ordinary joint conveyance by two
+    # or more co-heirs together (which would match more than one of them on the same transfer).
+    co_heir_cutout = False
+    hc = raw.get("heir_candidates")
+    heirs = [c for c in hc if isinstance(c, dict)
+             and str(c.get("relation") or "").strip().lower() in PUBLISHABLE_HEIR_RELATIONS] \
+        if isinstance(hc, list) else []
+    if len(heirs) >= 2:
+        matches = []
+        for h in heirs:
+            for r in transfers:
+                if r.get("grantor") and _names_match(h.get("name"), r["grantor"]):
+                    matches.append((h, r))
+                    break
+        if len(matches) == 1:
+            co_heir_cutout = True
+            h, r = matches[0]
+            details["co_heir_cutout"] = {
+                "heir_name": h.get("name"), "heir_count": len(heirs),
+                "grantor": r.get("grantor"), "transfer_date": r.get("date"),
+            }
+
+    # 3. Undervalued transfer: price under _UNDERVALUE_RATIO of the county's own appraisal
+    # (fullmer_rank.cad_value -- the "County 100%-basis appraisal", the same number fullmer_rank
+    # underwrites off), and not already the stricter, separate _LOVE_AND_AFFECTION nominal-price
+    # check above.
+    undervalued = False
+    assessed, assessed_src = cad_value(li)
+    if assessed:
+        for r in transfers:
+            price = r.get("price")
+            if price is None or price in _LOVE_AND_AFFECTION:
+                continue
+            if price < _UNDERVALUE_RATIO * assessed:
+                undervalued = True
+                details["undervalued_transfer"] = {
+                    "transfer_date": r.get("date"), "price": price,
+                    "assessed_value": assessed, "assessed_value_source": assessed_src,
+                    "ratio": round(price / assessed, 3),
+                }
+                break
+
+    return {
+        "near_death_transfer": near_death,
+        "co_heir_cutout": co_heir_cutout,
+        "undervalued_transfer": undervalued,
+        "details": details,
+    }
+
+
+def enrich_fraud_signals(listings: Iterable[Listing]) -> dict:
+    """Cross-reference deed_chain against heir_candidates and the recorded date of death to flag
+    a conveyance that looks like fraud against an heir (DPA master_sources_and_signals.md item
+    B.20). Stamps raw['fraud_signals'] = {near_death_transfer, co_heir_cutout, undervalued_transfer,
+    details} on every row that has a deed chain to evaluate. Detection only -- see the module-level
+    note above: not wired into distress_score.py or any ListingType.
+
+    Call this AFTER both enrich_deed_chain() and enrich_heir_candidates() have already run over
+    the same rows (main.py wires it in as its own pass right after the heir_candidates block)."""
+    listings = list(listings)
+    stamped = 0
+    near_death = 0
+    cutout = 0
+    undervalued = 0
+
+    for li in listings:
+        signals = _fraud_signals_for(li)
+        if signals is None:
+            continue
+        if not isinstance(li.raw, dict):
+            li.raw = {}
+        li.raw["fraud_signals"] = signals
+        stamped += 1
+        if signals["near_death_transfer"]:
+            near_death += 1
+        if signals["co_heir_cutout"]:
+            cutout += 1
+        if signals["undervalued_transfer"]:
+            undervalued += 1
+
+    log.info("fraud_signals.done", listings=len(listings), stamped=stamped,
+             near_death_transfer=near_death, co_heir_cutout=cutout, undervalued_transfer=undervalued)
+
+    return {
+        "stamped": stamped,
+        "near_death_transfer": near_death,
+        "co_heir_cutout": cutout,
+        "undervalued_transfer": undervalued,
     }
