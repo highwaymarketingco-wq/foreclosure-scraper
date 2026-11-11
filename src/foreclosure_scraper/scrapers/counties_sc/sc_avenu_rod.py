@@ -218,27 +218,37 @@ async def _read_grid_data(c: httpx.AsyncClient, base_url: str, county: str) -> l
     For Kendo Grid (which Avenu uses), data is typically at a Read endpoint.
     Since we don't have the exact endpoint from docs, we'll try common patterns.
     """
-    # Try different possible grid read endpoints
-    potential_endpoints = [
-        f"{base_url}/Public/{county}sc/InstrumentGrid/GridRead",
-        f"{base_url}/Public/{county}sc/InstrumentGrid/GetGridData",
-        f"{base_url}/Public/{county}sc/InstrumentGrid/Read",
-    ]
+    # Discovered via browser inspection 2026-11-11:
+    # POST /Public/{county}sc/InstrumentGrid (no suffix!)
+    # Content-Type: application/x-www-form-urlencoded
+    endpoint = f"{base_url}/Public/{county}sc/InstrumentGrid"
     
-    for endpoint in potential_endpoints:
-        try:
-            resp = await c.post(endpoint, json={"take": 500, "skip": 0, "page": 1, "pageSize": 500})
-            if resp.status_code == 200:
-                data = resp.json()
-                if "Data" in data and isinstance(data["Data"], list):
-                    log.info("avenu.grid_data_found", county=county, endpoint=endpoint, records=len(data["Data"]))
-                    return data["Data"]
-        except Exception as e:
-            log.debug("avenu.endpoint_failed", county=county, endpoint=endpoint, error=str(e)[:100])
-            continue
+    # Form-encoded payload (use data= not json=)
+    payload = {
+        "sort": "",
+        "group": "",
+        "filter": "",
+        "page": 1,
+        "pageSize": 500,
+        "skip": 0,
+        "take": 500,
+    }
     
-    log.warning("avenu.no_grid_data", county=county)
-    return []
+    try:
+        resp = await c.post(endpoint, data=payload)
+        resp.raise_for_status()
+        data = resp.json()
+        
+        if "Data" in data and isinstance(data["Data"], list):
+            total = data.get("Total", len(data["Data"]))
+            log.info("avenu.grid_data_found", county=county, records=len(data["Data"]), total=total)
+            return data["Data"]
+        else:
+            log.warning("avenu.unexpected_response_format", county=county, keys=list(data.keys()))
+            return []
+    except Exception as e:
+        log.error("avenu.grid_fetch_failed", county=county, error=str(e)[:200])
+        return []
 
 
 def _build_listing(slug: str, county: str, base_url: str, record: dict) -> Listing | None:
