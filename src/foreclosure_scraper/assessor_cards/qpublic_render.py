@@ -28,14 +28,19 @@ Per-county Schneider app config (AppID / LayerID / PageID) and KeyValue strategy
                "Living Area" sqft (incl. basement). Resolve by address search.
                (Plain curl returned 403 in discovery; render is required. If Union
                still 403s under render, it returns None gracefully.)
-  Clarendon    AppID=795  LayerID=11833 PageID=5733* card; PageID=5732 search
-               2026-11-11 gap-sweep add. AppID/LayerID/search-PageID read LIVE off
-               the county's own public assessor page
-               (clarendoncountysc.gov/business-and-development/assessor/, which
-               embeds the exact Application.aspx link -- not behind Cloudflare)
-               and cross-confirmed via qpublic.net/sc/clarendon/search.html's own
-               redirect link (both sources agree byte-for-byte). Resolve by
-               address search (no verified dashed-TMS formula for this county).
+  Clarendon    AppID=795  LayerID=11833 PageID=5732 search; card PageID resolved
+               dynamically (see Lee note below), LIVE-CONFIRMED end-to-end
+               2026-11-11: fetch() on a real board address (1163 Oak Ridge Dr)
+               returned a real CardResult (market_value $23,500, 5 sales). The
+               first two test addresses tried did NOT resolve via the typeahead
+               (no match in Schneider's own index, not a wall/config failure --
+               the third did) -- a normal address-matching miss rate, not a
+               defect. AppID/LayerID/search-PageID read LIVE off the county's own
+               public assessor page (clarendoncountysc.gov/business-and-development
+               /assessor/, which embeds the exact Application.aspx link -- not
+               behind Cloudflare) and cross-confirmed via
+               qpublic.net/sc/clarendon/search.html's redirect link (both sources
+               agree byte-for-byte). Resolve by address search.
   Lee          AppID=913  LayerID=17622 PageID=7896  card (LIVE-CONFIRMED, not a
                guess); PageID=7894 search. 2026-11-11 gap-sweep add. AppID/LayerID/
                search-PageID read LIVE off qpublic.net/sc/lee/search.html's
@@ -45,31 +50,45 @@ Per-county Schneider app config (AppID / LayerID / PageID) and KeyValue strategy
                reading the URL the app itself navigated to. This is exactly why
                `fetch()`'s "search" path now uses that resolved page directly
                instead of reconstructing a card URL from a configured PageID.
-  Fairfield    AppID=796  LayerID=11834 PageID=5737* card; PageID=5736 search
-               HOST IS beacon.schneidercorp.com, NOT qpublic — this county's
-               Schneider app is Beacon-branded (read LIVE off
+  Fairfield    AppID=796  LayerID=11834 PageID=5736 search; card PageID resolved
+               dynamically. HOST IS beacon.schneidercorp.com, NOT qpublic --
+               this county's Schneider app is Beacon-branded (read LIVE off
                qpublic.net/sc/fairfield/search.html's redirect link, which points
                at beacon.schneidercorp.com). AppID=796/LayerID=11834 sit right
                next to Clarendon's 795/11833 -- the two were evidently provisioned
-               in the same Schneider batch. Resolve by address search. (Fairfield
-               also runs a separate, unrelated Esri "Economic Development" viewer
-               at fairfieldcountysc.giswebtechguru.com -- not the assessor's record
-               source and not used here.)
-  * = card PageID is a search+1 GUESS, unconfirmed -- and, per the Lee finding
-      just above, demonstrably not always right (Lee's real card PageID is
-      search+2). It mostly doesn't matter: `fetch()`'s "search" KeyValue
-      strategy (all 3 of these new counties) now renders the card page the
-      typeahead itself navigated to, not a URL rebuilt from this guess -- the
-      guess is only a fallback for the rare case that render comes back
-      unusable. `fetch()` still returns None cleanly if everything fails, never
-      mis-reported data.
-  Edgefield SC NOT resolved this pass: the county's own site (edgefieldcounty.sc.gov)
-               is refusing connections live (curl: "empty reply from server" /
-               HTTP2 protocol errors, not a Cloudflare wall), and qpublic.net's
-               Edgefield page has no working search link -- the only one found is a
-               9-year-old Wayback snapshot (2017) pointing at a different, legacy
-               Schneider product (qpublic7.qpublic.net/ga_search.php, now almost
-               certainly stale). Needs its own follow-up, not guessed here.
+               in the same Schneider batch. LIVE-CONFIRMED end-to-end 2026-11-11:
+               fetch() on a real board address (410 Davis Cir) returned a real
+               CardResult (market_value $8,100, 6 sales). Resolve by address
+               search. (Fairfield also runs a separate, unrelated Esri "Economic
+               Development" viewer at fairfieldcountysc.giswebtechguru.com -- not
+               the assessor's record source and not used here.)
+  The card PageID for all 3 of the above is NOT a fixed configured number --
+  per the Lee finding, Schneider does not guarantee card = search+1 (Lee's real
+  card PageID is search+2, Fairfield's is search+2 too; only Clarendon's own
+  card PageID was never independently needed because `fetch()`'s "search"
+  strategy renders the page the typeahead itself navigated to, not a
+  reconstructed URL -- see `_resolve_via_search`). `_CFG["card"]` is kept as a
+  best-effort fallback value only, used only if that direct render comes back
+  unusable; it is never required to be exactly right, and `fetch()` returns
+  None cleanly if everything fails, never mis-reported data.
+  Edgefield SC PARTIALLY resolved: the county's own site (edgefieldcounty.sc.gov)
+               was refusing connections live when first tried (curl: "empty reply
+               from server" / HTTP2 protocol errors, not a Cloudflare wall), and
+               qpublic.net's Edgefield page has no working search link (the only
+               one found is a 9-year-old Wayback snapshot pointing at a different,
+               now-dead legacy Schneider product). Recovered instead via the
+               App={County}CountySC alias form (same trick sc_qpublic.py's
+               docstring already documents for Kershaw/Oconee/Colleton) -- LIVE-
+               CONFIRMED AppID=859, LayerID=16089 (home page rendered clean past
+               Cloudflare, 162KB, real nav chrome). The SEARCH PageID is still
+               open: 5 PageID candidates on that home page (7159/7160/7162/
+               8513/8514) ALL render a page with a search box and no error, so
+               which one is the plain owner/address Property Search (vs. Sales
+               Search / Map Search / something else) was not disambiguated this
+               pass -- NOT added to `_CFG` rather than guessed. Next step: drive
+               each candidate's typeahead with a real Edgefield address (same
+               `_resolve_via_search` plumbing already proven on the other 3) and
+               keep the one that actually resolves a KeyValue.
 
 Card URL shape:
   https://{host}/Application.aspx?AppID={A}&LayerID={L}&PageTypeID=4&PageID={P}&KeyValue={key}
@@ -88,6 +107,18 @@ Parsing: the SPA renders standard Schneider markup —
     county so we map by HEADER NAME, not fixed index. Newest row is first.
 
 Defensive: ANY exception / timeout / no-match -> return None (never raises).
+
+SCHEMA NOTE (2026-11-11): this module's `CardResult` carries `market_value`,
+not a separate `assessed_value`, and has no acreage/lot_size field at all --
+`enrichment_assessor_card.py._apply()` only ever writes the result onto
+`li.market_value` / `li.living_sqft` (and `li.raw['assessor_card']['sale_price']`
+for the best arm's-length sale), for every county in this file, old and new.
+Clearing this county's Cloudflare wall does NOT, by itself, fill the board's
+`assessed_value` / `lot_size` cube cells (gis_fill.py's VERDICTS entry for
+Clarendon/Lee/Fairfield) -- that would need its own follow-up (parsing the
+card's own "Assessed Value" / "Acres" row, where the card shows one distinctly
+from market value, and wiring `_apply()` to write it) separate from the wall
+itself, which is what this pass fixed.
 """
 from __future__ import annotations
 
@@ -203,14 +234,22 @@ async def _click_agree(page) -> None:
 
 def _looks_unsolved(html: str) -> bool:
     """True when `html` is still the raw, unsolved Cloudflare Turnstile page
-    (title "Just a moment...", Turnstile widget chrome) rather than real app
-    content. The browser-rendered challenge page is ~45KB (the full Turnstile
-    JS/iframe scaffolding), NOT the ~6KB bare HTML a plain curl sees -- a size
-    check alone is not a reliable signal, so this matches on marker TEXT."""
+    rather than real app content. The browser-rendered challenge page is
+    ~45KB (the full Turnstile JS/iframe scaffolding), NOT the ~6KB bare HTML a
+    plain curl sees -- a size check alone is not a reliable signal.
+
+    MUST match on the page's <title>, not on 'cf-turnstile' / 'turnstile' /
+    'challenges.cloudflare.com' substrings anywhere in the page: live-checked
+    2026-11-11, a genuinely SOLVED card page (real tabular-data present, 200
+    status) still carries a 'challenges.cloudflare.com' reference in its own
+    <head> (a persistent CSP entry this Cloudflare zone sends on every
+    response, solved or not) -- matching on that alone is a false positive
+    that rejects good pages and sends them into a pointless retry loop. Only
+    the UNSOLVED interstitial's own <title> reads "Just a moment...".
+    """
     if not html:
         return False
-    low = html[:4000].lower()
-    return "just a moment" in low or "cf-turnstile" in low or "challenges.cloudflare.com" in low
+    return bool(re.search(r"<title>\s*just a moment", html[:2000], re.IGNORECASE))
 
 
 async def _render(url: str, *, on_loaded=None) -> str:

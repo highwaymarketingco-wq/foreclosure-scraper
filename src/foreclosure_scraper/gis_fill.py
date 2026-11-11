@@ -172,7 +172,16 @@ def _lacks(counties: Iterable[str], cols: Iterable[str], reason: str, state: str
 _QPUBLIC = ("the county's property card is on Schneider qPublic / Beacon, which answers scripts with a Cloudflare "
             "'Just a moment' check (2026-10-07 county records matrix); a person opens it in a browser: "
             "walls_register card sc_qpublic")
-_verdict("walled", ("Clarendon", "Edgefield", "Fairfield", "Lee"), ("assessed_value", "lot_size"), _QPUBLIC)
+# 2026-11-11 Schneider-wall gap-sweep: Clarendon/Lee/Fairfield REMOVED from this verdict --
+# the Cloudflare wall itself is cleared (assessor_cards/qpublic_render.py now has live-confirmed
+# AppID/LayerID/search-PageID config + a card render for all 3, real market_value+sales pulled
+# past the same Turnstile check live-reverified real that same night). NOT yet a full fix for
+# THESE TWO COLUMNS specifically though -- the card adapter fills li.market_value/living_sqft,
+# not li.assessed_value/lot_size (see qpublic_render.py's "SCHEMA NOTE"), so the cube cell stays
+# genuinely empty until that separate field-mapping gap is closed too; this cell is just no
+# longer "walled" (the wall is not what's stopping it now). Edgefield stays walled: AppID/LayerID
+# found (859/16089, same alias-form technique) but the search PageID is still unpinned.
+_verdict("walled", ("Edgefield",), ("assessed_value", "lot_size"), _QPUBLIC)
 _verdict("walled", ("Colleton", "Florence", "Lancaster", "Orangeburg"), ("assessed_value",),
          "the county's open parcel layer carries no usable value field (Florence: the building value only; "
          "fields read 2026-10-09); the value is on the county's qPublic card behind the Cloudflare check: "
