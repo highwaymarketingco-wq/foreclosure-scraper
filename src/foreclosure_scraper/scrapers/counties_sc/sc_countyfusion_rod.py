@@ -22,6 +22,19 @@ Greenville separately confirmed (web search) to run its own
 viewer.greenvillecounty.org with account registration, a third platform --
 not yet built. Greenwood/Allendale not yet re-sourced at all.
 
+RE-CHECKED A SECOND TIME, same evening, after a later commit (5a3ba2c) tried
+countyfusion2.govos.com for Orangeburg, rod.greenvillecounty.org for
+Greenville and www.greenwoodsc.gov for Greenwood instead of countyfusion14.
+That commit's OWN message already flagged all three as broken ("login token
+issue" / "search endpoint unstable" / "502") -- live-reconfirmed here rather
+than trusted either way: Orangeburg's loginDisplay.action on countyfusion2
+returns the SAME empty 0-byte body as countyfusion14 (not a different host
+that happens to work), and www.greenwoodsc.gov is the county's generic
+public website homepage, not a ROD system at all. Reverted back to
+Lexington-only for the same reason as the first time: a COUNTIES entry this
+scraper will actually try every run should be one that's live-verified to
+respond, not one a commit message itself already called broken.
+
 Authentication: POST /countyweb/login.action with countyname={County}SC, username, password,
 cmd=login. Credentials stored in .secrets/countyfusion/username.txt and password.txt.
 
@@ -47,14 +60,11 @@ log = structlog.get_logger()
 _REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent
 _SECRETS = _REPO_ROOT / ".secrets" / "countyfusion"
 
-# Each county has its own domain! Discovered 2026-11-11 via user login verification.
-# Credentials: Cash / 1Caroline (NOT from .secrets - user provided)
+# Counties on countyfusion14.govos.com. See the module docstring for the full
+# history of why Orangeburg/Greenville/Greenwood/Allendale are NOT here --
+# live-verified wrong TWICE, under two different sets of candidate hosts.
 COUNTIES = {
     "Lexington": {"host": "countyfusion14.govos.com", "name": "LexingtonSC"},
-    "Orangeburg": {"host": "countyfusion2.govos.com", "name": "OrangeburgSC"},
-    "Greenville": {"host": "rod.greenvillecounty.org", "name": "GreenvilleSC"},
-    "Greenwood": {"host": "www.greenwoodsc.gov", "name": "GreenwoodSC"},
-    # Sumter: user couldn't create account (may require different flow)
 }
 
 # Lookback window (days)
