@@ -764,6 +764,26 @@ async def enrich_gis_attrs(listings: list[Listing], concurrency: int = 8) -> dic
                 return
         base = _resolve_layer(li)
         if not base:
+            # No live GIS layer is configured for this county at all (and no FULL parcel_cache
+            # hit landed above, or there'd have been an early return+stamp already) -- this is a
+            # STRUCTURAL dead end, not a transient failure: NC_GIS/SC_GIS/SC_LAYER are static
+            # code, so "try again next run" can never succeed for this row unless the project
+            # adds a layer for this county. FOUND 2026-11-11: this returned unstamped, so a row
+            # here stayed "never queried" forever and got re-selected by every single future
+            # backfill_gis_attrs_boardwide.py batch, cratering its effective throughput -- NC has
+            # a live layer for only 18 of ~100 counties (SC has all 46), so the vast majority of
+            # the board-wide "never-queried" backlog this script reports is actually THIS,  not
+            # genuine unprocessed work. Stamp it (matching the function's own existing precedent
+            # just below: "A genuine no-match (reached GIS, no feature) IS marked so we don't
+            # re-query it every run forever" -- same logic, this is a no-match before the GIS
+            # call was even possible). If a county later gains a layer, FORCE=1 re-attempts it.
+            if not isinstance(li.raw, dict):
+                li.raw = {}
+            g = li.raw.setdefault("gis", {})
+            if not g.get("queried"):
+                g["queried"] = True
+                g["source"] = "no_live_layer"
+                stats["no_live_layer"] = stats.get("no_live_layer", 0) + 1
             return
         # A point that is a geocoder FALLBACK (a county seat or town centroid, a point many leads
         # share) is not this property's location: the parcel under it is someone else's (audit
