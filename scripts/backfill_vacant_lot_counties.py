@@ -166,8 +166,11 @@ def main() -> int:
     target_set = set(cache_ok.keys())
 
     docs = REPO / "docs"
+    # wait=3600/poll=10: board_lock()'s default (wait=0.0) raises BoardLockBusy immediately
+    # instead of queuing behind a concurrently-running writer (confirmed live 2026-11-11 against
+    # this board's now-routine concurrent gis_attrs/sos_dissolution/code_enforcement backfills).
     lock = contextlib.nullcontext() if args.dry_run else board_lock(
-        REPO, owner="backfill_vacant_lot_counties")
+        REPO, owner="backfill_vacant_lot_counties", wait=3600, poll=10)
 
     with lock:
         print(f"\n[{time.strftime('%H:%M:%S')}] scanning board...", flush=True)
