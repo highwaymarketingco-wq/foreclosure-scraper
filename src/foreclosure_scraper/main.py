@@ -987,6 +987,13 @@ DATELESS_OK_SOURCES = {
     # being SILENTLY DROPPED by _active_only for lack of a sale_date. That's why
     # they read 0 on the board. Adding them makes them land on every run.
     "counties_nc.buncombe_elderly",               # elderly long-tenure owners (GIS, dateless)
+    # 2026-11-11 — lt_elderly_disabled gap-sweep: the SC homestead-exemption analog
+    # of buncombe_elderly above. Full-county bulk sweep (every homesteaded parcel is
+    # its own lead), not a duplicate of enrichment_tax_relief.py's existing per-lead
+    # York/Lexington lookup (that one only fires on leads ALREADY resolved to a
+    # parcel from another source). Dateless (a homestead flag has no sale date).
+    "counties_sc.york_homestead",                 # York SC homestead exemption (GIS, dateless)
+    "counties_sc.lexington_homestead",            # Lexington SC homestead exemption (GIS, dateless)
     "counties_nc.asheville_helene",               # Helene Unsafe/Restricted placards (dateless)
     "public_notices.gannett_obituaries",          # obituaries -> pre-probate heir leads (dateless)
     "counties_nc.buncombe_delinquent_tax",        # Buncombe delinquent-tax list (dateless)
