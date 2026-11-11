@@ -581,17 +581,38 @@ def test_built_in_code_drops_vacant_cohort_false_credit():
     only textual evidence is co-location in enrichment_arcgis.py's NC_GIS/SC_GIS registries
     (used for unrelated columns, not the vacant cohort flag), while the two counties with a
     genuine vacant producer, and nc_lincoln_bulk.py's own untouched single-county credit, keep
-    theirs."""
+    theirs.
+
+    2026-11-11 UPDATE (same shape as the 2026-11-10 UPDATE on
+    test_built_in_code_known_false_positives_not_silently_fixed above, for 'condemned'/Gaston):
+    SC/Richland and SC/York move from "known false positive, must stay absent" to "true positive,
+    must stay present" -- NOT a regression. The vacant/vacancy breadth pass that day gave
+    arcgis_distress_layers.py a real, precise Layer.vacancy=True opt-in for exactly two of its
+    ~26 entries (columbia_code_vacant_boarded -- Richland SC, where= pre-filtered to Boarded
+    Building/Demolition/Vacant Building cases; rockhill_code_demolition -- York SC, a dedicated
+    demolition sub-layer), read back here via _arcgis_distress_layers_credit()'s new 'vacant' key
+    (see its own and _ARCGIS_DISTRESS_LAYERS_REL's docstrings) -- not the blanket file-name match
+    this test originally guarded against. The same pass also gave three more real, single/few-
+    county NC producers (gastonia_code_enforcement.py/Gaston, kinston_proposed_demolition.py/
+    Lenoir, rocky_mount_blight_survey.py/Nash+Edgecombe) a raw['gis']['vacant'] mirror of the
+    raw['vacancy'] wrapper each already wrote -- their blanket text-match credit was already
+    correct (each file only ever names its own real county/counties), so they are new true
+    positives here too, not a refinement like Richland/York's."""
     built = gm.built_in_code()
     # false positives removed: named only via enrichment_arcgis.py's unrelated GIS registries
     for st, co in (("NC", "Mecklenburg"), ("NC", "Buncombe"), ("NC", "Henderson"), ("NC", "Burke"),
-                   ("NC", "Cleveland"), ("SC", "Richland"), ("SC", "Greenville"), ("SC", "York")):
+                   ("NC", "Cleveland"), ("SC", "Greenville")):
         assert (st, co) not in built["vacant"], f"{st}/{co} has no real vacant-cohort producer"
     # real producers keep their credit
-    assert ("NC", "Gaston") in built["vacant"]           # enrichment_arcgis.py _COHORT_FLAG_COUNTIES
+    assert ("NC", "Gaston") in built["vacant"]           # gastonia_code_enforcement.py (condemned branch)
+    assert ("NC", "Lenoir") in built["vacant"]            # kinston_proposed_demolition.py (utility-cutoff basis)
+    assert ("NC", "Nash") in built["vacant"]              # rocky_mount_blight_survey.py (vacant_boarded class)
+    assert ("NC", "Edgecombe") in built["vacant"]         # rocky_mount_blight_survey.py (vacant_boarded class)
     assert ("SC", "Spartanburg") in built["vacant"]      # spartanburg_vacant.py (single-county, correct as-is)
+    assert ("SC", "Richland") in built["vacant"]          # arcgis_distress_layers.py: columbia_code_vacant_boarded
+    assert ("SC", "York") in built["vacant"]              # arcgis_distress_layers.py: rockhill_code_demolition
     assert ("NC", "Lincoln") in built["vacant"]           # nc_lincoln_bulk.py -- untouched, not part of this bug
-    assert len(built["vacant"]) == 3
+    assert len(built["vacant"]) == 8
 
 
 def test_sc_heir_estate_parcel_cache_credit_reads_real_registry_not_text():
