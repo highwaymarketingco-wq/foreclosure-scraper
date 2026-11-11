@@ -408,6 +408,24 @@ ROSTERS = [
     ("NC", "Iredell", "p2c_jqgrid", "https://p2c.iredellcountync.gov"),
     ("SC", "Kershaw", "zuercher", "kershaw-so-sc"),
     ("NC", "Alamance", "p2c_jqgrid", "https://apps.alamance-nc.com/p2c"),
+    # ROSTER SYNC 2026-11-11 -- 3 counties that `scrapers/national/jail_bookings.ROSTERS`
+    # already had (built/landed as standalone inmate-leads on 2026-10-22) but the 2026-11-05/06
+    # syncs above missed, so this enricher's OWNER cross-match + cross-county fanout never ran
+    # against them. Zero new code -- both vendors are already dispatched above. Re-verified
+    # live right now (not trusted from 20-day-old memory): Pickens 349 in custody, Union 104,
+    # Rutherford 189.
+    ("SC", "Pickens", "zuercher", "pickens-so-sc"),
+    ("SC", "Union", "zuercher", "union-so-sc"),
+    ("NC", "Rutherford", "citizen_connect", "RutherfordCoNC|NC0810000"),
+    # NEW DISCOVERIES 2026-11-11 -- found via a bounded live probe of the same predictable
+    # Zuercher `{county}-{so|911}-{state}.zuercherportal.com` subdomain pattern used to find
+    # Pickens/Union on 2026-10-22, run against every NC/SC county still "no source known" for
+    # this signal. 96 counties x 2 suffix guesses (so/911) = 192 live POSTs, 0.25s apart, against
+    # the real /api/portal/inmates/load endpoint -- not guessed from documentation. 3 real hits,
+    # all three on the SAME already-wired "zuercher" vendor as every entry above, zero new code:
+    ("NC", "Davie", "zuercher", "davie-so-nc"),       # verified live 2026-11-11: 59 in custody
+    ("NC", "Nash", "zuercher", "nash-911-nc"),        # verified live 2026-11-11: 287 in custody
+    ("NC", "Pender", "zuercher", "pender-so-nc"),     # verified live 2026-11-11: 87 in custody
 ]
 
 # (state, county, vendor, target) for the PER-NAME search vendors — no bulk
