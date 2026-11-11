@@ -76,7 +76,7 @@ from foreclosure_scraper.enrichment_code_enforcement import (  # noqa: E402
     enrich_with_code_enforcement,
 )
 from foreclosure_scraper.models import Listing  # noqa: E402
-from foreclosure_scraper.web_artifact import board_lock, patch_existing_rows  # noqa: E402
+from foreclosure_scraper.web_artifact import BoardLockBusy, board_lock, patch_existing_rows  # noqa: E402
 
 _SIG_FIELDS = ("state", "county", "parcel_id", "street_address", "zip_code",
               "case_number", "source_url", "listing_type")
@@ -173,51 +173,70 @@ def main() -> int:
     total_new_negative = 0
     total_unresolved = 0  # still None after the call: could not be asked (outage/no address)
 
-    with board_lock(REPO, owner="backfill_mecklenburg_code_enforcement", wait=3600, poll=10):
-        for i in range(0, len(items), args.batch_size):
-            if args.max_batches and batches_run >= args.max_batches:
-                print(f"\nreached --max-batches {args.max_batches}; stopping "
-                      f"({len(items) - i:,} candidates remain for a future invocation).")
-                break
-            batch = dict(items[i:i + args.batch_size])
-            before = {k: li.raw.get("code_enforcement") for k, li in batch.items()}
+    # THE LOCK is scoped to just each batch's write below (narrowed 2026-11-11, same class
+    # of fix as backfill_mecklenburg_tax.py tonight -- see
+    # project_board_lock_wide_scope_stalls_gis_attrs_2026-11-11). This used to hold board_lock
+    # across the WHOLE batch loop, including asyncio.run(enrich_with_code_enforcement(...))
+    # below -- a live, per-row ArcGIS query against gis.charlottenc.gov, ~1.17s/row, up to
+    # ~29 min for a default --batch-size 1500 batch -- starving every other board-writing
+    # script of the lock for just as long. patch_existing_rows() independently refuses to
+    # write without the lock held (require_board_lock()), so this narrowing removes no
+    # correctness guarantee.
+    for i in range(0, len(items), args.batch_size):
+        if args.max_batches and batches_run >= args.max_batches:
+            print(f"\nreached --max-batches {args.max_batches}; stopping "
+                  f"({len(items) - i:,} candidates remain for a future invocation).")
+            break
+        batch = dict(items[i:i + args.batch_size])
+        before = {k: li.raw.get("code_enforcement") for k, li in batch.items()}
 
-            t0 = time.monotonic()
-            print(f"\n[batch {batches_run}] running enrich_with_code_enforcement() on "
-                  f"{len(batch):,} Charlotte rows (CITY_ENDPOINTS + SEVERE_ENDPOINTS)...",
-                  flush=True)
-            asyncio.run(enrich_with_code_enforcement(list(batch.values())))
-            elapsed = time.monotonic() - t0
+        t0 = time.monotonic()
+        print(f"\n[batch {batches_run}] running enrich_with_code_enforcement() on "
+              f"{len(batch):,} Charlotte rows (CITY_ENDPOINTS + SEVERE_ENDPOINTS)...",
+              flush=True)
+        asyncio.run(enrich_with_code_enforcement(list(batch.values())))
+        elapsed = time.monotonic() - t0
 
-            patches: dict[str, dict] = {}
-            new_pos = new_neg = unresolved = 0
-            for k, li in batch.items():
-                after = li.raw.get("code_enforcement") if isinstance(li.raw, dict) else None
-                if after == before[k]:
-                    if after is None:
-                        unresolved += 1
-                    continue
-                patches[k] = {"raw": {"code_enforcement": after}}
-                if isinstance(after, dict) and after.get("has_open"):
-                    new_pos += 1
-                elif isinstance(after, dict):
-                    new_neg += 1
+        patches: dict[str, dict] = {}
+        new_pos = new_neg = unresolved = 0
+        for k, li in batch.items():
+            after = li.raw.get("code_enforcement") if isinstance(li.raw, dict) else None
+            if after == before[k]:
+                if after is None:
+                    unresolved += 1
+                continue
+            patches[k] = {"raw": {"code_enforcement": after}}
+            if isinstance(after, dict) and after.get("has_open"):
+                new_pos += 1
+            elif isinstance(after, dict):
+                new_neg += 1
 
-            stats = patch_existing_rows(
-                patches, {"backfill_mecklenburg_code_enforcement": f"batch={batches_run}"},
-                docs_dir=docs) if patches else {"applied": 0, "not_found": 0,
-                                                "duplicate_key_matches": 0, "existing": None}
-            total_patched += stats["applied"]
-            total_new_positive += new_pos
-            total_new_negative += new_neg
-            total_unresolved += unresolved
-            batches_run += 1
-            print(f"  [batch {batches_run - 1}] {elapsed:.0f}s | new open-violation tags: "
-                  f"{new_pos} | newly cleared (checked, nothing found): {new_neg} | "
-                  f"could not be asked (outage/no address): {unresolved} | "
-                  f"patched: {stats['applied']}/{len(patches)} "
-                  f"(not_found: {stats['not_found']}, "
-                  f"duplicate_key_matches: {stats['duplicate_key_matches']})", flush=True)
+        if patches:
+            try:
+                with board_lock(REPO, owner="backfill_mecklenburg_code_enforcement",
+                                 wait=3600, poll=10):
+                    stats = patch_existing_rows(
+                        patches,
+                        {"backfill_mecklenburg_code_enforcement": f"batch={batches_run}"},
+                        docs_dir=docs)
+            except BoardLockBusy as exc:
+                print(f"{exc} -- refusing to write this batch's {len(patches):,} patches "
+                      f"(re-run to redo this batch; {len(items) - i:,} candidates remain "
+                      f"including this one).")
+                return 1
+        else:
+            stats = {"applied": 0, "not_found": 0, "duplicate_key_matches": 0, "existing": None}
+        total_patched += stats["applied"]
+        total_new_positive += new_pos
+        total_new_negative += new_neg
+        total_unresolved += unresolved
+        batches_run += 1
+        print(f"  [batch {batches_run - 1}] {elapsed:.0f}s | new open-violation tags: "
+              f"{new_pos} | newly cleared (checked, nothing found): {new_neg} | "
+              f"could not be asked (outage/no address): {unresolved} | "
+              f"patched: {stats['applied']}/{len(patches)} "
+              f"(not_found: {stats['not_found']}, "
+              f"duplicate_key_matches: {stats['duplicate_key_matches']})", flush=True)
 
     print(f"\n=== RESULTS ===")
     print(f"batches run: {batches_run}")
