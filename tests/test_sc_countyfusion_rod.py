@@ -1,4 +1,5 @@
-"""Tests for CountyFusion ROD scraper (Lexington, Orangeburg, Greenville, Greenwood, Allendale SC)."""
+"""Tests for CountyFusion ROD scraper (Lexington SC only -- see sc_countyfusion_rod.py's
+module docstring for why Orangeburg/Greenville/Greenwood/Allendale were removed 2026-11-11)."""
 import pytest
 from foreclosure_scraper.scrapers.counties_sc.sc_countyfusion_rod import (
     SCCountyFusionROD,
@@ -14,14 +15,13 @@ def test_slug():
 
 
 def test_counties_configured():
-    """Verify all 5 counties are configured."""
-    assert len(COUNTIES) == 5
+    """Verify only the live-confirmed county is configured. Orangeburg/Greenville/
+    Greenwood/Allendale were live-verified (2026-11-11) to NOT be tenants on
+    countyfusion14.govos.com -- loginDisplay.action returns an empty body for all
+    four, not a login-flow bug worth asserting coverage for here."""
+    assert len(COUNTIES) == 1
     assert "Lexington" in COUNTIES
-    assert "Orangeburg" in COUNTIES
-    assert "Greenville" in COUNTIES
-    assert "Greenwood" in COUNTIES
-    assert "Allendale" in COUNTIES
-    
+
     # Verify structure
     for county, config in COUNTIES.items():
         assert "host" in config

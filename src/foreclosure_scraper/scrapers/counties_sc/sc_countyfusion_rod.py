@@ -1,12 +1,26 @@
-"""SC Register-of-Deeds distress recordings via GovOS CountyFusion (multi-county).
+"""SC Register-of-Deeds distress recordings via GovOS CountyFusion.
 
-Covers Lexington, Orangeburg, Greenville, Greenwood, Allendale SC (20,364 build-list rows).
-Uses authenticated login (credentials in .secrets/countyfusion/) to access the instrument
-search grid. Sweeps adverse document types (liens, lis pendens, foreclosure deeds) via
+Covers Lexington SC ONLY (6,606 build-list rows). Uses authenticated login
+(credentials in .secrets/countyfusion/) to access the instrument search grid.
+Sweeps adverse document types (liens, lis pendens, foreclosure deeds) via
 date-window search and emits properly-typed leads.
 
-Platform: https://countyfusion14.govos.com/countyweb/ (Lexington, Orangeburg, Greenville,
-Greenwood, Allendale) and countyfusion2.govos.com (Sumter, already covered separately).
+Platform: https://countyfusion14.govos.com/countyweb/ (Lexington only) and
+countyfusion2.govos.com (Sumter, already covered separately).
+
+WHY NOT Orangeburg/Greenville/Greenwood/Allendale (2026-11-11): an earlier
+version of this COUNTIES dict listed all 5 as countyfusion14.govos.com
+tenants. Live-verified false: loginDisplay.action?countyname={Orangeburg,
+Greenville,Greenwood}SC all return a 200 with an EMPTY (0-byte) body --
+these counties are simply not tenants on this GovOS instance, not a login
+bug to debug. (Allendale's entry additionally had a real typo,
+"AllendaleeSC" -- moot now, but noted in case it's ever re-added.)
+Orangeburg's REAL platform is the entirely different
+src/foreclosure_scraper/scrapers/counties_sc/orangeburg_scrod.py
+(a legacy ASP site at orangeburgscrod.org, confirmed working live).
+Greenville separately confirmed (web search) to run its own
+viewer.greenvillecounty.org with account registration, a third platform --
+not yet built. Greenwood/Allendale not yet re-sourced at all.
 
 Authentication: POST /countyweb/login.action with countyname={County}SC, username, password,
 cmd=login. Credentials stored in .secrets/countyfusion/username.txt and password.txt.
@@ -33,13 +47,12 @@ log = structlog.get_logger()
 _REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent
 _SECRETS = _REPO_ROOT / ".secrets" / "countyfusion"
 
-# Counties on countyfusion14.govos.com
+# Counties on countyfusion14.govos.com. See the module docstring: Orangeburg/
+# Greenville/Greenwood/Allendale were removed 2026-11-11 after live-verifying
+# they are not tenants on this host at all (empty loginDisplay.action
+# response), not a login-flow bug.
 COUNTIES = {
     "Lexington": {"host": "countyfusion14.govos.com", "name": "LexingtonSC"},
-    "Orangeburg": {"host": "countyfusion14.govos.com", "name": "OrangeburgSC"},
-    "Greenville": {"host": "countyfusion14.govos.com", "name": "GreenvilleSC"},
-    "Greenwood": {"host": "countyfusion14.govos.com", "name": "GreenwoodSC"},
-    "Allendale": {"host": "countyfusion14.govos.com", "name": "AllendaleeSC"},
 }
 
 # Lookback window (days)
