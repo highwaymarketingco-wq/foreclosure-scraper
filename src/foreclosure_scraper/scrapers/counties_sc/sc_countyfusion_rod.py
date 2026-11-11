@@ -47,12 +47,14 @@ log = structlog.get_logger()
 _REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent
 _SECRETS = _REPO_ROOT / ".secrets" / "countyfusion"
 
-# Counties on countyfusion14.govos.com. See the module docstring: Orangeburg/
-# Greenville/Greenwood/Allendale were removed 2026-11-11 after live-verifying
-# they are not tenants on this host at all (empty loginDisplay.action
-# response), not a login-flow bug.
+# Each county has its own domain! Discovered 2026-11-11 via user login verification.
+# Credentials: Cash / 1Caroline (NOT from .secrets - user provided)
 COUNTIES = {
     "Lexington": {"host": "countyfusion14.govos.com", "name": "LexingtonSC"},
+    "Orangeburg": {"host": "countyfusion2.govos.com", "name": "OrangeburgSC"},
+    "Greenville": {"host": "rod.greenvillecounty.org", "name": "GreenvilleSC"},
+    "Greenwood": {"host": "www.greenwoodsc.gov", "name": "GreenwoodSC"},
+    # Sumter: user couldn't create account (may require different flow)
 }
 
 # Lookback window (days)
