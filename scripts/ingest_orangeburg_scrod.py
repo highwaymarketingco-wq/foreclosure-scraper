@@ -12,7 +12,14 @@ lock every 15-20s; a 0-wait lock grab would almost certainly lose this run's
 scraped data to a BoardLockBusy on first contention.
 
     python scripts/ingest_orangeburg_scrod.py --dry-run
-    python scripts/ingest_orangeburg_scrod.py
+    BOARD_APPEND_ALLOW_LARGE=1 python scripts/ingest_orangeburg_scrod.py
+
+BOARD_APPEND_ALLOW_LARGE=1 is required for the real run (not the dry-run) once
+the board passes append_new_rows()'s own 2400MB ceiling -- confirmed live
+2026-11-11, board source measured at 5396MB. Left as a caller-supplied env var
+rather than set in code, matching every other ingest/backfill script in this
+project: the "supervised run" override is a decision for whoever launches it,
+not a default baked into the script.
 """
 from __future__ import annotations
 
