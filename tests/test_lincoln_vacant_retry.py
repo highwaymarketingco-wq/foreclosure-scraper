@@ -3,9 +3,10 @@ page fetch gets retried, not treated as "the whole scrape failed."
 
 Found 2026-11-07 (gap-sweep): the pagination loop's only network call --
 ``r = await c.get(QUERY_URL, params=params)`` -- runs on a bare, inline
-``httpx.AsyncClient(verify=False, timeout=60.0)`` (verify=False because the county
-host's TLS cert is expired, so this scraper never goes through the shared,
-already-retrying ``http_client.client()`` helper) with zero retry cushioning,
+``httpx.AsyncClient(verify=False, timeout=60.0)`` (verify=False because the host serves
+an incomplete TLS cert chain, not an expired cert -- see lincoln_vacant.py's docstring --
+so this scraper never goes through the shared, already-retrying ``http_client.client()``
+helper) with zero retry cushioning,
 guarded only by a bare ``except Exception: break``. Because the FIRST page
 (offset=0) runs on every single invocation and every page appends to one shared
 ``out`` list, a transient blip on that first call silently zeroed (or, on a later
