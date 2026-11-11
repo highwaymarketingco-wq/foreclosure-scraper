@@ -234,9 +234,20 @@ async def _read_grid_data(c: httpx.AsyncClient, base_url: str, county: str) -> l
         "take": 500,
     }
     
+    # Kendo Grid expects XHR headers
+    headers = {
+        "X-Requested-With": "XMLHttpRequest",
+        "Accept": "application/json, text/javascript, */*; q=0.01",
+    }
+    
     try:
-        resp = await c.post(endpoint, data=payload)
+        resp = await c.post(endpoint, data=payload, headers=headers)
         resp.raise_for_status()
+        
+        # Debug: log raw response
+        raw_text = resp.text[:500]
+        log.info("avenu.grid_response", county=county, status=resp.status_code, preview=raw_text)
+        
         data = resp.json()
         
         if "Data" in data and isinstance(data["Data"], list):
