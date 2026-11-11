@@ -11,9 +11,9 @@ All three counties use the same Avenu Insights/Neumo Records Management platform
 
 ## Authentication
 
-Requires login credentials stored in:
-- `.secrets/avenu_insights/email.txt`: cashrandolphhigh@gmail.com
-- `.secrets/avenu_insights/password.txt`: 1Caroline
+Requires login credentials stored in (gitignored, values never committed):
+- `.secrets/avenu_insights/email.txt`
+- `.secrets/avenu_insights/password.txt`
 
 **Login flow**:
 1. GET `/Public/{county}sc/Account/Login` to extract `__RequestVerificationToken` CSRF token

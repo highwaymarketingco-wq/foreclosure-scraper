@@ -36,7 +36,7 @@
 
 1. **Manual browser inspection**:
    - Open https://williamsburgsc.avenuinsights.com in browser
-   - Login with credentials (cashrandolphhigh@gmail.com / 1Caroline)
+   - Login with credentials from `.secrets/avenu_insights/` (see below)
    - Open Dev Tools → Network tab
    - Submit a search on the InstrumentGrid page
    - Look for XHR/Fetch requests after clicking "Search" button
@@ -80,9 +80,9 @@ If the grid data is only client-side JavaScript populated:
 
 ### Credentials Status
 
-✓ Stored in `.secrets/avenu_insights/`:
-- email.txt: cashrandolphhigh@gmail.com
-- password.txt: 1Caroline
+✓ Stored in `.secrets/avenu_insights/` (gitignored, values never committed):
+- email.txt
+- password.txt
 
 ✓ Login tested and working for williamsburgsc.avenuinsights.com
 

@@ -7,8 +7,8 @@ This is the ONLY county on the Cott Systems RecordHub platform (unlike
 Avenu Insights / CountyFusion which are multi-tenant). Login required with
 reCAPTCHA v2 checkbox challenge.
 
-Auth:
-  - .secrets/cott_recordhub/email.txt (cashrandolphhigh@gmail.com)
+Auth (gitignored, values never committed):
+  - .secrets/cott_recordhub/email.txt
   - .secrets/cott_recordhub/password.txt
 
 Login flow:
