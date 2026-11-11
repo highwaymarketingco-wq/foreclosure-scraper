@@ -36,10 +36,15 @@ Per-county Schneider app config (AppID / LayerID / PageID) and KeyValue strategy
                and cross-confirmed via qpublic.net/sc/clarendon/search.html's own
                redirect link (both sources agree byte-for-byte). Resolve by
                address search (no verified dashed-TMS formula for this county).
-  Lee          AppID=913  LayerID=17622 PageID=7895* card; PageID=7894 search
-               2026-11-11 gap-sweep add. AppID/LayerID/search-PageID read LIVE off
-               qpublic.net/sc/lee/search.html's redirect link. Resolve by address
-               search.
+  Lee          AppID=913  LayerID=17622 PageID=7896  card (LIVE-CONFIRMED, not a
+               guess); PageID=7894 search. 2026-11-11 gap-sweep add. AppID/LayerID/
+               search-PageID read LIVE off qpublic.net/sc/lee/search.html's
+               redirect link; card PageID is NOT search+1 here (that guess, 7895,
+               is wrong) -- confirmed 7896 by actually driving the address
+               typeahead (28 E Willow Grove Rd -> KeyValue 068-04-00-053-000) and
+               reading the URL the app itself navigated to. This is exactly why
+               `fetch()`'s "search" path now uses that resolved page directly
+               instead of reconstructing a card URL from a configured PageID.
   Fairfield    AppID=796  LayerID=11834 PageID=5737* card; PageID=5736 search
                HOST IS beacon.schneidercorp.com, NOT qpublic — this county's
                Schneider app is Beacon-branded (read LIVE off
@@ -50,12 +55,14 @@ Per-county Schneider app config (AppID / LayerID / PageID) and KeyValue strategy
                also runs a separate, unrelated Esri "Economic Development" viewer
                at fairfieldcountysc.giswebtechguru.com -- not the assessor's record
                source and not used here.)
-  * = card PageID is PREDICTED as search+1, following the pattern of all 4
-      pre-existing counties above (100% consistent, n=4) -- NOT independently
-      live-confirmed, because confirming it needs an actual Cloudflare-cleared
-      render, same as everything else in this file. Verify (or correct) on first
-      real run; `fetch()` returns None cleanly if it's wrong, it does not
-      mis-report data.
+  * = card PageID is a search+1 GUESS, unconfirmed -- and, per the Lee finding
+      just above, demonstrably not always right (Lee's real card PageID is
+      search+2). It mostly doesn't matter: `fetch()`'s "search" KeyValue
+      strategy (all 3 of these new counties) now renders the card page the
+      typeahead itself navigated to, not a URL rebuilt from this guess -- the
+      guess is only a fallback for the rare case that render comes back
+      unusable. `fetch()` still returns None cleanly if everything fails, never
+      mis-reported data.
   Edgefield SC NOT resolved this pass: the county's own site (edgefieldcounty.sc.gov)
                is refusing connections live (curl: "empty reply from server" /
                HTTP2 protocol errors, not a Cloudflare wall), and qpublic.net's
@@ -112,7 +119,7 @@ _CFG: dict[str, dict] = {
     # 2026-11-11 gap-sweep adds (see module docstring for how each was sourced;
     # the `card` PageID on each is a search+1 PREDICTION, not yet live-confirmed).
     "Clarendon":   {"app": 795, "layer": 11833, "card": 5733, "search": 5732, "key": "search"},
-    "Lee":         {"app": 913, "layer": 17622, "card": 7895, "search": 7894, "key": "search"},
+    "Lee":         {"app": 913, "layer": 17622, "card": 7896, "search": 7894, "key": "search"},
     "Fairfield":   {"app": 796, "layer": 11834, "card": 5737, "search": 5736, "key": "search",
                      "host": BEACON_HOST},
 }
@@ -290,12 +297,23 @@ async def _render(url: str, *, on_loaded=None) -> str:
     return html
 
 
-async def _resolve_via_search(cfg: dict, query: str) -> str | None:
-    """Drive the qPublic typeahead with `query`; return the resolved KeyValue.
+async def _resolve_via_search(cfg: dict, query: str) -> tuple[str, str] | None:
+    """Drive the qPublic typeahead with `query`; return (KeyValue, card_html).
 
     The search box is a twitter-typeahead `input[type=search]`. We type the
     address, wait for the suggestion dropdown, click the first suggestion, and
     read KeyValue out of the resulting card URL. Returns None on any failure.
+
+    `card_html` is the page's OWN content at the moment it lands on the card
+    (captured by `_render`'s page_action, same as any other render -- no extra
+    round-trip) and the caller should render-and-parse THAT directly rather
+    than reconstructing a card URL from a configured `cfg["card"]` PageID.
+    Live-diagnosed 2026-11-11: the typeahead click can land on a card PageID
+    that does NOT match `search PageID + 1` (confirmed on Lee: search=7894
+    resolves to card PageID=7896, not 7895) -- the Schneider CMS does not
+    guarantee that offset, it just happens to hold for 4/4 of this file's
+    older counties. Using the URL the app itself navigated to sidesteps that
+    guess entirely instead of assuming a fixed offset.
     """
     holder: dict = {}
 
@@ -346,12 +364,12 @@ async def _resolve_via_search(cfg: dict, query: str) -> str | None:
         except Exception:
             pass
 
-    await _render(_search_url(cfg, query), on_loaded=on_loaded)
+    card_html = await _render(_search_url(cfg, query), on_loaded=on_loaded)
     final = holder.get("url") or ""
     m = re.search(r"[?&]KeyValue=([^&#]+)", final)
-    if m and "PageTypeID=4" in final:
+    if m and "PageTypeID=4" in final and card_html and not _looks_unsolved(card_html):
         from urllib.parse import unquote
-        return unquote(m.group(1))
+        return unquote(m.group(1)), card_html
     return None
 
 
@@ -607,20 +625,27 @@ async def fetch(li) -> CardResult | None:
 
         # Resolve the KeyValue per county strategy.
         key: str | None = None
+        html: str | None = None
         if cfg["key"] == "tms":
             key = _spartanburg_key(li)
         elif cfg["key"] == "dashed":
             key = _oconee_key(li)
-        else:  # "search": Pickens (R-account) / Union — resolve via typeahead
+        else:  # "search": resolve via typeahead (Pickens/Union/Clarendon/Lee/Fairfield)
             query = (li.street_address or "").strip() or (li.parcel_id or "").strip()
             if not query:
                 return None
-            key = await _resolve_via_search(cfg, query)
+            resolved = await _resolve_via_search(cfg, query)
+            if not resolved:
+                return None
+            key, html = resolved  # html is the card page the typeahead already landed on
 
         if not key:
             return None
 
-        html = await _render(_card_url(cfg, key))
+        # Fall back to a fresh render only if the search step didn't already hand us
+        # a usable card page (e.g. the "tms"/"dashed" strategies never render one).
+        if not html or len(html) < 500:
+            html = await _render(_card_url(cfg, key))
         if not html or len(html) < 500:
             return None
         return _parse_card(html, county)
