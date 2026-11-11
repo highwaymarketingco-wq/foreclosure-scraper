@@ -1,0 +1,149 @@
+#!/usr/bin/env python3
+"""One-off/repeatable backfill: run the REAL, unmodified enrichment_mecklenburg_tax.
+enrich_mecklenburg_tax() against the ALREADY-PUBLISHED board's historical Mecklenburg rows.
+
+WHY THIS EXISTS (2026-11-11, Mecklenburg gap-sweep). enrichment_mecklenburg_tax.py was built
+2026-11-05 and wired into main.py's enrichment chain, but shipped behind FORECLOSURE_MECKLENBURG_
+MYDT (default off) "since nothing has wired this into main.py yet" -- that reason is gone now
+that it's called, and scripts/run_local.sh now exports it on by default (commit ccd012f). BUT
+un-gating it only changes what a FUTURE main.py run does: like every other enrichment this
+project has found to have this exact shape tonight (tax_aging_surfaced, tax_owed, gis_attrs,
+sos_dissolution), main.py's run_enrich_tail only ever walks that run's OWN newly-merged rows,
+never the historical backlog -- so the ~39,861 Mecklenburg rows already on the board would sit
+unchecked forever without a dedicated pass like this one.
+
+enrich_mecklenburg_tax() is a LIVE per-parcel query against taxbill.co.mecklenburg.nc.us (no
+bulk export) -- NOT cheap/offline like tax_owed's cross-reference pass. It is already
+self-bounding (MAX_ROWS env, default 300 per call; BUDGET_S wall-clock cap, default 600s;
+CONCURRENCY semaphore, default 4; a consecutive-failure circuit breaker) -- this script does
+not change or bypass any of those, it only chooses WHICH rows to hand it (Mecklenburg's real
+backlog, not whatever a live run happened to just merge) and chunks repeated calls into
+checkpointed board writes so a long backfill survives being re-invoked across sessions.
+
+BOARD I/O: streamed read-only via board_stream.iter_board_rows() (never load_board()), scoped
+to state=="NC" and county=="Mecklenburg" during the stream itself (not after loading everything)
+-- this board has 477k+ rows, no reason to build a lightweight Listing for the other ~438k.
+Writes via web_artifact.patch_existing_rows() with the same dedupe_key()-collision guard every
+sibling backfill in this project uses (a key shared by >1 distinct row is dropped, counted, never
+guessed at).
+
+    MECKLENBURG_MYDT_MAX=300 python scripts/backfill_mecklenburg_tax.py --dry-run
+    FORECLOSURE_MECKLENBURG_MYDT=1 MECKLENBURG_MYDT_MAX=300 \
+        BOARD_PATCH_ALLOW_LARGE=1 python scripts/backfill_mecklenburg_tax.py --rounds 1
+"""
+from __future__ import annotations
+
+import argparse
+import asyncio
+import contextlib
+import os
+import sys
+from pathlib import Path
+from typing import Optional
+
+REPO = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO / "src"))
+
+# enrich_mecklenburg_tax() itself checks _ENABLED (FORECLOSURE_MECKLENBURG_MYDT) and no-ops if
+# unset -- force it on for this standalone backfill regardless of the caller's shell env, same
+# as backfill_lincoln_cchs_rod.py and siblings do for their own feature flags.
+os.environ.setdefault("FORECLOSURE_MECKLENBURG_MYDT", "1")
+
+from foreclosure_scraper.board_stream import iter_board_rows  # noqa: E402
+from foreclosure_scraper.enrichment_mecklenburg_tax import (  # noqa: E402
+    CHECKED_KEY, MYDT_KEY, TYD_KEY, enrich_mecklenburg_tax,
+)
+from foreclosure_scraper.models import Listing  # noqa: E402
+from foreclosure_scraper.web_artifact import board_lock, patch_existing_rows  # noqa: E402
+
+_LIGHT_FIELDS = ("state", "county", "parcel_id", "street_address", "zip_code",
+                  "case_number", "source_url", "listing_type", "source", "raw")
+_WATCH_KEYS = (TYD_KEY, MYDT_KEY, CHECKED_KEY)
+
+
+def _dedupe_key(li) -> Optional[str]:
+    try:
+        return li.dedupe_key()
+    except Exception:  # noqa: BLE001 - a row too malformed to key is simply skipped
+        return None
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--rounds", type=int, default=1,
+                     help="how many times to call enrich_mecklenburg_tax() in this invocation "
+                          "(each round is its own MAX_ROWS/BUDGET_S-capped pass over the "
+                          "still-eligible rows; re-invoke the whole script across sessions to "
+                          "keep grinding through the backlog)")
+    args = ap.parse_args()
+
+    docs = REPO / "docs"
+    lock = contextlib.nullcontext() if args.dry_run else board_lock(
+        REPO, owner="backfill_mecklenburg_tax", wait=3600, poll=10)
+
+    with lock:
+        board: list[Listing] = []
+        keys: list[Optional[str]] = []
+        before: list[dict] = []
+        for rec in iter_board_rows(docs / "listings.json.gz"):
+            if (rec.get("state") or "").strip().upper() != "NC":
+                continue
+            if (rec.get("county") or "").strip() != "Mecklenburg":
+                continue
+            li = Listing.model_construct(**{k: rec.get(k) for k in _LIGHT_FIELDS})
+            board.append(li)
+            keys.append(_dedupe_key(li))
+            raw = li.raw if isinstance(li.raw, dict) else {}
+            before.append({k: raw.get(k) for k in _WATCH_KEYS})
+
+        key_counts: dict[str, int] = {}
+        for k in keys:
+            if k is not None:
+                key_counts[k] = key_counts.get(k, 0) + 1
+
+        print(f"Mecklenburg/NC rows on board: {len(board):,}")
+
+        total_stats: dict = {}
+        for rnd in range(args.rounds):
+            stats = asyncio.run(enrich_mecklenburg_tax(board))
+            print(f"  round {rnd + 1}/{args.rounds}: {stats}")
+            for k, v in stats.items():
+                total_stats[k] = total_stats.get(k, 0) + v
+            if stats.get("eligible", 0) == 0:
+                print("  no more eligible rows -- backlog exhausted for this invocation")
+                break
+
+        print(f"\ncumulative this invocation: {total_stats}")
+
+        if args.dry_run:
+            print("\n--dry-run: nothing written (enrich_mecklenburg_tax() still ran live "
+                  "network queries above -- there is no network-free dry-run path for this "
+                  "module; --dry-run here only means the board write is skipped)")
+            return 0
+
+        patches: dict[str, dict] = {}
+        collisions = 0
+        for li, key, b4 in zip(board, keys, before):
+            raw = li.raw if isinstance(li.raw, dict) else {}
+            after = {k: raw.get(k) for k in _WATCH_KEYS}
+            if after == b4:
+                continue
+            if key is None:
+                continue
+            if key_counts.get(key, 0) > 1:
+                collisions += 1
+                continue
+            patches[key] = {"raw": {k: v for k, v in after.items() if v is not None}}
+
+        print(f"patches staged: {len(patches):,} (dropped as dedupe_key collisions: {collisions:,})")
+
+        if patches:
+            stats = patch_existing_rows(
+                patches, {"backfill_mecklenburg_tax": f"n={len(patches)}"}, docs_dir=docs)
+            print(f"patch_existing_rows: {stats}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
