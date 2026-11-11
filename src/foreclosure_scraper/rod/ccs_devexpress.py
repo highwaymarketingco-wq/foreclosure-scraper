@@ -967,7 +967,7 @@ _SEARCH_JS = r"""
     // all (first-ever load, Jasper's own original scenario), or (b) it
     // EXISTS but reads zero width/height because another subapp (e.g. the
     // per-document image/"Open Details" viewer, Iredell's own live-hit
-    # scenario this pass ran into) is currently fronted instead -- the grid
+    // scenario this pass ran into) is currently fronted instead -- the grid
     // itself never populates while that's true. The top-level tab control's
     // own visible text differs by tenant (Jasper: "Land Records"; Iredell:
     // "Real Property Index", id `subappTab_LRSearch_0`) -- try the stable
