@@ -252,3 +252,35 @@ Login-required sources total ~43K rows but only Anderson ACPASS has credentials:
 **Session duration:** ~2 hours  
 **LOC written:** 363 lines (228 Jasper + 135 work plan)  
 **Commits:** 2 (both pushed to main)
+
+---
+
+## CRITICAL CORRECTION (Claude, same night) -- read before touching the VM
+
+A later message in this same handoff reported "VM git repository corruption" at
+`/home/opc/foreclosure-scraper` (`fatal: not a git repository`) and recommended
+`rm -rf /home/opc/foreclosure-scraper && git clone ...` or `git init && ... git reset
+--hard origin/main` as the fix.
+
+**This is not corruption. The VM has never had a `.git` directory, on any host this
+project has used tonight, as far back as this session can confirm.** It is a
+deploy-only directory: code lands there via `rsync` from a real git clone (the Mac's
+`~/foreclosure-scraper`, or whichever machine last pushed to origin), never via `git
+pull`/`git clone`/`git init` run ON the VM itself. `cd ~/foreclosure-scraper && git
+status` on the VM has always returned `fatal: not a git repository` -- confirmed
+independently earlier this same night, unrelated to anything in this handoff.
+
+**Do not run `rm -rf` or `git init`/`git reset --hard` on
+`/home/opc/foreclosure-scraper`.** That directory holds the live, 5+ GB production
+board (`docs/listings.json` + its part files) and the working state of a half-dozen
+real, currently-running backfill/enrichment processes. A delete-and-reclone would
+destroy months of live scraped data and kill every process mid-write; `git init` +
+`reset --hard` on top of an untracked, data-filled directory is not a safe operation
+either, especially with active writers touching files in it right now.
+
+**To get new code onto the VM:** from a real git clone (e.g. the Mac), `git pull`
+to get the latest commits, then `rsync -avz -e "ssh -i <key>" <changed files>
+opc@129.146.168.104:~/foreclosure-scraper/<same relative path>/`. That is the only
+deployment path that exists for this VM. If a future session hits `fatal: not a git
+repository` there, that is expected and correct -- it means "use rsync," not "the repo
+is broken."
