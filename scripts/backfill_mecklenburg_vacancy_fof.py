@@ -120,8 +120,11 @@ def main() -> int:
     print(f"  {total_open:,} currently-open cases; {fof_case_count:,} carry an active "
           f"Findings-of-Fact demolition order; {len(fof_parcels):,} distinct parcels")
 
+    # wait=3600/poll=10: board_lock()'s default (wait=0.0) raises BoardLockBusy immediately
+    # instead of queuing behind a concurrently-running writer (confirmed live tonight -- the
+    # board-wide gis_attrs backfill holds this lock for minutes at a time, routinely).
     lock = contextlib.nullcontext() if args.dry_run else board_lock(
-        REPO, owner="backfill_mecklenburg_vacancy_fof")
+        REPO, owner="backfill_mecklenburg_vacancy_fof", wait=3600, poll=10)
 
     with lock:
         key_counts: Counter = Counter()

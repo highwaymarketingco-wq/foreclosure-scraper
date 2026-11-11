@@ -146,6 +146,23 @@ export ASSESSOR_CARD_MAX="${ASSESSOR_CARD_MAX:-400}"
 # this keeps future advertisement updates (new tax year, newly-added parcels) landing too.
 export FORECLOSURE_MECKLENBURG_DELINQUENT="${FORECLOSURE_MECKLENBURG_DELINQUENT:-1}"
 
+# Mecklenburg's taxbill.co.mecklenburg.nc.us live "Bill Search" portal (enrichment_mecklenburg_
+# tax.py, built+wired into main.py's enrichment chain 2026-11-05, operator-enabled 2026-11-10):
+# per-parcel multi-year bill history, closing the single biggest sourced-not-built cell in the
+# whole gap matrix (~39,861 Mecklenburg rows for multi_year_delinquent_tax/two_year_delinquent).
+# It shipped gated off (FORECLOSURE_MECKLENBURG_MYDT) only because main.py hadn't called it yet
+# -- that reason is gone now that it's wired (confirmed in main.py's enrichment_stats block), and
+# every structurally-identical sibling (qpaybill/its_public/ptscloud/iredell/cabarrus/catawba
+# _multiyear_tax) already runs unconditionally with the same MAX_ROWS=300/BUDGET_S=600s/
+# CONCURRENCY=4/circuit-breaker-at-8 bounds as this module, which is itself the safety valve
+# (same "existing cap is the safety net, enabling is a normal judgment call" reasoning as
+# FORECLOSURE_MECKLENBURG_DELINQUENT just above). Re-verified live 2026-11-10 against 6 real,
+# already-known-distressed parcels (sourced from this file's own prior advertisement rows): all
+# 6 answered HTTP 200, no WAF/CAPTCHA, 5 of 6 showed genuine matured multi-year delinquency
+# through the real, unmodified parser -- see tests/test_enrichment_mecklenburg_tax.py (new,
+# 2026-11-10; this module had zero test coverage before).
+export FORECLOSURE_MECKLENBURG_MYDT="${FORECLOSURE_MECKLENBURG_MYDT:-1}"
+
 # Mecklenburg/Carteret's Harris "ROD Web Access" real-estate + marriage name-index search
 # (operator-enabled 2026-10-23): a Playwright headless-browser lookup, live-verified working
 # (no login/CAPTCHA, just a one-time disclaimer click-through), held off since 2026-10-07

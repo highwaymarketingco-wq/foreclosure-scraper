@@ -173,7 +173,7 @@ def main() -> int:
     total_new_negative = 0
     total_unresolved = 0  # still None after the call: could not be asked (outage/no address)
 
-    with board_lock(REPO, owner="backfill_mecklenburg_code_enforcement"):
+    with board_lock(REPO, owner="backfill_mecklenburg_code_enforcement", wait=3600, poll=10):
         for i in range(0, len(items), args.batch_size):
             if args.max_batches and batches_run >= args.max_batches:
                 print(f"\nreached --max-batches {args.max_batches}; stopping "

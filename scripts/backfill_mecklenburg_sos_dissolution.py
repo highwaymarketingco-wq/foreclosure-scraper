@@ -169,7 +169,7 @@ def main() -> int:
     total_dissolved = 0
     total_active_or_unknown = 0
 
-    with board_lock(REPO, owner="backfill_mecklenburg_sos_dissolution"):
+    with board_lock(REPO, owner="backfill_mecklenburg_sos_dissolution", wait=3600, poll=10):
         for rnd in range(args.rounds):
             if not names_remaining:
                 print(f"\n[round {rnd}] no names left to check this invocation.")
