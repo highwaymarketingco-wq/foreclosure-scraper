@@ -41,6 +41,42 @@ async def test_a_demolish_order_tags_severity_on_a_fresh_row(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_a_demolish_order_also_stamps_condemned_and_distressed_2026_11_11(monkeypatch):
+    """2026-11-11 fix: a real SEVERE_ENDPOINTS hit must also reach the top-level
+    raw['condemned']/raw['distressed'] board columns, not just the code_enforcement
+    sub-block's own `severity` field -- every other condemned producer (charlotte_
+    open_data.py's fof_ordered, arcgis_distress_layers.py's Layer(condemned=True),
+    gastonia_code_enforcement.py) stamps the same top-level keys, and a row that only
+    reaches this generic enrichment pass (not charlotte_open_data.py's own scrape) was
+    previously left with no condemned signal at all despite a real city demolition order."""
+    async def fake_fetch(c, li, cfg):
+        if cfg.get("severity") == "order_to_demolish":
+            return _DEMOLISH_FEAT
+        return []
+
+    monkeypatch.setattr(M, "_fetch_violations_for_listing", fake_fetch)
+    li = _li(raw={})
+    await M.enrich_with_code_enforcement([li])
+    assert li.raw["condemned"] is True
+    assert li.raw["distressed"] is True
+    assert li.raw["code_enforcement"]["severity"] == "order_to_demolish"
+
+
+@pytest.mark.asyncio
+async def test_no_demolish_order_never_sets_condemned_2026_11_11(monkeypatch):
+    """The negative case: no real hit on the demolish layer must never fabricate a
+    condemned stamp (mirrors test_no_demolish_order_never_clears_an_existing_block)."""
+    async def fake_fetch(c, li, cfg):
+        return []  # both layers answer, neither finds anything for THIS property
+
+    monkeypatch.setattr(M, "_fetch_violations_for_listing", fake_fetch)
+    li = _li(raw={})
+    await M.enrich_with_code_enforcement([li])
+    assert "condemned" not in li.raw
+    assert "distressed" not in li.raw
+
+
+@pytest.mark.asyncio
 async def test_a_demolish_order_merges_into_an_existing_open_violation_not_overwrite_it(monkeypatch):
     async def fake_fetch(c, li, cfg):
         if cfg.get("severity") == "order_to_demolish":

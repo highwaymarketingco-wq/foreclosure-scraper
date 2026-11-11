@@ -376,7 +376,24 @@ async def enrich_with_code_enforcement(listings: list[Listing]) -> None:
         code_enforcement block already exists (building a minimal one if this city
         isn't also in CITY_ENDPOINTS) rather than overwriting it. A miss here means
         "no demolish order on file" -- NOT "no violations" -- so it never clears an
-        existing block the regular pass (or another producer) already wrote."""
+        existing block the regular pass (or another producer) already wrote.
+
+        2026-11-11 fix: a real hit here was ONLY ever recorded into the code_enforcement
+        sub-block's `severity` field, never into the top-level raw['condemned'] (or
+        raw['distressed']) board columns that every other condemned producer writes
+        (charlotte_open_data.py's own fof_ordered check, arcgis_distress_layers.py's
+        Layer(condemned=True) opt-in, gastonia_code_enforcement.py's _CONDEMNED_STATUS_RE
+        -- see docs/memory project_condemned_gap_not_a_bug). SEVERE_ENDPOINTS is reserved,
+        per this dict's own docstring above, for a dedicated "orders to demolish" layer --
+        a city's own authoritative condemnation-equivalent declaration, not a text-regex
+        guess -- so it earns the same stamp those producers use. Live-verified 2026-11-11:
+        0 of the 472,777-row board currently carries this severity marker (all 14 of
+        Charlotte's real, live "Orders to Demolish" cases are already condemned=True via
+        charlotte_open_data.py's own fof_ordered pathway, and were excluded from every past
+        backfill's candidate set as "already screened") -- so this closes a real but
+        currently-dormant gap with zero rows retroactively affected; it protects any FUTURE
+        row (from a different producer, or if charlotte_open_data.py's own scrape ever lags)
+        that this generic, recurring enrichment pass (scripts/enrich_board.py) checks."""
         async with sem:
             feats = await _fetch_violations_for_listing(c, li, cfg)
             counts["severe_queried"] += 1
@@ -394,6 +411,8 @@ async def enrich_with_code_enforcement(listings: list[Listing]) -> None:
             ce["severity"] = cfg["severity"]
             ce["has_open"] = True
             li.raw["code_enforcement"] = stamp(ce, ttl_days=_TTL_DAYS)
+            li.raw["condemned"] = True
+            li.raw["distressed"] = True
             counts["severe_tagged"] += 1
 
     async with client(timeout=20.0) as c:
