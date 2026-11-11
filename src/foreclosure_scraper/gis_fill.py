@@ -181,6 +181,29 @@ _verdict("walled", ("Newberry",), ("assessed_value", "lot_size"),
          "the county's own parcel service (map.newberrycounty.net PropertyParcel/MapServer) answers 'Service not "
          "started' (HTTP 500, 2026-10-09); the property card is on qPublic behind the Cloudflare check: "
          "walls_register card sc_qpublic")
+# 2026-11-11 live re-check (gap_matrix flagged these 4 as "bot_wall_inhouse" on
+# services1.arcgis.com/services3.arcgis.com/map.newberrycounty.net -- that source attribution
+# is wrong, not just stale): curl with a real UA right now shows ALL FOUR of those hosts are
+# still NOT Cloudflare-walled -- Colleton/Florence (services1.arcgis.com) and Lancaster
+# (services3.arcgis.com) return clean 200 JSON (open REST, no challenge, no cf- headers); Newberry's
+# MapServer still answers the same {"error":{"code":500,"message":"Service PropertyParcel/MapServer
+# not started"}} as 2026-10-09. The REAL (and still genuinely live) Cloudflare wall is the qPublic
+# card above -- confirmed 2026-11-11 (403, cf-mitigated: challenge, server: cloudflare on both
+# qpublic.schneidercorp.com/ root and a known-good existing AppID). The existing bypass
+# (qpublic_render._render, StealthyFetcher solve_cloudflare=True -- same mechanism as
+# Spartanburg/Oconee/Pickens/Union) DOES clear it for all 4 of these counties too: live-run
+# confirmed each county's Application.aspx?App={County}CountySC lands on a real app page (search
+# chrome present, 45-185KB) and yielded a real numeric AppID/LayerID pair: Colleton 1046/23500,
+# Florence 920/17892, Lancaster 211/2815 (repeated twice, consistent), Newberry 868/16446. NOT yet
+# confirmed: which PageID is the card (PageTypeID=4) vs the owner/address Search page
+# (PageTypeID=2) for each -- the existing "search PageID + 1 = card" convention (validated on the
+# 4 built counties, used as a *prediction* for Clarendon/Lee/Fairfield above) does not cleanly
+# match the PageIDs seen in these 4 counties' nav HTML (no adjacent pair at all for
+# Lancaster/Newberry). Do not guess it and wire these into qpublic_render.COUNTIES/_CFG without
+# running qpublic_render._resolve_via_search() with a real test query first to read the card
+# PageID (and the KeyValue/card-field-label shape) off the actual resolved URL, the same way the
+# 4 built counties were confirmed -- gis_fill's own contract is never mis-report a value, and an
+# unconfirmed PageID risks silently rendering the wrong page.
 _verdict("no source", ("Chesterfield", "Marion", "Williamsburg"), ("assessed_value", "lot_size"),
          "the county's only viewer is a WTH 'tgis' map shell with no open ArcGIS parcel REST layer "
          "(parcel_cache.py research note 2026-09-21; county records matrix 2026-10-07)")
