@@ -109,3 +109,90 @@ def test_a_real_bad_http_status_is_not_retried():
     out = _run_fetch(http)
     assert http.calls == 1   # a real bad status is not a transport/timeout error
     assert out == []
+
+
+# --- 2026-11-10: HERMES triage follow-up flagged this source zero-row, "ArcGIS
+# MapServer query failing". Live-reverified the same day: QUERY_URL/_WHERE/_OUT are
+# all still correct (an unmodified fetch() returned 21,785 real rows live), but this
+# host answers a bad/failed query with HTTP 200 and a JSON {"error": {...}} envelope
+# -- live-confirmed with a deliberately bogus outFields/where -- not a non-200 status
+# or a transport exception. The OLD code did `r.json().get("features", [])`
+# unconditionally, so an error envelope silently read as "zero features = real end of
+# pagination", with NO exception and NO retry -- on offset=0 that zeroes the entire
+# source. These tests cover the widened retry that now catches it. ---
+
+ERROR_ENVELOPE = {"error": {"code": 400, "message": "Failed to execute query.", "details": []}}
+
+
+class _JsonRaisingResp:
+    """A response whose .json() raises -- simulates a non-JSON/empty body (the
+    literal 2026-11-09 field-audit observation: 'ArcGIS returned empty body today')."""
+
+    def __init__(self, status_code=200):
+        self.status_code = status_code
+
+    def json(self):
+        raise ValueError("Expecting value: line 1 column 1 (char 0)")
+
+
+class _ArcGisErrorEnvelopeHttp:
+    """Always answers HTTP 200; the BODY is an ArcGIS {"error": ...} envelope for the
+    first N calls, then a real (terminal, single-page) feature payload."""
+
+    def __init__(self, fail_times: int, final_payload=None):
+        self.fail_times = fail_times
+        self.final_payload = final_payload if final_payload is not None else ONE_FEATURE_PAGE
+        self.calls = 0
+
+    async def get(self, url, params=None, timeout=None):
+        self.calls += 1
+        if self.calls <= self.fail_times:
+            return _FakeResp(ERROR_ENVELOPE, 200)
+        return _FakeResp(self.final_payload, 200)
+
+
+class _NonJsonBodyHttp:
+    """Always answers HTTP 200; .json() raises for the first N calls (non-JSON/empty
+    body), then a real payload."""
+
+    def __init__(self, fail_times: int, final_payload=None):
+        self.fail_times = fail_times
+        self.final_payload = final_payload if final_payload is not None else ONE_FEATURE_PAGE
+        self.calls = 0
+
+    async def get(self, url, params=None, timeout=None):
+        self.calls += 1
+        if self.calls <= self.fail_times:
+            return _JsonRaisingResp()
+        return _FakeResp(self.final_payload, 200)
+
+
+def test_an_arcgis_error_envelope_is_retried_and_then_succeeds():
+    http = _ArcGisErrorEnvelopeHttp(fail_times=2)
+    out = _run_fetch(http)
+    assert http.calls == 3
+    assert len(out) == 1
+    assert out[0].parcel_id == "TESTPIN1"
+
+
+def test_an_arcgis_error_envelope_that_never_clears_still_ends_cleanly_not_hangs():
+    http = _ArcGisErrorEnvelopeHttp(fail_times=99)  # always answers with the envelope
+    out = _run_fetch(http)
+    assert http.calls == 3   # stop_after_attempt(3), same backstop as a transport error
+    assert out == []
+
+
+def test_a_non_json_empty_body_is_also_retried_and_then_succeeds():
+    http = _NonJsonBodyHttp(fail_times=1)
+    out = _run_fetch(http)
+    assert http.calls == 2
+    assert len(out) == 1
+
+
+def test_a_legitimate_empty_last_page_is_not_confused_with_an_error_and_not_retried():
+    # A genuinely-finished pagination (real end of data) has no "error" key, just an
+    # empty features list -- must NOT be treated as an ArcGIS error / retried.
+    http = _FlakyHttp(fail_times=0, final_payload=EMPTY_PAGE)
+    out = _run_fetch(http)
+    assert http.calls == 1  # no retries triggered by a legitimate empty page
+    assert out == []

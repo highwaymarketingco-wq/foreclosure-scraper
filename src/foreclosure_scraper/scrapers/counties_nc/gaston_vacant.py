@@ -151,6 +151,12 @@ def _epoch_ms_to_dt(v) -> datetime | None:
         return None
 
 
+class _ArcGisQueryError(Exception):
+    """Raised when this host answers with HTTP 200 but a body that is not a usable
+    feature page -- an ArcGIS ``{"error": {...}}`` envelope, or a non-JSON/empty body.
+    See the retry wiring in ``fetch()`` for why this needs its own exception type."""
+
+
 class GastonVacant(BaseScraper):
     slug = "counties_nc.gaston_vacant"
     name = "Gaston County (NC) Vacant Parcels"
@@ -177,29 +183,54 @@ class GastonVacant(BaseScraper):
                 }
                 try:
                     # Retried up to 3 times (short exponential-jitter backoff) on a
-                    # transport error or timeout only -- found 2026-10-17, same gap
-                    # already fixed tonight for the Column legal-notice API scrapers,
-                    # spartan_weekly_legals.py and arcgis_webmap.query_features():
-                    # this bare client() call had zero retry cushioning (the shared
-                    # client() helper's own docstring says callers must wrap their
-                    # own retries), so a single transient blip on offset=0 (the
-                    # FIRST page of every run) silently zeroed this whole dateless
-                    # source's output -- reported as a healthy empty result since
-                    # this scraper is in main.DATELESS_OK_SOURCES (no fallback date
-                    # window to self-heal from). A real non-200 status is still left
-                    # alone, unretried, below.
+                    # transport error, timeout, OR an ArcGIS application-level error
+                    # envelope -- found 2026-10-17 (transport/timeout only; see the
+                    # matching fix for spartan_weekly_legals.py and
+                    # arcgis_webmap.query_features()), WIDENED 2026-11-10 (HERMES
+                    # triage follow-up flagged this source zero-row, "ArcGIS MapServer
+                    # query failing" -- live-reverified 2026-11-10 that QUERY_URL,
+                    # _WHERE and every _OUT field name are all still current and
+                    # correct: a bare, unmodified fetch() against the live host
+                    # returned 21,785 real rows in ~12s, matching the healthy
+                    # 21,289/21,770/21,767 runs already in
+                    # docs/source_history.json. The ACTUAL gap: this host answers a
+                    # bad/failed query with HTTP 200 and a JSON {"error": {"code":
+                    # 400, "message": "Failed to execute query."...}} envelope, not a
+                    # non-200 status or a transport exception (live-confirmed
+                    # 2026-11-10 with a deliberately bogus outFields/where). The OLD
+                    # code only checked status_code, then did
+                    # `r.json().get("features", [])` unconditionally -- against an
+                    # error envelope that silently reads as `feats = []`, with NO
+                    # exception raised, so `if not feats: break` below exits the
+                    # pagination loop exactly as if real data had legitimately run
+                    # out. On offset=0 (every run's first page) that zeroes the
+                    # ENTIRE ~21.6k-row source with no retry and no visibility --
+                    # almost certainly the same failure the 2026-11-09 field-audit
+                    # hit ("ArcGIS returned empty body today") and the lone 0
+                    # sandwiched between three healthy runs in source_history.json.
+                    # A malformed/non-JSON body (the "empty body" case) is covered
+                    # too. A real non-200 status is still left alone, unretried,
+                    # below -- unchanged from the 2026-10-17 fix.
                     async for attempt in AsyncRetrying(
                         stop=stop_after_attempt(3),
                         wait=wait_exponential_jitter(initial=1, max=8),
                         retry=retry_if_exception_type(
-                            (httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                            (httpx.TransportError, httpx.TimeoutException, TimeoutError,
+                             _ArcGisQueryError)),
                         reraise=True,
                     ):
                         with attempt:
                             r = await c.get(QUERY_URL, params=params)
+                            if r.status_code == 200:
+                                try:
+                                    body = r.json()
+                                except ValueError as exc:
+                                    raise _ArcGisQueryError(f"non-JSON body: {exc}") from exc
+                                if isinstance(body, dict) and body.get("error"):
+                                    raise _ArcGisQueryError(body["error"])
                     if r.status_code != 200:
                         break
-                    feats = r.json().get("features", []) or []
+                    feats = body.get("features", []) or []
                 except Exception:  # noqa: BLE001
                     break
                 if not feats:

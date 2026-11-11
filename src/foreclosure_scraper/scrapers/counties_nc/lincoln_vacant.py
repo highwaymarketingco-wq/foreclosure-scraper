@@ -7,7 +7,9 @@ Like the elderly/exemption lane this is property-keyed: ONE bulk query returns o
 situs address + mailing + value + parcel, a complete lead with no name-resolution needed.
 
 Free, anonymous, compliant (public ArcGIS REST, no auth/captcha). ~14,798 vacant parcels,
-paginated. GOTCHA: the host's TLS cert is EXPIRED, so we hit it with httpx verify=False.
+paginated. GOTCHA: the host serves an incomplete TLS certificate chain (missing
+intermediate CA), so we hit it with httpx verify=False -- see the 2026-11-10 note
+below; it is NOT an expired certificate, despite this docstring's own prior claim.
 Gate with FORECLOSURE_LINCOLN_VACANT=0 to skip.
 
 2026-10-03 (HERMES extraction-completeness audit, batch 5): the docstring above already
@@ -18,6 +20,50 @@ in-county owner from one mailing out of state. Now wired: raw['owner_mailing'] +
 previously-uncaptured SDATE), deed/plat reference, and co-owner (NAME2). See
 tests/test_lincoln_vacant.py for the live-verified fill rates and the absentee-heuristic
 false-positive guard (vacant land's situs usually has no house number).
+
+2026-11-10 (Hermes plain-code-bug flag: "TLS cert expired, still failing with
+verify=False"): live-verified the REAL error first rather than trusting that
+one-liner -- `curl -v` against this file's OLD host (arcgisserver.lincolncounty.org)
+showed the cert presented is `CN=*.lincolncountync.gov`, valid Sep 2026 - Apr 2027
+(NOT expired); curl rejects it only because the SAN doesn't cover the .org
+hostname ("no alternative certificate subject name matches target host name").
+verify=False (this file's existing setting) skips that hostname check, and the
+call already succeeds -- reconfirmed today with the real production outFields/
+where via both `curl -k` and a direct httpx(verify=False) call: HTTP 200, real
+rows, and through the full LincolnVacant.fetch() pagination end to end (14,738
+rows, zero exceptions). So there was no live-reproducible failure here today
+with verify=False already set -- Hermes's "still failing" did not reproduce,
+and the docstring's old "EXPIRED" claim (now corrected above) was simply wrong.
+
+The real, pre-existing defect: this was the LAST Lincoln NC module in this
+codebase still pointed at the legacy arcgisserver.lincolncounty.org host.
+arcgisserver.lincolncountync.gov -- the official .gov domain every OTHER
+Lincoln County module here already uses (lincoln_code_violations.py,
+enrichment_tax_relief.py, enrichment_owner_mailing.py, enrichment_county_phone.py,
+parcel_cache.py, enrichment_assessor_photo.py, assessor_cards/lincoln_nc.py,
+nc_lincoln_bulk.py, arcgis_distress_layers.py) -- resolves to the SAME IP
+(204.84.167.168) and serves byte-identical ComDevData/MapServer/25 data; .org
+only still answers because that IP's IIS has no per-hostname TLS binding, so it
+hands every caller the .gov wildcard cert regardless of Host header, which is
+exactly why .org fails real cert validation (wrong SAN) while .gov does not.
+.org is an unmaintained alias with no cert of its own -- one DNS/IIS cleanup on
+the county's side from going dark, a latent risk this file alone still carried.
+Switched QUERY_URL to the .gov host to match every sibling module.
+
+That still leaves a TLS quirk on .gov itself, but a DIFFERENT, already-diagnosed
+one: lincoln_code_violations.py's own 2026-09-15 TLS NOTE (live-confirmed by hand
+then) found arcgisserver.lincolncountync.gov serves an INCOMPLETE certificate
+chain -- the leaf is valid/current, the server just omits the intermediate CA,
+so httpx verify=True can fail with "unable to get local issuer certificate" even
+though the cert itself is fine; enrichment_tax_relief.py's Lincoln entry carries
+the same fact as its own `"insecure_tls": True` flag. This file's existing
+local-scoped `httpx.AsyncClient(verify=False, ...)` (not a change to the shared
+http_client.client() every other scraper uses) is exactly that established
+project pattern, so it stays as-is on the new host -- re-verified live above
+with the real outFields list over verify=False; on this Mac verify=True even
+happened to also succeed (these cert-chain quirks can vary by machine/trust
+store), so verify=False remains the correct, proven choice rather than relying
+on a check already documented to fail elsewhere in this same codebase.
 """
 from __future__ import annotations
 
@@ -33,7 +79,11 @@ from ...base_scraper import BaseScraper
 from ...gis_fill import plausible_value
 from ...models import Listing, ListingType, PropertyKind
 
-QUERY_URL = "https://arcgisserver.lincolncounty.org/arcgis/rest/services/ComDevData/MapServer/25/query"
+#: 2026-11-10: switched from the legacy arcgisserver.lincolncounty.org host (same IP,
+#: but its cert is now *.lincolncountync.gov, so .org fails real SAN validation) to the
+#: .gov host every other Lincoln NC module already uses. See the docstring's 2026-11-10
+#: note for the full live-verified diagnosis.
+QUERY_URL = "https://arcgisserver.lincolncountync.gov/arcgis/rest/services/ComDevData/MapServer/25/query"
 _WHERE = "VACANT='YES'"
 # NAME2/ADDRESS2/CITY/STATE/ZIP/DEEDBK/DEEDPG/DEEDYR/PLATBK/PLATPG/SDATE/SBDIVN added
 # 2026-10-03 (HERMES extraction-completeness audit, batch 5). Diffed the live 55-field
@@ -117,7 +167,10 @@ class LincolnVacant(BaseScraper):
             return []
         out: list[Listing] = []
         now = datetime.utcnow()
-        # Host TLS cert is expired -> verify=False (public read-only GIS endpoint).
+        # Host serves an incomplete TLS chain (missing intermediate CA), NOT an expired
+        # cert -> verify=False, scoped to this one client only (public read-only GIS
+        # endpoint, no auth). Same documented pattern as lincoln_code_violations.py /
+        # enrichment_tax_relief.py's "insecure_tls" flag for this same .gov host.
         async with httpx.AsyncClient(verify=False, timeout=60.0) as c:
             offset = 0
             while offset < 200000:  # hard backstop; real set ~14,798

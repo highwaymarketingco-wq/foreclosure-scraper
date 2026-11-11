@@ -37,6 +37,17 @@ landing page links no other .xlsx/.pdf/.csv besides this one file -- the
 "no amount, no situs" limitation stated above is still an honest description
 of the sheet, not a parsing gap.
 
+RE-VERIFIED LIVE 2026-11-10 (Hermes "treasurer page URL" flag check): the
+landing page is already on horrycountysc.gov and 200s with no redirect;
+LANDING below needed no change. Live-fetched both current workbooks it
+links -- 2026-real-estate-delinquent-list-110326.xlsx (1,990 rows, AS OF
+11/03/2026) and 2026-mobile-home-delinquent-list-110326.xlsx (550 rows) --
+and parse_workbook() reads both correctly, same 6-column header (Item
+Number, PIN, Owner Name, New Owner Name, Description, FLC Bid Amount) as
+the September audit, real dollar amounts in FLC Bid Amount on every
+sampled row. FALLBACK_XLSX below was the only stale thing found (it still
+200s, just ~12 weeks old) and is bumped to the current real-estate edition.
+
 Free, no login, no CAPTCHA, ordinary GET.
 Slug: counties_sc.horry_delinquent_xlsx
 Category: county_tax
@@ -60,7 +71,7 @@ log = structlog.get_logger()
 
 SLUG = "counties_sc.horry_delinquent_xlsx"
 LANDING = "https://www.horrycountysc.gov/departments/treasurer/delinquent-tax/"
-FALLBACK_XLSX = "https://www.horrycountysc.gov/media/b5af14ce/delinquent-list-on-website-081926.xlsx"
+FALLBACK_XLSX = "https://www.horrycountysc.gov/media/urdazygf/2026-real-estate-delinquent-list-110326.xlsx"
 
 _MONTHS = {m: i for i, m in enumerate(
     ["january", "february", "march", "april", "may", "june", "july", "august",
