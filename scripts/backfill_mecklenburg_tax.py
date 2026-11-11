@@ -54,7 +54,7 @@ from foreclosure_scraper.enrichment_mecklenburg_tax import (  # noqa: E402
     CHECKED_KEY, MYDT_KEY, TYD_KEY, enrich_mecklenburg_tax,
 )
 from foreclosure_scraper.models import Listing  # noqa: E402
-from foreclosure_scraper.web_artifact import board_lock, patch_existing_rows  # noqa: E402
+from foreclosure_scraper.web_artifact import BoardLockBusy, board_lock, patch_existing_rows  # noqa: E402
 
 _LIGHT_FIELDS = ("state", "county", "parcel_id", "street_address", "zip_code",
                   "case_number", "source_url", "listing_type", "source", "raw")
@@ -79,69 +79,87 @@ def main() -> int:
     args = ap.parse_args()
 
     docs = REPO / "docs"
-    lock = contextlib.nullcontext() if args.dry_run else board_lock(
-        REPO, owner="backfill_mecklenburg_tax", wait=3600, poll=10)
 
-    with lock:
-        board: list[Listing] = []
-        keys: list[Optional[str]] = []
-        before: list[dict] = []
-        for rec in iter_board_rows(docs / "listings.json.gz"):
-            if (rec.get("state") or "").strip().upper() != "NC":
-                continue
-            if (rec.get("county") or "").strip() != "Mecklenburg":
-                continue
-            li = Listing.model_construct(**{k: rec.get(k) for k in _LIGHT_FIELDS})
-            board.append(li)
-            keys.append(_dedupe_key(li))
-            raw = li.raw if isinstance(li.raw, dict) else {}
-            before.append({k: raw.get(k) for k in _WATCH_KEYS})
+    # BOARD I/O only happens at the final write below (patch_existing_rows()). Everything
+    # from here through the patches diff touches only in-memory Listing objects built by the
+    # streamed read -- never the board file -- so none of it needs board_lock() held. Narrowed
+    # 2026-11-11: this used to hold the lock across the WHOLE --rounds loop too, which is pure
+    # live network I/O against taxbill.co.mecklenburg.nc.us (up to MECKLENBURG_MYDT_BUDGET_S
+    # seconds per round) with zero board-file interaction of its own -- an 11+ min hold was
+    # observed in production, starving backfill_gis_attrs_boardwide.py/backfill_mecklenburg_
+    # gis_attrs.py of the same lock for just as long. patch_existing_rows() independently
+    # refuses to write without the lock held (require_board_lock()), so this narrowing removes
+    # no correctness guarantee -- the write itself is unaffected by when the lock is acquired.
+    board: list[Listing] = []
+    keys: list[Optional[str]] = []
+    before: list[dict] = []
+    for rec in iter_board_rows(docs / "listings.json.gz"):
+        if (rec.get("state") or "").strip().upper() != "NC":
+            continue
+        if (rec.get("county") or "").strip() != "Mecklenburg":
+            continue
+        li = Listing.model_construct(**{k: rec.get(k) for k in _LIGHT_FIELDS})
+        board.append(li)
+        keys.append(_dedupe_key(li))
+        raw = li.raw if isinstance(li.raw, dict) else {}
+        before.append({k: raw.get(k) for k in _WATCH_KEYS})
 
-        key_counts: dict[str, int] = {}
-        for k in keys:
-            if k is not None:
-                key_counts[k] = key_counts.get(k, 0) + 1
+    key_counts: dict[str, int] = {}
+    for k in keys:
+        if k is not None:
+            key_counts[k] = key_counts.get(k, 0) + 1
 
-        print(f"Mecklenburg/NC rows on board: {len(board):,}")
+    print(f"Mecklenburg/NC rows on board: {len(board):,}")
 
-        total_stats: dict = {}
-        for rnd in range(args.rounds):
-            stats = asyncio.run(enrich_mecklenburg_tax(board))
-            print(f"  round {rnd + 1}/{args.rounds}: {stats}")
-            for k, v in stats.items():
-                total_stats[k] = total_stats.get(k, 0) + v
-            if stats.get("eligible", 0) == 0:
-                print("  no more eligible rows -- backlog exhausted for this invocation")
-                break
+    total_stats: dict = {}
+    for rnd in range(args.rounds):
+        stats = asyncio.run(enrich_mecklenburg_tax(board))
+        print(f"  round {rnd + 1}/{args.rounds}: {stats}")
+        for k, v in stats.items():
+            total_stats[k] = total_stats.get(k, 0) + v
+        if stats.get("eligible", 0) == 0:
+            print("  no more eligible rows -- backlog exhausted for this invocation")
+            break
 
-        print(f"\ncumulative this invocation: {total_stats}")
+    print(f"\ncumulative this invocation: {total_stats}")
 
-        if args.dry_run:
-            print("\n--dry-run: nothing written (enrich_mecklenburg_tax() still ran live "
-                  "network queries above -- there is no network-free dry-run path for this "
-                  "module; --dry-run here only means the board write is skipped)")
-            return 0
+    if args.dry_run:
+        print("\n--dry-run: nothing written (enrich_mecklenburg_tax() still ran live "
+              "network queries above -- there is no network-free dry-run path for this "
+              "module; --dry-run here only means the board write is skipped)")
+        return 0
 
-        patches: dict[str, dict] = {}
-        collisions = 0
-        for li, key, b4 in zip(board, keys, before):
-            raw = li.raw if isinstance(li.raw, dict) else {}
-            after = {k: raw.get(k) for k in _WATCH_KEYS}
-            if after == b4:
-                continue
-            if key is None:
-                continue
-            if key_counts.get(key, 0) > 1:
-                collisions += 1
-                continue
-            patches[key] = {"raw": {k: v for k, v in after.items() if v is not None}}
+    patches: dict[str, dict] = {}
+    collisions = 0
+    for li, key, b4 in zip(board, keys, before):
+        raw = li.raw if isinstance(li.raw, dict) else {}
+        after = {k: raw.get(k) for k in _WATCH_KEYS}
+        if after == b4:
+            continue
+        if key is None:
+            continue
+        if key_counts.get(key, 0) > 1:
+            collisions += 1
+            continue
+        patches[key] = {"raw": {k: v for k, v in after.items() if v is not None}}
 
-        print(f"patches staged: {len(patches):,} (dropped as dedupe_key collisions: {collisions:,})")
+    print(f"patches staged: {len(patches):,} (dropped as dedupe_key collisions: {collisions:,})")
 
-        if patches:
-            stats = patch_existing_rows(
-                patches, {"backfill_mecklenburg_tax": f"n={len(patches)}"}, docs_dir=docs)
-            print(f"patch_existing_rows: {stats}")
+    if patches:
+        # THE LOCK, narrowed to just this write -- see the comment above. patch_existing_rows()
+        # self-enforces require_board_lock() regardless, so this is belt-and-suspenders, not
+        # the only thing standing between this script and a lock-less write.
+        lock = contextlib.nullcontext() if args.dry_run else board_lock(
+            REPO, owner="backfill_mecklenburg_tax", wait=3600, poll=10)
+        try:
+            with lock:
+                stats = patch_existing_rows(
+                    patches, {"backfill_mecklenburg_tax": f"n={len(patches)}"}, docs_dir=docs)
+        except BoardLockBusy as exc:
+            print(f"{exc} -- refusing to write ({len(patches):,} patches from this "
+                  f"invocation's live queries are lost; re-run to redo them and retry).")
+            return 1
+        print(f"patch_existing_rows: {stats}")
     return 0
 
 

@@ -39,7 +39,7 @@ from foreclosure_scraper.board_stream import iter_board_rows  # noqa: E402
 from foreclosure_scraper.enrichment_gis_attrs import enrich_gis_attrs  # noqa: E402
 from foreclosure_scraper.models import Listing  # noqa: E402
 from foreclosure_scraper.web_artifact import (  # noqa: E402
-    board_lock, board_patch_size_state, patch_existing_rows,
+    BoardLockBusy, board_lock, board_patch_size_state, patch_existing_rows,
 )
 
 COUNTY = "Mecklenburg"
@@ -142,9 +142,20 @@ def main() -> int:
         print("nothing to patch.")
         return 0
 
-    with board_lock(REPO, owner="backfill_mecklenburg_gis_attrs", wait=3600, poll=10):
-        pstats = patch_existing_rows(
-            patches, {"backfill_mecklenburg_gis_attrs": len(patches)}, docs_dir=docs_dir)
+    # Already scoped to just this write (confirmed by the 2026-11-11 investigation of the
+    # backfill_mecklenburg_tax.py lock-contention incident -- this script was a victim of that
+    # script's over-wide lock, not a cause of any contention of its own). Adding the try/except
+    # BoardLockBusy this codebase's other 25+ board-writing scripts already have (e.g.
+    # patch_vision_gemini.py, recompute_geo_imprecise_confidence.py), so a concurrent writer
+    # still holding the lock past `wait` exits cleanly instead of an unhandled traceback.
+    try:
+        with board_lock(REPO, owner="backfill_mecklenburg_gis_attrs", wait=3600, poll=10):
+            pstats = patch_existing_rows(
+                patches, {"backfill_mecklenburg_gis_attrs": len(patches)}, docs_dir=docs_dir)
+    except BoardLockBusy as exc:
+        print(f"{exc} -- refusing to write ({len(patches):,} patches from this "
+              f"invocation's enrichment pass are lost; re-run to redo them and retry).")
+        return 1
     print(f"patch_existing_rows: {pstats}")
     return 0
 
