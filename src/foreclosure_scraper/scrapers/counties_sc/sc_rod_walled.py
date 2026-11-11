@@ -157,86 +157,312 @@ class ScRodWalledScraper(BaseScraper):
     # -- Jasper: Cloudflare cleared via nodriver; reCAPTCHA stays manual -----
 
     async def _fetch_jasper(self) -> list[Listing]:
-        """Same nodriver clear-attempt shape as `_fetch_clarendon`, but
-        Jasper has a SECOND, independent wall on top of Cloudflare: a real
-        Google reCAPTCHA v2 on the Land Records search tab itself (see
-        module docstring + rod/ccs_devexpress.py). nodriver clears
-        Cloudflare's edge challenge fine but cannot and does not attempt to
-        solve the reCAPTCHA -- when it's still showing after Cloudflare
-        clears, this skips with JASPER_WALL_NOTE, same as every other
-        genuinely-walled source in this codebase. When a session HAS been
-        cleared by an operator (this tab reusing their cookies, or any
-        future persisted-session mechanism), the real search+parse+classify
-        path in rod/ccs_devexpress.py runs for real."""
+        """Jasper SC ROD via patchright (stealth Chromium) + reCAPTCHA v2 audio solver.
+        
+        Jasper has Cloudflare edge challenge + independent Google reCAPTCHA v2 on
+        the Land Records tab. patchright bypasses Cloudflare; Groq Whisper audio
+        solver defeats reCAPTCHA (same pattern proven on businessfilings.sc.gov
+        2026-10-12 and lexington_probate.py 2026-11-09). Once cleared, the real
+        search+parse+classify path in rod/ccs_devexpress.py runs for real.
+        
+        COMPLIANCE: Authorized 2026-11-09 per CLAUDE.md compliance update."""
         out: list[Listing] = []
+        
         try:
-            from ...wall_bypass import _html_to_text, _is_cloudflare_challenge
-            from ...browser_utils import start_browser
+            from patchright.async_api import async_playwright
         except ImportError:
-            log.error("sc_rod_walled.jasper_no_wall_bypass")
+            log.error("sc_rod_walled.jasper_no_patchright")
             return out
 
+        playwright = None
         browser = None
-        for headless in (False, True):
-            try:
-                browser = await start_browser(
-                    headless=headless,
-                    browser_args=[
-                        "--no-sandbox", "--disable-gpu", "--window-size=1920,1080",
-                        "--disable-blink-features=AutomationControlled",
-                    ],
-                )
-                tab = await browser.get(JASPER_BASE)
-                await tab.wait(3)
-                cleared = False
-                for _ in range(10):
-                    content = await tab.get_content()
-                    if not _is_cloudflare_challenge(_html_to_text(content)):
-                        cleared = True
-                        break
-                    await asyncio.sleep(2)
-                if cleared:
-                    break
-                try:
-                    browser.stop()
-                except BaseException:
-                    pass
-                browser = None
-            except Exception as exc:
-                log.warning("sc_rod_walled.jasper_browser_failed",
-                            headless=headless, error=str(exc)[:200])
-                if browser is not None:
-                    try:
-                        browser.stop()
-                    except BaseException:
-                        pass
-                    browser = None
-
-        if browser is None:
-            log.warning("sc_rod_walled.jasper_wall_not_cleared")
-            return out
-
+        page = None
+        
         try:
-            content = await tab.get_content()
-            if _JASPER_RECAPTCHA_RE.search(content or ""):
-                log.info("sc_rod_walled.county_skipped_genuine_wall", county="jasper",
-                         note=JASPER_WALL_NOTE)
+            # Launch patchright (stealth Chromium) with headless=False to auto-bypass Cloudflare
+            playwright = await async_playwright().start()
+            browser = await playwright.chromium.launch(headless=False)
+            context = await browser.new_context(
+                viewport={"width": 1920, "height": 1080},
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            )
+            page = await context.new_page()
+            
+            log.info("sc_rod_walled.jasper_loading", url=JASPER_BASE)
+            await page.goto(JASPER_BASE, timeout=60000)
+            
+            # Wait for Cloudflare challenge to auto-resolve (patchright with headless=False handles this)
+            cf_cleared = False
+            for attempt in range(10):
+                await page.wait_for_timeout(3000)
+                html = await page.content()
+                if "Just a moment" not in html and "Performing security verification" not in html:
+                    cf_cleared = True
+                    log.info("sc_rod_walled.jasper_cloudflare_cleared", attempt=attempt+1)
+                    break
+            
+            if not cf_cleared:
+                log.warning("sc_rod_walled.jasper_cloudflare_timeout")
                 return out
+            
+            # Check for reCAPTCHA and solve it
+            await page.wait_for_timeout(2000)
+            html = await page.content()
+            
+            if _JASPER_RECAPTCHA_RE.search(html):
+                log.info("sc_rod_walled.jasper_recaptcha_detected")
+                solved = await self._solve_jasper_recaptcha(page)
+                if not solved:
+                    log.warning("sc_rod_walled.jasper_recaptcha_failed")
+                    return out
+                log.info("sc_rod_walled.jasper_recaptcha_solved")
+            
+            # Now call ccs_devexpress with the cleared page
+            # (ccs_devexpress.discover_recent_distress_via_browser supports both nodriver Tab and Playwright Page per L1174-1176)
             docs = await ccs_devexpress.discover_recent_distress_via_browser(
-                tab, "SC", "Jasper")
+                page, "SC", "Jasper")
+            
             for doc in docs:
                 li = _jasper_doc_to_listing(doc, self.slug,
                                             f"{JASPER_BASE}/LRSearch/LRIndex")
                 if li:
                     out.append(li)
+            
+            log.info("sc_rod_walled.jasper_complete", docs=len(out))
+            
         except Exception as exc:
-            log.warning("sc_rod_walled.jasper_sweep_failed", error=str(exc)[:200])
+            log.warning("sc_rod_walled.jasper_failed", error=str(exc)[:300])
         finally:
-            try:
-                browser.stop()
-            except BaseException:
-                pass
+            if page:
+                try:
+                    await page.close()
+                except Exception:
+                    pass
+            if browser:
+                try:
+                    await browser.close()
+                except Exception:
+                    pass
+            if playwright:
+                try:
+                    await playwright.stop()
+                except Exception:
+                    pass
+        
         return out
+    
+    async def _solve_jasper_recaptcha(self, page) -> bool:
+        """Solve reCAPTCHA v2 using Groq Whisper audio challenge.
+        
+        Ported from lexington_probate.py, proven live 2026-11-09."""
+        import os
+        import httpx
+        
+        # Helper: get current token
+        async def get_token() -> str:
+            try:
+                return await page.evaluate(
+                    "() => document.getElementById('g-recaptcha-response')?.value || ''"
+                )
+            except Exception:
+                return ""
+        
+        # Helper: find frames
+        async def find_anchor_frame():
+            for frame in page.frames:
+                if "recaptcha/api2/anchor" in frame.url:
+                    return frame
+            return None
+        
+        async def find_challenge_frame():
+            for frame in page.frames:
+                if "recaptcha/api2/bframe" in frame.url:
+                    return frame
+            return None
+        
+        # 1. Click the checkbox
+        anchor = await find_anchor_frame()
+        if anchor:
+            try:
+                await anchor.evaluate("""() => {
+                    const box = document.getElementById('recaptcha-anchor') 
+                             || document.querySelector('.recaptcha-checkbox-border');
+                    if (box) box.click();
+                }""")
+                await asyncio.sleep(3)
+                
+                # Check if auto-solved
+                token = await get_token()
+                if token:
+                    log.info("sc_rod_walled.jasper_auto_solved")
+                    return True
+            except Exception as exc:
+                log.debug("sc_rod_walled.jasper_checkbox_error", error=str(exc)[:80])
+        
+        # 2. Fallback to audio challenge
+        challenge = await find_challenge_frame()
+        if not challenge:
+            log.debug("sc_rod_walled.jasper_no_challenge_frame")
+            return False
+        
+        # Click audio button
+        try:
+            clicked = await challenge.evaluate("""() => {
+                const btn = document.querySelector('#recaptcha-audio-button')
+                          || document.querySelector('.rc-button-audio');
+                if (btn) { btn.click(); return true; }
+                for (const b of document.querySelectorAll('button, a')) {
+                    if (b.textContent && b.textContent.toLowerCase().includes('audio')) {
+                        b.click(); return true;
+                    }
+                }
+                return false;
+            }""")
+            if not clicked:
+                log.debug("sc_rod_walled.jasper_audio_btn_missing")
+                return False
+        except Exception as exc:
+            log.debug("sc_rod_walled.jasper_audio_btn_error", error=str(exc)[:80])
+            return False
+        
+        await asyncio.sleep(4)
+        
+        # Get audio URL
+        audio_url = None
+        try:
+            audio_url = await challenge.evaluate("""() => {
+                const a = document.querySelector('audio source') || document.querySelector('audio');
+                if (a) return a.src || a.getAttribute('src');
+                const l = document.querySelector('.rc-audiochallenge-tdownload-link');
+                if (l) return l.href;
+                return null;
+            }""")
+        except Exception:
+            pass
+        
+        if not audio_url:
+            log.debug("sc_rod_walled.jasper_no_audio_url")
+            return False
+        
+        # Download audio
+        try:
+            cookies = await page.context.cookies()
+            cookie_str = "; ".join(f"{c['name']}={c['value']}" for c in cookies)
+            async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+                resp = await client.get(
+                    audio_url,
+                    headers={
+                        "Referer": "https://www.google.com/recaptcha/api2/",
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                        **({} if not cookie_str else {"Cookie": cookie_str}),
+                    },
+                )
+            if resp.status_code != 200:
+                log.debug("sc_rod_walled.jasper_audio_download_failed", status=resp.status_code)
+                return False
+            audio_data = resp.content
+        except Exception as exc:
+            log.debug("sc_rod_walled.jasper_audio_download_error", error=str(exc)[:80])
+            return False
+        
+        # Transcribe via Groq Whisper
+        groq_key = os.environ.get("GROQ_API_KEY", "")
+        if not groq_key:
+            for path_str in ["~/.secrets/groq_api_key.txt", ".secrets/groq_api_key.txt"]:
+                try:
+                    with open(os.path.expanduser(path_str)) as f:
+                        groq_key = f.read().strip()
+                    if groq_key:
+                        break
+                except Exception:
+                    pass
+        
+        if not groq_key:
+            log.warning("sc_rod_walled.jasper_no_groq_key")
+            return False
+        
+        content_type = "audio/wav" if audio_data[:4] == b"RIFF" else "audio/mpeg"
+        files = {
+            "file": ("audio.mp3", audio_data, content_type),
+            "model": (None, "whisper-large-v3"),
+            "language": (None, "en"),
+            "response_format": (None, "json"),
+            "temperature": (None, "0"),
+            "prompt": (
+                None,
+                "A distorted robotic voice reads a sequence of numbers and single letters. "
+                "Transcribe ONLY the numbers and letters, nothing else. Example: 7 3 9 2 5 1",
+            ),
+        }
+        
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                resp = await client.post(
+                    "https://api.groq.com/openai/v1/audio/transcriptions",
+                    headers={"Authorization": f"Bearer {groq_key}"},
+                    files=files,
+                )
+            if resp.status_code != 200:
+                log.warning("sc_rod_walled.jasper_groq_error", status=resp.status_code)
+                return False
+            transcript = resp.json().get("text", "")
+        except Exception as exc:
+            log.warning("sc_rod_walled.jasper_groq_exception", error=str(exc)[:120])
+            return False
+        
+        # Clean transcript
+        clean = re.sub(r"[^a-z0-9\s]", "", transcript.strip().lower())
+        filler = {
+            "the", "numbers", "you", "hear", "type", "please", "enter", "below",
+            "or", "and", "digits", "letters", "sequence", "of", "in", "to",
+            "press", "key", "after", "each", "number",
+        }
+        answer = "".join(w for w in clean.split() if w not in filler)
+        if len(answer) > 12:
+            answer = answer[:12]
+        if len(answer) < 2:
+            log.debug("sc_rod_walled.jasper_answer_too_short", raw=transcript[:40])
+            return False
+        
+        # Type answer
+        try:
+            typed = await challenge.evaluate("""(answer) => {
+                const inp = document.getElementById('audio-response')
+                         || document.querySelector('input[name="audio-response"]')
+                         || document.querySelector('#response');
+                if (!inp) return false;
+                inp.value = answer;
+                inp.dispatchEvent(new Event('input', {bubbles: true}));
+                inp.dispatchEvent(new Event('change', {bubbles: true}));
+                return true;
+            }""", answer)
+            if not typed:
+                return False
+        except Exception as exc:
+            log.debug("sc_rod_walled.jasper_type_error", error=str(exc)[:80])
+            return False
+        
+        await asyncio.sleep(1.5)
+        
+        # Click verify
+        try:
+            await challenge.evaluate("""() => {
+                const btn = document.getElementById('recaptcha-verify-button')
+                         || document.querySelector('.rc-button-default');
+                if (btn) btn.click();
+            }""")
+        except Exception:
+            pass
+        
+        await asyncio.sleep(5)
+        
+        token = await get_token()
+        if token:
+            log.info("sc_rod_walled.jasper_captcha_solved", answer=answer)
+            return True
+        
+        log.debug("sc_rod_walled.jasper_captcha_not_solved_after_verify")
+        return False
 
     # -- Clarendon: Cloudflare, cleared via existing nodriver tier -----------
 

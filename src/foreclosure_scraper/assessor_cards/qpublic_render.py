@@ -1,12 +1,17 @@
 """Shared qPublic / Schneider (Spatialest SPA) assessor-card adapter — RENDER class.
 
-Four SC counties share one Schneider-hosted qPublic application
-(qpublic.schneidercorp.com). The card is a JavaScript SPA sitting behind
-Cloudflare Turnstile + (sometimes) a one-click "Agree" disclaimer, so plain HTTP
-returns 403 / an empty shell — it MUST be rendered with the project's stealth
-browser (Scrapling StealthyFetcher, camoufox), exactly like
-scrapers/counties_sc/sc_state_tax_lien.py. `solve_cloudflare=True` handles the
-Turnstile; the page_action clicks "Agree" if a disclaimer gate is shown.
+Several SC counties share one Schneider-hosted qPublic/Beacon application
+(qpublic.schneidercorp.com, or beacon.schneidercorp.com for the Beacon-branded
+counties -- same Spatialest SPA, same Cloudflare Turnstile, just a different
+hostname). The card is a JavaScript SPA sitting behind Cloudflare Turnstile +
+(sometimes) a one-click "Agree" disclaimer, so plain HTTP returns 403 / an
+empty shell — it MUST be rendered with the project's stealth browser (Scrapling
+StealthyFetcher, camoufox), exactly like scrapers/counties_sc/sc_state_tax_lien.py.
+`solve_cloudflare=True` handles the Turnstile; the page_action clicks "Agree" if
+a disclaimer gate is shown. Live-reverified 2026-11-11: a bare curl with a
+realistic UA against this same AppID still gets Cloudflare's "Just a moment..."
+(HTTP 403, `cf-mitigated: challenge`) -- the wall is real right now, not stale;
+this adapter's render-based bypass is the fix, not a new one.
 
 Per-county Schneider app config (AppID / LayerID / PageID) and KeyValue strategy:
 
@@ -23,11 +28,48 @@ Per-county Schneider app config (AppID / LayerID / PageID) and KeyValue strategy
                "Living Area" sqft (incl. basement). Resolve by address search.
                (Plain curl returned 403 in discovery; render is required. If Union
                still 403s under render, it returns None gracefully.)
+  Clarendon    AppID=795  LayerID=11833 PageID=5733* card; PageID=5732 search
+               2026-11-11 gap-sweep add. AppID/LayerID/search-PageID read LIVE off
+               the county's own public assessor page
+               (clarendoncountysc.gov/business-and-development/assessor/, which
+               embeds the exact Application.aspx link -- not behind Cloudflare)
+               and cross-confirmed via qpublic.net/sc/clarendon/search.html's own
+               redirect link (both sources agree byte-for-byte). Resolve by
+               address search (no verified dashed-TMS formula for this county).
+  Lee          AppID=913  LayerID=17622 PageID=7895* card; PageID=7894 search
+               2026-11-11 gap-sweep add. AppID/LayerID/search-PageID read LIVE off
+               qpublic.net/sc/lee/search.html's redirect link. Resolve by address
+               search.
+  Fairfield    AppID=796  LayerID=11834 PageID=5737* card; PageID=5736 search
+               HOST IS beacon.schneidercorp.com, NOT qpublic — this county's
+               Schneider app is Beacon-branded (read LIVE off
+               qpublic.net/sc/fairfield/search.html's redirect link, which points
+               at beacon.schneidercorp.com). AppID=796/LayerID=11834 sit right
+               next to Clarendon's 795/11833 -- the two were evidently provisioned
+               in the same Schneider batch. Resolve by address search. (Fairfield
+               also runs a separate, unrelated Esri "Economic Development" viewer
+               at fairfieldcountysc.giswebtechguru.com -- not the assessor's record
+               source and not used here.)
+  * = card PageID is PREDICTED as search+1, following the pattern of all 4
+      pre-existing counties above (100% consistent, n=4) -- NOT independently
+      live-confirmed, because confirming it needs an actual Cloudflare-cleared
+      render, same as everything else in this file. Verify (or correct) on first
+      real run; `fetch()` returns None cleanly if it's wrong, it does not
+      mis-report data.
+  Edgefield SC NOT resolved this pass: the county's own site (edgefieldcounty.sc.gov)
+               is refusing connections live (curl: "empty reply from server" /
+               HTTP2 protocol errors, not a Cloudflare wall), and qpublic.net's
+               Edgefield page has no working search link -- the only one found is a
+               9-year-old Wayback snapshot (2017) pointing at a different, legacy
+               Schneider product (qpublic7.qpublic.net/ga_search.php, now almost
+               certainly stale). Needs its own follow-up, not guessed here.
 
 Card URL shape:
-  https://qpublic.schneidercorp.com/Application.aspx?AppID={A}&LayerID={L}&PageTypeID=4&PageID={P}&KeyValue={key}
+  https://{host}/Application.aspx?AppID={A}&LayerID={L}&PageTypeID=4&PageID={P}&KeyValue={key}
 Search URL shape (typeahead lives on PageTypeID=2):
-  https://qpublic.schneidercorp.com/Application.aspx?AppID={A}&LayerID={L}&PageTypeID=2&PageID={S}&KeyValue={q}
+  https://{host}/Application.aspx?AppID={A}&LayerID={L}&PageTypeID=2&PageID={S}&KeyValue={q}
+`host` defaults to qpublic.schneidercorp.com; a county dict can override it
+(Fairfield -> beacon.schneidercorp.com) via the optional "host" key in `_CFG`.
 
 Parsing: the SPA renders standard Schneider markup —
   * Building/residential facts live in `table.tabular-data-two-column` rows
@@ -53,15 +95,26 @@ from .base import CardResult, CardSale, money
 log = structlog.get_logger()
 
 SOURCE_HOST = "https://qpublic.schneidercorp.com"
+#: Beacon is the same Schneider/Spatialest SPA under a different brand/hostname.
+BEACON_HOST = "https://beacon.schneidercorp.com"
 
-COUNTIES = [("SC", "Spartanburg"), ("SC", "Oconee"), ("SC", "Pickens"), ("SC", "Union")]
+COUNTIES = [("SC", "Spartanburg"), ("SC", "Oconee"), ("SC", "Pickens"), ("SC", "Union"),
+            ("SC", "Clarendon"), ("SC", "Lee"), ("SC", "Fairfield")]
 
-# Per-county Schneider app config. `card`/`search` are PageIDs.
+# Per-county Schneider app config. `card`/`search` are PageIDs. `host` overrides
+# SOURCE_HOST for a county whose app lives on a different Schneider hostname
+# (Fairfield -> Beacon); omitted it defaults to qpublic.schneidercorp.com.
 _CFG: dict[str, dict] = {
     "Spartanburg": {"app": 857, "layer": 16069, "card": 7149, "search": 7148, "key": "tms"},
     "Oconee":      {"app": 1030, "layer": 21692, "card": 9258, "search": 9257, "key": "dashed"},
     "Pickens":     {"app": 927, "layer": 18058, "card": 8077, "search": 8076, "key": "search"},
     "Union":       {"app": 861, "layer": 16112, "card": 7168, "search": 7167, "key": "search"},
+    # 2026-11-11 gap-sweep adds (see module docstring for how each was sourced;
+    # the `card` PageID on each is a search+1 PREDICTION, not yet live-confirmed).
+    "Clarendon":   {"app": 795, "layer": 11833, "card": 5733, "search": 5732, "key": "search"},
+    "Lee":         {"app": 913, "layer": 17622, "card": 7895, "search": 7894, "key": "search"},
+    "Fairfield":   {"app": 796, "layer": 11834, "card": 5737, "search": 5736, "key": "search",
+                     "host": BEACON_HOST},
 }
 
 # Render tunables (kept conservative; this is a low-volume, grade-gated path).
@@ -114,13 +167,13 @@ def _oconee_key(li) -> str | None:
 def _card_url(cfg: dict, key: str) -> str:
     q = {"AppID": cfg["app"], "LayerID": cfg["layer"], "PageTypeID": 4,
          "PageID": cfg["card"], "KeyValue": key}
-    return f"{SOURCE_HOST}/Application.aspx?{urlencode(q)}"
+    return f"{cfg.get('host', SOURCE_HOST)}/Application.aspx?{urlencode(q)}"
 
 
 def _search_url(cfg: dict, query: str) -> str:
     q = {"AppID": cfg["app"], "LayerID": cfg["layer"], "PageTypeID": 2,
          "PageID": cfg["search"], "KeyValue": query}
-    return f"{SOURCE_HOST}/Application.aspx?{urlencode(q)}"
+    return f"{cfg.get('host', SOURCE_HOST)}/Application.aspx?{urlencode(q)}"
 
 
 # --------------------------------------------------------------------------- #
@@ -139,6 +192,18 @@ async def _click_agree(page) -> None:
                 return
         except Exception:
             continue
+
+
+def _looks_unsolved(html: str) -> bool:
+    """True when `html` is still the raw, unsolved Cloudflare Turnstile page
+    (title "Just a moment...", Turnstile widget chrome) rather than real app
+    content. The browser-rendered challenge page is ~45KB (the full Turnstile
+    JS/iframe scaffolding), NOT the ~6KB bare HTML a plain curl sees -- a size
+    check alone is not a reliable signal, so this matches on marker TEXT."""
+    if not html:
+        return False
+    low = html[:4000].lower()
+    return "just a moment" in low or "cf-turnstile" in low or "challenges.cloudflare.com" in low
 
 
 async def _render(url: str, *, on_loaded=None) -> str:
@@ -200,9 +265,28 @@ async def _render(url: str, *, on_loaded=None) -> str:
     # Solve-if-challenged first; if that yields nothing (no challenge present, so Scrapling
     # raised, or it came back empty), retry as a plain render — the CAMA/sqft section needs
     # JS execution either way, but most parcels do NOT present an active Cloudflare challenge.
-    html = await _attempt(True)
-    if not html:
-        html = await _attempt(False)
+    #
+    # OUTER RETRY (2026-11-11, live-diagnosed): the solve/no-solve pair above can BOTH still
+    # land on the raw, unsolved "Just a moment..." Turnstile page -- Scrapling's solve_cloudflare
+    # occasionally misses the challenge on the FIRST navigation in a process (raises "No
+    # Cloudflare challenge found" before the widget has actually mounted), and the no-solve
+    # fallback then just captures that same unsolved page (HTTP 403, ~45KB of Turnstile JS
+    # chrome, no app content) -- NOT empty, so the old code returned it as if it were real.
+    # Measured live: 1/1 cold first-attempt failures on a KNOWN-GOOD county (Oconee's own
+    # documented example key) vs 3/3 successes simply retrying the same call again in the same
+    # process (Scrapling logs "Cloudflare captcha is solved", HTTP 200, real card data) -- a
+    # genuine cold-start flakiness in the existing bypass, not a change in the wall or a bad
+    # county config. Up to 3 total rounds; `_looks_unsolved` tells a raw challenge page apart
+    # from real (or genuinely absent) content so a round that still has it retries instead of
+    # being returned as if it were success.
+    for round_num in range(3):
+        html = await _attempt(True)
+        if not html or _looks_unsolved(html):
+            html = await _attempt(False)
+        if html and not _looks_unsolved(html):
+            return html
+        if round_num < 2:
+            await asyncio.sleep(2.5)
     return html
 
 

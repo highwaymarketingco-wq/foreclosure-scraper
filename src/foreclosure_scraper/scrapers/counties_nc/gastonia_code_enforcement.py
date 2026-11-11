@@ -573,6 +573,14 @@ def build_listing(markers: list[dict], parcels: dict[str, dict] | None = None,
             "utility_status": None,
             "source": "gastonia_cityview_locator",
         }
+        # 2026-11-11 (vacant column breadth pass): the "vacancy" raw wrapper above
+        # has always fed distress_score's PROPERTY signal and gap_matrix's own
+        # "vacancy" column, but the SEPARATE "vacant" column checks raw["gis"]
+        # ["vacant"] specifically (confirmed in gap_matrix.py's own _cohort_flags
+        # comment -- the same fix charlotte_open_data.py's fof_ordered branch got
+        # 2026-10-20). An Order-to-Vacate/-Demolish case is the same confirmed-
+        # vacant evidence either way; no new request, just the missing mirror key.
+        raw.setdefault("gis", {})["vacant"] = True
         raw["distressed"] = True
 
     headline = sorted(types)[0] if types else "code violation"

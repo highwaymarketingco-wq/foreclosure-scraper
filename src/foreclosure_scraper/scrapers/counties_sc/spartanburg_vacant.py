@@ -343,6 +343,22 @@ class SpartanburgVacant(BaseScraper):
                         raw={
                             **geo_raw,
                             "vacant": {"source": "spartanburg_city_registry", "condition": cond or None},
+                            # 2026-11-11 (vacant column breadth pass, live-verified): every row
+                            # here comes from the city's own "City_Owned_and_Vacant_Properties"
+                            # FeatureServer (see the URL above) -- the layer's own scope, not a
+                            # per-row condition test, so every row IS a vacant structure by
+                            # construction (module docstring: CAMA specs only exist for an
+                            # IMPROVED parcel, so this is a genuine vacant-STRUCTURE registry,
+                            # not raw land). The bare top-level raw["vacant"] key above has never
+                            # been read by gap_matrix.py's "vacant" column (checks raw["gis"]
+                            # ["vacant"] specifically) nor by distress_score's PROPERTY vacancy
+                            # signal (checks the raw["vacancy"] wrapper) -- confirmed by grepping
+                            # both consumers; this scraper's real per-row data was invisible to
+                            # both despite being live and correct. Added, not replaced: the
+                            # original raw["vacant"] key stays for any other reader.
+                            "vacancy": {"vacant": True, "boarded_up": None, "utility_status": None,
+                                       "source": "spartanburg_city_registry"},
+                            "gis": {**geo_raw.get("gis", {}), "vacant": True},
                             # scores via distress_score PROPERTY "distressed_condition" (w=8)
                             "distressed": True,
                             "owner_mailing": _owner_mailing(a),

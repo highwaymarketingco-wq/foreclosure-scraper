@@ -114,6 +114,12 @@ def to_listing(a: dict, *, now: Optional[datetime] = None) -> Optional[Listing]:
         raw["utility_cutoff"] = {**cut_yes, "source": "kinston_proposed_demolition"}
         raw["vacancy"] = {"vacant": True, "basis": "utility_cut_off",
                           "source": "kinston_proposed_demolition"}
+        # 2026-11-11 (vacant column breadth pass): mirror into raw["gis"]["vacant"],
+        # the key gap_matrix.py's "vacant" column actually checks (separate from
+        # "vacancy" above) -- same fix shape as charlotte_open_data.py's fof_ordered
+        # branch 2026-10-20 and gastonia_code_enforcement.py's condemned branch
+        # same day as this comment. No new request: cut_yes is already computed.
+        raw.setdefault("gis", {})["vacant"] = True
     if _yes(a.get("HEIR_PROPERTY")):
         raw["heir_property"] = True
     mail = owner_mailing(

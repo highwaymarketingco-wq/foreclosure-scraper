@@ -75,8 +75,12 @@ _DEFAULT_COUNTY_MAX = 100
 
 # Render-class counties (Cloudflare-solving browser per parcel, ~30s-3min each).
 # ASSESSOR_CARD_SKIP_RENDER=1 skips them for a fast JSON/HTML-only pass.
+# 2026-11-11: added Clarendon/Lee/Fairfield (qpublic_render.py gap-sweep add --
+# same Schneider qPublic/Beacon Cloudflare wall as Spartanburg/Oconee/Pickens/Union,
+# live-reconfirmed real the same night).
 _RENDER_COUNTIES = {("SC", "Spartanburg"), ("SC", "Oconee"), ("SC", "Pickens"),
-                    ("SC", "Union"), ("NC", "Buncombe")}
+                    ("SC", "Union"), ("NC", "Buncombe"),
+                    ("SC", "Clarendon"), ("SC", "Lee"), ("SC", "Fairfield")}
 
 # Counties whose card renders behind a Cloudflare/WAF challenge that can ONLY be
 # reached by SOLVING it (qPublic Turnstile + Union WAF). When
@@ -85,7 +89,8 @@ _RENDER_COUNTIES = {("SC", "Spartanburg"), ("SC", "Oconee"), ("SC", "Pickens"),
 # Buncombe (Spatialest) renders WITHOUT a challenge, so it is NOT here and still
 # fills under no-solve. Skipping these keeps a compliant backfill efficient.
 _SOLVE_REQUIRED_COUNTIES = {("SC", "Spartanburg"), ("SC", "Oconee"),
-                            ("SC", "Pickens"), ("SC", "Union")}
+                            ("SC", "Pickens"), ("SC", "Union"),
+                            ("SC", "Clarendon"), ("SC", "Lee"), ("SC", "Fairfield")}
 
 # Property kinds that have no heated/finished living area — a card render returns no
 # sqft for these, so they're excluded to keep the (capped) budget on built homes.

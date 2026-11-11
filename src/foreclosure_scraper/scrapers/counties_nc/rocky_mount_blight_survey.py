@@ -169,6 +169,11 @@ def to_listing(slot: dict, *, now: Optional[datetime] = None) -> Optional[Listin
     if "vacant_boarded" in classes:
         raw["vacancy"] = {"vacant": True, "boarded_up": True,
                           "source": "rocky_mount_blight_survey_2025", "observed_year": 2025}
+        # 2026-11-11 (vacant column breadth pass): mirror into raw["gis"]["vacant"],
+        # the key gap_matrix.py's "vacant" column actually checks (separate from
+        # "vacancy" above) -- same fix shape as charlotte_open_data.py's fof_ordered
+        # branch 2026-10-20. No new request: "classes" is already computed.
+        raw.setdefault("gis", {})["vacant"] = True
     mail = owner_mailing(owner, (a.get("MAILADD"), a.get("MCITY"), a.get("MSTATE"), a.get("MZIP")),
                          a.get("MSTATE"), situs, pid, "NC", "rocky_mount_blight_survey_2025")
     if mail:

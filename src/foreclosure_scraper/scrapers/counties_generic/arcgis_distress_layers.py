@@ -181,6 +181,23 @@ class Layer(NamedTuple):
     #: Hanover's demolition_permits -- a homeowner's own voluntary teardown
     #: application, not a condemnation) is never swept in by accident.
     condemned: bool = False
+    #: 2026-11-11 (vacant column breadth pass, live-verified): the layer's own `where`/
+    #: sub-layer selection ALREADY restricts rows to a vacant/boarded/demolition-ordered
+    #: case (no per-row test needed here, same reasoning as `condemned` above). Stamps
+    #: raw["vacancy"] (hendersonville_vacant_structures.py's own shape, distress_score's
+    #: PROPERTY vacancy signal) AND raw["gis"]["vacant"] (the SEPARATE key gap_matrix.py's
+    #: "vacant" column actually checks) -- the identical pair charlotte_open_data.py's
+    #: fof_ordered branch already writes for its own "order to vacate" evidence. Opt-in
+    #: (default False): columbia_code_vacant_boarded's `where` is pre-filtered to Boarded
+    #: Building/Demolition/Vacant Building cases (1,020 live rows, Richland SC, re-verified
+    #: 2026-11-11); rockhill_code_demolition already gets `condemned=True` below and a
+    #: demolition order is at least as strong "confirmed vacant" evidence (17 live rows,
+    #: York SC, re-verified 2026-11-11). Every OTHER layer in this file keeps this False --
+    #: a generic code-enforcement complaint (Durham's "Repair or Demolish", Rock Hill's
+    #: plain "Housing" category) is evidence of a structural problem, not proof the
+    #: structure is actually vacant right now, and this column is specifically about
+    #: vacancy, not condition.
+    vacancy: bool = False
     #: The layer is an assessor's condition rating (detail = the rating text): rows get
     #: raw['distressed'] and raw['condition_cama'] {source, condition, condition_code,
     #: distressed}, the shape enrichment_cama_condition writes, never raw['condemned'].
@@ -511,6 +528,10 @@ LAYERS: tuple[Layer, ...] = (
                "OR Problem LIKE 'Vacant Building%')"),
         fields=("CaseNum", "OpenedDate", "Problem", "CaseStatus", "ADDRESS"),
         situs="ADDRESS", detail="Problem", process="code_enforcement",
+        # See Layer.vacancy docstring: the where= clause above already restricts
+        # every row here to a Boarded Building / Demolition / Vacant Building
+        # case, so this layer's rows are vacant-structure evidence by construction.
+        vacancy=True,
         source_page="https://www.columbiasc.gov/",
     ),
     # Greenville County parcels whose tax bill is still unpaid. TOTTAX > 0 with a NULL
@@ -654,6 +675,10 @@ LAYERS: tuple[Layer, ...] = (
         fields=("CaseNumber", "Type", "Status", "AddressText", "CreatedDateTime"),
         situs="AddressText", detail="Status", process="demolition_permit",
         condemned=True,
+        # See Layer.vacancy docstring: an active demolition case is at least as
+        # strong "confirmed vacant" evidence as charlotte_open_data.py's own
+        # fof_ordered signal (an order to vacate the structure).
+        vacancy=True,
         source_page="https://www.cityofrockhill.com/departments/neighborhood-services",
     ),
     Layer(
@@ -1133,6 +1158,14 @@ def _to_listing(a: dict, lay: Layer, photos: Optional[list[str]] = None) -> Opti
         # (a homeowner's own voluntary teardown application, not a
         # condemnation) deliberately does not.
         raw["condemned"] = True
+    if lay.vacancy:
+        # See Layer.vacancy docstring. Same two-key pair charlotte_open_data.py's
+        # fof_ordered branch writes; no new request, the where-clause/sub-layer
+        # choice already did the vacancy classification before this row arrived.
+        raw["vacancy"] = {"vacant": True, "boarded_up": None, "utility_status": None,
+                          "source": lay.slug}
+        raw.setdefault("gis", {})["vacant"] = True
+        raw["distressed"] = True
     if lay.condition_rating:
         raw["distressed"] = True
         raw["condition_cama"] = {"source": lay.slug, "condition": detail, "condition_code": detail,

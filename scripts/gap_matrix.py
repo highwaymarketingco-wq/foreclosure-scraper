@@ -1634,9 +1634,14 @@ _ARCGIS_DISTRESS_LAYERS_REL = "scrapers/counties_generic/arcgis_distress_layers.
 
 
 def _arcgis_distress_layers_credit() -> dict[str, set[tuple[str, str]]]:
-    """{'condemned': {...}, 'code_enforcement': {...}} read from arcgis_distress_layers.py's own
-    LAYERS registry: only an entry's own condemned=True / process=='code_enforcement' counts,
-    never mere co-location in the file. Empty dict if the module can't be imported."""
+    """{'condemned': {...}, 'code_enforcement': {...}, 'vacant': {...}} read from
+    arcgis_distress_layers.py's own LAYERS registry: only an entry's own condemned=True /
+    process=='code_enforcement' / vacancy=True counts, never mere co-location in the file.
+    'vacant' added 2026-11-11 (same bug, same fix, for the same file's new Layer.vacancy
+    opt-in -- see Layer.vacancy's own docstring in that module): columbia_code_vacant_boarded
+    (Richland SC) and rockhill_code_demolition (York SC) are the only two entries that set it,
+    out of ~26 layers spanning a dozen+ counties for unrelated processes in this one file.
+    Empty dict if the module can't be imported."""
     try:
         from foreclosure_scraper.scrapers.counties_generic import arcgis_distress_layers as _adl
     except Exception:  # noqa: BLE001 - a missing/broken module leaves the blanket grep in place
@@ -1644,6 +1649,7 @@ def _arcgis_distress_layers_credit() -> dict[str, set[tuple[str, str]]]:
     return {
         "condemned": {(lay.state, lay.county) for lay in _adl.LAYERS if lay.condemned},
         "code_enforcement": {(lay.state, lay.county) for lay in _adl.LAYERS if lay.process == "code_enforcement"},
+        "vacant": {(lay.state, lay.county) for lay in _adl.LAYERS if lay.vacancy},
     }
 
 
@@ -1887,9 +1893,17 @@ def built_in_code() -> dict[str, set[tuple[str, str]]]:
     # own (already-correct) text-grep credit untouched.
     vacant_spec = SPECS.get("vacant")
     if vacant_spec and _VACANT_COHORT_REL & set(vacant_spec.producers):
-        other_files = [PKG / f for f in vacant_spec.producers if f not in _VACANT_COHORT_REL]
+        # 2026-11-11: also drop arcgis_distress_layers.py from this column's blanket text match
+        # (same reason the generic adl_credit loop above drops it for condemned/code_enforcement)
+        # -- that one file now carries Layer.vacancy=True for exactly 2 of its ~26 county entries
+        # (Richland SC, York SC), and a bare counties_named_in() scan would otherwise credit
+        # every OTHER county the file mentions for unrelated processes (Buncombe, Transylvania,
+        # Durham, Greenville, ...), reintroducing the identical over-crediting bug this refinement
+        # exists to prevent. The precise replacement is adl_credit["vacant"], computed above.
+        _drop = _VACANT_COHORT_REL | {_ARCGIS_DISTRESS_LAYERS_REL}
+        other_files = [PKG / f for f in vacant_spec.producers if f not in _drop]
         base = counties_named_in([f for f in other_files if f.exists()], pats) if other_files else set()
-        out["vacant"] = base | _vacant_cohort_credit()
+        out["vacant"] = base | _vacant_cohort_credit() | adl_credit.get("vacant", set())
     # heir_estate: sc_heir_estate_parcel_cache.py's dynamic-list refinement (see
     # _SC_HEIR_ESTATE_PARCEL_CACHE_REL's own docstring) -- drop that one file's blanket (wrong-
     # direction: it credits the 3 counties this module deliberately EXCLUDES, via its own

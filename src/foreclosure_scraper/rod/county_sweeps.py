@@ -268,6 +268,42 @@ HOSTED_CCHS: dict[str, tuple[str, str]] = {
     "Chowan": ("us4", "ChowanNCNW"), "Franklin": ("us4", "FranklinNCNW"), "Camden": ("us4", "CamdenNCNW"),
     "Duplin": ("us4", "DuplinNCNW"),
     "Caldwell": ("us3", "CaldwellNCNW"), "Currituck": ("us3", "CurrituckNCNW"),
+    # 2026-11-11: 8 more "NCNW" tenants (docs/county_records/county_records_matrix.json listed
+    # all 8 as rod.access="blocked" from an Oct-7 test of application.asp only -- the same frame
+    # page whose Cloudflare 403 the comment above already explains is irrelevant noise for the
+    # 17 tenants above). Live-verified today the SAME way: application.asp genuinely 403s
+    # (cf-mitigated: challenge, confirmed for Pasquotank), but realestatesearch.asp/
+    # SearchService.asp -- the only two pages this reader actually asks for -- answer a plain
+    # 200 with no challenge on every one of the 8, and ALL EIGHT WERE RUN END TO END through
+    # this exact class (open()+read(), no board write) before being added here:
+    #   * Pasquotank: fully worked -- 12 adverse-instrument kinds parsed, a real (zero-result)
+    #     SearchService.asp answer for 2026. Not walled at all; gap_matrix's "bot_wall_inhouse"
+    #     call for this one was stale/wrong.
+    #   * Pender, Perquimans, Person, Richmond, Rockingham (us5): SearchService.asp?cmd=search
+    #     itself returns a real nonzero record count (Rockingham: doccount=470, live-confirmed by
+    #     a raw request outside this class too) -- so these are NOT walled either -- but cmd=getall
+    #     then fails with "the record list was empty although the search counted rows", the exact
+    #     getall-needs-a-shared-session bug this module's own get-all docstring note below and
+    #     project_cchs_classic_getall_session_bug_2026-11-07 already root-caused and deliberately
+    #     left unfixed pending dedicated http_client.py session-sharing surgery. Registered here
+    #     anyway (same precedent as Hyde, below, staying in a sibling registry while still blocked)
+    #     because the topology is confirmed correct and _stamp_county's own except-Exception path
+    #     already makes an unfixed getall a safe, silent not_stamp, never a false write -- that one
+    #     future session's fix unlocks all 5 (and Burke/Henderson) at once, no further wiring here.
+    #   * Tyrrell, Washington (us4): SearchService.asp 405s on GET like the original 10 us4
+    #     tenants, but unlike them the existing POST-fallback (http_client.post_text) also fails
+    #     here (confirmed: a bare POST to the same querystring gets a plain IIS 400, no Cloudflare
+    #     header anywhere) -- a second, narrower, NOT-YET-ROOT-CAUSED bug, still not Cloudflare.
+    #     Registered for the same reason as the getall-bug five: safe to leave wired, nothing to
+    #     lose, something for a future session to pick up with a live A/B against a working us4
+    #     tenant's exact POST request shape.
+    # Net: 0 of these 8 were a real Cloudflare wall at the search layer. 1 (Pasquotank) is a clean
+    # new working county today; the other 7 need a separate, already-scoped fix apiece, not a
+    # wall bypass, before they produce rows.
+    "Pasquotank": ("us4", "PasquotankNCNW"), "Pender": ("us5", "PenderNCNW"),
+    "Perquimans": ("us5", "PerquimansNCNW"), "Person": ("us5", "PersonNCNW"),
+    "Richmond": ("us5", "RichmondNCNW"), "Rockingham": ("us5", "RockinghamNCNW"),
+    "Tyrrell": ("us4", "TyrrellNCNW"), "Washington": ("us4", "WashingtonNCNW"),
 }
 
 

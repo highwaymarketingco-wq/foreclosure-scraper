@@ -695,6 +695,10 @@ DATELESS_OK_SOURCES = {
     # either -- a standing "who currently owes" list, same reasoning as
     # every other SC county delinquent-tax source in this list.
     "counties_sc.berkeley_paystar_tax",
+    # Union County NC's Granicus delinquent real-estate tax CSV (2026-11-11
+    # bot_wall_inhouse bypass, counties_nc.union_delinquent_tax) is the same
+    # standing "who currently owes" shape -- no per-parcel date either.
+    "counties_nc.union_delinquent_tax",
     # Most Wake County tax-foreclosure judgments carry "Date of Sale: To Be
     # Announced" -- a judgment has been entered but no auction date set yet.
     # Same reasoning as the freshly-filed-summons entries below: filed but
