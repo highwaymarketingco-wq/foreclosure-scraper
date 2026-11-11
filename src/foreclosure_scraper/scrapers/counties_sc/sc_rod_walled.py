@@ -205,17 +205,30 @@ class ScRodWalledScraper(BaseScraper):
                 log.warning("sc_rod_walled.jasper_cloudflare_timeout")
                 return out
             
-            # Check for reCAPTCHA and solve it
+            # Check for reCAPTCHA and solve it (with retry for intermittent audio availability)
             await page.wait_for_timeout(2000)
             html = await page.content()
             
             if _JASPER_RECAPTCHA_RE.search(html):
                 log.info("sc_rod_walled.jasper_recaptcha_detected")
-                solved = await self._solve_jasper_recaptcha(page)
+                solved = False
+                # Retry up to 3 times: Google doesn't always offer audio challenge (proven live 2026-11-11)
+                for attempt in range(1, 4):
+                    solved = await self._solve_jasper_recaptcha(page)
+                    if solved:
+                        log.info("sc_rod_walled.jasper_recaptcha_solved", attempt=attempt)
+                        break
+                    if attempt < 3:
+                        wait = 2 ** attempt  # exponential backoff: 2s, 4s
+                        log.info("sc_rod_walled.jasper_retry_captcha", attempt=attempt, wait_s=wait)
+                        await page.wait_for_timeout(wait * 1000)
+                        # Reload to get fresh CAPTCHA
+                        await page.reload()
+                        await page.wait_for_timeout(3000)
+                
                 if not solved:
-                    log.warning("sc_rod_walled.jasper_recaptcha_failed")
+                    log.warning("sc_rod_walled.jasper_recaptcha_failed_all_attempts")
                     return out
-                log.info("sc_rod_walled.jasper_recaptcha_solved")
             
             # Now call ccs_devexpress with the cleared page
             # (ccs_devexpress.discover_recent_distress_via_browser supports both nodriver Tab and Playwright Page per L1174-1176)
