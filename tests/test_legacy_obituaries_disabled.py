@@ -5,13 +5,21 @@ The scraper was disabled 2026-09-15 because the old search params
 scope results at all. Driving legacy.com's real search UI found the actual
 params: `country`/`state`/`city`, all taking human-readable full names
 (e.g. `?country=United+States&state=North+Carolina&city=Asheville`). Live
-verification of all 19 `_CITIES` entries with the corrected params found
-the fix overwhelmingly correct but not perfect (legacy.com's own facet has
-a small real leak rate), so `_fetch_city` also does its own server-side
+verification of all 19 original `_CITIES` entries with the corrected params
+found the fix overwhelmingly correct but not perfect (legacy.com's own facet
+has a small real leak rate), so `_fetch_city` also does its own server-side
 check per row -- see module docstring for the full live-verification
 writeup. These tests exercise that logic without hitting the network:
 real-shaped captures for the parsing path, synthetic-but-realistic cases
 for the verify/drop logic specifically.
+
+2026-11-11: rows are now built through the shared `obituary_listing()`
+factory (`raw["obituary"]`, `raw["life_event"] == "death"`, a real `county`
+from `CITY_COUNTY`) instead of a hand-rolled `raw["legacy"]` dict -- this is
+what makes gap_matrix's `atty_obituary_match` check actually credit this
+scraper's rows. Tests below were updated to the new raw shape; the
+regression guards that still matter (dead URL params, the city/state
+contradiction drop) are unchanged.
 """
 from __future__ import annotations
 
@@ -95,13 +103,29 @@ def test_parses_real_captured_result_and_marks_it_verified(monkeypatch):
     result = asyncio.run(m.LegacyObituariesScraper()._fetch_city("Asheville", "NC"))
     assert len(result) == 1
     row = result[0]
-    assert row.city == "Asheville"
     assert row.state == "NC"
     assert row.owner_name  # _NAME_RE matched something real
-    assert row.raw["legacy"]["verified"] is True
-    assert row.raw["legacy"]["search_params"] == {
-        "country": "United States", "state": "North Carolina", "city": "Asheville",
-    }
+    assert row.raw["obituary"]["verified"] is True
+    assert row.raw["obituary"]["search_city"] == "Asheville"
+    assert row.raw["obituary"]["search_state"] == "NC"
+
+
+def test_county_is_attached_from_the_known_city(monkeypatch):
+    """The 2026-11-11 fix: county is no longer left None for later
+    enrichment to maybe fill in -- each _CITIES entry is chosen because it
+    sits in one known county (CITY_COUNTY), so the row carries it directly.
+    This plus raw['obituary'] (not raw['legacy']) is what makes gap_matrix's
+    atty_obituary_match check actually credit this scraper's counties."""
+    async def fake_get_text_impersonate(url, *, timeout=30.0, **kw):
+        return _page(ASHEVILLE_GOOD)
+
+    monkeypatch.setattr(m, "get_text_impersonate", fake_get_text_impersonate)
+
+    result = asyncio.run(m.LegacyObituariesScraper()._fetch_city("Asheville", "NC"))
+    row = result[0]
+    assert row.county == "Buncombe"
+    assert isinstance(row.raw.get("obituary"), dict) and row.raw["obituary"]
+    assert row.raw.get("life_event") == "death"
 
 
 def test_drops_row_that_explicitly_names_a_different_state(monkeypatch):
@@ -158,7 +182,7 @@ def test_keeps_ambiguous_row_with_no_location_cue_but_flags_unverified(monkeypat
 
     result = asyncio.run(m.LegacyObituariesScraper()._fetch_city("Asheville", "NC"))
     assert len(result) == 1
-    assert result[0].raw["legacy"]["verified"] is False
+    assert result[0].raw["obituary"]["verified"] is False
 
 
 def test_fetch_iterates_cities_and_feeds_partial(monkeypatch):
@@ -166,6 +190,7 @@ def test_fetch_iterates_cities_and_feeds_partial(monkeypatch):
     and -- per BaseScraper's partial-results convention -- append to
     self.partial as it goes so a mid-run timeout still ships collected rows."""
     monkeypatch.setattr(m, "_CITIES", [("Asheville", "NC"), ("Spartanburg", "SC")])
+    monkeypatch.setattr(m, "_GAP_S", 0)  # keep the test fast; real pacing covered separately
 
     calls = []
 
@@ -185,6 +210,7 @@ def test_fetch_iterates_cities_and_feeds_partial(monkeypatch):
 
 def test_a_fetch_failure_on_one_city_does_not_drop_the_others(monkeypatch):
     monkeypatch.setattr(m, "_CITIES", [("Asheville", "NC"), ("Spartanburg", "SC")])
+    monkeypatch.setattr(m, "_GAP_S", 0)
 
     async def fake_get_text_impersonate(url, *, timeout=30.0, **kw):
         if "Spartanburg" in url:
@@ -195,4 +221,17 @@ def test_a_fetch_failure_on_one_city_does_not_drop_the_others(monkeypatch):
 
     result = list(asyncio.run(m.LegacyObituariesScraper().fetch()))
     assert len(result) == 1
-    assert result[0].city == "Asheville"
+    assert result[0].county == "Buncombe"
+
+
+def test_every_city_has_a_verified_county_in_the_canonical_lists():
+    """Regression guard for the 2026-11-11 county expansion: every
+    CITY_COUNTY value must be a real NC/SC county name (exact match), not a
+    typo'd or mis-cased one -- a silent mismatch here would make gap_matrix
+    credit the wrong county or none at all."""
+    from foreclosure_scraper.validation import NC_COUNTIES, SC_COUNTIES
+
+    assert len(m._CITIES) == len(set(m._CITIES)), "duplicate (city, state) entries"
+    for (city, state), county in m.CITY_COUNTY.items():
+        valid = NC_COUNTIES if state == "NC" else SC_COUNTIES
+        assert county in valid, f"{city}, {state} -> {county!r} not a canonical county"

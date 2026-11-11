@@ -21,7 +21,7 @@ default feed on every single request, not a loosely-scoped one.
 
 Live verification (2026-10-13, via curl impersonating a real browser UA,
 i.e. no CAPTCHA/WAF bypass needed -- see http_client.get_text_impersonate):
-all 19 `_CITIES` entries were fetched live with the corrected
+all 19 original `_CITIES` entries were fetched live with the corrected
 `country=United+States&state=<full state name>&city=<city>` params. Every
 one returned 50 real obituary rows (no empty/blocked responses). Manual
 inspection of 100 rows across 2 cities (Asheville NC, Hendersonville NC)
@@ -42,6 +42,61 @@ county property/owner records; see module history) is the final arbiter
 for those, same safety net that made the old bug "currently harmless" per
 the prior disabled-state docstring.
 
+RAW-SHAPE FIX + COUNTY EXPANSION (2026-11-11). Two bugs found checking why
+`atty_obituary_match` ("no source known", 113 NC+SC counties per
+docs/gap_matrix) didn't credit this scraper despite it being enabled, wired
+into main.py, and live-verified above:
+
+  1. Every row here was hand-built with `raw={"legacy": {...}}` and
+     `listing_type=ESTATE_LEAD`. The column's own check
+     (`gap_matrix.obituary_matched`) and every sibling obituary reader
+     (gannett_obituaries.py, funeral_home_rss.py, obituary_feeds.py,
+     echovita_obituaries.py) instead key off `raw["obituary"]` (a dict) and
+     `life_event == "death"` -- the shared `obituary_listing()` factory in
+     `scrapers/public_notices/_obit_common.py`. This scraper never called
+     it, so its real, live rows were invisible to the signal they exist to
+     produce. Fixed by building every row through that same shared
+     factory (also gets free survivor parsing + the private/public split
+     the other readers already have).
+  2. `_CITIES` carried `county=None` for every row (by design, deferred to
+     later name->property enrichment -- see the matching comment in
+     main.py next to this slug's registration). Since each of the 19
+     original cities (and the ones added below) is chosen specifically
+     *because* it sits in one known county, the county is attached
+     directly now via `CITY_COUNTY` -- strictly safer than the deferred
+     path, not a new risk, and it is what makes `atty_obituary_match`
+     county-scoped credit actually land.
+
+Cross-checking the 19 original cities against the 113-county gap list
+found 11 counties legacy.com was *already covering live* the whole time,
+just never credited (Burke, Jackson, Lincoln, McDowell, Transylvania,
+Yancey NC; Cherokee, Laurens, Oconee, Pickens, Union SC) -- fix (1) alone
+closes those with zero new scraping. The other 102 gap counties are new:
+one representative city per county, taken from this repo's own existing,
+already-reviewed `_bankruptcy_city_to_county.py` / `_coastal_city_to_county.py`
+/ `_upstate_city_to_county.py` crosswalks (not hand-typed, and every county
+name checked programmatically against `validation.NC_COUNTIES`/
+`SC_COUNTIES`), same `country`/`state`/`city` request shape proven above.
+
+HONEST STATUS on the 102 new cities specifically: a bounded live spot-check
+of 7 of them (2026-11-11, 2 attempts ~45s apart) got HTTP 429 from
+legacy.com both times -- this Mac's IP was rate-limited at test time
+(plausibly from the regular pipeline's own run against the original 19
+cities earlier that same day/night; a 429 is the same "throttling our
+volume, not a wall" shape gannett_obituaries.py's own docstring documents,
+not a structural block). The request shape itself is unchanged from the
+19-city version verified live 2026-10-13 and run for real 2026-09-08 (665
+rows across those 19 cities, see logs/*.log "legacy.done"). This scraper's
+own per-city error handling (one failed/empty city does not drop the
+others, see tests) makes a bad new-city guess harmless; real per-county
+yield for the 102 will show up in this scraper's own `legacy.city_done` /
+`legacy.done` log lines on its next scheduled run. Also added a 2.0s
+inter-city pacing gap (matching this project's established
+`_obit_common.PoliteFetcher.MIN_GAP_S` convention, absent here before) and
+raised `timeout_s` accordingly, since 121 cities back-to-back with no gap
+is a materially different request pattern than the original 19 and more
+likely to draw exactly this kind of rate limiting.
+
 Original design intent, still true: Legacy.com aggregates obituaries from
 1000s of funeral homes and newspapers -- a genuinely strong probate-lead
 signal (deceased owner -> heirs likely to sell) now that the search can
@@ -49,9 +104,9 @@ actually be scoped.
 """
 from __future__ import annotations
 
+import asyncio
 import re
 import urllib.parse
-from datetime import datetime
 from typing import Iterable
 
 import structlog
@@ -59,23 +114,154 @@ from selectolax.parser import HTMLParser
 
 from ...base_scraper import BaseScraper
 from ...http_client import get_text_impersonate
-from ...models import Listing, ListingType, PropertyKind
+from ...models import Listing
+from ..public_notices._obit_common import obituary_listing
 
 log = structlog.get_logger()
 
 _BASE = "https://www.legacy.com"
 _SEARCH = f"{_BASE}/obituaries/search"
 
-# Footprint cities for search.
-_CITIES = [
-    ("Asheville", "NC"), ("Hendersonville", "NC"), ("Brevard", "NC"),
-    ("Rutherfordton", "NC"), ("Marion", "NC"), ("Shelby", "NC"),
-    ("Gastonia", "NC"), ("Lincolnton", "NC"), ("Morganton", "NC"),
-    ("Sylva", "NC"), ("Burnsville", "NC"), ("Forest City", "NC"),
-    ("Spartanburg", "SC"), ("Gaffney", "SC"), ("Union", "SC"),
-    ("Laurens", "SC"), ("Pickens", "SC"), ("Anderson", "SC"),
-    ("Walhalla", "SC"),
-]
+# Inter-request pacing to legacy.com (one host, all cities) -- matches this
+# project's established obituary-reader convention
+# (_obit_common.PoliteFetcher.MIN_GAP_S) rather than hammering 121 cities
+# back-to-back.
+_GAP_S = 2.0
+
+# city/state -> county. Every value here is checked against
+# validation.NC_COUNTIES/SC_COUNTIES (see module docstring, 2026-11-11 fix).
+# The first 19 are the original WNC + Upstate-SC core footprint; the rest
+# are the 102 still-genuinely-uncovered counties of the 113-county
+# atty_obituary_match gap (the other 11 of that 113 turned out to already
+# be among the original 19 -- see docstring).
+CITY_COUNTY: dict[tuple[str, str], str] = {
+    ("Asheville", "NC"): "Buncombe",
+    ("Hendersonville", "NC"): "Henderson",
+    ("Brevard", "NC"): "Transylvania",
+    ("Rutherfordton", "NC"): "Rutherford",
+    ("Marion", "NC"): "McDowell",
+    ("Shelby", "NC"): "Cleveland",
+    ("Gastonia", "NC"): "Gaston",
+    ("Lincolnton", "NC"): "Lincoln",
+    ("Morganton", "NC"): "Burke",
+    ("Sylva", "NC"): "Jackson",
+    ("Burnsville", "NC"): "Yancey",
+    ("Forest City", "NC"): "Rutherford",
+    ("Spartanburg", "SC"): "Spartanburg",
+    ("Gaffney", "SC"): "Cherokee",
+    ("Union", "SC"): "Union",
+    ("Laurens", "SC"): "Laurens",
+    ("Pickens", "SC"): "Pickens",
+    ("Anderson", "SC"): "Anderson",
+    ("Walhalla", "SC"): "Oconee",
+    # -- 102 net-new counties (2026-11-11), one representative city each,
+    # taken from this repo's own city->county crosswalks --
+    ("Graham", "NC"): "Alamance",
+    ("Taylorsville", "NC"): "Alexander",
+    ("Sparta", "NC"): "Alleghany",
+    ("Wadesboro", "NC"): "Anson",
+    ("Jefferson", "NC"): "Ashe",
+    ("Newland", "NC"): "Avery",
+    ("Washington", "NC"): "Beaufort",
+    ("Windsor", "NC"): "Bertie",
+    ("Elizabethtown", "NC"): "Bladen",
+    ("Bolivia", "NC"): "Brunswick",
+    ("Lenoir", "NC"): "Caldwell",
+    ("Camden", "NC"): "Camden",
+    ("Beaufort", "NC"): "Carteret",
+    ("Yanceyville", "NC"): "Caswell",
+    ("Newton", "NC"): "Catawba",
+    ("Pittsboro", "NC"): "Chatham",
+    ("Murphy", "NC"): "Cherokee",
+    ("Edenton", "NC"): "Chowan",
+    ("Hayesville", "NC"): "Clay",
+    ("Whiteville", "NC"): "Columbus",
+    ("New Bern", "NC"): "Craven",
+    ("Currituck", "NC"): "Currituck",
+    ("Manteo", "NC"): "Dare",
+    ("Lexington", "NC"): "Davidson",
+    ("Mocksville", "NC"): "Davie",
+    ("Kenansville", "NC"): "Duplin",
+    ("Louisburg", "NC"): "Franklin",
+    ("Gatesville", "NC"): "Gates",
+    ("Robbinsville", "NC"): "Graham",
+    ("Oxford", "NC"): "Granville",
+    ("Snow Hill", "NC"): "Greene",
+    ("Halifax", "NC"): "Halifax",
+    ("Lillington", "NC"): "Harnett",
+    ("Waynesville", "NC"): "Haywood",
+    ("Winton", "NC"): "Hertford",
+    ("Raeford", "NC"): "Hoke",
+    ("Swan Quarter", "NC"): "Hyde",
+    ("Trenton", "NC"): "Jones",
+    ("Sanford", "NC"): "Lee",
+    ("Kinston", "NC"): "Lenoir",
+    ("Franklin", "NC"): "Macon",
+    ("Marshall", "NC"): "Madison",
+    ("Williamston", "NC"): "Martin",
+    ("Bakersville", "NC"): "Mitchell",
+    ("Troy", "NC"): "Montgomery",
+    ("Carthage", "NC"): "Moore",
+    ("Nashville", "NC"): "Nash",
+    ("Jackson", "NC"): "Northampton",
+    ("Jacksonville", "NC"): "Onslow",
+    ("Hillsborough", "NC"): "Orange",
+    ("Bayboro", "NC"): "Pamlico",
+    ("Elizabeth City", "NC"): "Pasquotank",
+    ("Burgaw", "NC"): "Pender",
+    ("Hertford", "NC"): "Perquimans",
+    ("Roxboro", "NC"): "Person",
+    ("Columbus", "NC"): "Polk",
+    ("Asheboro", "NC"): "Randolph",
+    ("Rockingham", "NC"): "Richmond",
+    ("Lumberton", "NC"): "Robeson",
+    ("Wentworth", "NC"): "Rockingham",
+    ("Salisbury", "NC"): "Rowan",
+    ("Clinton", "NC"): "Sampson",
+    ("Laurinburg", "NC"): "Scotland",
+    ("Albemarle", "NC"): "Stanly",
+    ("Danbury", "NC"): "Stokes",
+    ("Dobson", "NC"): "Surry",
+    ("Bryson City", "NC"): "Swain",
+    ("Columbia", "NC"): "Tyrrell",
+    ("Monroe", "NC"): "Union",
+    ("Henderson", "NC"): "Vance",
+    ("Warrenton", "NC"): "Warren",
+    ("Plymouth", "NC"): "Washington",
+    ("Boone", "NC"): "Watauga",
+    ("Goldsboro", "NC"): "Wayne",
+    ("Wilkesboro", "NC"): "Wilkes",
+    ("Yadkinville", "NC"): "Yadkin",
+    ("Aiken", "SC"): "Aiken",
+    ("Allendale", "SC"): "Allendale",
+    ("Bamberg", "SC"): "Bamberg",
+    ("Beaufort", "SC"): "Beaufort",
+    ("St Matthews", "SC"): "Calhoun",
+    ("Chester", "SC"): "Chester",
+    ("Chesterfield", "SC"): "Chesterfield",
+    ("Walterboro", "SC"): "Colleton",
+    ("Darlington", "SC"): "Darlington",
+    ("Dillon", "SC"): "Dillon",
+    ("St George", "SC"): "Dorchester",
+    ("Winnsboro", "SC"): "Fairfield",
+    ("Georgetown", "SC"): "Georgetown",
+    ("Greenwood", "SC"): "Greenwood",
+    ("Hampton", "SC"): "Hampton",
+    ("Ridgeland", "SC"): "Jasper",
+    ("Camden", "SC"): "Kershaw",
+    ("Lancaster", "SC"): "Lancaster",
+    ("Bishopville", "SC"): "Lee",
+    ("Marion", "SC"): "Marion",
+    ("Bennettsville", "SC"): "Marlboro",
+    ("McCormick", "SC"): "McCormick",
+    ("Newberry", "SC"): "Newberry",
+    ("Saluda", "SC"): "Saluda",
+    ("Sumter", "SC"): "Sumter",
+    ("York", "SC"): "York",
+}
+
+# Footprint cities for search -- single source of truth is CITY_COUNTY above.
+_CITIES: tuple[tuple[str, str], ...] = tuple(CITY_COUNTY.keys())
 
 # Real param values legacy.com's Location facet sends (confirmed by driving
 # the live UI -- see module docstring). Country is always this literal
@@ -138,11 +324,12 @@ class LegacyObituariesScraper(BaseScraper):
     category = "probate"
     expected_min_count = 0
     requires_apify = False
-    timeout_s = 300.0  # Multiple city searches
+    timeout_s = 1200.0  # 121 cities at 2.0s pacing + request latency
     disabled = False
 
     async def _fetch_city(self, city: str, state: str) -> list[Listing]:
         out: list[Listing] = []
+        county = CITY_COUNTY.get((city, state))
         params = {"country": _COUNTRY, "state": _STATE_FULL[state], "city": city}
         url = f"{_SEARCH}?{urllib.parse.urlencode(params)}"
 
@@ -156,6 +343,16 @@ class LegacyObituariesScraper(BaseScraper):
             return []
 
         tree = HTMLParser(html)
+
+        def _make(name: str, age: int | None, text: str, detail_url: str,
+                  verified: bool) -> Listing:
+            return obituary_listing(
+                source="national.legacy_obituaries", url=detail_url or url,
+                decedent=name, state=state, county=county, publisher="Legacy.com",
+                text=text, residence_city=city if verified else None, age=age,
+                extra_public={"search_city": city, "search_state": state,
+                              "verified": verified},
+            )
 
         # Obituary listings are in div/article elements.
         entries = tree.css(".obituary, .result, .listing-item, article")
@@ -185,30 +382,7 @@ class LegacyObituariesScraper(BaseScraper):
                 if contradicted:
                     continue
 
-                out.append(Listing(
-                    source=self.slug,
-                    source_url=url,
-                    listing_type=ListingType.ESTATE_LEAD,
-                    property_kind=PropertyKind.UNKNOWN,
-                    owner_name=name,
-                    city=city,
-                    state=state,
-                    county=None,
-                    description=f"Obituary: {name} ({city}, {state})",
-                    first_seen=datetime.utcnow(),
-                    last_seen=datetime.utcnow(),
-                    raw={
-                        "legacy": {
-                            "deceased_name": name,
-                            "age": age,
-                            "obituary_excerpt": block[:500],
-                            "search_city": city,
-                            "search_state": state,
-                            "search_params": params,
-                            "verified": verified,
-                        },
-                    },
-                ))
+                out.append(_make(name, age, block, "", verified))
             return out
 
         for entry in entries:
@@ -244,38 +418,16 @@ class LegacyObituariesScraper(BaseScraper):
                          text=text[:160])
                 continue
 
-            out.append(Listing(
-                source=self.slug,
-                source_url=detail_url or url,
-                listing_type=ListingType.ESTATE_LEAD,
-                property_kind=PropertyKind.UNKNOWN,
-                owner_name=name,
-                city=city,
-                state=state,
-                county=None,
-                description=f"Obituary: {name} ({city}, {state})",
-                first_seen=datetime.utcnow(),
-                last_seen=datetime.utcnow(),
-                raw={
-                    "legacy": {
-                        "deceased_name": name,
-                        "age": age,
-                        "obituary_text": text[:500],
-                        "detail_url": detail_url,
-                        "search_city": city,
-                        "search_state": state,
-                        "search_params": params,
-                        "verified": verified,
-                    },
-                },
-            ))
+            out.append(_make(name, age, text, detail_url, verified))
 
-        log.info("legacy.city_done", city=city, state=state, count=len(out))
+        log.info("legacy.city_done", city=city, state=state, county=county, count=len(out))
         return out
 
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
-        for city, state in _CITIES:
+        for i, (city, state) in enumerate(_CITIES):
+            if i:
+                await asyncio.sleep(_GAP_S)
             city_results = await self._fetch_city(city, state)
             out.extend(city_results)
             self.partial.extend(city_results)

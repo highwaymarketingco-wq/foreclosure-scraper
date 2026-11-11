@@ -808,9 +808,41 @@ SPECS: dict[str, Spec] = {
                    # its own code comment ("this is the assessor's land class for
                    # UNIMPROVED LAND... downstream lead-signal code reads a bare 'vacant'
                    # as an empty STRUCTURE") -- it was never a real producer here.
+                   #
+                   # 2026-11-11 (vacant/vacancy "no source known" breadth pass): enrichment_
+                   # arcgis.py's own Gaston-only VacantImpro cohort flag and nc_lincoln_bulk.py's
+                   # own VACANT flag are BOTH confirmed, by this same file's "vacant_lot" family
+                   # audit above (_VACANT_LAND_NOT_CODE_VACANCY_SOURCES's docstring, 2026-09-30),
+                   # to read the county's VACANT-LAND CAMA flag ("no improvement on the parcel"),
+                   # not a vacant-STRUCTURE determination -- i.e. the two producers already
+                   # listed here are themselves mislabeled, not genuinely this column's signal.
+                   # Left in place (not this pass's scope to rewrite enrichment_arcgis.py's
+                   # cohort logic), but real board-level coverage from them should be read with
+                   # that caveat. Five NEW, correctly-labeled producers added this pass -- each
+                   # already had a real per-row "this structure is vacant" determination (a
+                   # code officer's case classification or a dedicated vacant-registry layer
+                   # scope) flowing into raw["vacancy"]/raw["vacant"] already, just never
+                   # mirrored into the raw["gis"]["vacant"] key this column actually checks
+                   # (the exact bug class charlotte_open_data.py's fof_ordered branch was fixed
+                   # for 2026-10-20): gastonia_code_enforcement.py (Order to Vacate/Demolish,
+                   # Gaston NC), kinston_proposed_demolition.py (utility-cutoff vacancy basis,
+                   # Lenoir NC), rocky_mount_blight_survey.py (vacant_boarded class, Nash/
+                   # Edgecombe NC), spartanburg_vacant.py (every row is the city's own "City_
+                   # Owned_and_Vacant_Properties" registry, Spartanburg SC -- its real per-row
+                   # data was writing to a bare top-level raw["vacant"] key neither this column
+                   # nor distress_score's PROPERTY vacancy signal has ever read), and
+                   # counties_generic/arcgis_distress_layers.py (two already-live layers opted
+                   # in via the new Layer.vacancy field: columbia_code_vacant_boarded -- Richland
+                   # SC, where= pre-filtered to Boarded Building/Demolition/Vacant Building
+                   # cases, 1,020 live rows re-verified 2026-11-11 -- and rockhill_code_demolition
+                   # -- York SC, 17 live rows re-verified same day).
                    producers=("enrichment_arcgis.py", "scrapers/counties_sc/spartanburg_vacant.py",
-                              "nc_lincoln_bulk.py"),
-                   doc="raw.vacant present (a city/county vacant-structure registry)"),
+                              "nc_lincoln_bulk.py", "scrapers/counties_nc/gastonia_code_enforcement.py",
+                              "scrapers/counties_nc/kinston_proposed_demolition.py",
+                              "scrapers/counties_nc/rocky_mount_blight_survey.py",
+                              "scrapers/counties_generic/arcgis_distress_layers.py"),
+                   doc="raw.vacant present (a city/county vacant-structure registry); the real "
+                       "check elsewhere in this file is raw['gis']['vacant'] specifically"),
     "storm_damage": Spec(_S, "county", "disaster", applies="storm_scope",
                          producers=("enrichment_helene_damage.py",),
                          doc="raw.storm_damage present (post-Helene damage-assessment layers); applies "
@@ -992,8 +1024,15 @@ SPECS: dict[str, Spec] = {
                                      "obituary survivors); applies to rows whose owner is dead or an estate"),
     "atty_obituary_match": Spec(_S, "county", "obituary", applies="person",
                                 producers=("scrapers/public_notices/gannett_obituaries.py",
-                                           "scrapers/public_notices/funeral_home_rss.py"),
-                                doc="raw.obituary present or life_event == 'death'"),
+                                           "scrapers/public_notices/funeral_home_rss.py",
+                                           "scrapers/public_notices/obituary_feeds.py",
+                                           "scrapers/public_notices/echovita_obituaries.py",
+                                           "scrapers/national/legacy_obituaries.py"),
+                                doc="raw.obituary present or life_event == 'death'. 2026-11-11: "
+                                    "producers list was stale (only 2 of 5 live obituary readers "
+                                    "listed); legacy_obituaries.py was also silently uncredited "
+                                    "for a separate reason until that date -- it built raw['legacy'] "
+                                    "instead of raw['obituary'], see its own module docstring."),
     "atty_rod_lien_checked": Spec(_F, "row", "rod",
                                   producers=("enrichment_aumentum_rod.py", "enrichment_cchs_rod.py", "enrichment_gaston_rod.py",
                                              "enrichment_generic_rod.py", "enrichment_spartanburg_rod.py",
