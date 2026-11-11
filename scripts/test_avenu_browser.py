@@ -40,15 +40,29 @@ async def test():
         
         print("✅ Login successful!")
         
-        print("\n3. Submitting search...")
-        # Click search form, fill dates, submit
-        await page.wait_for_selector('input[name="FromDate"]', timeout=10000)
-        await page.fill('input[name="FromDate"]', "01/01/2024")
-        await page.fill('input[name="ToDate"]', "12/31/2024")
+        # Debug: screenshot and log URL
+        await page.screenshot(path="/tmp/avenu_after_login.png")
+        print(f"   Landed on: {page.url}")
+        print(f"   Screenshot saved to /tmp/avenu_after_login.png")
         
-        # Select distress document types
-        await page.click('button:has-text("Search")')
-        await page.wait_for_timeout(2000)
+        print("\n3. Submitting search...")
+        # The page might already be on InstrumentGrid with search form
+        # Let's navigate directly to it
+        await page.goto(f"{url}/Public/{county}sc/InstrumentGrid")
+        await page.wait_for_load_state("networkidle")
+        await page.screenshot(path="/tmp/avenu_grid_page.png")
+        
+        # Fill date fields - they're labeled "Start" and "End"
+        # Try multiple selector patterns
+        await page.wait_for_timeout(2000)  # Let JS load
+        
+        # Look for the Start/End date inputs
+        start_input = page.locator('input[placeholder*="Start"], input[aria-label*="Start"], label:has-text("Start") + input, th:has-text("Start") ~ td input').first
+        end_input = page.locator('input[placeholder*="End"], input[aria-label*="End"], label:has-text("End") + input, th:has-text("End") ~ td input').first
+        
+        await start_input.fill("01/01/2024")
+        await end_input.fill("12/31/2024")
+        await page.keyboard.press("Enter")  # Submit the form
         
         print("\n4. Waiting for grid to load...")
         await page.wait_for_selector('.k-grid-content', timeout=10000)
