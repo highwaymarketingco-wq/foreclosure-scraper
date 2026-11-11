@@ -158,7 +158,7 @@ def main() -> int:
                 patches[key] = {"raw": {"deed_chain": li.raw["deed_chain"]}}
         if not patches or args.dry_run:
             return
-        with board_lock(REPO, owner="mecklenburg_deed_chain_backfill", wait=600, poll=10):
+        with board_lock(REPO, owner="mecklenburg_deed_chain_backfill", wait=3600, poll=10):
             pstats = patch_existing_rows(
                 patches, {"backfill_mecklenburg_deed_chain_batch": len(patches)}, docs_dir=docs_dir)
         print(f"  patch_existing_rows: {pstats}")

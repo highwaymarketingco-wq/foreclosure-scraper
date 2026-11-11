@@ -225,7 +225,7 @@ def main() -> int:
 
         if not patches:
             continue
-        with board_lock(REPO, owner="mecklenburg_rod_render_backfill", wait=600, poll=10):
+        with board_lock(REPO, owner="mecklenburg_rod_render_backfill", wait=3600, poll=10):
             pstats = patch_existing_rows(
                 patches, {"mecklenburg_rod_render_backfill_batch": len(patches)}, docs_dir=docs_dir)
         print(f"  patch_existing_rows: {pstats}")
