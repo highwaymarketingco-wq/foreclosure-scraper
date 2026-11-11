@@ -323,9 +323,11 @@ def _row_to_listing(row: dict, slug: str) -> Optional[Listing]:
 async def _drive_estate_search(page, counties: list[str], lookback_days: int) -> list[dict]:
     rows: list[dict] = []
 
-    # Step 0: pre-warm aws-waf-token (no-op unless TYLER_USE_WAF_SOLVER=1 and
-    # the invisible challenge is served; image-grid falls through to OSS solver).
+    # Step 0: pre-warm aws-waf-token via invisible challenge solver.
+    # This bypasses the 20-puzzle image-grid escalation that portal-nc triggers
+    # on suspicious browsers. Enable by default for this scraper.
     try:
+        os.environ.setdefault("TYLER_USE_WAF_SOLVER", "1")
         from ...tyler_waf_token import fetch_waf_token
         pre = await fetch_waf_token(SEARCH_URL, "portal-nc.tylertech.cloud")
         if pre:
