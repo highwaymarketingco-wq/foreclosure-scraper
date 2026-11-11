@@ -533,38 +533,33 @@ async def _download_audio_clip(
 
         log.info("recaptcha.audio_url", url=href[:120])
 
-        # Download via the page's browser context (preserves cookies/session).
-        # Use page.evaluate to fetch the audio as a blob, then save to disk.
-        audio_data = await page.evaluate("""
-            async (url) => {
-                try {
-                    const resp = await fetch(url);
-                    if (!resp.ok) return null;
-                    const blob = await resp.blob();
-                    const reader = new FileReader();
-                    return new Promise((resolve) => {
-                        reader.onloadend = () => resolve(reader.result);
-                        reader.readAsDataURL(blob);
-                    });
-                } catch(e) {
-                    return null;
-                }
-            }
-        """, href)
-
-        if not audio_data or not isinstance(audio_data, str):
-            log.warning("recaptcha.audio_download_failed")
+        # Download via a plain HTTP client, not the browser's own fetch() --
+        # fetching cross-origin from inside page.evaluate() can hit CORS
+        # restrictions Google's recaptcha/api2/payload endpoint doesn't face
+        # from a raw request. This mirrors sc_rod_walled.py's own
+        # _solve_jasper_recaptcha(), which uses this exact pattern (httpx +
+        # the page's own cookies/Referer/UA) and is live-proven working.
+        try:
+            import httpx
+            cookies = await page.context.cookies()
+            cookie_str = "; ".join(f"{c['name']}={c['value']}" for c in cookies)
+            async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+                resp = await client.get(
+                    href,
+                    headers={
+                        "Referer": "https://www.google.com/recaptcha/api2/",
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                        **({} if not cookie_str else {"Cookie": cookie_str}),
+                    },
+                )
+            if resp.status_code != 200:
+                log.warning("recaptcha.audio_download_failed", status=resp.status_code)
+                return None
+            audio_bytes = resp.content
+            header = resp.headers.get("content-type", "audio/mpeg")
+        except Exception as exc:
+            log.warning("recaptcha.audio_download_error", error=str(exc)[:160])
             return None
-
-        # The data URL is "data:audio/mp3;base64,...."
-        # Strip the prefix and decode.
-        import base64
-        if "," not in audio_data:
-            log.warning("recaptcha.bad_data_url")
-            return None
-
-        header, data = audio_data.split(",", 1)
-        audio_bytes = base64.b64decode(data)
 
         # Determine extension from the MIME type.
         ext = ".mp3"
