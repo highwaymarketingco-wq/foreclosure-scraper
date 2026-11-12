@@ -1019,7 +1019,7 @@ SPECS: dict[str, Spec] = {
                                     doc="a name read from the tax roll/parcel record: gis.owner, owner_mailing.owner, "
                                         "qpaybill_roll, lrcpwa, heir_estate, mcdowell_probate, or owner_name on a "
                                         "tax_lien/tax_sale row"),
-    "atty_heir_candidates": Spec(_F, "row", "probate", applies="deceased", ledger="probate_heir",
+    "atty_heir_candidates": Spec(_F, "row", "probate", applies="deceased", ledger="probate_heir|heir_roll",
                                  doc="heir names or a personal representative (heir_estate, probate, SC probate, "
                                      "obituary survivors); applies to rows whose owner is dead or an estate"),
     "atty_obituary_match": Spec(_S, "county", "obituary", applies="person",
@@ -1042,7 +1042,7 @@ SPECS: dict[str, Spec] = {
                                       "rod_docs or nc_rod)"),
     "atty_deed_chain_fetched": Spec(_F, "row", "gis_deed", producers=("enrichment_deed_chain.py",),
                                     doc="raw.deed_chain.transfers is non-empty"),
-    "atty_probate_case": Spec(_F, "row", "probate", applies="deceased", ledger="probate_heir",
+    "atty_probate_case": Spec(_F, "row", "probate", applies="deceased", ledger="probate_heir|heir_roll",
                               doc="an estate file number (probate, sc_probate_notice, sc_probate_net, or a "
                                   "probate_notice/estate_lead row's case_number); applies to dead/estate owners"),
     "atty_tax_verified_confirmed": Spec(_S, "row", "tax", applies="tax_claim", ledger="tax_lien",
