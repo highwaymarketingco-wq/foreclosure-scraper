@@ -50,6 +50,16 @@ def main() -> int:
     ap.add_argument("--allow-large", action="store_true")
     ap.add_argument("--max-queries", type=int, default=20000)
     ap.add_argument("--per-county-cap", type=int, default=0, help="0 = no cap")
+    ap.add_argument("--state", choices=["NC", "SC"], default=None,
+                     help="scope this run to one state only (default: both, unchanged from "
+                          "before this flag existed). Lets two SEPARATE processes -- one --state "
+                          "NC, one --state SC -- run concurrently without doubling up on the same "
+                          "names: enrich_incarceration()'s own 1 req/sec pacing is per-process, "
+                          "and NC/SC hit different lookup hosts (webapps6.doc.state.nc.us vs the "
+                          "SC SCDC site), so two scoped processes are two independent 1 req/sec "
+                          "streams against two different servers -- not one host asked twice as "
+                          "fast. See scripts/supervise_incarceration_backfill.sh, which runs it "
+                          "this way (2026-11-12).")
     args = ap.parse_args()
 
     docs_dir = REPO / "docs"
@@ -61,11 +71,12 @@ def main() -> int:
         if args.allow_large:
             os.environ["BOARD_PATCH_ALLOW_LARGE"] = "1"
 
-    print("streaming board for NC/SC rows...")
+    wanted_states = (args.state,) if args.state else ("NC", "SC")
+    print(f"streaming board for {'/'.join(wanted_states)} rows...")
     keyed: dict[str, Listing] = {}
     before: dict[str, dict] = {}
     for rec in iter_board_rows(docs_dir / "listings.json.gz"):
-        if rec.get("state") not in ("NC", "SC"):
+        if rec.get("state") not in wanted_states:
             continue
         full_raw = rec.get("raw") if isinstance(rec.get("raw"), dict) else {}
         li = Listing.model_construct(**{k: rec.get(k) for k in _LIGHT_FIELDS})
