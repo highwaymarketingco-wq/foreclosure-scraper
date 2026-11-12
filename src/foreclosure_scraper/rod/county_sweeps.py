@@ -307,6 +307,62 @@ HOSTED_CCHS: dict[str, tuple[str, str]] = {
 }
 
 
+async def _classic_fetch_one(url: str, headers: dict, timeout: float, session):
+    """One CCHS classic-ASP call through the shared escalation ladder (plain httpx ->
+    405-retry via POST -> curl-cffi impersonation), all sharing `session`'s cookies.
+    Async core of _impersonated_classic_get — factored out so _impersonated_classic_pair
+    can await two of these inside ONE asyncio.run() / ONE event loop (a SharedSession's
+    httpx.AsyncClient / curl_cffi.AsyncSession can't cross event loops, which is why the
+    old two-independent-asyncio.run()-calls shape could never have shared a session).
+    Degrades every failure to a non-2xx Page instead of raising — same contract
+    _impersonated_classic_get already had."""
+    from .nc_polite import Page
+    from .. import http_client as HC
+    try:
+        text = await HC.get_text(url, headers=headers, timeout=timeout, impersonate=True,
+                                  session=session)
+        return Page(status=200, url=url, final_url=url, text=text)
+    except httpx.HTTPStatusError as exc:
+        code = exc.response.status_code if exc.response is not None else 599
+        if code == 405:
+            try:
+                text = await HC.post_text(url, headers=headers, timeout=timeout, session=session)
+                return Page(status=200, url=url, final_url=url, text=text)
+            except Exception as exc2:  # noqa: BLE001 -- the POST fallback also failed; degrade as before
+                m2 = re.search(r"got (\d+)", str(exc2))
+                code2 = int(m2.group(1)) if m2 else 599
+                return Page(status=code2, url=url, final_url=url, text=str(exc2))
+        return Page(status=code, url=url, final_url=url, text=str(exc))
+    except Exception as exc:  # noqa: BLE001 -- any failure degrades to a Page, never raises
+        m = re.search(r"got (\d+)", str(exc))
+        code = int(m.group(1)) if m else 599
+        return Page(status=code, url=url, final_url=url, text=str(exc))
+
+
+def _impersonated_classic_pair(search_url: str, build_getall_url, headers: dict, timeout: float = 40.0):
+    """Fixes 'the record list was empty although the search counted rows' (confirmed live
+    2026-11-07: CCHS's getall reads the search call's server-side session rather than
+    re-querying — see project_cchs_classic_getall_session_bug_2026-11-07 memory). Runs the
+    search call, then — ONLY if `build_getall_url(search_page)` returns a URL (None means
+    the caller already knows it won't/shouldn't call getall, e.g. n==0) — the getall call,
+    BOTH through one shared SharedSession so the search's Set-Cookie is sent back on getall.
+    One asyncio.run() for the whole pair (same safe-on-a-worker-thread reasoning
+    _impersonated_classic_get's docstring already gives). Returns (search_page, getall_page
+    or None)."""
+    from .. import http_client as HC
+
+    async def _run():
+        async with HC.SharedSession() as session:
+            search_page = await _classic_fetch_one(search_url, headers, timeout, session)
+            getall_url = build_getall_url(search_page)
+            if getall_url is None:
+                return search_page, None
+            getall_page = await _classic_fetch_one(getall_url, headers, timeout, session)
+            return search_page, getall_page
+
+    return asyncio.run(_run())
+
+
 def _impersonated_classic_get(url: str, headers: dict, timeout: float = 40.0):
     """CchsClassicReader's two SearchService.asp calls, via the curl-cffi Chrome tier
     (see the module docstring's 2026-10-16 exception). Runs on a worker thread
@@ -422,7 +478,23 @@ class CchsClassicReader(Reader):
              "instrumenttypes": ",".join(self.kinds), "description": "", "docnumber": "", "booknumber": "",
              "pagenumber": "", "taxfrom": "", "taxto": "", "resultstype": "1", "maxrecordcount": str(C.MAX_RECORDS),
              "symbolsetout": "0", "sortorder": "1", "sortfield": "docno", "rangetype": "doc"}
-        rep = _impersonated_classic_get(self.app + "SearchService.asp?" + urlencode(q), headers=xhr)
+        search_url = self.app + "SearchService.asp?" + urlencode(q)
+
+        def _build_getall_url(search_page):
+            # Same early-out conditions read() always checked before ever calling getall —
+            # decided here too so the pair call skips getall entirely in those cases, exactly
+            # like two separate calls did before this fix.
+            n, _docs = C.counts(search_page.text)
+            if search_page.status >= 400 or n is None or n == 0 or n >= C.MAX_RECORDS:
+                return None
+            return self.app + f"SearchService.asp?cmd=getall&start=0&offset={n}"
+
+        # ONE call, not two independent ones: fixes "the record list was empty although the
+        # search counted rows" (confirmed live 2026-11-07 — CCHS's getall reads the search
+        # call's server-side session rather than re-querying; see
+        # project_cchs_classic_getall_session_bug_2026-11-07 memory). Both calls now share
+        # one SharedSession's cookies instead of each opening its own.
+        rep, rows = _impersonated_classic_pair(search_url, _build_getall_url, headers=xhr)
         _wall_check(self.client, rep)
         n, _docs = C.counts(rep.text)
         if rep.status >= 400 or n is None:
@@ -431,8 +503,7 @@ class CchsClassicReader(Reader):
             return [], False
         if n >= C.MAX_RECORDS:
             return [], True
-        rows = _impersonated_classic_get(
-            self.app + f"SearchService.asp?cmd=getall&start=0&offset={n}", headers=xhr)
+        # _build_getall_url returned a URL for exactly this remaining case, so `rows` is set.
         _wall_check(self.client, rows)
         if rows.status >= 400:
             raise RuntimeError(f"getall HTTP {rows.status}")

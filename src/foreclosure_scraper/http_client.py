@@ -236,6 +236,57 @@ class _ThrottledTransport(httpx.AsyncBaseTransport):
         await self._inner.aclose()
 
 
+class SharedSession:
+    """An explicit, caller-owned session for threading cookies across 2+ related calls
+    through get_text/post_text — e.g. a classic-ASP search-then-getall pair where the
+    second call needs the server-side session the first call's response set (confirmed
+    live 2026-11-07: CCHS's ``cmd=getall`` reads the search's session rather than
+    re-querying; see rod/county_sweeps.py's CchsClassicReader, the only caller today).
+
+    Lazily creates and reuses ONE httpx.AsyncClient and/or ONE curl_cffi AsyncSession —
+    whichever tier(s) a given pair of calls actually ends up using — so a Set-Cookie
+    from the first call is sent on the second. The caller owns its lifetime (use as an
+    `async with`); get_text/post_text never close a SharedSession they're handed.
+
+    Every other caller passes no `session` (the default, None): get_text/post_text/
+    client()/_impersonate_fetch all still open and close a fresh one per call, exactly
+    as before this class existed — adding it changes nothing for them.
+    """
+
+    def __init__(self) -> None:
+        self._httpx: httpx.AsyncClient | None = None
+        self._curl = None
+
+    async def httpx_client(self, *, timeout: float, follow_redirects: bool,
+                            headers: dict, http2: bool) -> httpx.AsyncClient:
+        if self._httpx is None:
+            proxy = os.environ.get("PROXY_URL") or None
+            _conn_to = float(os.environ.get("HTTP_CONNECT_TIMEOUT", "8.0"))
+            _pool_to = float(os.environ.get("HTTP_POOL_TIMEOUT", "8.0"))
+            transport = _ThrottledTransport(httpx.AsyncHTTPTransport(retries=0))
+            self._httpx = httpx.AsyncClient(
+                timeout=httpx.Timeout(timeout, connect=_conn_to, pool=_pool_to),
+                follow_redirects=follow_redirects, headers=dict(headers),
+                proxy=proxy, transport=transport, http2=http2,
+            )
+        return self._httpx
+
+    async def curl_session(self):
+        if self._curl is None:
+            from curl_cffi.requests import AsyncSession
+            self._curl = AsyncSession()
+        return self._curl
+
+    async def __aenter__(self) -> "SharedSession":
+        return self
+
+    async def __aexit__(self, *exc: object) -> None:
+        if self._httpx is not None:
+            await self._httpx.aclose()
+        if self._curl is not None:
+            await self._curl.close()
+
+
 @asynccontextmanager
 async def client(
     *,
@@ -244,13 +295,22 @@ async def client(
     headers: dict | None = None,
     impersonate_browser: bool = True,
     http2: bool = True,
+    session: "SharedSession | None" = None,
 ) -> AsyncIterator[httpx.AsyncClient]:
     """Shared throttled client. Pass ``http2=False`` for the rare host whose CDN
     answers an ordinary HTTP/1.1 request but not httpx's HTTP/2 one (see
-    law_firms.mewborn_deselms) — everything else keeps HTTP/2."""
+    law_firms.mewborn_deselms) — everything else keeps HTTP/2. Pass `session` (a
+    SharedSession) to reuse one cookie-carrying client across several calls instead of
+    a fresh one per call — see SharedSession's own docstring; default None is today's
+    unchanged behavior."""
     h = dict(DEFAULT_HEADERS)
     if headers:
         h.update(headers)
+    if session is not None:
+        cli = await session.httpx_client(
+            timeout=timeout, follow_redirects=follow_redirects, headers=h, http2=http2)
+        yield cli
+        return
     proxy = os.environ.get("PROXY_URL") or None
     # HARD-timeout hardening (flaky-connection safe). Bound CONNECT and POOL-acquire
     # tightly: a wedged connect or an exhausted pool are the flaky-network stalls that
@@ -279,6 +339,7 @@ async def _impersonate_fetch(
     headers: dict | None,
     referer: str | None,
     impersonate: str,
+    session: "SharedSession | None" = None,
 ) -> str:
     """Fetch via curl-cffi with a real Chrome JA3/TLS + HTTP/2 fingerprint.
 
@@ -290,6 +351,10 @@ async def _impersonate_fetch(
     Honours the same per-host throttle and per-run block signal as the httpx
     transport, so politeness + BLOCKED classification are unchanged. Raises on
     block/transient codes so the retry/escalation logic above can react.
+
+    Pass `session` (a SharedSession) to reuse one cookie-carrying curl-cffi session
+    across several calls instead of opening+closing one per call — see SharedSession's
+    docstring; default None is today's unchanged per-call session.
     """
     from curl_cffi.requests import AsyncSession  # local import: keep dep optional
 
@@ -302,25 +367,30 @@ async def _impersonate_fetch(
     proxies = {"http": proxy, "https": proxy} if proxy else None
 
     await _throttle(_host_of(url))
-    async with AsyncSession() as s:
-        r = await s.get(
-            url,
-            headers=h,
-            impersonate=impersonate,
-            timeout=timeout,
-            proxies=proxies,
-            allow_redirects=True,
+
+    async def _get(s, hdrs: dict):
+        return await s.get(
+            url, headers=hdrs, impersonate=impersonate, timeout=timeout,
+            proxies=proxies, allow_redirects=True,
         )
-        # Some hosts (e.g. overpass-api.de) reject the browser-like Accept header
-        # impersonation sends with a 406, yet answer fine with a permissive Accept.
-        # Retry once with Accept: */* before treating it as a block/escalating.
+
+    if session is not None:
+        s = await session.curl_session()
+        r = await _get(s, h)
         if r.status_code == 406:
             h2 = dict(h)
             h2["Accept"] = "*/*"
-            r = await s.get(
-                url, headers=h2, impersonate=impersonate, timeout=timeout,
-                proxies=proxies, allow_redirects=True,
-            )
+            r = await _get(s, h2)
+    else:
+        async with AsyncSession() as s:
+            r = await _get(s, h)
+            # Some hosts (e.g. overpass-api.de) reject the browser-like Accept header
+            # impersonation sends with a 406, yet answer fine with a permissive Accept.
+            # Retry once with Accept: */* before treating it as a block/escalating.
+            if r.status_code == 406:
+                h2 = dict(h)
+                h2["Accept"] = "*/*"
+                r = await _get(s, h2)
     code = r.status_code
     if code in _BLOCK_CODES or 500 <= code < 600:
         holder = _block_holder.get()
@@ -342,11 +412,14 @@ async def get_text_impersonate(
     headers: dict | None = None,
     referer: str | None = None,
     impersonate: str = "chrome",
+    session: "SharedSession | None" = None,
 ) -> str:
     """GET via the curl-cffi browser-impersonation tier only, with retry.
 
     Use directly when a host is known to need a real TLS fingerprint. For the
     automatic plain->impersonate escalation, prefer `get_text(..., impersonate=True)`.
+    Pass `session` to reuse one cookie-carrying session across calls (default None is
+    unchanged: a fresh session per call, including per retry attempt here).
     """
     async for attempt in AsyncRetrying(
         stop=stop_after_attempt(3),
@@ -356,7 +429,7 @@ async def get_text_impersonate(
         with attempt:
             return await _impersonate_fetch(
                 url, timeout=timeout, headers=headers,
-                referer=referer, impersonate=impersonate,
+                referer=referer, impersonate=impersonate, session=session,
             )
     raise RuntimeError("unreachable")
 
@@ -466,6 +539,7 @@ async def get_text(
     referer: str | None = None,
     impersonate: bool = False,
     wall_bypass: bool = False,
+    session: "SharedSession | None" = None,
 ) -> str:
     """GET a URL and return text, with retry on transient errors.
 
@@ -482,6 +556,12 @@ async def get_text(
 
     Hosts seen blocking plain httpx are remembered process-wide so later
     fetches impersonate first and skip the doomed attempt.
+
+    Pass `session` (a SharedSession) to carry cookies across this call and others —
+    e.g. a search-then-getall pair on the same vendor session (see SharedSession's own
+    docstring). Threaded through whichever tier(s) this call actually uses. Default
+    None is completely unchanged: a fresh client/session per tier per call, same as
+    before `session` existed.
     """
     # Allow forcing wall_bypass via env var for standalone walled-source runs
     if os.environ.get("WALL_BYPASS_FORCE", "0") == "1":
@@ -494,7 +574,7 @@ async def get_text(
     impersonate_first = impersonate and host is not None and host in _impersonate_hosts
     if impersonate_first:
         return await get_text_impersonate(
-            url, timeout=timeout, headers=headers, referer=referer
+            url, timeout=timeout, headers=headers, referer=referer, session=session,
         )
 
     try:
@@ -505,7 +585,7 @@ async def get_text(
             reraise=True,
         ):
             with attempt:
-                async with client(timeout=timeout) as c:
+                async with client(timeout=timeout, session=session) as c:
                     r = await c.get(url, headers=h)
                     if r.status_code in (429, 500, 502, 503, 504):
                         raise httpx.HTTPStatusError(
@@ -532,7 +612,7 @@ async def get_text(
             _impersonate_hosts.add(host)
         try:
             return await get_text_impersonate(
-                url, timeout=timeout, headers=headers, referer=referer
+                url, timeout=timeout, headers=headers, referer=referer, session=session,
             )
         except Exception:
             if wall_bypass:
@@ -556,7 +636,7 @@ async def get_text(
         if impersonate:
             try:
                 return await get_text_impersonate(
-                    url, timeout=timeout, headers=headers, referer=referer
+                    url, timeout=timeout, headers=headers, referer=referer, session=session,
                 )
             except Exception:
                 pass
@@ -575,6 +655,7 @@ async def post_text(
     timeout: float = 30.0,
     headers: dict | None = None,
     data: dict | None = None,
+    session: "SharedSession | None" = None,
 ) -> str:
     """POST a URL (plain httpx, through the same throttled `client()`) and return text,
     with the same transient-5xx retry as `get_text`.
@@ -588,6 +669,9 @@ async def post_text(
     us3+us5 tenants 200 on GET already and unaffected either way. No impersonation
     tier here: this is a verb restriction, not a TLS-fingerprint block, and plain
     httpx POST already clears it on every tenant tested.
+
+    Pass `session` to reuse one cookie-carrying client across calls (default None is
+    unchanged — see SharedSession's docstring).
     """
     h = dict(headers or {})
     async for attempt in AsyncRetrying(
@@ -597,7 +681,7 @@ async def post_text(
         reraise=True,
     ):
         with attempt:
-            async with client(timeout=timeout) as c:
+            async with client(timeout=timeout, session=session) as c:
                 r = await c.post(url, headers=h, data=data)
                 if r.status_code in (429, 500, 502, 503, 504):
                     raise httpx.HTTPStatusError(
