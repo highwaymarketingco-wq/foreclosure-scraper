@@ -130,6 +130,18 @@ PORTALS: dict[str, Portal] = {
     # multi-year grid (parcel 42028261520000, 1707 S Anderson Blvd, bills 2023-2026). The
     # `/css` path segment is REQUIRED (the tenant's base, not `/citizens/...` directly).
     "Pender": Portal("Pender", "https://mss.pendercountync.gov/css"),
+    # ADDED 2026-11-12. Live-verified before adding, not guessed from the shared hostname
+    # pattern: a bare fetch of the bare /citizens/RealEstate/Default.aspx (NO /css segment --
+    # unlike Pender) returned the real search form (ParcelIDTextBox present); the same path with
+    # mode=new alone first returned a 200 FileNotFound.aspx error page (ASP.NET custom-error
+    # convention: a 200 status on a page that is actually a 404) before that was noticed -- see
+    # project_sampson_greene_wrong_template_corrected_2026-11-12 memory for the full story.
+    # search() then confirmed live against 3 real board parcels: 19-21 real bill rows each.
+    # Greene County (greenecounty.munisselfservice.com), the SAME research pass's other
+    # candidate, is deliberately NOT added here: same path pattern, but search() 500s on every
+    # one of 6 real Greene parcels tried (not a parcel-id-shape issue -- a genuine server-side
+    # difference not yet diagnosed). Don't re-add Greene without finding why first.
+    "Sampson": Portal("Sampson", "https://sampsonnc.munisselfservice.com"),
 }
 _BY_COUNTY = {k.lower(): v for k, v in PORTALS.items()}
 
