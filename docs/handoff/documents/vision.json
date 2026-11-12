@@ -2,10 +2,10 @@
 "schema": 1,
 "kind": "document_ledger",
 "lane": "vision",
-"generated_at": "2026-11-11T16:02:51Z",
+"generated_at": "2026-11-12T14:01:03Z",
 "host": "SMB-LTSEO05",
 "counts": {"entries": 29518, "fetch_failed": 1635, "graded": 27878, "ungraded": 5},
-"last_run": {"at": "2026-11-11T16:02:51Z", "not_due": 740, "reapplied": 1, "recorded": 729, "summary": {"elapsed_s": 5490.5, "leftover": 6842, "no_image": 62, "scored": 667, "stop_reason": "wall_clock"}},
+"last_run": {"at": "2026-11-12T14:01:03Z", "not_due": 799, "reapplied": 2, "recorded": 0, "summary": {}},
 "rows": {
 "i:0001487948269dd4b5dd": {"attempts":1,"county":"NC:Rutherford","extractor_version":"vision-v1","outcome":"graded","processed_at":"2026-10-07T17:09:03Z","provider":"nvidia:ising-calibration-1.5-","reason":"seeded_from_board_2026-10-07","source":"counties_nc.rutherford_tax","values":{"condition_tier":"cosmetic","confidence":"LOW","n_photos":1,"rehab_psf_high":45,"rehab_psf_low":15}},
 "i:00053740c712a575cf44": {"attempts":1,"county":"NC:Buncombe","extractor_version":"vision-v1","landed":["condition_tier"],"outcome":"graded","processed_at":"2026-10-17T16:55:19Z","provider":"nvidia:ising-calibration-1.5-","source":"counties_nc.nc_heir_estate_parcels","values":{"condition_tier":"major","confidence":"HIGH","n_photos":1,"rehab_psf_high":80,"rehab_psf_low":35}},
