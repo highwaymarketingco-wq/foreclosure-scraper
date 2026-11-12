@@ -25,15 +25,37 @@ not yet built. Greenwood/Allendale not yet re-sourced at all.
 RE-CHECKED A SECOND TIME, same evening, after a later commit (5a3ba2c) tried
 countyfusion2.govos.com for Orangeburg, rod.greenvillecounty.org for
 Greenville and www.greenwoodsc.gov for Greenwood instead of countyfusion14.
-That commit's OWN message already flagged all three as broken ("login token
-issue" / "search endpoint unstable" / "502") -- live-reconfirmed here rather
-than trusted either way: Orangeburg's loginDisplay.action on countyfusion2
-returns the SAME empty 0-byte body as countyfusion14 (not a different host
-that happens to work), and www.greenwoodsc.gov is the county's generic
-public website homepage, not a ROD system at all. Reverted back to
-Lexington-only for the same reason as the first time: a COUNTIES entry this
-scraper will actually try every run should be one that's live-verified to
-respond, not one a commit message itself already called broken.
+Results were NOT uniform across the three -- an earlier pass here wrongly
+treated them as all equally broken, corrected below after calling
+_login()/_get_instrument_types()/_search_instruments() directly rather than
+just probing the bare domain:
+
+  - Orangeburg (countyfusion2.govos.com): loginDisplay.action returns the
+    SAME empty 0-byte body as countyfusion14 did. Not a different host that
+    happens to work -- genuinely not a tenant here either.
+  - Greenville (rod.greenvillecounty.org) and Greenwood (www.greenwoodsc.gov):
+    the domains ARE correct -- _login() succeeds and _get_instrument_types()
+    returns real data (119 types/20 adverse for Greenville, 75 types/8
+    adverse for Greenwood). (A first pass here dismissed greenwoodsc.gov as
+    "just the county's public homepage" from checking only the bare `/`
+    path -- wrong: the real code hits /countyweb/loginDisplay.action
+    specifically, a different path that DOES serve a real CountyFusion
+    login on that same domain.) But _search_instruments() fails for BOTH,
+    every time: Greenville with "peer closed connection... incomplete
+    chunked read", Greenwood with HTTP 502. Reproduced 3x each with 5s
+    delays AND across different date-window sizes (730/90/30 days) -- same
+    failure every time, ruling out both transient flakiness and an
+    oversized-query timeout. Zero real records recovered from either
+    despite login genuinely working, so there is still nothing to ship for
+    them from this scraper. If this is ever revisited: the fact that both
+    fail with generic gateway/proxy-level errors (not a 400 or a parse
+    error) rather than succeeding intermittently suggests a real
+    server-side problem on those two counties' deployments, not a request
+    this code is building wrong -- but that is an inference, not confirmed.
+
+COUNTIES stays Lexington-only either way: a dict entry this scraper tries
+every run should be one that's live-verified to return real records, and
+right now none of Orangeburg/Greenville/Greenwood do.
 
 Authentication: POST /countyweb/login.action with countyname={County}SC, username, password,
 cmd=login. Credentials stored in .secrets/countyfusion/username.txt and password.txt.
