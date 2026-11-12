@@ -1,0 +1,424 @@
+"""NC Register of Deeds — pre-foreclosure recordings (Notice of Sale,
+Substitute Trustee Deed, Lis Pendens) across in-scope NC counties.
+
+Routes through the existing rod/aumentum / rod/cott / rod/cchs vendor
+modules (already battle-tested for ASP.NET WebForms search) rather
+than re-implementing per-vendor flows. Each vendor's
+``discover_recent_nods()`` returns a list of RodDoc records filtered
+to NOD-style document types within a date range.
+
+Coverage (in-scope NC counties only after the 2026-05-07 scope rollback):
+
+  Aumentum:  Buncombe (registerofdeeds.buncombecounty.org)
+  Cott:      Polk     (cotthosting.com/ncpolkexternal)
+             Rutherford (cotthosting.com/NCRUTHERFORDEXTERNAL)
+  CCHS:      Burke     (us5.courthousecomputersystems.com/burkenc)
+             Cleveland (us5.courthousecomputersystems.com/clevelandnc)
+             Lincoln   (us4.courthousecomputersystems.com/lincolnnc)
+             Henderson (us4.courthousecomputersystems.com/hendersonnc)
+
+2026-09-28: Lincoln and Henderson were dropped below as "not wired" / "not
+yet covered", but rod/cchs.py's CCHS_COUNTIES has run BOTH of them on the
+same live classic-ASP SearchService.asp flow as Burke/Cleveland since
+2026-06-30 (Henderson) and 2026-07-27 (Lincoln) — this list just never got
+updated after that. Re-verified live 2026-09-28 (see rod/cchs.py docstring):
+added both back rather than leaving two already-working counties silently
+uncovered.
+
+2026-10-03: removed Gaston from the Aumentum row above. It was still listed
+as `("Gaston", aumentum, "aumentum")` below, but `deeds.gastongov.com` is a
+confirmed-dead host — live-tested 2026-10-03 (TCP connects, TLS handshake
+never completes, 5+ attempts/timeout values, control hosts on the same
+network all answer normally) and already independently flagged dead in
+docs/completeness_document.md, docs/completeness_deeds.md (2026-08-02) and
+rod/doc_images.py's `("NC","Gaston"): ("unreachable", ...)` entry. Gaston
+moved its ROD to Courthouse Computer Systems on 2026-05-28 and this scraper
+was never re-pointed. The real host (`gastonnc.courthousecomputersystems.com`,
+a DevExpress "LRSearch" MVC app, NOT the classic-ASP app `rod/cchs.py`
+handles) only has a per-owner-name search built against it so far
+(`enrichment_gaston_rod.py`) — no date-range sweep exists yet to plug in
+here, so Gaston drops to NOT YET COVERED below rather than silently
+wasting a timeout every run.
+
+NOT YET COVERED (no ROD vendor mapped):
+  Mitchell, McDowell, Transylvania, New Hanover, Brunswick, Onslow,
+  Madison/Yancey/Haywood (these were intentionally dropped from scope per
+  2026-05-07b rollback; Madison IS in CCHS_COUNTIES but stays out of SOURCES
+  per that rollback — re-add if Madison comes back in scope).
+  Gaston (dead Aumentum host, see 2026-10-03 note above — a real fix needs a
+  new date-range sweep against gastonnc.courthousecomputersystems.com's
+  LRSearch app, not a re-point to an existing vendor module).
+
+Output: each RodDoc is converted into a Listing with:
+  - listing_type = LIS_PENDENS (these are PRE-foreclosure leads — the
+    actual sale hasn't happened yet)
+  - sale_date = None (not in the recording — Notice of Sale lists a
+    FUTURE date; we'd need to fetch the doc body to get it)
+  - defendant = grantor (current owner against whom foreclosure is filed)
+  - case_number = book/page or instrument_no
+  - raw.nc_rod = {vendor, doc_type, recorded_date, book, page,
+    instrument_no}
+
+This is a LEAD source, not a sold-comp source. Post-sale recordings
+("Trustee's Deed Upon Sale" with deed-tax stamps that encode the
+hammer price) require extending each vendor module's discover_*
+function to ALSO sweep post-sale doc types AND the parser to capture
+the consideration column. That's a separate larger effort.
+
+Note re: previous 'permitium' configuration: the URL
+``https://buncombe-recordings.permitium.com/`` doesn't resolve on
+public DNS — it appears to have been a misconfiguration. Buncombe's
+actual ROD is the Aumentum-hosted URL above, verified reachable via
+the rod/aumentum.py module.
+"""
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Iterable
+
+import structlog
+
+from ...base_scraper import BaseScraper, OUTCOME_BLOCKED, OUTCOME_PARTIAL
+from ...deed_index import Party, derive_loss
+from ...models import Listing, ListingType, PropertyKind
+from ...rod import aumentum, cchs, cott
+from ...rod.cchs import CchsWall
+from ...rod.inst_class import classify_instrument
+from ...rod.models import RodDoc
+
+log = structlog.get_logger()
+
+
+# In-scope NC counties paired with the vendor module that handles them.
+# Order matters only for determinism in logs.
+SOURCES: list[tuple[str, object, str]] = [
+    # (county_name, vendor_module, vendor_label)
+    ("Buncombe", aumentum, "aumentum"),
+    # Gaston removed 2026-10-03 — dead Aumentum host, see module docstring.
+    ("Polk",       cott,   "cott"),
+    ("Rutherford", cott,   "cott"),
+    ("Burke",     cchs,    "cchs"),
+    ("Cleveland", cchs,    "cchs"),
+    # Lincoln and Henderson run the SAME classic-ASP CCHS SearchService.asp flow
+    # as Burke/Cleveland (rod/cchs.py CCHS_COUNTIES has both, verified live
+    # 2026-07-27 and 2026-06-30 respectively, re-verified 2026-09-28) — they were
+    # missing here only because this list wasn't updated after cchs.py grew them.
+    ("Lincoln",    cchs,   "cchs"),
+    ("Henderson",  cchs,   "cchs"),
+]
+
+LOOKBACK_DAYS = 60                    # PRE-sale (NOD/NOS) sweep window
+POST_SALE_LOOKBACK_DAYS = 90          # POST-sale (Trustee's Deed) sweep window
+MAX_DOCS_PER_COUNTY = 80
+
+
+def _vendor_search_url(vendor_label: str, county: str) -> str:
+    if vendor_label == "aumentum":
+        host = aumentum.AUMENTUM_COUNTIES.get(("NC", county))
+        if host:
+            return host.rstrip("/") + "/SrchName.aspx"
+    elif vendor_label == "cott":
+        host = cott.COTT_COUNTIES.get(("NC", county))
+        if host:
+            return host.rstrip("/") + "/SrchName.aspx"
+    elif vendor_label == "cchs":
+        u = cchs.search_url("NC", county)
+        if u:
+            return u
+    return "https://www.nccourts.gov/"
+
+
+def _case_id_from_doc(doc: RodDoc) -> str | None:
+    if doc.instrument_no:
+        return f"INST-{doc.instrument_no}"
+    if doc.book and doc.page:
+        return f"BK{doc.book}-PG{doc.page}"
+    return None
+
+
+# CCHS tags every grantor/grantee party "I" (individual) or "F" (firm/
+# entity) -- the vendor's own `orc`/`eec` columns, live-verified on Burke
+# 2026-10-03, now carried in `raw['grantor_parties']`/`raw['grantee_parties']`
+# by rod/cchs.py's `_parse_rows` (see its docstring). A suffix of TR/TRUSTEE/
+# SUB TR/COMM/COMMISSIONER/ATTY/AIF (the vendor's `ors`/`ees` role column)
+# marks a party acting in a PROFESSIONAL capacity even when kind=="I" -- a
+# live-named human substitute trustee is still not the homeowner. Confirmed
+# live on Burke instrument 2026005171: grantor side carries the real owner
+# (JACKSON CLYDE EUGENE JR., kind "I") alongside CAPE FEAR TRUSTEE SERVICES,
+# LLC and BELL CARRINGTON PRICE & GREGG, PLLC (both kind "F") -- the OLD
+# `_all_grantor_names` had no institutional filter at all, so all three
+# would have landed in `defendant` together. Aumentum/Cott docs never
+# populate `grantor_parties`/`grantee_parties` (those vendors don't carry
+# kind/suffix columns), so this only ever activates for CCHS.
+_OFFICER_SUFFIXES = {"TR", "TRUSTEE", "SUB TR", "COMM", "COMMISSIONER", "ATTY", "AIF"}
+
+
+def _is_real_owner_party(p: dict) -> bool:
+    if (p.get("kind") or "").strip().upper() == "F":
+        return False
+    if (p.get("suffix") or "").strip().upper() in _OFFICER_SUFFIXES:
+        return False
+    return bool((p.get("name") or "").strip())
+
+
+def _dedupe_names(names: list[str]) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for n in names:
+        n = (n or "").strip()
+        if not n:
+            continue
+        key = n.upper()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(n)
+    return out
+
+
+def _all_grantor_names(doc: RodDoc) -> str | None:
+    """Every REAL-OWNER grantor-side party name on this recording, joined and
+    deduped.
+
+    CCHS-sourced docs (Burke/Cleveland/Lincoln/Henderson) serve ONE ROW PER
+    PARTY (see this module's `_former_owner` docstring, `deed_index.py`'s
+    module docstring -- "Burke 2025: 166 party rows for 55 documents" -- and
+    `rod/cchs.py`'s own sweep docstring) and the vendor adapter already
+    collapses them into `raw['grantors']` / `raw['grantor_parties']`.
+    `_former_owner` (below) reads the full list for the POST-sale path, but
+    this PRE-sale path used to read only the single `doc.grantor` -- the
+    FIRST party's name -- which silently dropped every co-owner on a
+    multi-grantor Notice of Sale / Lis Pendens (a husband-and-wife or
+    multi-heir filing). Now prefers `grantor_parties` (carries the vendor's
+    own individual/firm classification, see `_is_real_owner_party`) and
+    falls back to the plain name list, then to `doc.grantor`, for vendors
+    that don't carry it -- no behavior change for Aumentum/Cott.
+    """
+    raw = doc.raw if isinstance(doc.raw, dict) else {}
+    parties = raw.get("grantor_parties")
+    if parties:
+        owners = _dedupe_names([p["name"] for p in parties if _is_real_owner_party(p)])
+        if owners:
+            return "; ".join(owners)
+        # every grantor-side party reads as a firm/officer -- fall through
+        # rather than publish nothing, in case the vendor flag mis-tagged.
+    names = raw.get("grantors")
+    if names:
+        out = _dedupe_names(names)
+        if out:
+            return "; ".join(out)
+    return doc.grantor
+
+
+def _doc_to_listing(doc: RodDoc, vendor_label: str) -> Listing:
+    """Convert a PRE-sale recording (NOD / Notice of Sale / Lis Pendens)
+    into a LIS_PENDENS Listing — early-warning lead, not a sold comp."""
+    return Listing(
+        source="counties_nc.nc_rod_substitute_trustee",
+        source_url=_vendor_search_url(vendor_label, doc.county),
+        listing_type=ListingType.LIS_PENDENS,
+        property_kind=PropertyKind.UNKNOWN,
+        state="NC",
+        county=doc.county,
+        parcel_id=doc.parcel_id,
+        legal_description=doc.notes,
+        case_number=_case_id_from_doc(doc),
+        defendant=_all_grantor_names(doc),
+        plaintiff=doc.grantee,
+        first_seen=datetime.utcnow(),
+        last_seen=datetime.utcnow(),
+        raw={
+            "nc_rod": {
+                "vendor": vendor_label,
+                "doc_type": doc.doc_type,
+                "recorded_date": doc.recorded_date.isoformat() if doc.recorded_date else None,
+                "book": doc.book,
+                "page": doc.page,
+                "instrument_no": doc.instrument_no,
+                "grantor": doc.grantor,
+                "grantors": (doc.raw or {}).get("grantors") if isinstance(doc.raw, dict) else None,
+                "grantor_parties": (doc.raw or {}).get("grantor_parties") if isinstance(doc.raw, dict) else None,
+                "grantee": doc.grantee,
+                "kind": "pre_sale",
+            },
+        },
+    )
+
+
+def _former_owner(doc: RodDoc) -> str | None:
+    """The borrower or taxpayer named on a post-sale deed. CCHS serves one row per
+    party and doc.grantor is the FIRST row's, which on a trustee's deed is often
+    the foreclosing law firm (the sweep now requests TR/D, so this is common).
+    Falls back to doc.grantor when the parties cannot be read as a loss.
+
+    Prefers `raw['grantor_parties']` (name + the vendor's own kind/suffix,
+    see `_all_grantor_names` above) so `derive_loss`'s internal `_is_person`
+    check gets the REAL individual/firm flag instead of a blank default --
+    `Party(n)` with no kind/suffix was the only thing ever built here before,
+    so a firm whose name carries none of `_FIRM_RE`'s keywords (no LLC/TRUST/
+    BANK/etc token) could previously slip through as a "loser". Falls back
+    to plain names for Aumentum/Cott, which never populate grantor_parties.
+    """
+    raw = doc.raw if isinstance(doc.raw, dict) else {}
+    parties_raw = raw.get("grantor_parties")
+    if parties_raw:
+        parties = [Party(p["name"], kind=p.get("kind") or "", suffix=p.get("suffix") or "")
+                   for p in parties_raw if (p.get("name") or "").strip()]
+    else:
+        names = raw.get("grantors") or ([doc.grantor] if doc.grantor else [])
+        parties = [Party(n) for n in names]
+    cls = classify_instrument(raw.get("ki"), doc.doc_type)
+    _kind, losers = derive_loss(cls, parties, doc.notes or "")
+    return losers[0] if losers else doc.grantor
+
+
+def _sold_doc_to_listing(doc: RodDoc, vendor_label: str) -> Listing:
+    """Convert a POST-sale recording (Trustee's Deed Upon Sale or
+    equivalent) into a FORECLOSURE_SALE Listing with confirmed
+    hammer price. Goes into the foreclosure_sold_comps pool."""
+    sold_price = doc.consideration_amount
+    raw_payload = {
+        "nc_rod": {
+            "vendor": vendor_label,
+            "doc_type": doc.doc_type,
+            "recorded_date": doc.recorded_date.isoformat() if doc.recorded_date else None,
+            "book": doc.book,
+            "page": doc.page,
+            "instrument_no": doc.instrument_no,
+            "grantor": doc.grantor,
+            "grantee": doc.grantee,
+            "kind": "post_sale",
+            "excise_tax_stamp": doc.excise_tax_stamp,
+        },
+    }
+    if sold_price is not None:
+        # Top-level so enrichment_foreclosure_sold_comps reads it as
+        # the confirmed hammer price (not opening-bid floor).
+        raw_payload["actual_sold_price"] = sold_price
+    return Listing(
+        source="counties_nc.nc_rod_substitute_trustee",
+        source_url=_vendor_search_url(vendor_label, doc.county),
+        listing_type=ListingType.FORECLOSURE_SALE,
+        property_kind=PropertyKind.UNKNOWN,
+        state="NC",
+        county=doc.county,
+        parcel_id=doc.parcel_id,
+        legal_description=doc.notes,
+        case_number=_case_id_from_doc(doc),
+        defendant=_former_owner(doc),  # Borrower / former owner
+        plaintiff=doc.grantee,        # Auction winner / lender
+        sale_date=doc.recorded_date,  # Recording date ≈ sale date (within days)
+        opening_bid=sold_price,       # Surface as opening_bid for grading
+        first_seen=datetime.utcnow(),
+        last_seen=datetime.utcnow(),
+        raw=raw_payload,
+    )
+
+
+class NCRodSubstituteTrustee(BaseScraper):
+    """NC ROD pre-foreclosure recordings across in-scope counties via
+    rod/aumentum + rod/cott + rod/cchs."""
+
+    slug = "counties_nc.nc_rod_substitute_trustee"
+    name = "NC ROD pre-foreclosure recordings (8 in-scope counties)"
+    category = "register_of_deeds"
+    expected_min_count = 0
+    requires_apify = False
+    # The vendor modules use plain httpx + ASP.NET form posts (no JS) —
+    # not Scrapling-required despite the prior misclassification.
+    requires_render = False
+    timeout_s = 600.0
+
+    async def fetch(self) -> Iterable[Listing]:
+        # Bank rows as they are collected: if the soft timeout fires,
+        # base_scraper ships self.partial instead of discarding the run.
+        out = self.partial
+        per_county_pre: dict[str, int] = {}
+        per_county_post: dict[str, int] = {}
+        # 2026-10-14 (silent-failure sweep follow-up item 1): CCHS (Burke/Cleveland/
+        # Lincoln/Henderson) is a Cloudflare-fronted vendor shared by 4 of this
+        # scraper's 8 counties. A vendor-wide CCHS wall used to land in the same
+        # `except Exception` as a genuine zero-result county, so it never showed up
+        # as anything but a slightly smaller total. rod/cchs.py's _cchs_fetch now
+        # raises CchsWall specifically for that case, counted here per county
+        # (either sweep hitting the wall marks the county walled, since both sweeps
+        # hit the same Cloudflare-fronted SearchService.asp endpoint).
+        cchs_counties = {county for county, vendor, _label in SOURCES if vendor is cchs}
+        cchs_walled: set[str] = set()
+        for county, vendor, vendor_label in SOURCES:
+            # PRE-sale sweep (Notice of Sale, Substitute Trustee Deed
+            # appointment, Lis Pendens) → LIS_PENDENS leads
+            try:
+                pre_docs = await vendor.discover_recent_nods(
+                    state="NC", county=county,
+                    days_back=LOOKBACK_DAYS,
+                    max_docs=MAX_DOCS_PER_COUNTY,
+                )
+            except CchsWall as exc:
+                cchs_walled.add(county)
+                log.warning("nc_rod.cchs_wall_pre", county=county, error=str(exc)[:200])
+                pre_docs = []
+            except Exception as exc:  # noqa: BLE001
+                log.warning(
+                    "nc_rod.vendor_pre_failed",
+                    county=county, vendor=vendor_label,
+                    error=str(exc)[:200],
+                )
+                pre_docs = []
+            per_county_pre[f"{county}/{vendor_label}"] = len(pre_docs)
+            for d in pre_docs:
+                if d.county and d.county != county:
+                    d.county = county
+                out.append(_doc_to_listing(d, vendor_label))
+
+            # POST-sale sweep (Trustee's Deed Upon Sale and equivalents)
+            # → FORECLOSURE_SALE listings with confirmed hammer prices,
+            # routed into the sold-comps pool.
+            try:
+                post_docs = await vendor.discover_recent_sold_recordings(
+                    state="NC", county=county,
+                    days_back=POST_SALE_LOOKBACK_DAYS,
+                    max_docs=MAX_DOCS_PER_COUNTY,
+                )
+            except AttributeError:
+                # Vendor module hasn't grown discover_recent_sold_recordings yet.
+                # Aumentum + Cott + CCHS all have it as of 2026-05-07f; this is
+                # defensive against future module additions.
+                post_docs = []
+            except CchsWall as exc:
+                cchs_walled.add(county)
+                log.warning("nc_rod.cchs_wall_post", county=county, error=str(exc)[:200])
+                post_docs = []
+            except Exception as exc:  # noqa: BLE001
+                log.warning(
+                    "nc_rod.vendor_post_failed",
+                    county=county, vendor=vendor_label,
+                    error=str(exc)[:200],
+                )
+                post_docs = []
+            per_county_post[f"{county}/{vendor_label}"] = len(post_docs)
+            for d in post_docs:
+                if d.county and d.county != county:
+                    d.county = county
+                out.append(_sold_doc_to_listing(d, vendor_label))
+
+        if cchs_counties and cchs_walled == cchs_counties:
+            # Every CCHS county in this sweep was wall-blocked on at least one of
+            # its two sweeps -- a distinct, countable signal instead of folding
+            # into whatever the other (non-CCHS) counties still contributed.
+            self.last_outcome = OUTCOME_PARTIAL if out else OUTCOME_BLOCKED
+            self.last_reason = (
+                f"CCHS vendor wall-blocked for all {len(cchs_walled)} CCHS counties "
+                f"in this sweep ({'/'.join(sorted(cchs_counties))}) — other, "
+                f"non-CCHS counties in this run are unaffected")
+            log.warning("nc_rod.cchs_all_walled", walled=sorted(cchs_walled),
+                        attempted=sorted(cchs_counties), total_rows=len(out))
+
+        log.info(
+            "nc_rod.done",
+            total=len(out),
+            pre_sale_per_county=per_county_pre,
+            post_sale_per_county=per_county_post,
+            counties_searched=len(SOURCES),
+        )
+        return out

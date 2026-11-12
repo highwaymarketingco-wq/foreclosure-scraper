@@ -1,0 +1,747 @@
+"""Heir / estate owner-of-record parcels — a net-new motivated-seller signal.
+
+When a property owner dies, the county parcel roll often re-titles the owner of
+record to "<SURNAME> HEIRS", "HEIRS OF <NAME>", or "<NAME> ESTATE" / "ESTATE OF
+<NAME>" long before (or instead of) any probate case is opened. Those parcels are
+classic tangled-title / pre-probate leads: undivided heir interests, no single
+decision-maker, frequently vacant and tax-delinquent — owners motivated to
+liquidate but stuck.
+
+This is property-keyed at the source: one ArcGIS query per county parcel layer
+returns owner + full situs + PIN + mailing in a single call, so every lead lands
+already resolved to a parcel (no downstream GIS round-trip needed). It reuses the
+COUNTY_GIS field map + _query helper from enrichment_owner_mailing, so adding a
+county here is free once its parcel layer is in COUNTY_GIS.
+
+Scope: 11 NC counties (each with its OWN dedicated COUNTY_GIS layer) + 8 Upstate/
+broader-footprint SC counties (Spartanburg, Pickens, Laurens, Union, Oconee, York,
+Charleston, Beaufort) whose COUNTY_GIS owner layer retitles decedent parcels.
+SC:Anderson is still omitted: its COUNTY_GIS entry carries owner=[] on purpose (the
+only owner-shaped column, TAXOWNSTR, is confirmed always-null — see that spec's own
+comment in enrichment_owner_mailing.py). SC:Cherokee has no ArcGIS parcel layer at
+all (qPublic-only). Add a county by dropping its key into _HEIR_COUNTIES once its
+COUNTY_GIS parcel layer is confirmed to return hits.
+
+  2026-10-02 CORRECTION — Oconee was previously (wrongly) excluded here with a
+  "0 hits" claim. Re-verified LIVE: SC:Oconee's `current_owner` field DOES retitle
+  real decedent parcels ("BROOKS INA ESTATE", "KING MARGARET ESTATE", "ROGERS
+  PLOMA ESTATE" — fixed-width field, trailing spaces trimmed downstream). That
+  closes one of only 3 gaps in the 18-county core footprint for this technique
+  (Anderson + Cherokee remain genuinely unfixable via GIS, per above).
+
+  2026-10-02 EXTENSION — NC_STATEWIDE_FALLBACK_COUNTIES. Every NC county that does
+  NOT have its own dedicated COUNTY_GIS layer (89 of the state's 100) is now ALSO
+  queried through this exact same technique against NC OneMap's STATEWIDE parcel
+  layer (NC1Map_Parcels/FeatureServer/1) — the identical layer NC:Cleveland above
+  already uses; a different county just needs a different `cntyname` value on the
+  SAME url/fields. That layer is already load-bearing for OTHER signals across this
+  codebase (enrichment_arcgis.py, enrichment_bankruptcy_property.py,
+  enrichment_recorded_sales.py, enrichment_land_buildability.py,
+  enrichment_resolve_name_to_property.py, enrichment_parcel_from_geo.py,
+  nc_coastal_tax_foreclosure.py, brunswick_legal_notices.py) but had never been
+  pointed at the heir/estate owner-name pattern for any county but Cleveland.
+  Verified LIVE 2026-10-02 against 12 sample counties outside the dedicated 11
+  (Catawba, Watauga, Avery, Yadkin, Surry, Wilkes, Caldwell, Madison, Ashe,
+  Alexander, Iredell, Yancey) — all 12 returned real decedent-titled parcels with
+  situs + parcel id (e.g. Catawba "DOVER MARY HOLHOUSER HEIRS", 2136 Stove Dr,
+  parno 366903111618). ESTATE_LEAD is a distressed-type lead, not a flip, so it is
+  admissible in ANY real NC county per config.in_scope_distressed — this is a
+  breadth play (closing the 28/148 probate/heir-estate-coverage gap), not a
+  footprint change; counties outside the 18-county flip scope (Wake, Mecklenburg,
+  etc.) will show up here exactly as the project's own distressed-scope rule
+  already intends for every other probate/divorce/lien signal.
+
+Distress signal: emits ListingType.ESTATE_LEAD with raw['relationship_signal']
+= {kind: 'probate'} so distress_score scores it (LIFE_EVENT). Dateless — routed
+via DATELESS_OK_SOURCES. LIFE ESTATE (a living life-tenant, not a decedent) is
+its OWN signal, not noise -- see the 2026-11-10 note above _EXCLUDE below.
+
+  2026-11-10 AUDIT — gap_matrix flagged the owner/heir-retitling columns as
+  "built-but-low-yield" across ~148 counties and asked whether `_HEIR_COUNTIES`
+  (11 NC + 8 SC) is a too-narrow hardcoded list sitting on a much bigger
+  unused registry. It is NOT, for NC: `_HEIR_COUNTIES` is only the
+  dedicated-layer subset. `fetch()` ALSO runs every other NC county through
+  NC_STATEWIDE_FALLBACK_COUNTIES (see the 2026-10-02 EXTENSION above), so NC
+  coverage via this module is already 100/100 counties -- `_HEIR_COUNTIES`
+  alone looks narrow only if you don't read `fetch()`'s second loop. Nothing
+  to widen there.
+
+  For SC, re-verified Anderson a second, independent way: `enrichment_owner_
+  mailing.COUNTY_GIS["SC:Anderson"]` (this module's registry) already
+  documents its owner column (TAXOWNSTR) as always-null; live-queried
+  `parcel_cache.PARCEL_LAYERS["Anderson"]` instead (a DIFFERENT registry,
+  DIFFERENT field name -- "OWNER", not TAXOWNSTR, same underlying
+  gis.cityofandersonsc.com layer) against the already-cached 208,476-row
+  SQLite snapshot: 0 of 208,476 rows have a non-null/non-empty owner under
+  EITHER field name. Confirms Anderson's exclusion from both registries is
+  correct, not a stale guess -- this is a Water Utilities parcels layer, not
+  the assessor's CAMA/ownership roll.
+
+  Checked whether the state's remaining ~13 small SC counties with NO
+  GIS-owner source anywhere in this project (Abbeville, Allendale, Bamberg,
+  Chesterfield, Clarendon, Dillon, Edgefield, Fairfield, Lee, Marion,
+  Marlboro, McCormick, Newberry) have an addable layer. Found one promising
+  lead -- ArcGIS Online org "GDITAdmin" publishes a uniform "Parcels - SC -
+  <County> County" Feature Service for ALL 46 SC counties, which looked
+  exactly like the missing "SC OneMap" this module's NC side already has.
+  Live-checked it (`sharing/rest/content/items/<id>?f=json` for Newberry/
+  Fairfield/Marion/Abbeville's item ids): every one now answers HTTP 403
+  "Subscription is canceled, the item is not accessible" -- that whole
+  catalog is dead, not a usable source at any freshness. These 13 counties
+  remain genuinely unbuilt; each needs its own live GIS/assessor-site
+  discovery from scratch, the same way every other county in this module's
+  registries was originally found -- not a registry-widening fix. See the
+  sibling sc_heir_estate_parcel_cache.py's own 2026-11-10 note for the SC
+  parcel_cache-side half of this same audit.
+"""
+from __future__ import annotations
+
+import asyncio
+import os
+import re
+from datetime import datetime
+from typing import Iterable
+
+import httpx
+import structlog
+from tenacity import (
+    AsyncRetrying,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
+
+from ...base_scraper import BaseScraper
+from ...http_client import client
+from ...models import Listing, ListingType, PropertyKind
+from ... import job_events
+from ...enrichment_owner_mailing import COUNTY_GIS, _query, _query_page, _spec_out_fields
+from ...validation import NC_COUNTIES as _ALL_NC_COUNTIES
+
+log = structlog.get_logger()
+
+# Counties whose COUNTY_GIS layer exposes a queryable owner-name field that
+# retitles decedent parcels to "<name> HEIRS" / "ESTATE OF". NC is the 11 core
+# counties, each with its own dedicated layer (every OTHER NC county is covered
+# by the statewide NC OneMap fallback below instead). SC adds the Upstate +
+# broader-footprint layers that return real hits — see the module docstring's
+# 2026-10-02 notes for Oconee's correction and York/Charleston/Beaufort's
+# addition. SC:Anderson (no usable owner column) and SC:Cherokee (no ArcGIS
+# layer at all) are still genuinely unfixable via this technique.
+_HEIR_COUNTIES = [
+    "NC:Buncombe", "NC:Henderson", "NC:Rutherford", "NC:Gaston", "NC:Transylvania",
+    "NC:Polk", "NC:Lincoln", "NC:Mitchell", "NC:Burke", "NC:McDowell", "NC:Cleveland",
+    "SC:Spartanburg", "SC:Pickens", "SC:Laurens", "SC:Union",
+    "SC:Oconee", "SC:York", "SC:Charleston", "SC:Beaufort",
+]
+
+#: Bounds how many statewide-fallback counties are queried concurrently. The
+#: shared http_client per-host throttle serializes requests to the SAME host
+#: anyway (~0.8-1.5s/request regardless of concurrency), so this mainly keeps
+#: the asyncio task count sane; it does not defeat the throttle.
+_STATEWIDE_CONCURRENCY = 10
+
+# Owner-of-record patterns that indicate a decedent/heir title. HEIR catches
+# HEIRS/HEIR/HEIR OF; ESTATE catches singular "<name> ESTATE"/"ESTATE OF".
+_MATCH_TOKENS = ("HEIR", "ESTATE")
+# SQL-level exclusions. Plural "ESTATES" + "REAL ESTATE" are almost always a
+# subdivision/HOA/brokerage, not a decedent -- true noise, unrelated to a life
+# estate, and still excluded below unchanged.
+#
+# 2026-10-19: "LIFE-ESTATE" (hyphen, no space) found live while sampling SC
+# parcel_cache owner columns for a new cache-based producer (sc_heir_estate_
+# parcel_cache.py). Greenville's cache spells it this way on 74 rows ("CLARK
+# LOTTIE B (LIFE-ESTATE)") and Hampton's on 2 -- the literal-substring
+# "LIFE ESTATE" (space) never matched a hyphen, so both slipped through as
+# false decedent hits at the time (Greenville's corrected yield then: 38,
+# matching the ~40 already found and reported via a separate live check in
+# project_gap_matrix_sweep1_2026-10-18.md).
+#
+# 2026-11-10: LIFE ESTATE / LIFE-ESTATE pulled back OUT of this exclusion.
+# A life estate names a LIVING life-tenant, not a decedent -- but the
+# coaching program this board is built around (DPA) treats "buy the
+# remainderman's future interest while an elderly life-tenant still occupies
+# the property" as a real, repeatable, buyable lead type. So a parcel that
+# matched ONLY on "LIFE ESTATE" was being thrown away here as noise when it
+# is actually a distinct motivated-seller signal, not a false positive. It
+# is no longer excluded at either the SQL or the Python layer -- see
+# `_LIFE_ESTATE_RE` / `_is_life_estate()` below, which tag it instead of
+# dropping it: raw['heir_estate']['match'] = "life_estate" (+ a plain
+# raw['heir_estate']['life_estate'] bool) and raw['relationship_signal']
+# ['kind'] = "life_estate", NOT "probate" (the owner has not died), plus
+# raw['life_events'] = ["life_estate"] -- the SAME tag enrichment_life_events.py
+# already writes for this exact concept elsewhere (scanned off owner_name
+# there; set directly here since this producer already knows it with
+# certainty), which distress_score.py's existing "life_estate" -> LIFE_EVENT
+# rule (weight 8) was already reading and waiting on. REAL ESTATE and
+# ESTATES (plural) are a DIFFERENT false-positive source (a subdivision/HOA/
+# brokerage name) with nothing to do with a life estate, so both stay
+# excluded below, unchanged.
+#
+# Side effect to know about: sc_heir_estate_parcel_cache.py imports this
+# file's `_excluded_row` directly, so this same change also stops IT from
+# discarding LIFE-ESTATE rows (its own docstring's "corrected yield: 38"
+# count will grow once this lands) -- that producer was NOT touched here to
+# brand those rows "life_estate" the same way; its own match/relationship_
+# signal write-up still unconditionally says "estate"/"probate". Flagged as
+# a follow-up, not fixed in this change (see this fix's own report).
+_EXCLUDE = ("REAL ESTATE", "ESTATES")
+
+#: Rows read per county per run. Was a flat 80 with no order and no offset, so every run
+#: re-read the same arbitrary first 80 of ~10.9k matching parcels across the 19 county
+#: layers (2026-10-07 audit). Raised in stages (owner decision 2026-10-07): 400 by default,
+#: env-adjustable, highest-value parcels first (see _value_field), and the cap is recorded
+#: in the run stats (NCHeirEstateParcels.run_stats, job_events note "nc_heir.run_stats").
+_PER_COUNTY_CAP = int(os.environ.get("HEIR_ESTATE_PER_COUNTY_CAP", "400"))
+#: One request's page size while ranking by value (<= every layer's maxRecordCount).
+_RANK_PAGE = 400
+
+#: Total-value column names, best first (lowercased). Only a NUMERIC column qualifies:
+#: ordering a string column ("TotalMarketValue" on Buncombe is text) sorts lexically.
+_VALUE_FIELD_PREFERENCE = (
+    "parval", "totval", "tot_val", "totalvalue", "total_value", "totalmarketvalue",
+    "totmktval", "taxmktval", "fairmktval", "fmv_total", "aprtotval", "apr_tot_val",
+    "totalappraisedvalue", "appraisedvalue", "appraised_value", "cost_total_value",
+    "marketvalue", "market_value", "assessedvalue", "assessed_value", "assessed_v",
+    "taxvalue", "tax_value",
+)
+_NUMERIC_TYPES = {"esriFieldTypeDouble", "esriFieldTypeInteger", "esriFieldTypeSmallInteger",
+                  "esriFieldTypeSingle", "esriFieldTypeBigInteger"}
+
+# Python-side belt-and-suspenders: an "ESTATE" hit is only a decedent when it is
+# NOT an entity (LLC/HOA/church/etc.). HEIR hits are accepted outright.
+_ENTITY_SUFFIX = re.compile(
+    r"\b(LLC|L L C|INC|CORP|COMPANY|\bCO\b|LP|LLP|LLLP|TRUST|HOLDINGS?|"
+    r"PROPERTIES|PARTNERS?|ASSOC|ASSN|HOA|HOMEOWNERS?|CHURCH|MINISTR|"
+    r"DEVELOP|VENTURES?|GROUP|FARMS?|ENTERPRISE|BANK)\b", re.I)
+
+
+# WORD-BOUNDARY tokens, not a bare substring test. Found live 2026-10-02 while
+# cross-checking the broader-footprint SC counties: York's roll carries a real,
+# unremarkable surname "PINHEIRO" (owner "PINHEIRO GUILHON DANILO WILLIAM ETAL")
+# that a plain `"HEIR" in u` substring test flags as a decedent — the string
+# "HEIR" sits inside "pinHEIRo" with no word boundary on either side. `\bHEIRS?\b`
+# requires HEIR/HEIRS to stand alone as a token, so "PINHEIRO" no longer matches
+# while "...HEIRS", "...HEIR OF", "HEIRS LAW LLC" (still caught by the entity
+# exclusion below) are unaffected. `\bESTATE\b` similarly cannot match inside
+# "ESTATES" (no boundary between E and the trailing S), making the SQL-level
+# "ESTATES" exclusion in _EXCLUDE redundant-but-harmless for this Python gate.
+_HEIR_TOKEN = re.compile(r"\bHEIRS?\b", re.I)
+_ESTATE_TOKEN = re.compile(r"\bESTATE\b", re.I)
+
+
+def _field_is_decedent(field_value: str) -> bool:
+    """Does this ONE owner subfield, on its own, carry a decedent token?
+
+    Checked per-field (not on a joined multi-field string) so a co-owner /
+    care-of subfield that happens to be an entity name (a bank trust dept, a
+    law firm) can never mask a genuine HEIRS/ESTATE token sitting in a
+    DIFFERENT subfield of the same row.
+    """
+    u = field_value or ""
+    # An entity that merely contains HEIR/ESTATE in its NAME (e.g. "HEIRS LAW LLC",
+    # "REAL ESTATE HOLDINGS") is never a decedent — exclude entities from BOTH tokens.
+    if _ENTITY_SUFFIX.search(u):
+        return False
+    return bool(_HEIR_TOKEN.search(u) or _ESTATE_TOKEN.search(u))
+
+
+def _is_decedent(owner_fields: list[str]) -> bool:
+    """A row is a decedent/heir lead when AT LEAST ONE owner subfield (not
+    necessarily the first) carries the token. See `_owner()` below for why
+    this must look at every subfield, not just the combined/first one.
+    """
+    return any(_field_is_decedent(f) for f in owner_fields)
+
+
+def _county_name(key: str) -> str:
+    return key.split(":", 1)[1]
+
+
+# NC OneMap's statewide parcel layer — the SAME url/fields "NC:Cleveland" above
+# already uses, just without pinning one county. `county_field` scopes each
+# query to one county via its own WHERE clause (see _where()).
+_NC_ONEMAP_SPEC = dict(COUNTY_GIS["NC:Cleveland"])
+
+#: NC counties with their own dedicated COUNTY_GIS layer — never double-queried
+#: through the statewide fallback below (Cleveland uses the onemap layer too,
+#: via its own COUNTY_GIS entry, so it's excluded from the fallback set here).
+_NC_DEDICATED_COUNTIES = frozenset(
+    _county_name(k) for k in _HEIR_COUNTIES if k.startswith("NC:")
+)
+
+#: Every OTHER real NC county (89 of the state's 100), run through the exact
+#: same heir/estate detection against the statewide NC OneMap layer instead of
+#: a county-specific one. See the module docstring's 2026-10-02 EXTENSION note.
+NC_STATEWIDE_FALLBACK_COUNTIES: tuple[str, ...] = tuple(
+    sorted(_ALL_NC_COUNTIES - _NC_DEDICATED_COUNTIES)
+)
+
+
+#: Parcel facts the layer carries beside owner/situs/mailing, by layer url (2026-10-08
+#: source-completeness audit; extraction audit 2026-10-07 section 3 "value/acreage/sale/deed/link
+#: columns unmapped"). Only layers whose field names were read live from the layer's own schema
+#: that day are listed (a name the layer lacks makes ArcGIS answer 400 and the county is lost):
+#: NC OneMap (Cleveland + the 89 statewide-fallback counties) and Polk. Kept in
+#: raw['heir_estate']['parcel_facts']; acreage and the legal description also fill the Listing.
+_PARCEL_FACT_FIELDS: dict[str, tuple[str, ...]] = {
+    _NC_ONEMAP_SPEC["url"]: ("gisacres", "parval", "landval", "improvval", "saledate",
+                             "saledatetx", "legdecfull", "parusedesc", "structyear", "mapref",
+                             "altparno"),
+    COUNTY_GIS["NC:Polk"]["url"]: ("TOTAL_TAX_VALUE", "TOTAL_TAX_OWED", "DEEDED_ACRES",
+                                   "DEED_BOOK", "DEED_PAGE", "DEED_YEAR", "PropertyRecordCard"),
+}
+_ACRE_FIELDS = ("gisacres", "DEEDED_ACRES")
+_LEGAL_FIELDS = ("legdecfull",)
+
+
+def _parcel_facts(spec: dict, attrs: dict) -> dict:
+    """The _PARCEL_FACT_FIELDS this row carries (None / blank values dropped)."""
+    out = {}
+    for k in _PARCEL_FACT_FIELDS.get(spec.get("url") or "", ()):
+        v = attrs.get(k)
+        if v is None or (isinstance(v, str) and not v.strip()):
+            continue
+        out[k] = v.strip() if isinstance(v, str) else v
+    return out
+
+
+def _first_num(facts: dict, keys: tuple[str, ...]):
+    for k in keys:
+        v = facts.get(k)
+        if isinstance(v, (int, float)) and v > 0:
+            return float(v)
+    return None
+
+
+def _where(spec: dict, county: str) -> str:
+    owner_fields = spec.get("owner") or []
+    if not owner_fields:
+        return ""
+    pos = " OR ".join(
+        f"UPPER({f}) LIKE '%{tok}%'" for f in owner_fields for tok in _MATCH_TOKENS)
+    # The exclusions go on the FIRST owner field only. `UPPER(f2) NOT LIKE ...` is NULL
+    # when the second owner field is NULL, which silently dropped every single-owner row
+    # (Lincoln 305 matched as written vs 1,162 null-safe; 2026-10-07 audit), and the
+    # null-safe `OR f2 IS NULL` form drew a 403 from one county host. The other fields
+    # are excluded in Python (_excluded_row), with the same meaning.
+    neg = " AND ".join(
+        f"UPPER({owner_fields[0]}) NOT LIKE '%{ex}%'" for ex in _EXCLUDE)
+    where = f"({pos})"
+    if neg:
+        where += f" AND {neg}"
+    # Shared statewide layers (NC OneMap) need the county pinned.
+    cf = spec.get("county_field")
+    if cf:
+        where += f" AND UPPER({cf}) = '{county.upper()}'"
+    return where
+
+
+_EXCLUDE_RE = re.compile("|".join(re.escape(x) for x in _EXCLUDE), re.I)
+
+
+def _excluded_row(owner_fields: list[str]) -> bool:
+    """Any owner field carrying REAL ESTATE / ESTATES (subdivision/HOA/brokerage noise;
+    LIFE ESTATE is handled separately now, see _is_life_estate below): the row is out,
+    the rule the SQL used to apply to every field (see _where)."""
+    return any(_EXCLUDE_RE.search(f or "") for f in owner_fields)
+
+
+# LIFE ESTATE / LIFE-ESTATE: a DIFFERENT signal from the decedent/heir rows above (the
+# named owner is explicitly STILL ALIVE -- a life tenant), so it gets its own detector
+# rather than reusing `_is_decedent`/`_excluded_row`: those no longer remove it (see the
+# 2026-11-10 note above _EXCLUDE) but also have no way to tell it apart from a genuine
+# decedent row (both contain a bare `ESTATE` token), and `_is_decedent`'s entity-suffix
+# guard exists to keep LLCs/trusts/etc OUT of the HEIR/ESTATE match, not to judge a
+# life-tenant. Same `\bLIFE\s*EST`-shaped pattern enrichment_life_events.py /
+# enrichment_owner_name_signal.py already use for this exact concept elsewhere in the
+# codebase; `[\s-]*` additionally covers the hyphen spelling from the 2026-10-19 note
+# above (and a no-separator "LIFEESTATE").
+_LIFE_ESTATE_RE = re.compile(r"\bLIFE[\s-]*ESTATE\b", re.I)
+
+
+def _is_life_estate(owner_fields: list[str]) -> bool:
+    """Any owner field naming a life estate -- a living life-tenant, not a decedent."""
+    return any(_LIFE_ESTATE_RE.search(f or "") for f in owner_fields)
+
+
+def _pick_value_field(layer_meta: dict) -> str | None:
+    """The layer's numeric total-value column, by _VALUE_FIELD_PREFERENCE, else None."""
+    numeric = {str(f.get("name") or "").lower(): f.get("name")
+               for f in (layer_meta.get("fields") or [])
+               if f.get("type") in _NUMERIC_TYPES and f.get("name")}
+    for want in _VALUE_FIELD_PREFERENCE:
+        if want in numeric:
+            return numeric[want]
+    return None
+
+
+def _num(v) -> float | None:
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return None
+    return f if f > 0 else None
+
+
+def _html(s: str) -> str:
+    """Strip embedded tags some SC layers put in owner/situs (Laurens: '<br>&')."""
+    return re.sub(r"<[^>]+>", " ", s or "")
+
+
+def _stitch(spec: dict, attrs: dict, fields_key: str) -> str | None:
+    parts = []
+    for f in spec.get(fields_key) or []:
+        v = attrs.get(f)
+        if v not in (None, "", " "):
+            parts.append(_html(str(v)).strip())
+    out = " ".join(p for p in parts if p).strip()
+    return re.sub(r"\s+", " ", out) or None
+
+
+def _owner_fields(spec: dict, attrs: dict) -> list[str]:
+    """Every populated owner-name subfield, cleaned, in spec order.
+
+    Several target counties store owner-of-record across MULTIPLE subfields
+    (Gaston CURR_NAME1/CURR_NAME2, Polk OWNAM1/2/3, McDowell/Cleveland
+    ownname/ownname2, Lincoln/Pickens NAME1/NAME2, Mitchell Owner1/Owner2) —
+    this is where a second heir's name, or a care-of/trustee contact line,
+    lives. A single-field `_owner()` that returned only the first non-empty
+    value both dropped real second heirs (live-confirmed, Gaston: CURR_NAME1
+    "HARDIN CLARENCE HEIRS" / CURR_NAME2 "HARDIN OMA HEIRS" -> only the first
+    survived) AND, worse, could drop the WHOLE row when the HEIR/ESTATE token
+    landed on a later field (live-confirmed, McDowell: ownname "SWOFFORD
+    RONALD TRUSTEE 1/2" has no token, ownname2 "SWOFFORD LEONARD HEIRS 1/2"
+    does -- the old code checked only ownname and discarded a real heir row
+    the SQL WHERE clause had already matched). See `_is_decedent` below.
+    """
+    out: list[str] = []
+    for f in spec.get("owner") or []:
+        v = attrs.get(f)
+        if v is None:
+            continue
+        cleaned = re.sub(r"\s+", " ", _html(str(v))).strip()
+        if cleaned:
+            out.append(cleaned)
+    return out
+
+
+def _owner_display(owner_fields: list[str]) -> str | None:
+    """Join every subfield (deduped) so no co-owner/heir name is dropped."""
+    seen: set[str] = set()
+    parts: list[str] = []
+    for f in owner_fields:
+        key = f.upper()
+        if key in seen:
+            continue
+        seen.add(key)
+        parts.append(f)
+    return "; ".join(parts) if parts else None
+
+
+# 2026-10-02 — heir-list breadth gap (owner: "if its multiple heirs and who
+# they are. i dont just want a name i want ALL data"). `_owner_display()`
+# above has ALWAYS joined every owner subfield into one "A HEIRS; B HEIRS"
+# string for `defendant` -- that join already preserves every name (nothing
+# was silently dropped), but it is not machine-readable as a LIST: nothing
+# downstream can answer "who are the heirs" without re-splitting a free-text
+# string. `_parse_owner_field()` below parses each raw subfield into a clean
+# name + the role token the county roll encoded inline with it, so
+# raw['heir_estate']['heir_names'] is a real list of {raw, name, role} dicts,
+# not a second copy of the same joined string.
+_ROLE_TOKENS: tuple[tuple[re.Pattern, str], ...] = (
+    (re.compile(r"\bHEIRS?\b", re.I), "heir"),
+    (re.compile(r"\bESTATE\b", re.I), "estate"),
+    (re.compile(r"\bTRUSTEE\b", re.I), "trustee"),
+)
+# Trailing fractional-interest ("1/2") or Latin co-owner noise ("ET AL") left
+# over once the role token itself is stripped out of the middle/end of the
+# string (McDowell: "SWOFFORD LEONARD HEIRS 1/2" -> role-strip -> "SWOFFORD
+# LEONARD  1/2" -> this strip -> "SWOFFORD LEONARD").
+_TRAILING_NOISE_RE = re.compile(r"(?:\d+\s*/\s*\d+|ET\s*AL\.?|\bOF)\s*$", re.I)
+
+
+def _parse_owner_field(field: str) -> dict:
+    """One raw owner-of-record subfield -> a clean name + its encoded role.
+
+    County rolls fold the role into the name text itself rather than a
+    separate column, in three shapes seen live: trailing ("<NAME> HEIRS",
+    "<NAME> ESTATE", "<NAME> TRUSTEE 1/2") and leading ("ESTATE OF <NAME>").
+    Returns {"raw": <original>, "name": <role token stripped>, "role":
+    "heir"|"estate"|"trustee"|"other"} -- "other" for a plain co-owner/agent
+    subfield (e.g. "HUNTER LINDA PACE ET VIR") that carries no role token at
+    all; it still gets a dict here so NO subfield is silently dropped from
+    the structured list, matching what `_owner_display()` already does for
+    the joined string.
+    """
+    f = (field or "").strip()
+    m = re.match(r"^ESTATE\s+OF\s+(.+)$", f, re.I)
+    if m:
+        name, role = m.group(1), "estate"
+    else:
+        name, role = f, "other"
+        for pat, r in _ROLE_TOKENS:
+            if pat.search(f):
+                name, role = pat.sub(" ", f), r
+                break
+    name = _TRAILING_NOISE_RE.sub("", name).strip()
+    name = re.sub(r"\s+", " ", name).strip(" ,;")
+    return {"raw": field, "name": name or field, "role": role}
+
+
+def _heir_names(owner_fields: list[str]) -> list[dict]:
+    """Every owner subfield parsed into the structured {raw,name,role} shape,
+    in the SAME order as `owner_fields` (which is already spec-field order) --
+    no name is dropped or re-ordered relative to the joined `owner_of_record`
+    string this sits alongside in `raw['heir_estate']`."""
+    return [_parse_owner_field(f) for f in owner_fields]
+
+
+class NCHeirEstateParcels(BaseScraper):
+    slug = "counties_nc.nc_heir_estate_parcels"
+    name = "Heir / Estate Owner-of-Record Parcels (NC statewide + Upstate/broader SC GIS)"
+    category = "motivated_seller"
+    expected_min_count = 5
+    # Raised 240 -> 360 on 2026-10-02 when NC_STATEWIDE_FALLBACK_COUNTIES (89 counties)
+    # was added: each extra county is one more sequential ArcGIS query behind the shared
+    # per-host throttle (~0.8-1.5s/request regardless of concurrency — see
+    # _STATEWIDE_CONCURRENCY's comment), so 89 more counties is roughly another 70-130s
+    # on top of the ~18-county baseline.
+    # 360 -> 600 on 2026-10-07: up to 400 value-ranked rows per county (was 80 unordered)
+    # plus one schema read per layer. Measured live: 3 counties 6 s -> 20 s.
+    timeout_s = 600.0
+    requires_apify = False
+    optional = True
+
+    def __init__(self, *a, **kw):
+        super().__init__(*a, **kw)
+        self._value_fields: dict[str, str | None] = {}
+        self.run_stats: dict = {"per_county_cap": _PER_COUNTY_CAP, "counties": 0,
+                                "rows_read": 0, "capped_counties": [],
+                                "ranked_by_value": 0}
+
+    async def _value_field(self, http, url: str) -> str | None:
+        """The layer's numeric total-value column (one schema GET per layer per run).
+
+        The GET is wrapped in AsyncRetrying (2026-10-17 gap-sweep): a bare transient
+        transport/timeout blip here used to permanently disable value-ranking for that
+        layer for the rest of the run with zero retry cushioning -- never a zeroed
+        county (the caller falls back to the pre-existing unordered `_query()` read),
+        just silently worse ordering for that one layer. Retried ONLY transport/timeout
+        errors; a real bad status or parse failure still falls straight through to the
+        same vf=None fallback below, unretried, exactly as before.
+        """
+        if url not in self._value_fields:
+            vf = None
+            try:
+                async for attempt in AsyncRetrying(
+                    stop=stop_after_attempt(3),
+                    wait=wait_exponential_jitter(initial=1, max=8),
+                    retry=retry_if_exception_type(
+                        (httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                    reraise=True,
+                ):
+                    with attempt:
+                        r = await http.get(url.rstrip("/"), params={"f": "json"}, timeout=30.0)
+                if getattr(r, "status_code", 0) == 200:
+                    vf = _pick_value_field(r.json() or {})
+            except Exception:  # noqa: BLE001 - unranked is the old behaviour, not a failure
+                vf = None
+            self._value_fields[url] = vf
+        return self._value_fields[url]
+
+    async def _ranked_rows(self, http, spec: dict, where: str, value_field: str | None):
+        """Up to _PER_COUNTY_CAP matching rows, highest value first when the layer has a
+        numeric value column. An empty ranked first page (a slow ordered query times out
+        the same way an empty one answers) falls back to the old unordered read."""
+        out_fields = _spec_out_fields(spec)
+        extra = _PARCEL_FACT_FIELDS.get(spec.get("url") or "", ())
+        if extra:
+            out_fields = ",".join(dict.fromkeys(out_fields.split(",") + list(extra)))
+        if value_field:
+            out_fields = ",".join(dict.fromkeys(out_fields.split(",") + [value_field]))
+            rows: list[dict] = []
+            offset = 0
+            while len(rows) < _PER_COUNTY_CAP:
+                page, more = await _query_page(
+                    http, spec["url"], where, out_fields,
+                    count=min(_RANK_PAGE, _PER_COUNTY_CAP - len(rows)), offset=offset,
+                    order_by=f"{value_field} DESC")
+                rows.extend(page)
+                offset += len(page)
+                if not page or not more:
+                    break
+            if rows:
+                self.run_stats["ranked_by_value"] += 1
+                return rows[:_PER_COUNTY_CAP], True
+        rows = await _query(http, spec["url"], where, out_fields=out_fields,
+                            count=_PER_COUNTY_CAP)
+        return rows, False
+
+    async def _process_county(self, http, state: str, county: str, spec: dict) -> list[Listing]:
+        """One county's worth of heir/estate parcels. Pulled out of fetch() so the
+        dedicated per-county layers AND the statewide NC OneMap fallback (which
+        queries dozens more counties against the same spec shape) share one path."""
+        where = _where(spec, county)
+        if not where:
+            return []
+        try:
+            value_field = await self._value_field(http, spec["url"])
+            rows, ranked = await self._ranked_rows(http, spec, where, value_field)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("nc_heir.county_fail", county=county, error=str(exc)[:120])
+            return []
+        self.run_stats["counties"] += 1
+        self.run_stats["rows_read"] += len(rows)
+        if len(rows) >= _PER_COUNTY_CAP:
+            self.run_stats["capped_counties"].append(f"{state}:{county}")
+        out: list[Listing] = []
+        for rank, attrs in enumerate(rows, 1):
+            owner_fields = _owner_fields(spec, attrs)
+            if not owner_fields:
+                continue
+            # LIFE ESTATE rows are their OWN signal (2026-11-10 note above _EXCLUDE) and
+            # are judged on that alone: _is_decedent/_excluded_row are decedent-shaped
+            # heuristics that do not apply to a living life-tenant, so a life-estate hit
+            # must never be run through them and risk being silently dropped on grounds
+            # that were never meant for it (e.g. _is_decedent's entity-suffix guard).
+            is_life_estate = _is_life_estate(owner_fields)
+            if not is_life_estate and (
+                    not _is_decedent(owner_fields) or _excluded_row(owner_fields)):
+                continue
+            owner = _owner_display(owner_fields)
+            if not owner:
+                continue
+            situs = _stitch(spec, attrs, "situs")
+            mail = _stitch(spec, attrs, "mail")
+            parcel = attrs.get(spec.get("parcel")) if spec.get("parcel") else None
+            # Care-of / attn line (e.g. Buncombe "CareOf") — the executor
+            # or heir's agent, a resolvable contact. Spec-declared field
+            # name only (no guessing); absent on counties that don't map it.
+            care_of_field = spec.get("care_of")
+            care_of = None
+            if care_of_field:
+                cv = attrs.get(care_of_field)
+                if cv and str(cv).strip():
+                    care_of = re.sub(r"\s+", " ", _html(str(cv))).strip() or None
+            facts = _parcel_facts(spec, attrs)
+            legal = next((str(facts[k]) for k in _LEGAL_FIELDS if facts.get(k)), None)
+            # LIFE ESTATE is a living-owner signal, not a decedent one: tag it distinctly
+            # everywhere the decedent/heir path tags a row below, instead of reusing
+            # "probate" (which would misreport a living life-tenant as deceased).
+            if is_life_estate:
+                match = "life_estate"
+                relationship_signal = {
+                    "kind": "life_estate",
+                    "keyword": "life_estate_owner_of_record",
+                    "source": self.slug,
+                }
+            else:
+                match = "heirs" if _HEIR_TOKEN.search(owner) else "estate"
+                relationship_signal = {
+                    "kind": "probate",
+                    "keyword": "heir_estate_owner_of_record",
+                    "source": self.slug,
+                }
+            li = Listing(
+                source=self.slug,
+                source_url=spec["url"],
+                acreage=_first_num(facts, _ACRE_FIELDS),
+                legal_description=legal,
+                listing_type=ListingType.ESTATE_LEAD,
+                property_kind=PropertyKind.UNKNOWN,
+                state=state,
+                county=county,
+                street_address=situs,
+                parcel_id=str(parcel).strip() if parcel else None,
+                defendant=owner,
+                sale_date=None,
+                description=f"Heir/estate owner of record ({owner}) in {county} County, {state}",
+                first_seen=datetime.utcnow(),
+                last_seen=datetime.utcnow(),
+                raw={
+                    "heir_estate": {
+                        "owner_of_record": owner,
+                        # Structured list (NOT the joined string above) so
+                        # "who are the heirs" has real distinct names to read,
+                        # not a ";"-delimited blob to re-parse downstream.
+                        "heir_names": _heir_names(owner_fields),
+                        "mailing": mail,
+                        "care_of": care_of,
+                        "match": match,
+                        # Plain boolean so a filter never has to know "life_estate" is
+                        # one of the values `match` above can carry.
+                        "life_estate": is_life_estate,
+                        # 2026-10-07: the layer's own total value (the ranking key), the
+                        # row's place in its county's value-ranked read, and the cap.
+                        **({"value": _num(attrs.get(value_field)), "value_field": value_field,
+                            "value_rank": rank} if ranked and value_field else {}),
+                        "per_county_cap": _PER_COUNTY_CAP,
+                        **({"parcel_facts": facts} if facts else {}),
+                    },
+                    # Score as a probate/life-event distress signal (life estate gets its
+                    # own "life_estate" kind above instead -- see is_life_estate).
+                    "relationship_signal": relationship_signal,
+                    # Same raw['life_events'] shape enrichment_life_events.py already
+                    # writes for this exact token (there, scanned off owner_name; here,
+                    # set directly since this producer already knows it with certainty).
+                    # Feeds distress_score.py's existing "life_estate" -> LIFE_EVENT
+                    # (weight 8) rule, which was already live and waiting on a producer
+                    # to populate this key for this signal.
+                    **({"life_events": ["life_estate"]} if is_life_estate else {}),
+                },
+            )
+            out.append(li)
+        log.info("nc_heir.county", county=county, kept=len(out))
+        return out
+
+    async def fetch(self) -> Iterable[Listing]:
+        # Bank rows as each county completes: if the soft timeout fires partway
+        # through the 89-county statewide sweep, base_scraper ships whatever has
+        # already landed in self.partial instead of discarding the whole run.
+        out = self.partial
+        async with client(timeout=25.0) as http:
+            for key in _HEIR_COUNTIES:
+                spec = COUNTY_GIS.get(key)
+                if not spec:
+                    continue
+                state, county = key.split(":", 1)
+                out.extend(await self._process_county(http, state, county, spec))
+
+            # Statewide NC OneMap fallback — every other in-scope NC county, same
+            # technique, same spec shape (see NC_STATEWIDE_FALLBACK_COUNTIES).
+            sem = asyncio.Semaphore(_STATEWIDE_CONCURRENCY)
+
+            async def _bounded(county: str) -> list[Listing]:
+                async with sem:
+                    return await self._process_county(http, "NC", county, _NC_ONEMAP_SPEC)
+
+            for coro in asyncio.as_completed(
+                [_bounded(c) for c in NC_STATEWIDE_FALLBACK_COUNTIES]
+            ):
+                out.extend(await coro)
+        log.info("nc_heir.parsed", listings=len(out), **{
+            k: (len(v) if isinstance(v, list) else v) for k, v in self.run_stats.items()})
+        try:
+            job_events.note("nc_heir.run_stats", listings=len(out),
+                            per_county_cap=self.run_stats["per_county_cap"],
+                            counties=self.run_stats["counties"],
+                            rows_read=self.run_stats["rows_read"],
+                            ranked_by_value=self.run_stats["ranked_by_value"],
+                            capped_counties=",".join(self.run_stats["capped_counties"])[:200])
+        except Exception:  # noqa: BLE001 - bookkeeping never fails the run
+            pass
+        return out
+
+
+if __name__ == "__main__":
+
+    async def _main() -> None:
+        s = NCHeirEstateParcels()
+        rows = await s.safe_run()
+        print(f"outcome={s.last_outcome} count={len(rows)}")
+        for li in rows[:12]:
+            print(f"  {li.county:14} {(li.defendant or '')[:34]:34} "
+                  f"situs={(li.street_address or '')[:34]} pin={li.parcel_id}")
+
+    asyncio.run(_main())

@@ -1,0 +1,46 @@
+{
+ "operationalLayers": [
+  {
+   "id": "19a7e6fb8d8-layer-11",
+   "title": "Aerial Imagery 2025",
+   "url": "https://gisweb.hendersoncountync.gov/arcgis/rest/services/Orthos2025_NC/MapServer",
+   "layerType": "ArcGISMapServiceLayer",
+   "visibility": false
+  },
+  {
+   "id": "19a7ed9c4f7-layer-5",
+   "title": "ALL Parcels Henderson County NC",
+   "url": "https://gisweb.hendersoncountync.gov/arcgis/rest/services/Parcels/FeatureServer/0",
+   "layerType": "ArcGISFeatureLayer",
+   "layerDefinition": {},
+   "visibility": false,
+   "itemId": "09c7541e18b24b9eba751a9e3a5672e4"
+  },
+  {
+   "id": "19a3be15e74-layer-7",
+   "title": "Foreclosure Parcels Henderson County NC",
+   "url": "https://gisweb.hendersoncountync.gov/arcgis/rest/services/Parcels/FeatureServer/0",
+   "layerType": "ArcGISFeatureLayer",
+   "layerDefinition": {
+    "definitionExpression": "REID = '301249' OR REID = '1001870' OR REID = '1010102' OR REID = '1010327' OR REID = '104711' OR REID = '500487' OR REID = '9929018' OR REID = '300467' OR REID = '9970187' OR REID = '9906139' OR REID = '9975083' OR REID = '500984' OR REID = '401186' OR REID = '1008000' OR REID = '1001771'"
+   },
+   "visibility": true,
+   "itemId": "09c7541e18b24b9eba751a9e3a5672e4"
+  },
+  {
+   "id": "1997822241f-layer-9",
+   "title": "Roads",
+   "url": "https://gisweb.hendersoncountync.gov/arcgis/rest/services/Roads/MapServer",
+   "layerType": "ArcGISMapServiceLayer",
+   "visibility": true
+  },
+  {
+   "id": "1997bd8996f-layer-9",
+   "title": "Addresses",
+   "url": "https://gisweb.hendersoncountync.gov/arcgis/rest/services/Addresses/MapServer",
+   "layerType": "ArcGISMapServiceLayer",
+   "visibility": true
+  }
+ ],
+ "version": "2.35"
+}

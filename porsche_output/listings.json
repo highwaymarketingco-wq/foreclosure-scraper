@@ -1,0 +1,26 @@
+[
+  {
+    "source": "fb_marketplace",
+    "source_url": "https://www.facebook.com/marketplace/item/4452222998399581/",
+    "listing_id": "4452222998399581",
+    "title": "2016 Porsche cayenne base",
+    "year": 2016,
+    "make": "Porsche",
+    "model": null,
+    "trim": null,
+    "price_usd": 21995.0,
+    "current_bid_usd": null,
+    "mileage": 98000,
+    "location": "Greer, South Carolina",
+    "seller_type": "private",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https:\\/\\/scontent-atl3-3.xx.fbcdn.net\\/v\\/t39.84726-6\\/720126089_2369123810318045_6138719065430290894_n.jpg?stp=c90.0.540.540a_dst-jpg_p180x540_tt6&_nc_cat=108&ccb=1-7&_nc_sid=92e707&_nc_ohc=BA8OCxsGPJEQ7kNvwHyqbQo&_nc_oc=Ado_tk_rxZAr-gE7HHQpk8ZtuNIx1diGj9h2aPsQlGGLwYLqtyrj6gEY2hLdqtwQHlv9zLmRUDKGt5Wgsz8AeEJs&_nc_zt=14&_nc_ht=scontent-atl3-3.xx&_nc_gid=B8Gg2KncvfHRYQNseaNuvA&_nc_ss=7b2a8&oh=00_AQGgXqwaJ_63Qcp-CKBtJlYyYqqvdF8CSLMHlsJNl8AX9g&oe=6A858F30",
+    "vin": null,
+    "lot_number": null,
+    "sale_date": null,
+    "first_seen": "2026-08-15T02:30:37.401115Z",
+    "raw": {},
+    "project_tier": "clean"
+  }
+]

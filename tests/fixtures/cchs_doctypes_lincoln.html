@@ -1,0 +1,51 @@
+<!-- Captured 2026-09-20 from https://us4.courthousecomputersystems.com/LincolnNCNW/realestatesearch.asp (HTTP 200).
+     Trimmed from 214 instrument kinds to the ones the deed-index tests need; each
+     doctype block is byte-for-byte as served. Lincoln names its deed book type DEED,
+     and spells the dictionary names without apostrophes (COMMISSIONERS DEED). -->
+<html><head><title>Register of Deeds</title></head><body><script>
+var BookTypes = new Array();
+ var doctypes = new Array();
+ var doctype = new Object();
+ doctype.name = 'COMMISSIONERS DEED';
+ doctype.kind = 'COM/D';
+ doctypes[doctypes.length] = doctype;
+ var doctype = new Object();
+ doctype.name = 'DEED';
+ doctype.kind = 'DEED';
+ doctypes[doctypes.length] = doctype;
+ var doctype = new Object();
+ doctype.name = 'DEED OF SEPARATION';
+ doctype.kind = 'D/SEP';
+ doctypes[doctypes.length] = doctype;
+ var doctype = new Object();
+ doctype.name = 'DEED OF TRUST';
+ doctype.kind = 'D/T';
+ doctypes[doctypes.length] = doctype;
+ var doctype = new Object();
+ doctype.name = 'QUIT CLAIM DEED';
+ doctype.kind = 'QCD';
+ doctypes[doctypes.length] = doctype;
+ var doctype = new Object();
+ doctype.name = 'RELEASE DEED';
+ doctype.kind = 'REL/D';
+ doctypes[doctypes.length] = doctype;
+ var doctype = new Object();
+ doctype.name = 'REPORT OF COMMISSIONERS';
+ doctype.kind = 'R/COM';
+ doctypes[doctypes.length] = doctype;
+ var doctype = new Object();
+ doctype.name = 'SHERIFFS DEED';
+ doctype.kind = 'SHF/D';
+ doctypes[doctypes.length] = doctype;
+ var doctype = new Object();
+ doctype.name = 'SUBSTITUTION OF TRUSTEE';
+ doctype.kind = 'S/TR';
+ doctypes[doctypes.length] = doctype;
+ var doctype = new Object();
+ doctype.name = 'TRUSTEES DEED';
+ doctype.kind = 'TR/D';
+ doctypes[doctypes.length] = doctype;
+BookTypes[BookTypes.length]= new Object();
+BookTypes[BookTypes.length-1].name = 'DEED';
+BookTypes[BookTypes.length-1].doctypes = doctypes;
+</script></body></html>

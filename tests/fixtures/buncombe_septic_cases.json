@@ -1,0 +1,158 @@
+{
+ "features": [
+  {
+   "attributes": {
+    "OBJECTID": 1,
+    "CaseNumber": "SEP2003-00095",
+    "ParcelNum": "062822882200000",
+    "ApplicationName": "DAVIS NEWTON",
+    "SitusAddress": "99999 NC9 HWY",
+    "SitusCity": "BUNCOMBE",
+    "SitusZip": "99999",
+    "OwnerName": "DAVIS R NEWTON",
+    "ReceivedDate": 953596800000,
+    "LatestStatus": "Finaled",
+    "LatestStatusDate": 1046217600000,
+    "PermitType": "SEPTIC",
+    "SubType": "CONSTRUCTION AUTHORIZATION"
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 2,
+    "CaseNumber": "SEP2003-00144",
+    "ParcelNum": "976352602900000",
+    "ApplicationName": "STEVE BURLESON",
+    "SitusAddress": "6 DEERPEN DR",
+    "SitusCity": "WEAVERVILLE",
+    "SitusZip": "28787",
+    "OwnerName": "STEVE L BURLESON    & SONIA D",
+    "ReceivedDate": 953856000000,
+    "LatestStatus": "Finaled",
+    "LatestStatusDate": 1046649600000,
+    "PermitType": "SEPTIC",
+    "SubType": "SEPTIC REPAIR"
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 2177,
+    "CaseNumber": "SEP1995-37781",
+    "ParcelNum": "963314414600000",
+    "ApplicationName": null,
+    "SitusAddress": null,
+    "SitusCity": null,
+    "SitusZip": null,
+    "OwnerName": "ROY PARKER",
+    "ReceivedDate": -2208988800000,
+    "LatestStatus": "Received",
+    "LatestStatusDate": -2208988800000,
+    "PermitType": "SEPTIC",
+    "SubType": "NEW AUTHORIZATION"
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 4101,
+    "CaseNumber": "SEP2003-02648",
+    "ParcelNum": "869685584500000",
+    "ApplicationName": "DANIEL MORGAN",
+    "SitusAddress": "35 DEER MEADOWS DR",
+    "SitusCity": "CANDLER",
+    "SitusZip": "28715",
+    "OwnerName": "RONALD D HILTON & ELIZABETH R",
+    "ReceivedDate": 1000684800000,
+    "LatestStatus": "Issued",
+    "LatestStatusDate": 1068163200000,
+    "PermitType": "SEPTIC",
+    "SubType": "IMPROVEMENT PERMIT"
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 41990,
+    "CaseNumber": "SEP2013-01134",
+    "ParcelNum": "869685584500000",
+    "ApplicationName": "CYNTHIA FORREST",
+    "SitusAddress": "35 DEER MEADOWS DR",
+    "SitusCity": "CANDLER",
+    "SitusZip": "28715",
+    "OwnerName": "CYNTHIA A FORREST",
+    "ReceivedDate": 1381795200000,
+    "LatestStatus": "Permit Suspended",
+    "LatestStatusDate": 1431907200000,
+    "PermitType": "SEPTIC",
+    "SubType": "CONSTRUCTION AUTHORIZATION"
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 43431,
+    "CaseNumber": "SEP2015-00634",
+    "ParcelNum": "869685584500000",
+    "ApplicationName": "SCHUMACHER HOMES",
+    "SitusAddress": "35 DEER MEADOWS DR",
+    "SitusCity": "CANDLER",
+    "SitusZip": "28715",
+    "OwnerName": "CYNTHIA A FORREST",
+    "ReceivedDate": 1432598400000,
+    "LatestStatus": "S19A - OP Issued",
+    "LatestStatusDate": 1432771200000,
+    "PermitType": "SEPTIC",
+    "SubType": "REVISION"
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 27583,
+    "CaseNumber": "SEP2003-01969",
+    "ParcelNum": "967676571500000",
+    "ApplicationName": "DONALD WYATT",
+    "SitusAddress": "27 GRAYLYN DR",
+    "SitusCity": "FAIRVIEW",
+    "SitusZip": "28730",
+    "OwnerName": "MOUNTAIN DREAMBUILDERS LLC",
+    "ReceivedDate": 1061251200000,
+    "LatestStatus": "Finaled",
+    "LatestStatusDate": 1088467200000,
+    "PermitType": "SEPTIC",
+    "SubType": "CONSTRUCTION AUTHORIZATION"
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 31073,
+    "CaseNumber": "SEP2005-01337",
+    "ParcelNum": "967676571500000",
+    "ApplicationName": "DUANE MOORE",
+    "SitusAddress": "27 GRAYLYN DR",
+    "SitusCity": "FAIRVIEW",
+    "SitusZip": "28730",
+    "OwnerName": null,
+    "ReceivedDate": 1115164800000,
+    "LatestStatus": "Cancelled",
+    "LatestStatusDate": 1115164800000,
+    "PermitType": "SEPTIC",
+    "SubType": "REVISION"
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 83,
+    "CaseNumber": "SEP1907-23543",
+    "ParcelNum": null,
+    "ApplicationName": null,
+    "SitusAddress": " FAIRMONT RD",
+    "SitusCity": "BUNCOMBE",
+    "SitusZip": "99999",
+    "OwnerName": "HORSE SHOW ENKA-CANDLER",
+    "ReceivedDate": -2208988800000,
+    "LatestStatus": "OP Issued",
+    "LatestStatusDate": -1975276800000,
+    "PermitType": "SEPTIC",
+    "SubType": null
+   }
+  }
+ ],
+ "exceededTransferLimit": false
+}

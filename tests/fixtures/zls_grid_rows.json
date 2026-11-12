@@ -1,0 +1,134 @@
+[
+ {
+  "office": "Moore County Tax Office",
+  "parcel": "00025637",
+  "status": "Pending Confirmation",
+  "sale": "6/8/2026",
+  "upset": "n/a",
+  "opening_bid": "n/a",
+  "current_bid": "$45,000.00",
+  "notice_url": "",
+  "addr": "⚠️ 210 Woodlawn St, West End, NC 27376"
+ },
+ {
+  "office": "Guilford County Tax Office",
+  "parcel": "0021388",
+  "status": "Upset Bidding in Progress",
+  "sale": "7/22/2026",
+  "upset": "8/4/2026 5:00 PM",
+  "opening_bid": "n/a",
+  "current_bid": "$32,029.51",
+  "notice_url": "",
+  "addr": "⚠️ 1007 Avalon Rd, Greensboro, NC 27401"
+ },
+ {
+  "office": "Guilford County Tax Office",
+  "parcel": "0047081",
+  "status": "Sale Confirmed",
+  "sale": "4/9/2026",
+  "upset": "n/a",
+  "opening_bid": "n/a",
+  "current_bid": "$7,642.46",
+  "notice_url": "",
+  "addr": "⚠️ 4813 Troxler Rd, Greensboro, NC 27405"
+ },
+ {
+  "office": "Chatham County Tax Office",
+  "parcel": "0073058",
+  "status": "Sale Confirmed / Deed Recorded",
+  "sale": "2/18/2026",
+  "upset": "n/a",
+  "opening_bid": "n/a",
+  "current_bid": "$22,000.00",
+  "notice_url": "",
+  "addr": ""
+ },
+ {
+  "office": "Cabarrus County Tax Office",
+  "parcel": "04115 0055.00",
+  "status": "Resale Pending",
+  "sale": "2/19/2026",
+  "upset": "n/a",
+  "opening_bid": "n/a",
+  "current_bid": "$90,000.00",
+  "notice_url": "",
+  "addr": ""
+ },
+ {
+  "office": "Guilford County Tax Office",
+  "parcel": "161678",
+  "status": "Redeemed",
+  "sale": "7/22/2026",
+  "upset": "n/a",
+  "opening_bid": "n/a",
+  "current_bid": "$0.00",
+  "notice_url": "",
+  "addr": "⚠️ 1735 NC-62, Archdale, NC 27263"
+ },
+ {
+  "office": "Beaufort County Tax Office",
+  "parcel": "38910",
+  "status": "Stayed by Bankruptcy",
+  "sale": "12/16/2025",
+  "upset": "n/a",
+  "opening_bid": "n/a",
+  "current_bid": "$7,454.68",
+  "notice_url": "",
+  "addr": ""
+ },
+ {
+  "office": "Jones County Tax Office",
+  "parcel": "4478-83-5588-00",
+  "status": "Courthouse Sale",
+  "sale": "8/3/2026",
+  "upset": "n/a",
+  "opening_bid": "$4,957.42",
+  "current_bid": "To be announced.",
+  "notice_url": "",
+  "addr": "⚠️ 916 Greentown Rd, Trenton, NC 28585"
+ },
+ {
+  "office": "City of Laurinburg",
+  "parcel": "010013 22002",
+  "status": "Pending Confirmation",
+  "sale": "5/27/2026",
+  "upset": "n/a",
+  "opening_bid": "n/a",
+  "current_bid": "$18,563.56",
+  "notice_url": "",
+  "addr": "⚠️ 1009 Raleigh St, Laurinburg, NC 28352"
+ },
+ {
+  "office": "Wake County General Courts of Justice",
+  "parcel": "2705269963",
+  "status": "Sale Confirmed / Deed Recorded",
+  "sale": "12/3/2025",
+  "upset": "n/a",
+  "opening_bid": "n/a",
+  "current_bid": "$115,346.01",
+  "notice_url": "",
+  "addr": "⚠️ 114 E Lee St, Zebulon, NC 27597"
+ },
+ {
+  "office": "Town of Williamston",
+  "parcel": "0501321",
+  "status": "Sale Confirmed",
+  "sale": "6/5/2025",
+  "upset": "n/a",
+  "opening_bid": "n/a",
+  "current_bid": "$7,348.76",
+  "notice_url": "",
+  "addr": "⚠️ 813 W Main St, Williamston, NC 27892"
+ },
+ {
+  "office": "",
+  "parcel": "",
+  "status": "",
+  "sale": "",
+  "upset": "",
+  "opening_bid": "",
+  "current_bid": "",
+  "notice_url": "",
+  "addr": ""
+ }
+]

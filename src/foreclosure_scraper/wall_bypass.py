@@ -1,0 +1,551 @@
+"""Free wall-bypass fetch tiers — curl-cffi, pydoll (Turnstile) + nodriver (DataDome/hard CF).
+
+These sit ABOVE the curl-cffi impersonation tier in http_client.get_text's
+escalation chain. They launch real browser processes, so they are slower
+(~5-15s) and are only invoked when every cheaper tier has failed.
+
+Tier order in the full chain:
+  1. plain httpx (http_client.get_text)
+  2. curl subprocess fallback (http_client._curl_fallback_text)
+  3. curl-cffi Chrome impersonation (http_client.get_text_impersonate)
+  4. StealthyFetcher / camoufox (render.fetch_rendered) — JS rendering
+  5. curl-cffi impersonation (this module, fetch_with_curl_cffi) — Tier 1.5
+  6. pydoll (this module) — Cloudflare Turnstile + JS challenges
+  7. nodriver (this module) — DataDome + harder anti-bot
+
+All tiers are FREE — no paid CAPTCHA solving service is used. pydoll has
+built-in Cloudflare Turnstile bypass via CDP; nodriver is undetected Chrome
+that defeats DataDome and similar fingerprinting systems. nodriver and pydoll
+both auto-retry with headed mode (headless=False) when a Cloudflare challenge
+page is detected, since headless Chrome is fingerprinted by many WAFs.
+
+Each function returns rendered page text (visible text preferred, HTML
+fallback) or "" on failure — matching the render.fetch_rendered contract.
+"""
+from __future__ import annotations
+
+import asyncio
+import os
+from typing import Optional
+
+import structlog
+
+log = structlog.get_logger()
+
+# Concurrency: real browsers are heavy. One at a time by default.
+_PYDOLL_SEM: Optional[asyncio.Semaphore] = None
+_NODRIVER_SEM: Optional[asyncio.Semaphore] = None
+
+_PYDOLL_TIMEOUT_S = int(os.environ.get("PYDOLL_TIMEOUT_S", "30"))
+_NODRIVER_TIMEOUT_S = int(os.environ.get("NODRIVER_TIMEOUT_S", "30"))
+# DataDome requires non-headless to pass the JS challenge — headless is detected.
+# pydoll handles Turnstile fine headless, so it stays headless by default.
+# Override with env vars: WALL_BYPASS_HEADLESS=0 to force headless off for both.
+_PYDOLL_HEADLESS = os.environ.get("WALL_BYPASS_HEADLESS", "1") != "0"
+_NODRIVER_HEADLESS = os.environ.get("WALL_BYPASS_HEADLESS", "0") != "0"
+
+
+def _pydoll_sem() -> asyncio.Semaphore:
+    global _PYDOLL_SEM
+    if _PYDOLL_SEM is None:
+        _PYDOLL_SEM = asyncio.Semaphore(1)
+    return _PYDOLL_SEM
+
+
+def _nodriver_sem() -> asyncio.Semaphore:
+    global _NODRIVER_SEM
+    if _NODRIVER_SEM is None:
+        _NODRIVER_SEM = asyncio.Semaphore(1)
+    return _NODRIVER_SEM
+
+
+# ---------------------------------------------------------------------------
+# Cloudflare challenge detection
+# ---------------------------------------------------------------------------
+
+#: Markers that indicate a Cloudflare challenge/interstitial page.
+_CF_CHALLENGE_MARKERS = (
+    "just a moment",
+    "challenge-platform",
+    "cf-browser-verification",
+    "cf-challenge",
+    "/cdn-cgi/challenge-platform/",
+    "checking your browser",
+    "enable javascript and cookies to continue",
+    "ray id",  # often on challenge pages
+    "attention required! | cloudflare",
+)
+
+
+def _is_cloudflare_challenge(text: str) -> bool:
+    """Return True if *text* looks like a Cloudflare challenge page.
+
+    Checks for the common Cloudflare interstitial markers. The check is
+    intentionally broad — false positives just trigger a retry, not a crash.
+    """
+    if not text or len(text) < 50:
+        # Very short or empty responses are suspicious — treat as challenge.
+        return True
+    lower = text.lower()
+    return any(marker in lower for marker in _CF_CHALLENGE_MARKERS)
+
+
+# ---------------------------------------------------------------------------
+# curl-cffi — Chrome impersonation (Tier 1.5, between httpx and pydoll)
+# ---------------------------------------------------------------------------
+
+async def fetch_with_curl_cffi(
+    url: str,
+    *,
+    timeout_s: int = 20,
+    impersonate: str = "chrome120",
+) -> str:
+    """Fetch a URL using curl-cffi's browser impersonation feature.
+
+    curl-cffi replays the TLS/JA3 fingerprint and HTTP/2 settings of a real
+    Chrome browser, which is enough to pass many Cloudflare "managed"
+    challenges without launching a full browser process. This is significantly
+    faster (~1-2s) than pydoll/nodriver and is tried first when cheaper
+    tiers (httpx) fail.
+
+    Returns page text on success, or ``""`` on failure.
+    """
+    try:
+        from curl_cffi.requests import AsyncSession
+    except ImportError:
+        log.debug("wall_bypass.curl_cffi_not_installed")
+        return ""
+
+    try:
+        async with AsyncSession(impersonate=impersonate, timeout=timeout_s) as s:
+            resp = await s.get(url, allow_redirects=True)
+            if resp.status_code != 200:
+                log.debug(
+                    "wall_bypass.curl_cffi_non_200",
+                    status=resp.status_code,
+                    url=url[:120],
+                )
+                return ""
+            text = resp.text
+            if not text or _is_cloudflare_challenge(text):
+                log.debug("wall_bypass.curl_cffi_challenge", url=url[:120])
+                return ""
+            log.info("wall_bypass.curl_cffi_ok", url=url[:120], length=len(text))
+            return text
+    except Exception as exc:
+        log.debug(
+            "wall_bypass.curl_cffi_error",
+            url=url[:120],
+            error=f"{type(exc).__name__}: {exc}"[:200],
+        )
+        return ""
+
+
+# ---------------------------------------------------------------------------
+# pydoll — Cloudflare Turnstile + JS challenges
+# ---------------------------------------------------------------------------
+
+async def fetch_with_pydoll(
+    url: str,
+    *,
+    timeout_s: int = _PYDOLL_TIMEOUT_S,
+    wait_for_selector: str | None = None,
+) -> str:
+    """Fetch a URL with pydoll's undetected Chrome, auto-solving Cloudflare
+    Turnstile challenges.
+
+    pydoll uses CDP (Chrome DevTools Protocol) directly — no Selenium/WebDriver
+    fingerprint. Its ``enable_auto_solve_cloudflare_captcha`` detects and clicks
+    Turnstile checkboxes automatically.
+
+    Returns rendered page text, or "" on failure.
+    """
+    async with _pydoll_sem():
+        # First attempt with the caller's timeout.
+        try:
+            text = await asyncio.wait_for(
+                _pydoll_fetch(url, timeout_s, wait_for_selector),
+                timeout=timeout_s + 20,  # hard outer bound
+            )
+        except (asyncio.TimeoutError, Exception) as exc:
+            log.debug(
+                "wall_bypass.pydoll_first_attempt_failed",
+                url=url[:120],
+                error=f"{type(exc).__name__}: {exc}"[:160],
+            )
+            text = ""
+
+        if text and len(text) > 100 and not _is_cloudflare_challenge(text):
+            return text
+
+        # Second attempt with a longer timeout — Cloudflare challenges can
+        # need more time to clear, especially on slow connections.
+        retry_timeout = timeout_s + 15
+        log.info("wall_bypass.pydoll_retry", url=url[:120], retry_timeout=retry_timeout)
+        try:
+            text = await asyncio.wait_for(
+                _pydoll_fetch(url, retry_timeout, wait_for_selector),
+                timeout=retry_timeout + 25,
+            )
+        except (asyncio.TimeoutError, Exception) as exc:
+            log.debug(
+                "wall_bypass.pydoll_retry_failed",
+                url=url[:120],
+                error=f"{type(exc).__name__}: {exc}"[:160],
+            )
+            text = ""
+
+        return text or ""
+
+
+def _find_chrome_binary() -> str | None:
+    """Find Chrome/Chromium binary on macOS/Linux."""
+    import shutil
+    # Explicit env override.
+    env_path = os.environ.get("CHROME_BINARY")
+    if env_path and os.path.isfile(env_path):
+        return env_path
+    # Common macOS paths
+    mac_paths = [
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        "/Applications/Chromium.app/Contents/MacOS/Chromium",
+    ]
+    for p in mac_paths:
+        if os.path.exists(p):
+            return p
+    # Linux — snap first (Ubuntu VM), then system PATH.
+    linux_paths = ["/snap/bin/chromium", "/usr/bin/chromium-browser", "/usr/bin/google-chrome"]
+    for p in linux_paths:
+        if os.path.exists(p):
+            return p
+    return shutil.which("google-chrome") or shutil.which("chrome") or shutil.which("chromium")
+
+
+async def _pydoll_fetch(
+    url: str, timeout_s: int, wait_for_selector: str | None
+) -> str:
+    try:
+        from pydoll.browser.chromium import Chrome
+        from pydoll.browser.options import ChromiumOptions
+    except ImportError:
+        log.warning("wall_bypass.pydoll_not_installed")
+        return ""
+
+    browser = None
+    try:
+        opts = ChromiumOptions()
+        # Don't use opts.headless — it passes `--headless` which snap
+        # Chromium 155+ rejects.  Use `--headless=new` as an argument.
+        if _PYDOLL_HEADLESS:
+            opts.add_argument("--headless=new")
+        chrome_bin = _find_chrome_binary()
+        if chrome_bin:
+            opts.binary_location = chrome_bin
+        opts.add_argument("--no-sandbox")
+        opts.add_argument("--disable-gpu")
+
+        browser = Chrome(options=opts)
+        # Don't call __aenter__ — it starts Chrome, and then start()
+        # would try to start it again, causing a port conflict and
+        # "Connection refused" on the WebSocket.  Just call start().
+        tab = await browser.start()
+        # Enable auto-solve for any Cloudflare challenge that appears.
+        await tab.enable_auto_solve_cloudflare_captcha(
+            time_to_wait_captcha=10.0,
+        )
+        # Navigate (new_tab may not wait for full load).
+        await tab.go_to(url, timeout=timeout_s)
+
+        # If caller wants to wait for a specific element, poll for it.
+        if wait_for_selector:
+            deadline = asyncio.get_event_loop().time() + timeout_s
+            while asyncio.get_event_loop().time() < deadline:
+                try:
+                    el = await tab.find(
+                        class_name=wait_for_selector, timeout=2, raise_exc=False
+                    )
+                    if el:
+                        break
+                except Exception:
+                    pass
+                await asyncio.sleep(1)
+
+        # Give Cloudflare a moment to clear if it's still processing.
+        await asyncio.sleep(2)
+
+        # Get page source — page_source is a coroutine property.
+        try:
+            html = await tab.page_source
+        except Exception:
+            # Fallback: execute JS to get document content
+            try:
+                result = await tab.execute_script(
+                    "document.documentElement.outerHTML"
+                )
+                html = (
+                    result.get("result", {}).get("value", "")
+                    if isinstance(result, dict)
+                    else str(result)
+                )
+            except Exception:
+                html = ""
+
+        if not html:
+            return ""
+
+        # Extract visible text from HTML.
+        return _html_to_text(html)
+
+    except asyncio.TimeoutError:
+        log.warning("wall_bypass.pydoll_timeout", url=url[:120])
+        return ""
+    except Exception as exc:
+        log.debug(
+            "wall_bypass.pydoll_error",
+            url=url[:120],
+            error=f"{type(exc).__name__}: {exc}"[:200],
+        )
+        return ""
+    finally:
+        # 2026-10-17: this called browser.close() -- in pydoll's own Browser class
+        # (chromium/base.py) close() ONLY closes the WebSocket connection; stop() is
+        # the one that calls _browser_process_manager.stop_process() (SIGTERM, then
+        # SIGKILL after 15s) on the real OS Chrome subprocess. close() alone left
+        # every pydoll fetch's Chrome process running forever -- confirmed the exact
+        # cause of 365 orphaned Chrome processes from one run_stealth_sources.py run
+        # that made the Mac unresponsive. stop() also closes the connection and
+        # cleans up the temp profile dir, so it's a strict superset of close().
+        # CRITICAL: catch BaseException, not Exception — asyncio.CancelledError
+        # (raised when the outer wait_for times out) is a BaseException in
+        # Python 3.8+, so `except Exception` would let it propagate past the
+        # stop() call, leaking the browser process.
+        if browser is not None:
+            try:
+                await browser.stop()
+            except BaseException:
+                pass
+
+
+# ---------------------------------------------------------------------------
+# nodriver — DataDome + harder anti-bot
+# ---------------------------------------------------------------------------
+
+async def fetch_with_nodriver(
+    url: str,
+    *,
+    timeout_s: int = _NODRIVER_TIMEOUT_S,
+    wait_for_text: str | None = None,
+    return_html: bool = False,
+) -> str:
+    """Fetch a URL with nodriver (undetected Chrome).
+
+    nodriver is designed to evade DataDome, PerimeterX, and similar
+    fingerprinting anti-bot systems that go beyond Cloudflare. It uses
+    CDP directly and patches Chrome's automation fingerprints.
+
+    Returns rendered page text (or raw HTML if return_html=True), or "" on failure.
+    """
+    async with _nodriver_sem():
+        # First attempt — uses the configured headless setting.
+        try:
+            text = await asyncio.wait_for(
+                _nodriver_fetch(url, timeout_s, wait_for_text, return_html=return_html),
+                timeout=timeout_s + 20,
+            )
+        except asyncio.TimeoutError:
+            log.warning("wall_bypass.nodriver_timeout", url=url[:120])
+            text = ""
+        except Exception as exc:
+            log.debug(
+                "wall_bypass.nodriver_error",
+                url=url[:120],
+                error=f"{type(exc).__name__}: {exc}"[:160],
+            )
+            text = ""
+
+        if text and len(text) > 100 and not _is_cloudflare_challenge(text):
+            return text
+
+        # Retry with headed mode (headless=False). F5/DataDome and some
+        # Cloudflare challenges detect headless Chrome and return a challenge
+        # page. A real (visible) browser window passes these checks.
+        log.info(
+            "wall_bypass.nodriver_retry_headed",
+            url=url[:120],
+            first_empty=not text,
+            first_is_cf=_is_cloudflare_challenge(text) if text else False,
+        )
+        try:
+            text = await asyncio.wait_for(
+                _nodriver_fetch(url, timeout_s, wait_for_text, headless=False),
+                timeout=timeout_s + 30,
+            )
+        except asyncio.TimeoutError:
+            log.warning("wall_bypass.nodriver_retry_timeout", url=url[:120])
+            text = ""
+
+        return text or ""
+
+
+async def _nodriver_fetch(
+    url: str, timeout_s: int, wait_for_text: str | None, headless: bool | None = None,
+    return_html: bool = False,
+) -> str:
+    from foreclosure_scraper.browser_utils import start_browser
+
+    # Allow per-call headless override; fall back to the module default.
+    _headless = _NODRIVER_HEADLESS if headless is None else headless
+
+    browser = None
+    try:
+        browser = await start_browser(
+            headless=_headless,
+            browser_args=[
+                "--no-sandbox",
+                "--disable-gpu",
+                "--window-size=1920,1080",
+                "--disable-blink-features=AutomationControlled",
+            ],
+        )
+        tab = await browser.get(url)
+
+        # Wait for page to settle.  If Cloudflare presents a challenge,
+        # it typically takes 5-10 seconds to solve and redirect.  Poll
+        # for the challenge to clear instead of a fixed 3-second wait.
+        await tab.wait(3)
+        for _ in range(10):
+            try:
+                content = await tab.get_content()
+                if not _is_cloudflare_challenge(_html_to_text(content)):
+                    break
+            except Exception:
+                pass
+            await asyncio.sleep(2)
+
+        # If waiting for specific text, poll for it.
+        if wait_for_text:
+            deadline = asyncio.get_event_loop().time() + timeout_s
+            while asyncio.get_event_loop().time() < deadline:
+                try:
+                    content = await tab.get_content()
+                    if wait_for_text.lower() in content.lower():
+                        break
+                except Exception:
+                    pass
+                await asyncio.sleep(2)
+
+        # Get page content.
+        try:
+            html = await tab.get_content()
+        except Exception:
+            try:
+                html = await tab.evaluate(
+                    "document.documentElement.outerHTML",
+                    return_by_value=True,
+                )
+                if isinstance(html, str):
+                    pass
+                else:
+                    html = str(html)
+            except Exception:
+                html = ""
+
+        if not html:
+            return ""
+
+        if return_html:
+            return html
+
+        return _html_to_text(html)
+
+    except asyncio.TimeoutError:
+        log.warning("wall_bypass.nodriver_timeout", url=url[:120])
+        return ""
+    except Exception as exc:
+        log.debug(
+            "wall_bypass.nodriver_error",
+            url=url[:120],
+            error=f"{type(exc).__name__}: {exc}"[:200],
+        )
+        return ""
+    finally:
+        # CRITICAL: catch BaseException, not Exception — asyncio.CancelledError
+        # (from outer wait_for timeout) is a BaseException in Python 3.8+.
+        # `except Exception` would skip browser.stop(), leaking the Chrome
+        # process. This was the root cause of the slow memory leak on long runs.
+        if browser is not None:
+            try:
+                browser.stop()
+            except BaseException:
+                pass
+
+
+# ---------------------------------------------------------------------------
+# Escalation helper — try render → pydoll → nodriver
+# ---------------------------------------------------------------------------
+
+async def fetch_through_walls(
+    url: str,
+    *,
+    render_first: bool = True,
+    timeout_s: int = 30,
+) -> str:
+    """Try every wall-bypass tier in order until one returns non-empty text.
+
+    Order: StealthyFetcher (render) → pydoll (Turnstile) → nodriver (DataDome).
+
+    Use this when a URL is known to be walled but you don't know which wall
+    type it uses. Returns "" if all tiers fail.
+    """
+    # Tier 1: StealthyFetcher (camoufox) — cheapest real-browser option.
+    if render_first:
+        try:
+            from .render import fetch_rendered
+            text = await fetch_rendered(url)
+            if text and len(text) > 100 and not _is_cloudflare_challenge(text):
+                return text
+        except Exception:
+            pass
+
+    # Tier 1.5: curl-cffi Chrome impersonation — passes many Cloudflare
+    # managed challenges without a full browser (~1-2s, much cheaper than
+    # pydoll/nodriver).
+    text = await fetch_with_curl_cffi(url)
+    if text and len(text) > 100 and not _is_cloudflare_challenge(text):
+        return text
+
+    # Tier 2: pydoll (Turnstile + Cloudflare JS challenge).
+    text = await fetch_with_pydoll(url, timeout_s=timeout_s)
+    if text and len(text) > 100 and not _is_cloudflare_challenge(text):
+        return text
+
+    # Tier 3: nodriver (DataDome + harder cases).
+    text = await fetch_with_nodriver(url, timeout_s=timeout_s)
+    if text and not _is_cloudflare_challenge(text):
+        return text
+
+    return ""
+
+
+# ---------------------------------------------------------------------------
+# Utility
+# ---------------------------------------------------------------------------
+
+def _html_to_text(html: str) -> str:
+    """Quick HTML → visible text extraction (no BS4 dependency needed).
+
+    Strips script/style tags and HTML entities, collapses whitespace.
+    Not as precise as BS4 but sufficient for scraper regex matching.
+    """
+    import re
+    # Remove script and style blocks.
+    html = re.sub(r"<(script|style)[^>]*>.*?</\1>", "", html, flags=re.DOTALL | re.IGNORECASE)
+    # Remove all tags.
+    text = re.sub(r"<[^>]+>", " ", html)
+    # Decode common HTML entities.
+    text = text.replace("&nbsp;", " ").replace("&amp;", "&")
+    text = text.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", '"')
+    text = text.replace("&#39;", "'").replace("&#x27;", "'")
+    # Collapse whitespace.
+    text = re.sub(r"\s+", " ", text).strip()
+    return text

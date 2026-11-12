@@ -1,0 +1,332 @@
+"""Greenville County SC Master-in-Equity foreclosure adverts — TMS + total judgment debt.
+
+WHAT THIS UNLOCKS
+    docs/blocked_sources_forensic.md recorded "SC PublicIndex — per-case DETAIL (TMS +
+    judgment $)" as ABSENT: "Detail sits behind __doPostBack JS links that are dead in a
+    saved HTML file." That reasoned from the wrong artifact. The Master-in-Equity is
+    REQUIRED to advertise every foreclosure sale, and Greenville's advertisements are
+    published as ordinary web pages by the county's newspaper of record. No portal, no
+    postback, no login -- and publicindex.sccourts.org is not touched, so the operator's
+    ToS wall stands untouched.
+
+    Verified live 2026-09-11 on 2022-CP-23-03386:
+        case            2022-CP-23-03386
+        TMS             0577040104000
+        judgment debt   $161,897.79
+        address         4002 Fork Shoals Rd Simpsonville, SC 29680
+        sale date       08/07/2023
+        plaintiff       AmeriHome Mortgage Company, LLC
+
+    The judgment amount is the number the whole buy box turns on: it is the actual debt
+    against the property, not an estimate. `calc.est_gross_margin` was populated on 1,297
+    of 94,384 board rows -- 1.4% -- and this source carries it per case.
+
+AUDITED 2026-10-03 -- every advert's full body ALSO carries three fields the
+original parser never read, despite being plainly printed on every page sampled
+(15/15 live):
+  "Additional Defendants: <names>" -- co-defendants beyond the one primary
+      plaintiff/defendant line already captured (HOAs, co-owners, judgment
+      co-debtors, e.g. "James Brett Hindman Superior Pool Products LLC" on
+      2026-CP-23-00913). Live: 10/15 adverts carry a real value here (6/15
+      real names/entities, 4/15 the literal placeholder "et al." -- kept
+      verbatim rather than filtered, since even an unnamed "et al." still
+      tells a human reader more defendants exist), the rest genuinely blank
+      ("Additional Defendants: " followed immediately by the next
+      paragraph -- correctly None, not the auction-prose false match an
+      earlier whitespace-greedy regex produced by crossing the blank-line
+      gap -- see the inline comment above _ADDL_DEFENDANTS_RE).
+  "sold subject to the following mortgage(s)/ senior encumbrances: <text>"
+      -- whether the buyer inherits a SENIOR lien on top of the auction
+      price, a real valuation input (`calc.est_gross_margin`'s margin
+      shrinks if there is one). Live: mostly "None"/"N/A"/"NONE", but at
+      least one real case (2025-CP-23-04026-2): "SUBJECT TO ASSESSMENTS...
+      SPECIFICALLY, THIS SALE IS SUBJECT TO A SENIOR MORTGAGE HELD BY MERS
+      FOR NVR MORTGAGE FINANCE, INC. RECORDED IN BOOK 5679 AT PAGE 1191" --
+      a real, named, still-attached mortgage.
+  "interim interest ... at the rate of <N%>" -- the post-sale compliance
+      interest rate (13/15 live). Lower-value than the two above but free
+      and consistently present, so captured alongside them.
+  All three captured into raw only (not promoted to typed Listing fields --
+  `defendant`/`judgment_amount` already carry the one load-bearing name/
+  amount this source's own scope decision below keys off of).
+
+THE SITEMAP RETURNS HTTP 404 AND 96KB OF VALID XML
+    wp-sitemap-posts-advert-1.xml answers 404 while serving 772 <loc> entries. A probe
+    that checks the status and stops sees nothing. This is the same shape as the qPayBill
+    detail page that was written off for a wrong URL: the status said no, the body said
+    yes. So the status is deliberately ignored here and the parse decides.
+
+SCOPE, RESOLVED 2026-09-15
+    Greenville was pruned from the FORECLOSURE footprint by explicit direction
+    (config carries `# 2026-05-14 — pruned Greenville again per user direction`).
+    This scraper found 584 board rows already landed under a blanket
+    FORECLOSURE_SALE typing -- which fails `_in_scope()` for Greenville
+    outright and would have been silently wiped by any real scope re-pass.
+    Asked the user directly; their answer: "if they are actual foreclosures
+    going to sale, do not grab them. if they are real distressed etc then
+    grab them." `parse_advert` now types each row on that exact line: a
+    still-upcoming (or dateless) sale IS an active auction -- FORECLOSURE_SALE,
+    correctly denied for Greenville. A sale whose advertised date has already
+    passed is no longer something to bid on -- the judgment-debt/party data
+    is what's left, a DISTRESSED signal, admitted anywhere in NC/SC. On any
+    given day ~97% of this source's rows are past-dated (Master-in-Equity
+    adverts stay live on the sitemap long after the sale), so most of this
+    source's value flows through the DISTRESSED path. Also added to
+    DATELESS_OK_SOURCES in main.py -- a resolved case's judgment-debt value
+    doesn't go stale the way an active listing's sale_date window does.
+
+Free, public, no login.
+Slug: counties_sc.greenville_mie_adverts
+Category: court
+ListingType: FORECLOSURE_SALE (upcoming sale) or DISTRESSED (sale already passed)
+"""
+from __future__ import annotations
+
+import asyncio
+import html as _html
+import os
+import re
+from datetime import datetime
+from typing import Iterable
+
+import httpx
+import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
+
+from ...base_scraper import BaseScraper
+from ...models import Listing, ListingType, PropertyKind
+
+log = structlog.get_logger()
+
+BASE = "https://mie.greenvillejournal.com"
+SITEMAP = f"{BASE}/wp-sitemap-posts-advert-1.xml"
+_UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+       "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
+
+MAX_ADVERTS = int(os.getenv("GREENVILLE_MIE_MAX", "400"))
+_CONCURRENCY = int(os.getenv("GREENVILLE_MIE_CONCURRENCY", "4"))
+
+_LOC_RE = re.compile(r"<loc>\s*([^<\s]+/advert/[^<\s]+)\s*</loc>", re.I)
+_CASE_RE = re.compile(r"(20\d\d-CP-\d{2}-\d+)", re.I)
+_TMS_RE = re.compile(r"TMS[^0-9]{0,20}([0-9][0-9\-\.]{6,})", re.I)
+_JUDGMENT_RE = re.compile(r"total judgment debt[^$]{0,60}\$\s*([\d,]+(?:\.\d{2})?)", re.I)
+_ADDR_RE = re.compile(r"STREET ADDRESS IS:?\s*\n?\s*([^\n]{5,90})", re.I)
+_SALE_RE = re.compile(r"\bon\s+(\d{2}/\d{2}/\d{4})", re.I)
+_PLAINTIFF_RE = re.compile(r"\n([A-Z][A-Za-z .,&'\-]{4,60}?)\s*,?\s*\n?\s*Plaintiff", re.I)
+_DEFENDANT_RE = re.compile(r"\n([A-Z][A-Za-z .,&'\-]{4,60}?)\s*,?\s*\n?\s*Defendant", re.I)
+# [ \t]* (not \s*) right after the colon so the match can't cross the blank-
+# line gap to the NEXT paragraph when the field is genuinely empty -- an
+# earlier \s*-based version of this regex did exactly that and silently
+# captured the auction's own opening sentence as a fake "additional
+# defendant" on every advert that had none (see module docstring's
+# "AUDITED 2026-10-03" note).
+_ADDL_DEFENDANTS_RE = re.compile(r"Additional Defendants?:[ \t]*([^\n]*)\n", re.I)
+_SENIOR_ENCUMBRANCE_RE = re.compile(
+    r"mortgage\(s\)/?\s*senior encumbrances?:[ \t]*([^\n]+)", re.I)
+_INTEREST_RATE_RE = re.compile(
+    r"interim interest.{0,120}?rate of\s*\n?\s*([\d.]+\s*%)", re.I | re.S)
+
+
+def _text(raw: str) -> str:
+    t = re.sub(r"(?is)<(script|style).*?</\1>", " ", raw)
+    t = _html.unescape(re.sub(r"<[^>]+>", "\n", t))
+    return re.sub(r"[ \t]+", " ", t)
+
+
+def _money(s: str | None) -> float | None:
+    if not s:
+        return None
+    try:
+        return float(s.replace(",", ""))
+    except ValueError:
+        return None
+
+
+def parse_sitemap(xml: str) -> list[str]:
+    """Advert URLs. The status code is IGNORED by the caller on purpose -- this endpoint
+    answers HTTP 404 while serving 772 valid <loc> entries."""
+    return list(dict.fromkeys(_LOC_RE.findall(xml or "")))
+
+
+def parse_advert(url: str, raw: str) -> Listing | None:
+    t = _text(raw)
+    case = None
+    m = _CASE_RE.search(t) or _CASE_RE.search(url)
+    if m:
+        case = m.group(1).upper()
+    tms = (_TMS_RE.search(t).group(1) if _TMS_RE.search(t) else None)
+    judgment = _money(_JUDGMENT_RE.search(t).group(1) if _JUDGMENT_RE.search(t) else None)
+    addr_m = _ADDR_RE.search(t)
+    street = city = zipc = None
+    if addr_m:
+        full = " ".join(addr_m.group(1).split()).strip(" .,")
+        # "4002 Fork Shoals Rd Simpsonville, SC 29680"
+        zm = re.search(r"\b(\d{5})(?:-\d{4})?\s*$", full)
+        if zm:
+            zipc = zm.group(1)
+            full = full[:zm.start()].strip(" ,")
+        full = re.sub(r",?\s*SC\s*$", "", full).strip(" ,")
+        if "," in full:
+            street, city = (x.strip() for x in full.rsplit(",", 1))
+        else:
+            street = full
+    sale = None
+    sm = _SALE_RE.search(t)
+    if sm:
+        try:
+            sale = datetime.strptime(sm.group(1), "%m/%d/%Y")
+        except ValueError:
+            sale = None
+    # A row with neither a parcel nor an address cannot be underwritten or routed.
+    if not (tms or street):
+        return None
+    pl = _PLAINTIFF_RE.search(t)
+    df = _DEFENDANT_RE.search(t)
+    addl_m = _ADDL_DEFENDANTS_RE.search(t)
+    additional_defendants = (addl_m.group(1).strip() if addl_m else None) or None
+    senior_m = _SENIOR_ENCUMBRANCE_RE.search(t)
+    senior_encumbrances = (senior_m.group(1).strip() if senior_m else None) or None
+    rate_m = _INTEREST_RATE_RE.search(t)
+    interim_interest_rate = rate_m.group(1).replace(" ", "") if rate_m else None
+    now = datetime.utcnow()
+    # User-confirmed policy (2026-09-15): "if they are actual foreclosures
+    # going to sale, do not grab them [for Greenville]. if they are real
+    # distressed etc then grab them." A row with no sale date yet, or an
+    # upcoming one, IS an actual sale advertisement -- FORECLOSURE_SALE, a
+    # flip lead, correctly denied for Greenville per SCOPE_DENY_COUNTIES.
+    # A row whose advertised sale date has already passed is no longer an
+    # active sale to bid on -- it's a resolved case whose real remaining
+    # value is the judgment-debt/party-name data, a DISTRESSED signal,
+    # admitted anywhere in NC/SC. (97.6% of this source's rows are past-
+    # dated on any given day -- Master-in-Equity adverts stay live on the
+    # sitemap long after the sale.)
+    is_resolved = sale is not None and sale < now
+    # A resolved advert is a foreclosure record with a judgment, so it types LIS_PENDENS (FINANCIAL
+    # 28 in the scorer), not DISTRESSED (PROPERTY 10; audit 2026-09-21, F10). LIS_PENDENS is not a
+    # flip type (main._FLIP_LISTING_TYPES), so it keeps the policy above: admitted anywhere in
+    # NC/SC, never denied for Greenville. The scorer reads the advert's own sale date from
+    # raw['greenville_mie']['sale_date'], so a past-dated advert scores nothing.
+    ltype = ListingType.LIS_PENDENS if is_resolved else ListingType.FORECLOSURE_SALE
+    # For a resolved case, `sale_date` no longer means "when is the
+    # actionable event" -- it's just a historical fact (still preserved
+    # below in raw.greenville_mie.sale_date). Structured sale_date is left
+    # None so _active_only()'s DATELESS_OK_SOURCES exemption actually
+    # applies: that gate only checks the whitelist when sale_date is None
+    # -- a non-None-but-old date still gets window-checked and dropped
+    # regardless of the whitelist, which would silently undo the whole
+    # point of typing these as DISTRESSED in the first place.
+    structured_sale = None if is_resolved else sale
+    return Listing(
+        source="counties_sc.greenville_mie_adverts",
+        source_url=url,
+        listing_type=ltype,
+        property_kind=PropertyKind.UNKNOWN,
+        state="SC", county="Greenville",
+        parcel_id=tms, case_number=case,
+        street_address=street, city=city, zip_code=zipc,
+        sale_date=structured_sale,
+        judgment_amount=judgment,
+        plaintiff=(pl.group(1).strip() if pl else None),
+        defendant=(df.group(1).strip() if df else None),
+        owner_name=(df.group(1).strip() if df else None),
+        first_seen=now, last_seen=now,
+        raw={"greenville_mie": {
+            "case_number": case, "tms": tms,
+            # THE field. The actual debt against the property, not an estimate --
+            # calc.est_gross_margin was populated on only 1.4% of the board.
+            "total_judgment_debt": judgment,
+            "sale_date": sm.group(1) if sm else None,
+            "advert_url": url,
+            "additional_defendants": additional_defendants,
+            "senior_encumbrances": senior_encumbrances,
+            "interim_interest_rate": interim_interest_rate,
+        }},
+    )
+
+
+class GreenvilleMIEAdverts(BaseScraper):
+    slug = "counties_sc.greenville_mie_adverts"
+    name = "Greenville SC Master-in-Equity foreclosure adverts"
+    category = "court"
+    timeout_s = 420.0
+    expected_min_count = 0
+    optional = True
+
+    async def fetch(self) -> Iterable[Listing]:
+        headers = {"User-Agent": _UA, "Accept": "text/html,application/xml"}
+        out: list[Listing] = []
+        stats = {"adverts": 0, "parsed": 0, "no_anchor": 0, "errors": 0,
+                 "with_judgment": 0, "with_tms": 0}
+        async with httpx.AsyncClient(timeout=45.0, headers=headers,
+                                     follow_redirects=True) as c:
+            # Retried up to 3 times (short exponential-jitter backoff) on a transport
+            # error or timeout -- this bare call had zero retry cushioning, so a single
+            # transient blip (connection reset, DNS hiccup, read timeout) permanently
+            # zeroed this source's entire output for the run. Greenville is in
+            # main.DATELESS_OK_SOURCES (see module docstring), so a zeroed run has no
+            # fallback date window to self-heal -- it would silently report an
+            # empty/healthy result until someone noticed by hand. A real non-404/parse
+            # issue still falls through unretried -- status is never checked here on
+            # purpose (see the DO NOT check r.status_code comment below).
+            try:
+                async for attempt in AsyncRetrying(
+                    stop=stop_after_attempt(3),
+                    wait=wait_exponential_jitter(initial=1, max=8),
+                    retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                    reraise=True,
+                ):
+                    with attempt:
+                        r = await c.get(SITEMAP)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("greenville_mie.sitemap_failed", error=str(exc)[:120])
+                return []
+            # DO NOT check r.status_code: this endpoint returns 404 with valid XML.
+            urls = parse_sitemap(r.text)
+            stats["adverts"] = len(urls)
+            if not urls:
+                log.warning("greenville_mie.sitemap_empty", status=r.status_code,
+                            bytes=len(r.text or ""),
+                            note="404 here is normal; an EMPTY parse is the real failure")
+                return []
+            urls = urls[-MAX_ADVERTS:]          # newest last in the sitemap
+            sem = asyncio.Semaphore(_CONCURRENCY)
+
+            async def one(u: str) -> None:
+                async with sem:
+                    try:
+                        # Retried up to 3 times (short exponential-jitter backoff) on a
+                        # transport error or timeout -- only the GET itself, never
+                        # raise_for_status() below: a real bad HTTP status is not a
+                        # transport/timeout error, so it doesn't match the retry
+                        # predicate and reraises immediately on attempt 1, falling
+                        # through to the same except as today (one advert skipped,
+                        # not retried). This stays inside the SAME try as
+                        # raise_for_status() so either failure still only costs this
+                        # one advert -- asyncio.gather() has no return_exceptions=True,
+                        # so letting either escape one() would kill the whole batch.
+                        async for attempt in AsyncRetrying(
+                            stop=stop_after_attempt(3),
+                            wait=wait_exponential_jitter(initial=1, max=8),
+                            retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                            reraise=True,
+                        ):
+                            with attempt:
+                                rr = await c.get(u)
+                        rr.raise_for_status()
+                    except Exception:  # noqa: BLE001
+                        stats["errors"] += 1
+                        return
+                li = parse_advert(u, rr.text)
+                if not li:
+                    stats["no_anchor"] += 1
+                    return
+                stats["parsed"] += 1
+                if li.judgment_amount:
+                    stats["with_judgment"] += 1
+                if li.parcel_id:
+                    stats["with_tms"] += 1
+                out.append(li)
+
+            await asyncio.gather(*(one(u) for u in urls))
+        log.info("greenville_mie.done", fetched=len(urls), **stats)
+        return out

@@ -1,0 +1,286 @@
+"""Realtor.com foreclosure listings via HomeHarvest (free, no Apify).
+
+HomeHarvest scrapes Realtor.com directly via their public API.
+This scraper hits state-wide queries with foreclosure=True filter to catch
+listings that aren't in our priority counties but might still be relevant
+(neighboring metros, large land, etc.).
+
+Free, no Apify dependency.
+"""
+from __future__ import annotations
+
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
+from typing import Iterable
+
+import structlog
+from tenacity import Retrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
+
+from ...base_scraper import BaseScraper
+from ...models import Listing, ListingType, PropertyKind
+
+log = structlog.get_logger()
+
+# Top metros INSIDE our footprint (matched against SCOPE_DENY_COUNTIES
+# downstream — out-of-scope cities like Charlotte/Raleigh/Greenville-SC
+# would just get filtered, so don't bother scraping them at all).
+#
+# FOUND 2026-10-04 (HERMES extraction-completeness audit, batch 18): this
+# tuple used to query by CITY/SEAT name ("Asheville, NC") rather than the
+# whole county — the exact under-coverage bug class batch 17 found and
+# fixed on the sibling national.homeharvest ("searched by SEAT-TOWN CITY
+# NAME instead of the whole county"), just not yet backported here. Live-
+# verified the same lift on THIS scraper's own query shape (foreclosure=
+# True, past_days=180): "Asheville, NC" -> 2 rows vs "Buncombe County, NC"
+# -> 3 rows (adds a real Fletcher, NC row the city-only query missed);
+# "Myrtle Beach, SC" (10) + "North Myrtle Beach, SC" (0) vs "Horry County,
+# SC" (13) -- the county-wide query is a strict superset, not just a
+# dedup of the two city queries. Replaced every city anchor with its real
+# county (resolved via the same upstate/coastal/bankruptcy gazetteers
+# fannie_homepath.py / estate_sales.py / crexi_multifamily.py already use
+# for this identical city->county problem, confirmed live 2026-10-04) and
+# deduped the coastal cities that share a county (e.g. Wilmington +
+# Wrightsville Beach + Carolina Beach are all New Hanover County) down to
+# 13 unique counties from the original 18 city entries -- fewer fetches,
+# strictly more coverage.
+SEARCH_LOCATIONS = (
+    # In-scope WNC + upstate-SC anchors — county-wide, not seat-city-only
+    "Buncombe County, NC",      # was "Asheville, NC"
+    "Catawba County, NC",       # was "Hickory, NC"
+    "Spartanburg County, SC",   # was "Spartanburg, SC" (already county-seat-named)
+    # Coastal counties — only oceanfront-passing listings will survive
+    # _in_scope (OCEANFRONT_COASTAL_COUNTIES override). HomeHarvest's
+    # MLS descriptions usually contain "oceanfront" / "beachfront" terms
+    # when the property qualifies, giving the keyword signal the second
+    # hit it needs alongside geofence.
+    "New Hanover County, NC",   # was Wilmington, Wrightsville Beach, Carolina Beach
+    "Brunswick County, NC",     # was Oak Island, Holden Beach
+    "Pender County, NC",        # was Topsail Beach
+    "Carteret County, NC",      # was Atlantic Beach, Emerald Isle
+    "Dare County, NC",          # was Nags Head
+    "Horry County, SC",         # was Myrtle Beach, North Myrtle Beach
+    "Georgetown County, SC",    # was Pawleys Island
+    "Charleston County, SC",    # was Folly Beach, Isle of Palms, Charleston
+    "Colleton County, SC",      # was Edisto Beach
+    "Beaufort County, SC",      # was Hilton Head Island
+)
+
+
+def _kind(style: str | None) -> PropertyKind:
+    if not style:
+        return PropertyKind.UNKNOWN
+    s = style.lower()
+    if "single" in s:
+        return PropertyKind.SINGLE_FAMILY
+    if "condo" in s:
+        return PropertyKind.CONDO
+    if "town" in s:
+        return PropertyKind.TOWNHOUSE
+    if "multi" in s or "duplex" in s:
+        return PropertyKind.MULTI_FAMILY
+    if "land" in s or "lot" in s:
+        return PropertyKind.LAND
+    if "mobile" in s or "manufactured" in s:
+        return PropertyKind.MOBILE
+    if "commercial" in s:
+        return PropertyKind.COMMERCIAL
+    return PropertyKind.UNKNOWN
+
+
+def _to_listing(row, slug: str) -> Listing | None:
+    url = row.get("property_url") or row.get("permalink")
+    if not url:
+        return None
+    # HomeHarvest's `foreclosure=True` is a server-side filter — every row
+    # in the returned dataframe is already a foreclosure. The `status` /
+    # `mls_status` fields don't always say "foreclosure" (they reflect the
+    # generic MLS state: FOR_SALE / Active / Pending / Sold). Trust the
+    # upstream filter; only classify the ltype using the available hints.
+    status_raw = (row.get("status") or "").lower()
+    mls_status = (row.get("mls_status") or "").lower()
+    text_blob = (row.get("text") or "").lower()
+    combined = f"{status_raw} {mls_status} {text_blob}"
+
+    if "auction" in combined:
+        ltype = ListingType.AUCTION
+    elif "reo" in combined or "bank owned" in combined or "bank-owned" in combined:
+        ltype = ListingType.REO
+    elif "pre-foreclosure" in combined or "pre foreclosure" in combined or "lis pendens" in combined:
+        ltype = ListingType.LIS_PENDENS
+    else:
+        ltype = ListingType.FORECLOSURE_SALE
+
+    primary = row.get("primary_photo")
+    alt = row.get("alt_photos") or ""
+    photos: list[str] = []
+    if primary and not (isinstance(primary, float) and primary != primary):
+        photos.append(str(primary))
+    if isinstance(alt, str) and alt:
+        photos.extend([p.strip() for p in alt.split(",") if p.strip()][:5])
+
+    def _f(v):
+        if v in (None, "") or (isinstance(v, float) and v != v):
+            return None
+        try:
+            return float(v)
+        except (ValueError, TypeError):
+            return None
+
+    def _clean(v):
+        # pandas NaN / empty -> None; pass strings and phone lists through unchanged
+        if v is None or (isinstance(v, float) and v != v):
+            return None
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
+
+    return Listing(
+        source=slug,
+        source_url=url,
+        listing_type=ltype,
+        property_kind=_kind(row.get("style") or row.get("property_type")),
+        street_address=row.get("street") or row.get("full_street_line"),
+        city=row.get("city"),
+        state=row.get("state"),
+        zip_code=str(row.get("zip_code") or "")[:5] or None,
+        county=(row.get("county") or "").replace(" County", "") or None,
+        opening_bid=_f(row.get("list_price")),
+        bedrooms=_f(row.get("beds")),
+        bathrooms=_f(row.get("full_baths")),
+        living_sqft=_f(row.get("sqft")),
+        lot_size_sqft=_f(row.get("lot_sqft")),
+        # estimated_value -> market_value, assessed_value -> tax_value (mirrors homeharvest.py)
+        market_value=_f(row.get("estimated_value")),
+        tax_value=_f(row.get("assessed_value")),
+        year_built=int(row["year_built"]) if row.get("year_built") and str(row["year_built"]).isdigit() else None,
+        latitude=_f(row.get("latitude")),
+        longitude=_f(row.get("longitude")),
+        description=(row.get("text") or "")[:500] or None,
+        first_seen=datetime.utcnow(),
+        last_seen=datetime.utcnow(),
+        raw={
+            "realtor": {
+                "status": row.get("status"),
+                "mls_status": row.get("mls_status"),
+                "list_date": str(row.get("list_date") or ""),
+                # Realtor.com DOES return agent/office contact — the columns are
+                # agent_name/agent_email/agent_phones (the old "agent" key was null every row).
+                "agent_name": _clean(row.get("agent_name")),
+                "agent_email": _clean(row.get("agent_email")),
+                "agent_phones": _clean(row.get("agent_phones")),
+                "office_name": _clean(row.get("office_name")),
+                "office_phones": _clean(row.get("office_phones")),
+                "broker_name": _clean(row.get("broker_name")),
+                "mls_id": _clean(row.get("mls_id")),
+                "half_baths": _f(row.get("half_baths")),
+                # FOUND 2026-10-04 (HERMES extraction-completeness audit,
+                # batch 18): already on this scraper's own HomeHarvest row,
+                # zero extra requests, never read -- same gap batch 17 fixed
+                # on the sibling national.homeharvest. Live-verified 2026-
+                # 10-04 against the real current Horry County, SC query:
+                # 9/13 rows carry a real last_sold_price/last_sold_date/
+                # sold_price, 12/13 a real hoa_fee, 11/13 stories, 13/13
+                # new_construction -- a real recent-sale/new-build signal on
+                # a property now listed as a foreclosure.
+                "last_sold_price": _f(row.get("last_sold_price")),
+                "last_sold_date": str(row.get("last_sold_date") or "") or None,
+                "sold_price": _f(row.get("sold_price")),
+                "hoa_fee": _f(row.get("hoa_fee")),
+                "stories": _f(row.get("stories")),
+                "new_construction": bool(row.get("new_construction")) if row.get("new_construction") is not None else None,
+            },
+            "zillow": {
+                "photo": photos[0] if photos else None,
+                "photos": photos[:6],
+            },
+            "images": {"real": photos[:6]} if photos else {},
+        },
+    )
+
+
+def _scrape_location(loc: str, slug: str) -> list[Listing]:
+    try:
+        from homeharvest import scrape_property
+        import requests
+    except ImportError:
+        return []
+    out: list[Listing] = []
+    seen_urls: set[str] = set()
+    # Try foreclosure + auction filters
+    for listing_type in ("for_sale",):
+        for foreclosure in (True,):
+            try:
+                # scrape_property() -> homeharvest's RealtorScraper.search() ->
+                # general_search() -> self._graphql_post() -> requests.post() to
+                # https://www.realtor.com/frontdoor/graphql. That call has no
+                # retry decorator and no try/except inside homeharvest itself
+                # (unlike handle_location()/get_bulk_prop_details(), which do
+                # retry internally) -- a single transient connection reset or
+                # timeout there used to permanently zero this location's whole
+                # result for the run, silently, via the bare `except Exception:
+                # continue` below. homeharvest calls `requests`, not httpx, and
+                # scrape_property() runs synchronously inside a ThreadPoolExecutor
+                # worker here (see fetch()), so this uses tenacity's sync
+                # Retrying rather than AsyncRetrying, retrying only requests'
+                # own transient transport/timeout exceptions -- never a real
+                # bad HTTP status (e.g. the 403 homeharvest itself raises as
+                # AuthenticationError) and never a parsed-but-empty response.
+                for attempt in Retrying(
+                    stop=stop_after_attempt(3),
+                    wait=wait_exponential_jitter(initial=1, max=8),
+                    retry=retry_if_exception_type((
+                        requests.exceptions.ConnectionError,
+                        requests.exceptions.Timeout,
+                        requests.exceptions.ChunkedEncodingError,
+                    )),
+                    reraise=True,
+                ):
+                    with attempt:
+                        df = scrape_property(
+                            location=loc,
+                            listing_type=listing_type,
+                            foreclosure=foreclosure,
+                            past_days=180,
+                        )
+            except Exception:
+                continue
+            if df is None or len(df) == 0:
+                continue
+            for _, row in df.iterrows():
+                d = row.to_dict()
+                li = _to_listing(d, slug)
+                if li and li.source_url not in seen_urls:
+                    seen_urls.add(li.source_url)
+                    out.append(li)
+    return out
+
+
+class RealtorForeclosures(BaseScraper):
+    slug = "national.realtor_foreclosures"
+    name = "Realtor.com Foreclosures (HomeHarvest)"
+    category = "national_aggregator"
+    expected_min_count = 0
+    requires_apify = False
+    timeout_s = 360.0
+
+    async def fetch(self) -> Iterable[Listing]:
+        loop = asyncio.get_event_loop()
+        out: list[Listing] = []
+        seen: set[str] = set()
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            results = await asyncio.gather(
+                *(loop.run_in_executor(pool, _scrape_location, loc, self.slug)
+                  for loc in SEARCH_LOCATIONS),
+                return_exceptions=True,
+            )
+        for res in results:
+            if isinstance(res, Exception):
+                continue
+            for li in res:
+                if li.source_url not in seen:
+                    seen.add(li.source_url)
+                    out.append(li)
+        log.info("realtor_foreclosures.done", count=len(out),
+                 locations=len(SEARCH_LOCATIONS))
+        return out

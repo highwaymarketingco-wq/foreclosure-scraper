@@ -1,0 +1,133 @@
+"""Greenwood County SC - Delinquent Tax Sale properties.
+
+Greenwood County publishes delinquent tax sale properties on its county
+website. Annual tax sale lists with owner names, TMS numbers, addresses.
+
+Free, public, no login.
+
+DISABLED 2026-10-01: confirmed live this page is Treasurer-office info only
+(budget, FOIA, contact details, a "Pay Taxes online" link) -- no delinquent
+list, no table of any kind. Greenwood's real delinquent-tax system lives
+entirely on corebtpay.com (confirmed by counties_sc.qpaybill_delinquent_roll.
+py's own 2026-09-23 research note: no qPayBill/Catalis subdomain exists for
+Greenwood anywhere on greenwoodcounty-sc.gov), which is exactly what the
+sibling counties_sc.greenwood_corebtpay_delinquent_tax.py scrapes -- verified
+live the same day: that scraper is actively sweeping real unpaid parcels.
+Found via the 2026-10-01 counties_sc per-source extraction audit. Do not
+re-enable without a different, real per-parcel source at this URL.
+
+RE-VERIFIED LIVE 2026-10-04: still holds. The county's site has since moved
+to a Wix Studio build (the page now renders ~835KB with heavy embedded JSON
+app config), but the actual content is unchanged - 0 `<table>` tags, and the
+only "delinquent" mention anywhere on the page is inside that JSON config's
+own echoed requestUrl, not real page content. counties_sc.
+greenwood_corebtpay_delinquent_tax (the real per-parcel source) is still the
+live tenant for Greenwood.
+
+RE-VERIFIED LIVE 2026-10-13: still holds. This time rendered PAGE_URL in a
+real browser (not just curl, since this is a Wix SPA) and read the actual
+rendered DOM text: Treasurer office address/hours/contact, FOIA/fee-collection
+boilerplate, and a "Quick Links" list (Pay Taxes online, Tax Collector, Annual
+Budgets, etc.) -- no delinquent-parcel list or table anywhere in the rendered
+page. Also followed the rendered "Tax Collector" quick link
+(greenwoodcounty-sc.gov/tax-collector) as a second avenue: that page loads
+empty/blank in the browser (no usable content at all), so it is not a
+substitute source either. QPAYBILL_SUBS has no Greenwood entry (confirmed by grep of
+qpaybill_delinquent_roll.py), consistent with the existing note that
+corebtpay, not qPayBill, is Greenwood's real tenant. Confirmed
+greenwoodco.corebtpay.com/egov/apps/bill/pay.egov (the exact SITE_URL
+greenwood_corebtpay_delinquent_tax.py uses) is live today: 200.
+
+Slug: counties_sc.greenwood_delinquent_tax
+Category: county_tax
+ListingType: TAX_SALE
+"""
+from __future__ import annotations
+
+import re
+from datetime import datetime
+from typing import Iterable
+
+import structlog
+
+from ...base_scraper import BaseScraper
+from ...http_client import get_text
+from ...models import Listing, ListingType, PropertyKind
+
+log = structlog.get_logger()
+
+PAGE_URL = "https://www.greenwoodcounty-sc.gov/treasurer/delinquent-tax-sale"
+
+
+class GreenwoodDelinquentTax(BaseScraper):
+    slug = "counties_sc.greenwood_delinquent_tax"
+    name = "Greenwood County SC Delinquent Tax Sale"
+    disabled = True
+    disabled_reason = ("target page is Treasurer office info only, no delinquent list - "
+                       "superseded by counties_sc.greenwood_corebtpay_delinquent_tax - "
+                       "confirmed 2026-10-01, re-confirmed live 2026-10-04 and 2026-10-13")
+    category = "county_tax"
+    timeout_s = 120.0
+    expected_min_count = 0
+    optional = True
+    active_months = (10, 11, 12, 1)
+
+    async def fetch(self) -> Iterable[Listing]:
+        out: list[Listing] = []
+        try:
+            html = await get_text(PAGE_URL, impersonate=True, timeout=40.0)
+        except Exception as exc:
+            log.warning("greenwood_tax.fetch_fail", error=str(exc)[:160])
+            return out
+
+        if not html or len(html) < 200:
+            return out
+
+        rows = re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.I | re.S)
+        for row in rows:
+            cells = re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", row, re.I | re.S)
+            if len(cells) < 2:
+                continue
+            clean = [re.sub(r"<[^>]+>", "", c).strip() for c in cells]
+            if any(h in c.lower() for c in clean[:2] for h in ("owner", "name", "tms", "map", "#")):
+                continue
+            if not any(re.search(r"\d", c) for c in clean):
+                continue
+
+            parcel = None
+            for c in clean:
+                m = re.search(r"\b(\d{3}[-\s]?\d{2}[-\s]?\d{2}[-\s]?[\d.]+)\b", c)
+                if m:
+                    parcel = m.group(1).strip()
+                    break
+                m = re.search(r"\b(\d{8,})\b", c)
+                if m and not parcel:
+                    parcel = m.group(1)
+
+            owner = clean[0] if clean else None
+            addr = None
+            for c in clean[1:]:
+                if re.search(r"\d+\s+\w+", c):
+                    addr = c
+                    break
+            if not addr and len(clean) > 1:
+                addr = clean[1] if len(clean[1]) > 5 else None
+
+            out.append(Listing(
+                source="counties_sc.greenwood_delinquent_tax",
+                source_url=PAGE_URL,
+                listing_type=ListingType.TAX_SALE,
+                property_kind=PropertyKind.UNKNOWN,
+                state="SC",
+                county="Greenwood",
+                parcel_id=parcel,
+                defendant=owner,
+                street_address=addr,
+                description=" | ".join(clean[:6]),
+                first_seen=datetime.utcnow(),
+                last_seen=datetime.utcnow(),
+                raw={"greenwood_delinquent_tax": {"cells": clean[:10]}},
+            ))
+
+        log.info("greenwood_tax.done", count=len(out))
+        return out

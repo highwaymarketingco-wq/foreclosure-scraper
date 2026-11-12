@@ -1,0 +1,36 @@
+# worker/deploy.conf.example
+#
+# Copy to worker/deploy.conf (git-ignored) and fill in. No secrets belong here:
+# every value below is an identifier, not a credential. Lines starting with # are
+# ignored. Environment variables of the same names override this file.
+
+# Your Cloudflare Account ID (32 hex characters). Checklist Part 1: it is in the
+# address bar after dash.cloudflare.com/ and on the account home page.
+CF_ACCOUNT_ID=
+
+# How people reach the Worker. Checklist Part 0, "Web address".
+#   workers-dev    a free something.workers.dev address, no DNS work
+#   custom-domain  an address on a domain you already have on Cloudflare
+URL_MODE=
+
+# Only for URL_MODE=custom-domain, e.g. board.example.com
+WORKER_HOSTNAME=
+
+# Checklist Part 7, after you turn on Access for the Worker. Leave both empty for
+# the first deploy: the Worker then answers 503 to everything and serves nothing.
+#   ACCESS_TEAM_DOMAIN  your Zero Trust team name (Part 4), e.g. acme
+#   ACCESS_AUD          the Application Audience (AUD) tag: Zero Trust, Access
+#                       controls, Applications, open the Worker's application
+ACCESS_TEAM_DOMAIN=
+ACCESS_AUD=
+
+# Break-glass and test switches, both normally false. Redeploy after changing.
+#   CSP_RELAXED=true   allow inline scripts if a dashboard change breaks the page under the strict policy
+#   AUTH_DEBUG=true    refusals carry an X-Auth-Deny header naming why (turn off after a smoke test)
+# CSP_RELAXED=false
+# AUTH_DEBUG=false
+
+# Normally leave these alone.
+# WORKER_NAME=foreclosure-board
+# BUCKET_NAME=foreclosure-board
+# R2_TARGET=r2:foreclosure-board

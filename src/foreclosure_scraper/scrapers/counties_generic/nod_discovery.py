@@ -1,0 +1,204 @@
+"""NOD (Notice of Default / Notice of Foreclosure) discovery via ROD adapters.
+
+For every (state, county) where we have a working Register-of-Deeds vendor
+adapter, sweep the last `days_back` days of recordings and pull every doc
+that looks like a NOD / NOS / Lis Pendens. These are the *earliest* public
+signal that a property is heading to foreclosure (often weeks before a sale
+date is published), so we treat them as `LIS_PENDENS`-typed Listings to feed
+the same downstream dedupe / dashboard.
+
+This complements `counties.sitemap_walker` (which walks county.gov pages
+for already-scheduled sales) by surfacing the upstream pre-foreclosure
+trigger event.
+
+NOD discovery via the rod/ vendor adapters (Aumentum, CCHS, Cott, Kofile,
+Logan). Each adapter sweeps the last `days_back` days of recordings for its
+county's ROD and returns RodDoc objects matching NOD/NOS/Lis Pendens doc types.
+"""
+from __future__ import annotations
+
+import asyncio
+from datetime import datetime, timedelta
+from typing import Iterable
+
+import structlog
+
+from ...base_scraper import BaseScraper, OUTCOME_BLOCKED, OUTCOME_PARTIAL
+from ...models import Listing, ListingType, PropertyKind
+from ...rod import aumentum, cchs, cott, kofile
+from ...rod.cchs import CchsWall
+from ...rod.models import RodDoc
+
+log = structlog.get_logger()
+
+# (state, county, vendor-callable) tuples. Each callable takes
+# (state, county, days_back, max_docs) and returns list[RodDoc].
+ROD_TARGETS: tuple[tuple[str, str, callable], ...] = (
+    # CCHS — Burke / Lincoln / Cleveland NC
+    ("NC", "Burke", cchs.discover_recent_nods),
+    ("NC", "Lincoln", cchs.discover_recent_nods),
+    ("NC", "Cleveland", cchs.discover_recent_nods),
+    # Aumentum / Manatron — Mecklenburg / Buncombe NC
+    # Gaston deliberately NOT here: it was wired through this same Aumentum
+    # adapter but deeds.gastongov.com is a confirmed-dead host (live-tested
+    # 2026-10-03, see rod/aumentum.py's module docstring "GASTON REMOVED
+    # 2026-10-03" and AUMENTUM_COUNTIES) — Gaston moved its ROD to
+    # Courthouse Computer Systems on 2026-05-28 and was never re-pointed.
+    ("NC", "Mecklenburg", aumentum.discover_recent_nods),
+    ("NC", "Buncombe", aumentum.discover_recent_nods),
+    # Cott Systems — Polk / Rutherford NC
+    ("NC", "Polk", cott.discover_recent_nods),
+    ("NC", "Rutherford", cott.discover_recent_nods),
+    # Kofile — Oconee SC
+    ("SC", "Oconee", kofile.discover_recent_nods),
+)
+
+# Typical NC non-judicial-foreclosure timeline: NOH/NOS recorded → sale 30–90 days later.
+# 2026-10-14 (date-coverage audit pass2, prerequisite fix): this used to be projected straight
+# onto Listing.sale_date (recorded_date + NC_NOD_TO_SALE_DAYS) so the row would surface in the
+# upcoming-sales view. That field is trusted elsewhere as an AUTHORITATIVE sale date --
+# board_persist._is_terminal_dict() unconditionally drops any prior-only row whose sale_date is
+# more than TERMINAL_SALE_GRACE_DAYS (365d) in the past, BEFORE any AGE_EXEMPT_SOURCES check runs
+# -- so every row from this source was force-dropped at recorded_date + 90 + 365 ≈ 455 days
+# regardless of whether the underlying case was still alive, and would have silently defeated
+# this source's addition to AGE_EXEMPT_SOURCES (board_persist.py) the same day it landed. Kept as
+# an ESTIMATE in raw['nod']['estimated_sale_date'] only (see _to_listing below) -- never on the
+# authoritative Listing.sale_date field -- matching nc_rod_substitute_trustee.py's own convention
+# for a PRE-sale recording (sale_date=None; the real sale hasn't happened and isn't known yet).
+NC_NOD_TO_SALE_DAYS = 90
+
+
+def _project_sale_date(recorded: datetime | None) -> datetime | None:
+    """A best-effort ESTIMATE only (raw['nod']['estimated_sale_date']) -- never assign this to
+    Listing.sale_date; see the NC_NOD_TO_SALE_DAYS comment above for why."""
+    if recorded is None:
+        return None
+    return recorded + timedelta(days=NC_NOD_TO_SALE_DAYS)
+
+
+def _build_case_number(d: RodDoc) -> str | None:
+    if d.instrument_no:
+        return d.instrument_no.strip() or None
+    if d.book and d.page:
+        return f"{d.book}/{d.page}"
+    return None
+
+
+def _build_description(d: RodDoc) -> str:
+    rec = d.recorded_date.strftime("%Y-%m-%d") if d.recorded_date else "unknown date"
+    grantor = (d.grantor or "?").strip()
+    grantee = (d.grantee or "?").strip()
+    bk_pg = f"{d.book}/{d.page}" if (d.book and d.page) else (d.instrument_no or "n/a")
+    return f"NOD recorded {rec}: {grantor} vs {grantee} ({bk_pg})"
+
+
+def _build_source_url(d: RodDoc) -> str:
+    """Best-effort link back to the ROD vendor search page."""
+    state, county = d.state, d.county
+    if (state, county) in cchs.CCHS_COUNTIES:
+        host, app, _root = cchs.CCHS_COUNTIES[(state, county)]
+        return f"https://{host}.courthousecomputersystems.com/{app}/realestatesearch.asp"
+    if (state, county) in aumentum.AUMENTUM_COUNTIES:
+        return f"{aumentum.AUMENTUM_COUNTIES[(state, county)]}/SrchName.aspx"
+    if (state, county) in cott.COTT_COUNTIES:
+        return f"{cott.COTT_COUNTIES[(state, county)]}/SrchName.aspx"
+    if (state, county) in kofile.KOFILE_COUNTIES:
+        return f"https://{kofile.KOFILE_COUNTIES[(state, county)]}/"
+    return ""
+
+
+def _to_listing(d: RodDoc, slug: str) -> Listing:
+    now = datetime.utcnow()
+    estimated = _project_sale_date(d.recorded_date)
+    nod_raw = d.to_dict()
+    # Estimate only -- non-authoritative, never Listing.sale_date (see NC_NOD_TO_SALE_DAYS above).
+    nod_raw["estimated_sale_date"] = estimated.isoformat() if estimated else None
+    return Listing(
+        source=slug,
+        source_url=_build_source_url(d) or "https://example.invalid/",
+        listing_type=ListingType.LIS_PENDENS,
+        property_kind=PropertyKind.UNKNOWN,
+        state=d.state,
+        county=d.county,
+        case_number=_build_case_number(d),
+        defendant=d.grantor,
+        plaintiff=d.grantee,
+        sale_date=None,  # recorded_date + 90d is a guess, not a real sale date -- see above
+        description=_build_description(d),
+        first_seen=now,
+        last_seen=now,
+        raw={"nod": nod_raw},
+    )
+
+
+class NODDiscovery(BaseScraper):
+    slug = "counties.nod_discovery"
+    name = "ROD-driven NOD / NOS / Lis Pendens discovery"
+    category = "county_court"
+    # NOD discovery is opportunistic across multiple county ROD vendors;
+    # weeks with zero matches are normal (small counties don't always
+    # file in the lookback window). Real regression here = a county's
+    # ROD index becomes unreachable, which fires structural log warnings
+    # separately. Empty count alone shouldn't cry wolf.
+    expected_min_count = 0
+    requires_apify = False
+    timeout_s = 600.0
+
+    days_back: int = 60
+    max_docs_per_county: int = 100
+
+    async def fetch(self) -> Iterable[Listing]:
+        sem = asyncio.Semaphore(4)
+        # 2026-10-14 (silent-failure sweep follow-up item 1): see cash_buyer_deeds.py
+        # / nc_rod_substitute_trustee.py for the same CCHS-wall-visibility fix. This
+        # scraper's 3 CCHS targets (Burke/Lincoln/Cleveland) share one Cloudflare-
+        # fronted host; cchs.discover_recent_nods now raises CchsWall (not a bare
+        # exception) when it hits that wall, so it's countable separately here from
+        # a genuine zero-match county instead of silently folding into whatever the
+        # other (non-CCHS) targets below still contributed.
+        cchs_targets = {county for state, county, _fn in ROD_TARGETS
+                        if (state, county) in cchs.CCHS_COUNTIES}
+        cchs_walled: set[str] = set()
+
+        async def one(state: str, county: str, fn) -> list[Listing]:
+            async with sem:
+                bound = log.bind(scraper=self.slug, state=state, county=county)
+                try:
+                    docs = await fn(
+                        state, county,
+                        days_back=self.days_back,
+                        max_docs=self.max_docs_per_county,
+                    )
+                except CchsWall as exc:
+                    cchs_walled.add(county)
+                    bound.warning("nod.cchs_wall", error=str(exc)[:200])
+                    return []
+                except Exception as exc:  # noqa: BLE001
+                    bound.warning("nod.county_error",
+                                  error=str(exc), exc_type=type(exc).__name__)
+                    return []
+                if not isinstance(docs, list):
+                    return []
+                bound.info("nod.county_ok", count=len(docs))
+                return [_to_listing(d, self.slug) for d in docs if d.recorded_date]
+
+        results = await asyncio.gather(
+            *(one(s, c, fn) for s, c, fn in ROD_TARGETS),
+            return_exceptions=True,
+        )
+        out: list[Listing] = []
+        for r in results:
+            if isinstance(r, list):
+                out.extend(r)
+
+        if cchs_targets and cchs_walled == cchs_targets:
+            # Every CCHS target in this sweep was wall-blocked -- see module docstring.
+            self.last_outcome = OUTCOME_PARTIAL if out else OUTCOME_BLOCKED
+            self.last_reason = (
+                f"CCHS vendor wall-blocked for all {len(cchs_walled)} CCHS counties "
+                f"in this sweep ({'/'.join(sorted(cchs_targets))}) — other, non-CCHS "
+                f"targets in this run are unaffected")
+            log.warning("nod.cchs_all_walled", walled=sorted(cchs_walled),
+                        attempted=sorted(cchs_targets), total_rows=len(out))
+
+        return out

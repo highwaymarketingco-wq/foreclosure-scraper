@@ -1,0 +1,306 @@
+"""Rogers Townsend — direct PDF + HTML fetches via pdfplumber for structured tables.
+
+SC report: clean PDF table parsed via pdfplumber.extract_tables().
+NC report: 'NC_Listings.pdf' is actually served as HTML despite the .pdf extension.
+
+EXTRACTION-COMPLETENESS AUDIT, 2026-10-03 (live-verified):
+  * SC_URL is fully live and complete. Live-pulled 2026-10-03: a clean 7-column
+    pdfplumber table (County | Street Address | City | Tax Map No. | Sale Date |
+    DJ Demand | Bid), 2 pages, real upcoming sale dates (e.g. 10/5/2026,
+    11/2/2026). All 6 read columns are captured EXCEPT "DJ Demand"
+    (row[5], never read) -- checked every row on both pages live: it is a bare
+    Y/N deficiency-judgment-demand flag (e.g. "N", "Y"), never a dollar amount,
+    so there is no debt/judgment $ silently being dropped here; nothing of
+    analytical value is being lost by not capturing it.
+  * NC_URL ("https://rogerstownsend.com/reports/NC_Listings.pdf") is a DEAD
+    LINK -- confirmed live 2026-10-03: HTTP 404 (the response body is the
+    site's normal 404 HTML page, served with content-type text/html, which is
+    why the existing `if r.status_code == 200` guard matters -- without it,
+    the 404 page's content-type would pass the "html" sniff below and get
+    mis-parsed as a listings table). Rogers Townsend's own
+    https://rogerstownsend.com/reports/ directory listing no longer contains
+    an "NC_Listings.pdf" at all; as of 2026-10-03 it serves exactly 4 files:
+    NC_Bids.pdf, SC_Bids.pdf, SC_Listings.pdf, Sales_Report.pdf. Checked all
+    three NC-adjacent candidates as a possible replacement and none is one:
+    NC_Bids.pdf is a SALES-RESULTS report (Sold To / Sale Price / Sale Confirm
+    Date / Upset Bid Date columns, not an upcoming-sale listing), SC_Bids.pdf
+    is an empty results-report placeholder (header only, no rows), and
+    Sales_Report.pdf's rows are stale 2020-dated historical sales. None
+    carries a live upcoming NC sale the way NC_Listings.pdf used to. This is a
+    genuine external wall (the firm discontinued/renamed the live NC feed),
+    not a code bug -- no fix applied; flagged here with evidence so a future
+    audit pass doesn't re-discover the same dead link from scratch.
+
+SOURCE-COMPLETENESS AUDIT, 2026-10-08: the gated VM run of 10/8 scraped 0 (previous run 32)
+while SC_Listings.pdf was live at the same URL (same 7 columns, 33 rows parsed by this module
+the same day). The firm regenerates the file in place (Last-Modified moves during the day), and
+a single failed or empty fetch used to come back as a clean ZERO_RESULT with no retry, no
+carryover (expected_min_count was 0) and no reason. Now: the SC fetch is retried once; a
+failure that survives the retry is raised so the run report says NET_TIMEOUT / BLOCKED /
+ERROR instead of "ran clean, 0 rows"; expected_min_count=5 turns a zero into an alarm plus the
+last-known-good carryover. Also: the Bid column's "$0.00" is a no-bid placeholder (14 of 33
+rows on 10/8) and is no longer published as a $0 opening bid, and the DJ Demand flag
+(deficiency judgment demanded, Y/N) is kept in the description.
+"""
+from __future__ import annotations
+
+import asyncio
+import io
+import re
+from datetime import datetime
+from typing import Iterable
+
+import pdfplumber
+from dateutil import parser as dateparser
+from selectolax.parser import HTMLParser
+
+from ...base_scraper import BaseScraper
+from ...document_links import harvest_document_links, stamp_documents
+from ...http_client import client
+from ...models import Listing, ListingType, PropertyKind
+
+SC_URL = "https://rogerstownsend.com/reports/SC_Listings.pdf"
+NC_URL = "https://rogerstownsend.com/reports/NC_Listings.pdf"
+# One retry of the SC report after a failed/empty fetch: the file is regenerated in place,
+# and a single bad fetch used to zero the source for the whole run. Costs one extra
+# request (plus this delay) only on a failed attempt.
+SC_RETRY_DELAY_S = 3.0
+
+PARCEL_RE = re.compile(r"\b\d{2,3}-\d{2,3}-\d{2,3}-\d{1,4}(?:-\d+)?\b")
+DATE_RE = re.compile(r"\b\d{1,2}/\d{1,2}/\d{2,4}\b")
+ADDR_RE = re.compile(
+    r"^(\d+\s+[A-Z][\w .'\-]+(?:Road|Rd|Street|St|Drive|Dr|Lane|Ln|Avenue|Ave|"
+    r"Highway|Hwy|Boulevard|Blvd|Circle|Cir|Court|Ct|Way|Place|Pl|Trail|Trl|Parkway|Pkwy)\.?)",
+    re.I,
+)
+
+
+def _extract_pdf_text(data: bytes) -> str:
+    try:
+        from pypdf import PdfReader
+    except ImportError:
+        return ""
+    try:
+        reader = PdfReader(io.BytesIO(data))
+        return "\n".join((p.extract_text() or "") for p in reader.pages)
+    except Exception:
+        return ""
+
+
+def _parse_sc_pdf_with_pdfplumber(data: bytes, slug: str) -> list[Listing]:
+    """SC PDF: 7-column tabular list. Use pdfplumber for structured row extraction.
+    Columns: County | Street Address | City | Tax Map No. | Sale Date | DJ Demand | Bid
+    """
+    import structlog
+    log = structlog.get_logger()
+    out: list[Listing] = []
+    try:
+        pdf = pdfplumber.open(io.BytesIO(data))
+        log.info("rt.pdf.open", pages=len(pdf.pages), bytes=len(data))
+    except Exception as exc:
+        log.warning("rt.pdf.open_failed", error=str(exc)[:120], bytes=len(data))
+        return out
+
+    last_county = None
+    total_rows = 0
+    for page_idx, page in enumerate(pdf.pages):
+        try:
+            tables = page.extract_tables() or []
+        except Exception as exc:
+            log.warning("rt.pdf.extract_failed", page=page_idx, error=str(exc)[:80])
+            continue
+        log.info("rt.pdf.page", page=page_idx, tables=len(tables))
+        for table in tables:
+            total_rows += len(table)
+            for row in table:
+                if not row or len(row) < 5:
+                    continue
+                # Skip header row
+                if (row[0] or "").strip().lower() == "county":
+                    continue
+                county = (row[0] or "").strip() or last_county
+                if county:
+                    last_county = county
+                street = (row[1] or "").strip() or None
+                city = (row[2] or "").strip() or None
+                parcel = (row[3] or "").strip() or None
+                date_raw = (row[4] or "").strip()
+                bid_raw = (row[6] or "").strip() if len(row) > 6 else ""
+                dj_raw = (row[5] or "").strip().upper() if len(row) > 5 else ""
+
+                if not date_raw or not street:
+                    continue
+
+                sale_date = None
+                try:
+                    sale_date = dateparser.parse(date_raw)
+                except (ValueError, TypeError):
+                    continue
+
+                bid = None
+                bm = re.search(r"\$?\s*([\d,]+(?:\.\d{2})?)", bid_raw)
+                if bm and bm.group(1):
+                    try:
+                        bid = float(bm.group(1).replace(",", ""))
+                    except ValueError:
+                        pass
+                if not bid:
+                    # "$0.00" is the report's no-bid-set placeholder, not a $0 opening bid
+                    bid = None
+                description = None
+                if dj_raw in ("Y", "N"):
+                    description = ("DJ Demand: Y (deficiency judgment demanded)" if dj_raw == "Y"
+                                   else "DJ Demand: N (deficiency judgment waived)")
+
+                out.append(
+                    Listing(
+                        source=slug,
+                        source_url=SC_URL,
+                        listing_type=ListingType.FORECLOSURE_SALE,
+                        property_kind=PropertyKind.UNKNOWN,
+                        street_address=street,
+                        city=city,
+                        state="SC",
+                        county=county,
+                        parcel_id=parcel,
+                        sale_date=sale_date,
+                        opening_bid=bid,
+                        trustee="Rogers Townsend",
+                        description=description,
+                        first_seen=datetime.utcnow(),
+                        last_seen=datetime.utcnow(),
+                    )
+                )
+    pdf.close()
+    log.info("rt.pdf.parsed", total_rows=total_rows, listings_extracted=len(out))
+    return out
+
+
+def _parse_nc_html(html: str, slug: str) -> list[Listing]:
+    out: list[Listing] = []
+    tree = HTMLParser(html)
+    for tbl in tree.css("table"):
+        for row in tbl.css("tr"):
+            cells = [c.text(strip=True) for c in row.css("td")]
+            if len(cells) < 4:
+                continue
+            text = " | ".join(cells)
+            date_m = DATE_RE.search(text)
+            if not date_m:
+                continue
+            try:
+                sale_date = dateparser.parse(date_m.group(0))
+            except (ValueError, TypeError):
+                continue
+            addr_m = ADDR_RE.search(text)
+            bid = None
+            bm = re.search(r"\$\s*([\d,]+\.?\d*)", text)
+            if bm:
+                try:
+                    bid = float(bm.group(1).replace(",", ""))
+                except ValueError:
+                    pass
+            # First cell is usually county
+            county = cells[0].replace(" County", "").strip() if cells else None
+            out.append(
+                Listing(
+                    source=slug,
+                    source_url=NC_URL,
+                    listing_type=ListingType.FORECLOSURE_SALE,
+                    property_kind=PropertyKind.UNKNOWN,
+                    street_address=addr_m.group(1) if addr_m else None,
+                    state="NC",
+                    county=county,
+                    sale_date=sale_date,
+                    opening_bid=bid,
+                    trustee="Rogers Townsend",
+                    description=text[:400],
+                    first_seen=datetime.utcnow(),
+                    last_seen=datetime.utcnow(),
+                )
+            )
+            stamp_documents(out[-1], harvest_document_links(row.html or "", base_url=NC_URL))
+    return out
+
+
+class RogersTownsend(BaseScraper):
+    slug = "law_firms.rogers_townsend"
+    name = "Rogers Townsend"
+    category = "law_firm"
+    timeout_s = 120.0
+    # The VM fetches the SC report fine on most runs (15-37 rows per run); a zero is a fault,
+    # so it alarms and the last-known-good rows carry over (0 meant neither happened).
+    expected_min_count = 5
+    requires_apify = False  # marker for orchestrator skip-when-budget-out
+
+    async def _fetch_sc_once(self, c, log) -> tuple[list[Listing], str | None]:
+        """One GET of the SC report. Returns (rows, problem); problem is None when rows parsed."""
+        r = await c.get(SC_URL)
+        magic = r.content[:8]
+        ct = r.headers.get("content-type", "")
+        log.info(
+            "rt.fetch.sc",
+            status=r.status_code,
+            bytes=len(r.content),
+            magic=magic.hex(),
+            is_pdf=(magic[:4] == b"%PDF"),
+            content_type=ct,
+        )
+        if r.status_code >= 400:
+            r.raise_for_status()  # 403/429/5xx -> BLOCKED, 404 (moved file) -> ERROR in safe_run
+        if r.status_code != 200:
+            return [], f"HTTP {r.status_code}"
+        if r.content[:4] != b"%PDF":
+            return [], f"non-PDF body ({ct or 'no content-type'}, {len(r.content)} bytes)"
+        rows = _parse_sc_pdf_with_pdfplumber(r.content, self.slug)
+        if not rows:
+            return [], f"PDF parsed to 0 rows ({len(r.content)} bytes)"
+        return rows, None
+
+    async def fetch(self) -> Iterable[Listing]:
+        import structlog
+        log = structlog.get_logger()
+        out: list[Listing] = []
+        sc_exc: Exception | None = None
+        sc_problem: str | None = None
+        async with client(timeout=45.0) as c:
+            # SC: real PDF. Two attempts: a failed or empty fetch is retried once.
+            for attempt in range(2):
+                if attempt:
+                    await asyncio.sleep(SC_RETRY_DELAY_S)
+                try:
+                    rows, sc_problem = await self._fetch_sc_once(c, log)
+                    sc_exc = None
+                except Exception as exc:  # noqa: BLE001 -- recorded, re-raised below if the retry fails too
+                    sc_exc, sc_problem = exc, f"{type(exc).__name__}: {str(exc)[:120]}"
+                    rows = []
+                if rows:
+                    out.extend(rows)
+                    self.partial = list(out)  # a hung NC fetch must not throw these away
+                    sc_problem = None
+                    break
+                log.warning("rt.fetch.sc.error", attempt=attempt + 1, problem=sc_problem)
+            # NC: served as HTML even though .pdf extension
+            try:
+                r = await c.get(NC_URL)
+                ct = r.headers.get("content-type", "").lower()
+                magic = r.content[:8]
+                log.info(
+                    "rt.fetch.nc",
+                    status=r.status_code,
+                    bytes=len(r.content),
+                    magic=magic.hex(),
+                    content_type=ct,
+                )
+                if r.status_code == 200:
+                    if "html" in ct or r.content[:6].lower().startswith(b"<!doct"):
+                        out.extend(_parse_nc_html(r.text, self.slug))
+                    elif r.content[:4] == b"%PDF":
+                        out.extend(_parse_sc_pdf_with_pdfplumber(r.content, self.slug))
+            except Exception as exc:
+                log.warning("rt.fetch.nc.error", error=str(exc)[:120])
+        if not out and sc_exc is not None:
+            raise sc_exc  # safe_run classifies it (NET_TIMEOUT / BLOCKED / ERROR), not ZERO_RESULT
+        if not out and sc_problem and not sc_problem.startswith("PDF parsed to 0 rows"):
+            raise RuntimeError(f"SC_Listings.pdf: {sc_problem}")
+        return out

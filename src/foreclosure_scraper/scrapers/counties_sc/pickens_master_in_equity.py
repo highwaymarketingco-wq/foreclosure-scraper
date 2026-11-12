@@ -1,0 +1,386 @@
+"""Pickens County SC Master in Equity — session-aware PDF fetch.
+
+The county lists PDFs at sales_rosters.php; clicking a link redirects to
+cms5.revize.com which 404s direct curl requests. We solve it by using a
+single httpx.AsyncClient session that loads the listing page first (seeding
+cookies + referer) and then GETs the PDF.
+"""
+from __future__ import annotations
+
+import io
+import re
+from datetime import datetime, timedelta
+from typing import Iterable
+from urllib.parse import urljoin
+
+from dateutil import parser as dateparser
+from selectolax.parser import HTMLParser
+
+from ...base_scraper import BaseScraper
+from ...http_client import client
+from ...models import Listing, ListingType, PropertyKind
+
+PAGE_URL = "https://www.co.pickens.sc.us/departments/master_in_equity/sales_rosters.php"
+
+CASE_RE = re.compile(r"\b\d{2,4}-CP-\d{2}-\d{4,6}\b", re.I)
+# Lazy quantifier + \b around the suffix alternation: without the \b, the old
+# pattern matched "Rd"/"St" as bare substrings of ordinary words ("CARDINAL"
+# -> "CARD", "STATE" -> "ST") and also swallowed the case-number's own
+# trailing digits as a fake house number ("00468 CARDINAL..." -> "00468
+# CARD"). \w\s (not just a literal space) in the body lets an address that
+# PDF-extraction wrapped across a line break ("333 SLAB BRIDGE\nRD.,...")
+# still match as one address. Same fix shipped to the sibling
+# anderson_master_in_equity.py 2026-10-01.
+ADDR_RE = re.compile(
+    r"(\d+[ \t]+[A-Z][\w\s.'\-]+?\b(?:Road|Rd|Street|St|Drive|Dr|Lane|Ln|Avenue|Ave|"
+    r"Highway|Hwy|Boulevard|Blvd|Circle|Cir|Court|Ct|Way|Place|Pl|Trail|Trl|Parkway|Pkwy)\b\.?)",
+    re.I,
+)
+# South Carolina TMS/PIN: four hyphen-separated digit groups ("5029-11-66-6731"),
+# printed right after the address on every Pickens MIE roster row and RESULTS
+# row alike. The strongest parcel-keyed dedupe/resolution id these rows carry,
+# and it was never captured at all before 2026-10-01.
+TMS_RE = re.compile(r"\b(\d{4}-\d{2}-\d{2}-\d{4,6})\b")
+DATE_RE = re.compile(r"\b(?:\d{1,2}/\d{1,2}/\d{2,4})\b")
+# Caption split "Plaintiff V Defendant" / "Plaintiff v. Defendant" — Pickens
+# PDFs use a bare capital "V" with NO period ("CORP. V JOHN K. SHIVERS"), not
+# the "v." the sibling anderson_master_in_equity.py uses. The old pattern
+# required a literal lowercase "v." and had no re.I flag, so it NEVER matched
+# on this source -- confirmed live 2026-10-01: 34/34 real rows came back with
+# plaintiff=defendant=None. Accepts either shape now.
+PARTIES_RE = re.compile(
+    r"([A-Za-z][A-Za-z\s&.,'-]{3,80}?)\s+v\.?\s+([A-Za-z][A-Za-z\s&.,'-]{2,100}?)"
+    r"(?=,?\s*ET\.?\s*AL\b|\s*\d|\s*$)",
+    re.I,
+)
+_ETAL_RE = re.compile(r"\bet\.?\s*al\b.*$", re.I)
+# Attorney short-code legend (firm codes only — BR/WD status codes excluded so
+# they never masquerade as a trustee). Ported from anderson_master_in_equity.
+ATTORNEY_LEGEND = {
+    "B&S": "Brock & Scott",
+    "BCP": "Bell Carrington Price & Gregg",
+    "HSB": "Haynsworth Sinkler Boyd",
+    "RPL": "Riley Pope & Laney",
+    "RT": "Rogers Townsend",
+    "S&C": "Scott & Corley",
+}
+# A leading attorney short-code token sits between the case# and the plaintiff
+# ("... RPL Nationstar Mortgage LLC v. ...") — strip it so it never contaminates
+# the captured plaintiff.
+_LEADING_ATTY_RE = re.compile(
+    r"^\s*(?:" + "|".join(re.escape(c) for c in ATTORNEY_LEGEND) + r")\b\.?\s*",
+    re.I,
+)
+MONTH_HEADER_RE = re.compile(
+    r"\b((?:January|February|March|April|May|June|July|August|September|October|November|December))\s+(\d{4})\b",
+    re.I,
+)
+
+# Sold-price patterns commonly used in SC MIE results PDFs. Order
+# matters — most-specific first.
+SOLD_PRICE_PATTERNS = [
+    # "High Bid: $45,000" / "high bid of $45,000"
+    re.compile(r"high\s+bid(?:\s+of)?\s*[:=]?\s*\$\s*([\d,]+(?:\.\d{2})?)", re.I),
+    # "Sold for $45,000" / "Sold to XYZ LLC for $45,000" — the buyer
+    # can be multi-word, so we match anything up to "for $" non-greedily,
+    # but cap the gap to ~80 chars so we don't bridge across cases.
+    re.compile(r"sold\s+(?:to\s+[^$\n]{1,80}?\s+)?for\s*\$\s*([\d,]+(?:\.\d{2})?)", re.I),
+    # "Final Bid: $45,000"
+    re.compile(r"final\s+bid\s*[:=]?\s*\$\s*([\d,]+(?:\.\d{2})?)", re.I),
+    # "Bid Amount: $45,000" / "Successful Bid: $45,000"
+    re.compile(r"(?:successful\s+)?bid\s+amount\s*[:=]?\s*\$\s*([\d,]+(?:\.\d{2})?)", re.I),
+    # "Sale Price: $45,000"
+    re.compile(r"sale\s+price\s*[:=]?\s*\$\s*([\d,]+(?:\.\d{2})?)", re.I),
+    # "$45,000 SOLD" — money-amount immediately followed by SOLD keyword
+    re.compile(r"\$\s*([\d,]+(?:\.\d{2})?)\s+SOLD\b", re.I),
+    # 2026-10-04 extraction-completeness fix: NONE of the patterns above ever
+    # matched Pickens' OWN live results-PDF phrasing. Live-verified against
+    # every current RESULTS/ROSTER PDF in the scraper's actual 365-day fetch
+    # window (Dec 2025 - Sep 2026, 8 PDFs): every single completed-sale row
+    # used one of these phrasings in the NOTES column, and every one of them
+    # came back price=None ("no_match") before this fix -- a 0/many hit rate
+    # on real sold prices, not an edge case. pypdf's column-to-text flattening
+    # also splits "SOLD TO THIRD" and "PARTY BIDDER" across a line break, so
+    # the gap between words must tolerate a newline (plain \s* already does).
+    #
+    # "SOLD TO THIRD PARTY BIDDER $236,000.00" / "SOLD TO PLAINTIFF $100,000.00"
+    re.compile(r"sold\s+to\s+(?:third\s*[\s-]?\s*party\s*bidder|plaintiff)"
+               r"\s*[-:]?\s*\$\s*([\d,]+(?:\.\d{2})?)", re.I),
+    # "3rd Party Bid - $205,000.00" / "To Plaintiff - $200,000.00" (the
+    # 2023-era phrasing, no leading "SOLD")
+    re.compile(r"(?:3rd\s*party\s*bid|third[\s-]party\s*bid|to\s+plaintiff)"
+               r"\s*[-:]?\s*\$\s*([\d,]+(?:\.\d{2})?)", re.I),
+    # "PLAINTIFF BID $95,000.00" — a deficiency-demanded row still reports a
+    # real plaintiff bid amount
+    re.compile(r"plaintiff\s+bid\s*[-:]?\s*\$\s*([\d,]+(?:\.\d{2})?)", re.I),
+    # "$31,024.46 PLAINTIFF BID" — amount BEFORE the label (both orders occur
+    # across different monthly PDFs; same "amount-then-keyword" shape as the
+    # "$45,000 SOLD" pattern above)
+    re.compile(r"\$\s*([\d,]+(?:\.\d{2})?)\s+PLAINTIFF\s+BID\b", re.I),
+]
+
+# Phrases indicating an upset bid was filed (Pickens results sometimes
+# show successive upset bids; we want the FINAL one).
+UPSET_BID_RE = re.compile(
+    r"(?:upset|upset\s+bid|advanced\s+bid)\s*[:=]?\s*\$\s*([\d,]+(?:\.\d{2})?)",
+    re.I,
+)
+
+# Result-status words. If the chunk has "WITHDRAWN" / "POSTPONED" /
+# "DISMISSED" we don't trust the sold price (no actual sale happened).
+NON_SALE_STATUS_RE = re.compile(
+    r"\b(WITHDRAWN|POSTPONED|DISMISSED|RESCINDED|CANCELLED|CANCELED|"
+    r"NO\s+SALE|NOT\s+SOLD|NO\s+BID)\b",
+    re.I,
+)
+
+
+def _is_results_pdf(url: str, label: str = "") -> bool:
+    """RESULTS PDFs report past sales (with sold prices). Upcoming-sale
+    rosters list scheduled sales with opening bids only. The link label
+    + URL fragment both reliably mark RESULTS PDFs at Pickens."""
+    haystack = f"{url} {label}".upper()
+    return "RESULTS" in haystack
+
+
+def _extract_sold_price(chunk: str) -> tuple[float | None, str]:
+    """Parse the highest credible sold-price figure from a Pickens
+    RESULTS-PDF chunk. Prefers explicit upset-bid (final hammer) over
+    the initial bid when multiple amounts appear in the same chunk.
+
+    Returns (price, source_pattern_name). Price is None when:
+      * No matching pattern found
+      * Chunk has a NON_SALE_STATUS marker (withdrawn/postponed/etc.)
+      * Parsed amount is implausible (<$100 or >$10M)
+    """
+    if NON_SALE_STATUS_RE.search(chunk):
+        return None, "non_sale_status"
+
+    # Upset bids are always the final word — prefer them when present.
+    upset_amounts = []
+    for m in UPSET_BID_RE.finditer(chunk):
+        try:
+            upset_amounts.append(float(m.group(1).replace(",", "")))
+        except ValueError:
+            continue
+    if upset_amounts:
+        amt = max(upset_amounts)  # final upset is the largest
+        if 100 <= amt <= 10_000_000:
+            return amt, "upset_bid"
+
+    for pat in SOLD_PRICE_PATTERNS:
+        m = pat.search(chunk)
+        if not m:
+            continue
+        try:
+            amt = float(m.group(1).replace(",", ""))
+        except ValueError:
+            continue
+        if 100 <= amt <= 10_000_000:
+            return amt, pat.pattern[:30]
+
+    return None, "no_match"
+
+
+def _extract_pdf_text(data: bytes) -> str:
+    try:
+        from pypdf import PdfReader
+    except ImportError:
+        return ""
+    try:
+        reader = PdfReader(io.BytesIO(data))
+        return "\n".join((p.extract_text() or "") for p in reader.pages)
+    except Exception:
+        return ""
+
+
+class PickensMasterInEquity(BaseScraper):
+    slug = "counties_sc.pickens_master_in_equity"
+    name = "Pickens County (SC) Master in Equity"
+    category = "county_court"
+    timeout_s = 120.0
+    # Pickens publishes monthly rosters as PDFs. They legitimately have
+    # months with no active sales — verified 2026-05-06 with the live
+    # "MAY 2026 -NO ACTIVE SALES" PDF. expected_min_count=0 prevents
+    # false REGRESSED alerts on dry months; a real regression here looks
+    # like a code-level error (PDF parser broken), not an empty count.
+    expected_min_count = 0
+
+    async def fetch(self) -> Iterable[Listing]:
+        out: list[Listing] = []
+        today = datetime.utcnow()
+
+        async with client(timeout=45.0) as c:
+            # Step 1: Load the listing page to seed cookies. If direct httpx
+            # returns a JS-shell, fall back to Scrapling stealth.
+            html = ""
+            try:
+                r = await c.get(PAGE_URL)
+                if r.status_code == 200:
+                    html = r.text
+            except Exception:
+                pass
+
+            # If no PDF links visible in the direct fetch, try Scrapling
+            if html and "pdf" not in html.lower():
+                html = ""
+            if not html:
+                try:
+                    from scrapling.fetchers import StealthyFetcher
+                    result = await StealthyFetcher.async_fetch(
+                        PAGE_URL, headless=True, network_idle=True, timeout=60000,
+                    )
+                    body = getattr(result, "body", b"")
+                    html = body.decode("utf-8", errors="replace") if isinstance(body, bytes) else str(body or "")
+                except ImportError:
+                    return out
+                except Exception:
+                    return out
+
+            if not html:
+                return out
+
+            tree = HTMLParser(html)
+            # The page declares <base href="https://www.co.pickens.sc.us/">, so
+            # bare relative PDF hrefs resolve against the DOMAIN ROOT, not the
+            # /departments/master_in_equity/ path. Honor the declared <base> if
+            # present; otherwise default to the domain root.
+            base_href = "https://www.co.pickens.sc.us/"
+            base_el = tree.css_first("base[href]")
+            if base_el:
+                bh = (base_el.attributes.get("href") or "").strip()
+                if bh:
+                    base_href = bh
+            pdf_links: list[tuple[str, datetime | None]] = []
+            for a in tree.css("a[href$='.pdf'], a[href*='.pdf?']"):
+                href = a.attributes.get("href", "")
+                label = a.text(strip=True) or ""
+                # Try to extract month/year from the link label
+                mh = MONTH_HEADER_RE.search(label)
+                sale_d = None
+                if mh:
+                    try:
+                        sale_d = dateparser.parse(f"{mh.group(1)} 1, {mh.group(2)}")
+                    except (ValueError, TypeError):
+                        pass
+                # Normalize URL. Bare relative hrefs (e.g. "JULY 2026 6.2.26.pdf")
+                # must resolve against the declared <base href> (domain root),
+                # NOT the page path — resolving against the path 404s.
+                if href.startswith("http"):
+                    full = href
+                else:
+                    full = urljoin(base_href, href)
+                pdf_links.append((full, sale_d))
+
+            # Pick the latest PDF — Pickens posts past sale results too,
+            # so accept anything within the last 365 days (covers their full
+            # publishing cadence — typically monthly).
+            future_pdfs = [(u, d) for u, d in pdf_links if d and d >= today - timedelta(days=365)]
+            if not future_pdfs:
+                # Last resort: try the most recent few PDFs by URL ordering
+                future_pdfs = pdf_links[:5]
+            future_pdfs.sort(key=lambda x: x[1] or today, reverse=True)
+            # Cap at top 6 (covers ~6 months of monthly rosters)
+            future_pdfs = future_pdfs[:6]
+
+            # Track which PDFs are RESULTS (past sales w/ prices) vs upcoming
+            # rosters. Carries through to the chunk loop so we can tag listings.
+            for url, sale_d in future_pdfs[:6]:  # bumped 3 -> 6 so we get more results PDFs
+                try:
+                    r = await c.get(url, headers={"Referer": PAGE_URL})
+                    if r.status_code != 200 or not r.content[:4] == b"%PDF":
+                        continue
+                    text = _extract_pdf_text(r.content)
+                except Exception:
+                    continue
+                if not text:
+                    continue
+
+                is_results = _is_results_pdf(url)
+
+                # Extract a per-document sale date from the PDF header if any
+                doc_date = sale_d
+                if not doc_date:
+                    md = MONTH_HEADER_RE.search(text)
+                    if md:
+                        try:
+                            doc_date = dateparser.parse(f"{md.group(1)} 1, {md.group(2)}")
+                        except (ValueError, TypeError):
+                            pass
+
+                # Each row anchored on case number
+                for chunk in re.split(r"(?=\b\d{2,4}-CP-\d{2}-)", text):
+                    chunk = chunk.strip()
+                    if len(chunk) < 30:
+                        continue
+                    case_m = CASE_RE.search(chunk)
+                    if not case_m:
+                        continue
+                    # Search everything AFTER the case number, never the case
+                    # number text itself -- "2026-CP-39-00559 SOUTH STATE..."
+                    # otherwise lets the case number's own trailing digits
+                    # ("00559") masquerade as the address's house number, with
+                    # the whole caption dragged along as a "street name" until
+                    # the next real suffix match.
+                    region = _LEADING_ATTY_RE.sub("", chunk[case_m.end():])
+                    addr_m = ADDR_RE.search(region)
+                    tms_m = TMS_RE.search(region)
+
+                    # Parties + attorney firm from the roster chunk (the sibling
+                    # anderson/spartanburg parsers do this; pickens dropped it).
+                    plaintiff = defendant = None
+                    pm = PARTIES_RE.search(region)
+                    if pm:
+                        plaintiff = re.sub(r"\s+", " ", pm.group(1)).strip(" ,.") or None
+                        defendant = re.sub(r"\s+", " ", pm.group(2)).strip()
+                        defendant = _ETAL_RE.sub("", defendant).strip(" ,.") or None
+                    atty = None
+                    for code, full in ATTORNEY_LEGEND.items():
+                        if re.search(rf"\b{re.escape(code)}\b", chunk):
+                            atty = full
+                            break
+
+                    # RESULTS-PDF specifics: extract sold price + tag as
+                    # foreclosure-sale RESULT (already past, in the sold pool).
+                    sold_price = None
+                    sold_source_pattern = None
+                    raw_extras: dict = {}
+                    if is_results:
+                        sold_price, sold_source_pattern = _extract_sold_price(chunk)
+                        if sold_price is not None:
+                            raw_extras["actual_sold_price"] = sold_price
+                            raw_extras["sold_price_pattern"] = sold_source_pattern
+                            raw_extras["sale_result_pdf"] = url
+
+                    out.append(
+                        Listing(
+                            source=self.slug,
+                            source_url=url,
+                            listing_type=ListingType.FORECLOSURE_SALE,
+                            property_kind=PropertyKind.UNKNOWN,
+                            street_address=re.sub(r"\s+", " ", addr_m.group(1)).strip() if addr_m else None,
+                            parcel_id=tms_m.group(1) if tms_m else None,
+                            state="SC",
+                            county="Pickens",
+                            case_number=case_m.group(0),
+                            plaintiff=plaintiff,
+                            defendant=defendant,
+                            trustee=atty,
+                            sale_date=doc_date,
+                            opening_bid=sold_price,  # also surface as opening_bid so calc/dashboard reads it
+                            description=chunk[:500],
+                            first_seen=datetime.utcnow(),
+                            last_seen=datetime.utcnow(),
+                            raw=(
+                                {
+                                    # actual_sold_price at top level so
+                                    # enrichment_foreclosure_sold_comps reads it
+                                    # via _opening_or_judgment.
+                                    "actual_sold_price": raw_extras["actual_sold_price"],
+                                    "pickens_mie": raw_extras,
+                                }
+                                if raw_extras else {}
+                            ),
+                        )
+                    )
+        return out

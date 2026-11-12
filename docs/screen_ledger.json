@@ -1,0 +1,7029 @@
+{
+ "schema": "screen-ledger-v1",
+ "generated_at": "2026-10-16T20:25:28Z",
+ "run_at": "2026-10-16T20:25:27.945803+00:00",
+ "screens": {
+  "heir_estate": {
+   "NC|Alamance": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Alexander": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Alleghany": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Anson": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Ashe": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Avery": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Beaufort": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Bertie": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Bladen": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Brunswick": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Buncombe": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Burke": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Cabarrus": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Caldwell": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Camden": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Carteret": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Caswell": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Catawba": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Chatham": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Cherokee": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Chowan": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Clay": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Cleveland": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Columbus": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Craven": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Cumberland": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Currituck": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Dare": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Davidson": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Davie": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Duplin": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Durham": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Edgecombe": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Forsyth": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Franklin": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Gaston": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Gates": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Graham": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Granville": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Greene": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Guilford": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Halifax": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Harnett": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Haywood": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Henderson": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Hertford": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Hoke": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Hyde": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Iredell": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Jackson": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Johnston": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Jones": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Lee": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Lenoir": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Lincoln": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Macon": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Madison": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Martin": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|McDowell": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Mecklenburg": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Mitchell": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Montgomery": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Moore": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Nash": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|New Hanover": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Northampton": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Onslow": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Orange": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Pamlico": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Pasquotank": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Pender": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Perquimans": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Person": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Pitt": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Polk": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Randolph": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Richmond": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Robeson": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Rockingham": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Rowan": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Rutherford": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Sampson": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Scotland": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Stanly": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Stokes": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Surry": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Swain": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Transylvania": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Tyrrell": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Union": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Vance": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Wake": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Warren": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Washington": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Watauga": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Wayne": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Wilkes": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Wilson": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Yadkin": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Yancey": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   }
+  },
+  "heir_naming_publication": {
+   "NC|Alamance": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Alexander": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Anson": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Avery": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Beaufort": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Bertie": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Bladen": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Buncombe": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Burke": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Cabarrus": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Caldwell": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Caswell": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Catawba": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Chatham": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Cherokee": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Chowan": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Clay": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Cleveland": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Columbus": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Craven": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Cumberland": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Dare": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Davidson": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Davie": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Duplin": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Durham": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Forsyth": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Franklin": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Gaston": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Gates": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Granville": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Guilford": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Halifax": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Haywood": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Henderson": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Hertford": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Iredell": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Johnston": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Lee": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Lenoir": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Madison": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Martin": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|McDowell": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Mecklenburg": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Montgomery": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Moore": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Nash": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|New Hanover": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Onslow": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Pamlico": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Pasquotank": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Perquimans": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Pitt": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Polk": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Randolph": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Richmond": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Robeson": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Rockingham": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Rowan": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Rutherford": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Sampson": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Scotland": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Stanly": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Stokes": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Transylvania": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Union": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Vance": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Wake": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Warren": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Washington": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Watauga": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Wayne": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Wilkes": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Wilson": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Yadkin": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "SC|Anderson": {
+    "sources": [
+     "counties.column_legal_notices"
+    ],
+    "basis": "SC estate lane counties only; Column tags SC notices by newspaper region"
+   },
+   "SC|Beaufort": {
+    "sources": [
+     "counties.column_legal_notices"
+    ],
+    "basis": "SC estate lane counties only; Column tags SC notices by newspaper region"
+   },
+   "SC|Charleston": {
+    "sources": [
+     "counties.column_legal_notices"
+    ],
+    "basis": "SC estate lane counties only; Column tags SC notices by newspaper region"
+   },
+   "SC|Cherokee": {
+    "sources": [
+     "counties.column_legal_notices"
+    ],
+    "basis": "SC estate lane counties only; Column tags SC notices by newspaper region"
+   },
+   "SC|Chesterfield": {
+    "sources": [
+     "counties.column_legal_notices"
+    ],
+    "basis": "SC estate lane counties only; Column tags SC notices by newspaper region"
+   },
+   "SC|Colleton": {
+    "sources": [
+     "counties.column_legal_notices"
+    ],
+    "basis": "SC estate lane counties only; Column tags SC notices by newspaper region"
+   },
+   "SC|Darlington": {
+    "sources": [
+     "counties.column_legal_notices"
+    ],
+    "basis": "SC estate lane counties only; Column tags SC notices by newspaper region"
+   },
+   "SC|Florence": {
+    "sources": [
+     "counties.column_legal_notices"
+    ],
+    "basis": "SC estate lane counties only; Column tags SC notices by newspaper region"
+   },
+   "SC|Georgetown": {
+    "sources": [
+     "counties.column_legal_notices"
+    ],
+    "basis": "SC estate lane counties only; Column tags SC notices by newspaper region"
+   },
+   "SC|Greenville": {
+    "sources": [
+     "counties.column_legal_notices"
+    ],
+    "basis": "SC estate lane counties only; Column tags SC notices by newspaper region"
+   },
+   "SC|Horry": {
+    "sources": [
+     "counties.column_legal_notices"
+    ],
+    "basis": "SC estate lane counties only; Column tags SC notices by newspaper region"
+   },
+   "SC|Laurens": {
+    "sources": [
+     "counties.column_legal_notices"
+    ],
+    "basis": "SC estate lane counties only; Column tags SC notices by newspaper region"
+   },
+   "SC|Marion": {
+    "sources": [
+     "counties.column_legal_notices"
+    ],
+    "basis": "SC estate lane counties only; Column tags SC notices by newspaper region"
+   },
+   "SC|Marlboro": {
+    "sources": [
+     "counties.column_legal_notices"
+    ],
+    "basis": "SC estate lane counties only; Column tags SC notices by newspaper region"
+   },
+   "SC|Oconee": {
+    "sources": [
+     "counties.column_legal_notices"
+    ],
+    "basis": "SC estate lane counties only; Column tags SC notices by newspaper region"
+   },
+   "SC|Pickens": {
+    "sources": [
+     "counties.column_legal_notices"
+    ],
+    "basis": "SC estate lane counties only; Column tags SC notices by newspaper region"
+   },
+   "SC|Spartanburg": {
+    "sources": [
+     "counties.column_legal_notices"
+    ],
+    "basis": "SC estate lane counties only; Column tags SC notices by newspaper region"
+   },
+   "SC|Union": {
+    "sources": [
+     "counties.column_legal_notices"
+    ],
+    "basis": "SC estate lane counties only; Column tags SC notices by newspaper region"
+   }
+  },
+  "jail_booking": {
+   "NC|Cleveland": {
+    "sources": [
+     "national.jail_bookings"
+    ],
+    "basis": "county jail rosters; rosters_unhealthy removed"
+   },
+   "NC|Gaston": {
+    "sources": [
+     "national.jail_bookings"
+    ],
+    "basis": "county jail rosters; rosters_unhealthy removed"
+   },
+   "NC|Henderson": {
+    "sources": [
+     "national.jail_bookings"
+    ],
+    "basis": "county jail rosters; rosters_unhealthy removed"
+   },
+   "SC|Anderson": {
+    "sources": [
+     "national.jail_bookings"
+    ],
+    "basis": "county jail rosters; rosters_unhealthy removed"
+   },
+   "SC|Cherokee": {
+    "sources": [
+     "national.jail_bookings"
+    ],
+    "basis": "county jail rosters; rosters_unhealthy removed"
+   },
+   "SC|Laurens": {
+    "sources": [
+     "national.jail_bookings"
+    ],
+    "basis": "county jail rosters; rosters_unhealthy removed"
+   },
+   "SC|Oconee": {
+    "sources": [
+     "national.jail_bookings"
+    ],
+    "basis": "county jail rosters; rosters_unhealthy removed"
+   }
+  },
+  "lt_auction": {
+   "NC|Alamance": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Alexander": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Alleghany": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Anson": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Ashe": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Avery": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Beaufort": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Bertie": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Bladen": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Brunswick": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Buncombe": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Burke": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Cabarrus": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Caldwell": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Camden": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Carteret": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Caswell": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Catawba": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Chatham": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Cherokee": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Chowan": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Clay": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Cleveland": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Columbus": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Craven": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Cumberland": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Currituck": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Dare": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Davidson": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Davie": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Duplin": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Durham": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Edgecombe": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Forsyth": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Franklin": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Gaston": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Gates": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Graham": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Granville": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Greene": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Guilford": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Halifax": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Harnett": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Haywood": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Henderson": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Hertford": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Hoke": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Hyde": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Iredell": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Jackson": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Johnston": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Jones": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Lee": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Lenoir": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Lincoln": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Macon": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Madison": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Martin": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|McDowell": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Mecklenburg": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Mitchell": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Montgomery": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Moore": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Nash": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|New Hanover": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Northampton": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Onslow": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Orange": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Pamlico": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Pasquotank": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Pender": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Perquimans": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Person": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Pitt": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Polk": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Randolph": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Richmond": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Robeson": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Rockingham": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Rowan": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Rutherford": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Sampson": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Scotland": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Stanly": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Stokes": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Surry": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Swain": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Transylvania": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Tyrrell": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Union": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Vance": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Wake": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Warren": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Washington": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Watauga": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Wayne": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Wilkes": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Wilson": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Yadkin": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "NC|Yancey": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Abbeville": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Aiken": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Allendale": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Anderson": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Bamberg": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Barnwell": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Beaufort": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Berkeley": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Calhoun": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Charleston": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Cherokee": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Chester": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Chesterfield": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Clarendon": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Colleton": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Darlington": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Dillon": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Dorchester": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Edgefield": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Fairfield": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Florence": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Georgetown": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Greenville": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Greenwood": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Hampton": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Horry": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Jasper": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Kershaw": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Lancaster": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Laurens": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Lee": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Lexington": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Marion": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Marlboro": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|McCormick": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Newberry": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Oconee": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Orangeburg": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Pickens": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Richland": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Saluda": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Spartanburg": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Sumter": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Union": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|Williamsburg": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   },
+   "SC|York": {
+    "sources": [
+     "national.auction_bank_reo",
+     "national.bid4assets",
+     "national.govdeals",
+     "national.hibid_real_estate",
+     "national.realtor_foreclosures",
+     "national.servicelink_auction"
+    ],
+    "basis": "national auction site"
+   }
+  },
+  "lt_bankruptcy": {
+   "NC|Alamance": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Alexander": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Alleghany": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Anson": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Ashe": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Avery": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Beaufort": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Bertie": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Bladen": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Brunswick": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Buncombe": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Burke": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Cabarrus": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Caldwell": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Camden": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Carteret": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Caswell": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Catawba": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Chatham": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Cherokee": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Chowan": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Clay": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Cleveland": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Columbus": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Craven": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Cumberland": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Currituck": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Dare": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Davidson": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Davie": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Duplin": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Durham": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Edgecombe": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Forsyth": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Franklin": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Gaston": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Gates": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Graham": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Granville": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Greene": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Guilford": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Halifax": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Harnett": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Haywood": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Henderson": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Hertford": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Hoke": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Hyde": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Iredell": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Jackson": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Johnston": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Jones": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Lee": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Lenoir": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Lincoln": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Macon": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Madison": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Martin": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|McDowell": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Mecklenburg": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Mitchell": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Montgomery": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Moore": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Nash": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|New Hanover": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Northampton": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Onslow": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Orange": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Pamlico": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Pasquotank": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Pender": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Perquimans": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Person": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Pitt": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Polk": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Randolph": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Richmond": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Robeson": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Rockingham": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Rowan": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Rutherford": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Sampson": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Scotland": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Stanly": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Stokes": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Surry": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Swain": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Transylvania": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Tyrrell": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Union": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Vance": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Wake": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Warren": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Washington": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Watauga": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Wayne": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Wilkes": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Wilson": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Yadkin": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "NC|Yancey": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Abbeville": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Aiken": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Allendale": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Anderson": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Bamberg": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Barnwell": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Beaufort": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Berkeley": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Calhoun": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Charleston": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Cherokee": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Chester": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Chesterfield": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Clarendon": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Colleton": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Darlington": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Dillon": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Dorchester": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Edgefield": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Fairfield": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Florence": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Georgetown": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Greenville": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Greenwood": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Hampton": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Horry": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Jasper": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Kershaw": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Lancaster": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Laurens": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Lee": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Lexington": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Marion": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Marlboro": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|McCormick": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Newberry": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Oconee": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Orangeburg": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Pickens": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Richland": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Saluda": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Spartanburg": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Sumter": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Union": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|Williamsburg": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   },
+   "SC|York": {
+    "sources": [
+     "national.courtlistener_bankruptcy"
+    ],
+    "basis": "statewide federal bankruptcy feed"
+   }
+  },
+  "lt_distressed": {
+   "NC|Gaston": {
+    "sources": [
+     "counties_nc.gaston_vacant"
+    ],
+    "basis": "county-named producer"
+   }
+  },
+  "lt_estate_lead": {
+   "NC|McDowell": {
+    "sources": [
+     "counties_nc.mcdowell_probate"
+    ],
+    "basis": "county-named producer"
+   }
+  },
+  "lt_foreclosure_sale": {
+   "NC|Buncombe": {
+    "sources": [
+     "counties_nc.buncombe_tax_foreclosure"
+    ],
+    "basis": "county-named producer"
+   },
+   "NC|Cleveland": {
+    "sources": [
+     "counties_nc.cleveland_tax_foreclosure"
+    ],
+    "basis": "county-named producer"
+   },
+   "NC|McDowell": {
+    "sources": [
+     "counties_nc.mcdowell_tax_foreclosure"
+    ],
+    "basis": "county-named producer"
+   },
+   "SC|Charleston": {
+    "sources": [
+     "counties_sc.charleston_mie"
+    ],
+    "basis": "county-named producer"
+   }
+  },
+  "lt_hoa_sale": {
+   "SC|Charleston": {
+    "sources": [
+     "counties_sc.charleston_mie"
+    ],
+    "basis": "county-named producer"
+   }
+  },
+  "lt_lis_pendens": {
+   "SC|Charleston": {
+    "sources": [
+     "counties_sc.charleston_mie"
+    ],
+    "basis": "county-named producer"
+   }
+  },
+  "lt_reo": {
+   "NC|Alamance": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Alexander": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Alleghany": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Anson": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Ashe": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Avery": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Beaufort": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Bertie": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Bladen": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Brunswick": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Buncombe": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Burke": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Cabarrus": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Caldwell": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Camden": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Carteret": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Caswell": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Catawba": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Chatham": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Cherokee": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Chowan": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Clay": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Cleveland": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Columbus": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Craven": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Cumberland": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Currituck": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Dare": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Davidson": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Davie": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Duplin": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Durham": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Edgecombe": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Forsyth": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Franklin": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Gaston": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Gates": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Graham": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Granville": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Greene": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Guilford": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Halifax": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Harnett": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Haywood": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Henderson": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Hertford": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Hoke": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Hyde": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Iredell": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Jackson": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Johnston": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Jones": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Lee": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Lenoir": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Lincoln": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Macon": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Madison": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Martin": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|McDowell": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Mecklenburg": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Mitchell": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Montgomery": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Moore": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Nash": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|New Hanover": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Northampton": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Onslow": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Orange": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Pamlico": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Pasquotank": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Pender": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Perquimans": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Person": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Pitt": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Polk": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Randolph": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Richmond": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Robeson": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Rockingham": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Rowan": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Rutherford": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Sampson": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Scotland": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Stanly": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Stokes": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Surry": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Swain": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Transylvania": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Tyrrell": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Union": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Vance": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Wake": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Warren": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Washington": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Watauga": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Wayne": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Wilkes": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Wilson": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Yadkin": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "NC|Yancey": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Abbeville": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Aiken": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Allendale": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Anderson": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Bamberg": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Barnwell": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Beaufort": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Berkeley": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Calhoun": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Charleston": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Cherokee": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Chester": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Chesterfield": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Clarendon": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Colleton": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Darlington": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Dillon": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Dorchester": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Edgefield": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Fairfield": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Florence": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Georgetown": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Greenville": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Greenwood": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Hampton": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Horry": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Jasper": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Kershaw": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Lancaster": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Laurens": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Lee": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Lexington": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Marion": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Marlboro": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|McCormick": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Newberry": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Oconee": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Orangeburg": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Pickens": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Richland": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Saluda": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Spartanburg": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Sumter": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Union": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|Williamsburg": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   },
+   "SC|York": {
+    "sources": [
+     "national.fannie_homepath",
+     "national.homepath_json",
+     "national.hubzu",
+     "national.usda_properties",
+     "reo.treasury_seized",
+     "reo.usda_rd",
+     "reo.vrm_va_reo"
+    ],
+    "basis": "national REO inventory"
+   }
+  },
+  "lt_sheriff_sale": {
+   "SC|Bamberg": {
+    "sources": [
+     "counties_sc.bamberg_sheriff"
+    ],
+    "basis": "county-named producer"
+   },
+   "SC|Barnwell": {
+    "sources": [
+     "counties_sc.barnwell_sheriff"
+    ],
+    "basis": "county-named producer"
+   }
+  },
+  "lt_tax_lien": {
+   "NC|Guilford": {
+    "sources": [
+     "counties_nc.guilford_tax_foreclosures"
+    ],
+    "basis": "county-named producer"
+   },
+   "NC|Mecklenburg": {
+    "sources": [
+     "counties_nc.mecklenburg_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "NC|Rowan": {
+    "sources": [
+     "counties_nc.rowan_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "NC|Rutherford": {
+    "sources": [
+     "counties_nc.rutherford_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "NC|Transylvania": {
+    "sources": [
+     "counties_nc.transylvania_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "SC|Charleston": {
+    "sources": [
+     "counties_sc.charleston_tax_sale_xlsx"
+    ],
+    "basis": "county-named producer"
+   },
+   "SC|Greenwood": {
+    "sources": [
+     "counties_sc.greenwood_corebtpay_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   }
+  },
+  "lt_tax_sale": {
+   "NC|Cumberland": {
+    "sources": [
+     "counties_nc.cumberland_tax_foreclosure"
+    ],
+    "basis": "county-named producer"
+   },
+   "NC|Edgecombe": {
+    "sources": [
+     "counties_nc.edgecombe_tax_foreclosure"
+    ],
+    "basis": "county-named producer"
+   },
+   "NC|Guilford": {
+    "sources": [
+     "counties_nc.guilford_tax_foreclosures"
+    ],
+    "basis": "county-named producer"
+   },
+   "NC|Henderson": {
+    "sources": [
+     "counties_nc.henderson_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "NC|New Hanover": {
+    "sources": [
+     "counties_nc.new_hanover_foreclosures"
+    ],
+    "basis": "county-named producer"
+   },
+   "NC|Rutherford": {
+    "sources": [
+     "counties_nc.rutherford_foreclosure"
+    ],
+    "basis": "county-named producer"
+   },
+   "NC|Stokes": {
+    "sources": [
+     "counties_nc.stokes_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "NC|Swain": {
+    "sources": [
+     "counties_nc.swain_tax_foreclosures"
+    ],
+    "basis": "county-named producer"
+   },
+   "NC|Wake": {
+    "sources": [
+     "counties_nc.wake_tax_foreclosure"
+    ],
+    "basis": "county-named producer"
+   },
+   "SC|Charleston": {
+    "sources": [
+     "counties_sc.charleston_delinquent_tax",
+     "counties_sc.charleston_tax_sale_xlsx"
+    ],
+    "basis": "county-named producer"
+   },
+   "SC|Cherokee": {
+    "sources": [
+     "counties_sc.cherokee_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "SC|Florence": {
+    "sources": [
+     "counties_sc.florence_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "SC|Greenville": {
+    "sources": [
+     "counties_sc.greenville_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "SC|Horry": {
+    "sources": [
+     "counties_sc.horry_flc"
+    ],
+    "basis": "county-named producer"
+   },
+   "SC|Laurens": {
+    "sources": [
+     "counties_sc.laurens_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "SC|Spartanburg": {
+    "sources": [
+     "counties_sc.spartanburg_flc"
+    ],
+    "basis": "county-named producer"
+   },
+   "SC|Union": {
+    "sources": [
+     "counties_sc.union_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "SC|York": {
+    "sources": [
+     "counties_sc.york_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   }
+  },
+  "lt_tax_sale_overage": {
+   "SC|Calhoun": {
+    "sources": [
+     "counties_sc.calhoun_overage_claims"
+    ],
+    "basis": "county-named producer"
+   },
+   "SC|Fairfield": {
+    "sources": [
+     "counties_sc.fairfield_overage_claims"
+    ],
+    "basis": "county-named producer"
+   }
+  },
+  "multi_year_delinquent_tax": {
+   "NC|Mecklenburg": {
+    "sources": [
+     "counties_nc.mecklenburg_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "NC|Rowan": {
+    "sources": [
+     "counties_nc.rowan_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "NC|Stokes": {
+    "sources": [
+     "counties_nc.stokes_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "NC|Transylvania": {
+    "sources": [
+     "counties_nc.transylvania_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "SC|Aiken": {
+    "sources": [
+     "counties_sc.sc_catalis_delinquent_roll"
+    ],
+    "basis": "full unpaid roll per county"
+   },
+   "SC|Charleston": {
+    "sources": [
+     "counties_sc.charleston_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "SC|Cherokee": {
+    "sources": [
+     "counties_sc.cherokee_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "SC|Chester": {
+    "sources": [
+     "counties_sc.sc_catalis_delinquent_roll"
+    ],
+    "basis": "full unpaid roll per county"
+   },
+   "SC|Fairfield": {
+    "sources": [
+     "counties_sc.sc_catalis_delinquent_roll"
+    ],
+    "basis": "full unpaid roll per county"
+   },
+   "SC|Florence": {
+    "sources": [
+     "counties_sc.florence_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "SC|Greenville": {
+    "sources": [
+     "counties_sc.greenville_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "SC|Greenwood": {
+    "sources": [
+     "counties_sc.greenwood_corebtpay_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "SC|Hampton": {
+    "sources": [
+     "counties_sc.sc_catalis_delinquent_roll"
+    ],
+    "basis": "full unpaid roll per county"
+   },
+   "SC|Laurens": {
+    "sources": [
+     "counties_sc.laurens_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "SC|Pickens": {
+    "sources": [
+     "counties_sc.sc_catalis_delinquent_roll"
+    ],
+    "basis": "full unpaid roll per county"
+   },
+   "SC|Union": {
+    "sources": [
+     "counties_sc.union_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "SC|York": {
+    "sources": [
+     "counties_sc.york_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   }
+  },
+  "probate": {
+   "SC|Calhoun": {
+    "sources": [
+     "enrichment:probate_spartan"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "SC|Greenwood": {
+    "sources": [
+     "enrichment:probate_spartan"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "SC|Newberry": {
+    "sources": [
+     "enrichment:probate_spartan"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   }
+  },
+  "quiet_title": {
+   "NC|Alamance": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Alexander": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Anson": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Avery": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Beaufort": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Bertie": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Bladen": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Buncombe": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Burke": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Cabarrus": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Caldwell": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Caswell": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Catawba": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Chatham": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Cherokee": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Chowan": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Clay": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Cleveland": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Columbus": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Craven": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Cumberland": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Dare": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Davidson": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Davie": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Duplin": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Durham": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Forsyth": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Franklin": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Gaston": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Gates": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Granville": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Guilford": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Halifax": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Haywood": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Henderson": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Hertford": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Iredell": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Johnston": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Lee": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Lenoir": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Madison": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Martin": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|McDowell": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Mecklenburg": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Montgomery": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Moore": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Nash": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|New Hanover": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Onslow": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Pamlico": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Pasquotank": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Perquimans": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Pitt": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Polk": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Randolph": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Richmond": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Robeson": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Rockingham": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Rowan": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Rutherford": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Sampson": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Scotland": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Stanly": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Stokes": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Transylvania": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Union": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Vance": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Wake": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Warren": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Washington": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Watauga": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Wayne": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Wilkes": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Wilson": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "NC|Yadkin": {
+    "sources": [
+     "public_notices.nc_heir_notices"
+    ],
+    "basis": "NC counties with a Column paper; notices searched by text"
+   },
+   "SC|Anderson": {
+    "sources": [
+     "counties.column_legal_notices"
+    ],
+    "basis": "SC estate lane counties only; Column tags SC notices by newspaper region"
+   },
+   "SC|Beaufort": {
+    "sources": [
+     "counties.column_legal_notices"
+    ],
+    "basis": "SC estate lane counties only; Column tags SC notices by newspaper region"
+   },
+   "SC|Charleston": {
+    "sources": [
+     "counties.column_legal_notices"
+    ],
+    "basis": "SC estate lane counties only; Column tags SC notices by newspaper region"
+   },
+   "SC|Cherokee": {
+    "sources": [
+     "counties.column_legal_notices"
+    ],
+    "basis": "SC estate lane counties only; Column tags SC notices by newspaper region"
+   },
+   "SC|Chesterfield": {
+    "sources": [
+     "counties.column_legal_notices"
+    ],
+    "basis": "SC estate lane counties only; Column tags SC notices by newspaper region"
+   },
+   "SC|Colleton": {
+    "sources": [
+     "counties.column_legal_notices"
+    ],
+    "basis": "SC estate lane counties only; Column tags SC notices by newspaper region"
+   },
+   "SC|Darlington": {
+    "sources": [
+     "counties.column_legal_notices"
+    ],
+    "basis": "SC estate lane counties only; Column tags SC notices by newspaper region"
+   },
+   "SC|Florence": {
+    "sources": [
+     "counties.column_legal_notices"
+    ],
+    "basis": "SC estate lane counties only; Column tags SC notices by newspaper region"
+   },
+   "SC|Georgetown": {
+    "sources": [
+     "counties.column_legal_notices"
+    ],
+    "basis": "SC estate lane counties only; Column tags SC notices by newspaper region"
+   },
+   "SC|Greenville": {
+    "sources": [
+     "counties.column_legal_notices"
+    ],
+    "basis": "SC estate lane counties only; Column tags SC notices by newspaper region"
+   },
+   "SC|Horry": {
+    "sources": [
+     "counties.column_legal_notices"
+    ],
+    "basis": "SC estate lane counties only; Column tags SC notices by newspaper region"
+   },
+   "SC|Laurens": {
+    "sources": [
+     "counties.column_legal_notices"
+    ],
+    "basis": "SC estate lane counties only; Column tags SC notices by newspaper region"
+   },
+   "SC|Marion": {
+    "sources": [
+     "counties.column_legal_notices"
+    ],
+    "basis": "SC estate lane counties only; Column tags SC notices by newspaper region"
+   },
+   "SC|Marlboro": {
+    "sources": [
+     "counties.column_legal_notices"
+    ],
+    "basis": "SC estate lane counties only; Column tags SC notices by newspaper region"
+   },
+   "SC|Oconee": {
+    "sources": [
+     "counties.column_legal_notices"
+    ],
+    "basis": "SC estate lane counties only; Column tags SC notices by newspaper region"
+   },
+   "SC|Pickens": {
+    "sources": [
+     "counties.column_legal_notices"
+    ],
+    "basis": "SC estate lane counties only; Column tags SC notices by newspaper region"
+   },
+   "SC|Spartanburg": {
+    "sources": [
+     "counties.column_legal_notices"
+    ],
+    "basis": "SC estate lane counties only; Column tags SC notices by newspaper region"
+   },
+   "SC|Union": {
+    "sources": [
+     "counties.column_legal_notices"
+    ],
+    "basis": "SC estate lane counties only; Column tags SC notices by newspaper region"
+   }
+  },
+  "rollback_exposure": {
+   "NC|Alamance": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Ashe": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Beaufort": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Bladen": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Buncombe": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Burke": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Cabarrus": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Caldwell": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Catawba": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Chatham": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Cherokee": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Craven": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Cumberland": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Dare": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Davie": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Edgecombe": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Forsyth": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Gaston": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Gates": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Guilford": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Henderson": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Iredell": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Lenoir": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Macon": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Montgomery": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Nash": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|New Hanover": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Onslow": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Orange": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Pasquotank": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Perquimans": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Person": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Pitt": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Randolph": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Rockingham": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Rutherford": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Sampson": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Scotland": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Stanly": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Stokes": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Swain": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Tyrrell": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Washington": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   },
+   "NC|Wilkes": {
+    "sources": [
+     "enrichment:onemap_sweeps"
+    ],
+    "basis": "county-wide sweep (enrichment)"
+   }
+  },
+  "tax_aging_surfaced": {
+   "NC|Mecklenburg": {
+    "sources": [
+     "counties_nc.mecklenburg_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "NC|Rowan": {
+    "sources": [
+     "counties_nc.rowan_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "NC|Stokes": {
+    "sources": [
+     "counties_nc.stokes_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "NC|Transylvania": {
+    "sources": [
+     "counties_nc.transylvania_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "SC|Aiken": {
+    "sources": [
+     "counties_sc.sc_catalis_delinquent_roll"
+    ],
+    "basis": "full unpaid roll per county"
+   },
+   "SC|Charleston": {
+    "sources": [
+     "counties_sc.charleston_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "SC|Cherokee": {
+    "sources": [
+     "counties_sc.cherokee_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "SC|Chester": {
+    "sources": [
+     "counties_sc.sc_catalis_delinquent_roll"
+    ],
+    "basis": "full unpaid roll per county"
+   },
+   "SC|Fairfield": {
+    "sources": [
+     "counties_sc.sc_catalis_delinquent_roll"
+    ],
+    "basis": "full unpaid roll per county"
+   },
+   "SC|Florence": {
+    "sources": [
+     "counties_sc.florence_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "SC|Greenville": {
+    "sources": [
+     "counties_sc.greenville_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "SC|Greenwood": {
+    "sources": [
+     "counties_sc.greenwood_corebtpay_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "SC|Hampton": {
+    "sources": [
+     "counties_sc.sc_catalis_delinquent_roll"
+    ],
+    "basis": "full unpaid roll per county"
+   },
+   "SC|Laurens": {
+    "sources": [
+     "counties_sc.laurens_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "SC|Pickens": {
+    "sources": [
+     "counties_sc.sc_catalis_delinquent_roll"
+    ],
+    "basis": "full unpaid roll per county"
+   },
+   "SC|Union": {
+    "sources": [
+     "counties_sc.union_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "SC|York": {
+    "sources": [
+     "counties_sc.york_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   }
+  },
+  "two_year_delinquent": {
+   "NC|Mecklenburg": {
+    "sources": [
+     "counties_nc.mecklenburg_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "NC|Rowan": {
+    "sources": [
+     "counties_nc.rowan_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "NC|Stokes": {
+    "sources": [
+     "counties_nc.stokes_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "NC|Transylvania": {
+    "sources": [
+     "counties_nc.transylvania_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "SC|Aiken": {
+    "sources": [
+     "counties_sc.sc_catalis_delinquent_roll"
+    ],
+    "basis": "full unpaid roll per county"
+   },
+   "SC|Charleston": {
+    "sources": [
+     "counties_sc.charleston_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "SC|Cherokee": {
+    "sources": [
+     "counties_sc.cherokee_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "SC|Chester": {
+    "sources": [
+     "counties_sc.sc_catalis_delinquent_roll"
+    ],
+    "basis": "full unpaid roll per county"
+   },
+   "SC|Fairfield": {
+    "sources": [
+     "counties_sc.sc_catalis_delinquent_roll"
+    ],
+    "basis": "full unpaid roll per county"
+   },
+   "SC|Florence": {
+    "sources": [
+     "counties_sc.florence_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "SC|Greenville": {
+    "sources": [
+     "counties_sc.greenville_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "SC|Greenwood": {
+    "sources": [
+     "counties_sc.greenwood_corebtpay_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "SC|Hampton": {
+    "sources": [
+     "counties_sc.sc_catalis_delinquent_roll"
+    ],
+    "basis": "full unpaid roll per county"
+   },
+   "SC|Laurens": {
+    "sources": [
+     "counties_sc.laurens_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "SC|Pickens": {
+    "sources": [
+     "counties_sc.sc_catalis_delinquent_roll"
+    ],
+    "basis": "full unpaid roll per county"
+   },
+   "SC|Union": {
+    "sources": [
+     "counties_sc.union_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   },
+   "SC|York": {
+    "sources": [
+     "counties_sc.york_delinquent_tax"
+    ],
+    "basis": "county-named producer"
+   }
+  }
+ },
+ "not_screened": {
+  "condemned": {
+   "SC|Spartanburg": "counties_sc.spartanburg_condemned: CARRYOVER (1754 stale from prior run)"
+  },
+  "lt_distressed": {
+   "NC|Wake": "counties_nc.wake_code_cases: \ud83d\udd34 ALARM \u2014 ERROR: ReadError: ",
+   "SC|Charleston": "counties_sc.charleston_energov_history: \ud83d\udd34 ALARM \u2014 BLOCKED: connection refused/dropped (RemoteProtocolError)"
+  },
+  "lt_elderly_disabled": {
+   "NC|Buncombe": "counties_nc.buncombe_elderly: CARRYOVER (4322 stale from prior run)"
+  },
+  "lt_estate_lead": {
+   "SC|Anderson": "counties_sc.anderson_acpass_deeds: \u26a0\ufe0f PARTIAL (9) \u2014 exceeded soft timeout 480s \u2014 shipped 9 rows collected before th"
+  },
+  "lt_foreclosure_sale": {
+   "SC|Anderson": "counties_sc.anderson_master_in_equity: CARRYOVER (28 stale from prior run)",
+   "SC|Georgetown": "counties_sc.georgetown_civicengage: CARRYOVER (354 stale from prior run)",
+   "SC|Greenville": "counties_sc.greenville_mie_adverts: \ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 420s",
+   "SC|Spartanburg": "counties_sc.spartanburg_master_in_equity: REGRESSED (expected \u2265 5)"
+  },
+  "lt_lis_pendens": {
+   "NC|Cleveland": "counties_nc.cleveland_tax: CARRYOVER (9 stale from prior run)",
+   "SC|Greenville": "counties_sc.greenville_mie_adverts: \ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 420s"
+  },
+  "lt_probate_notice": {
+   "SC|Greenville": "counties_sc.greenville_probate: \u26a0\ufe0f PARTIAL (39) \u2014 exceeded soft timeout 1800s \u2014 shipped 39 rows collected before",
+   "SC|Horry": "counties_sc.horry_probate: \ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 180s"
+  },
+  "lt_sheriff_sale": {
+   "SC|Anderson": "counties_sc.anderson_sheriff: \ud83d\udd34 ALARM \u2014 TIMEOUT: network timeout (ConnectTimeout)",
+   "SC|Dillon": "counties_sc.dillon_sheriff: \ud83d\udd34 ALARM \u2014 0 listings for 3 consecutive runs (normally ~1/run) \u2014 source likely br"
+  },
+  "lt_tax_lien": {
+   "NC|Buncombe": "counties_nc.buncombe_delinquent_tax: CARRYOVER (1182 stale from prior run)",
+   "NC|Cumberland": "counties_nc.cumberland_delinquent_tax: \ud83d\udd34 ALARM \u2014 TIMEOUT: network timeout (ConnectTimeout)",
+   "NC|Iredell": "counties_nc.iredell_delinquent_tax: \ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 180s",
+   "SC|Dorchester": "counties_sc.dorchester_billtrax_delinquent_tax: CARRYOVER (1306 stale from prior run)",
+   "SC|Horry": "counties_sc.horry_delinquent_xlsx: \ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 180s",
+   "SC|Pickens": "counties_sc.pickens_delinquent_parcels: CARRYOVER (1403 stale from prior run)"
+  },
+  "lt_tax_sale": {
+   "NC|Brunswick": "counties_nc.brunswick_legal_notices: \ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 240s",
+   "NC|Buncombe": "counties_nc.buncombe_tax: CARRYOVER (24 stale from prior run)",
+   "NC|Cleveland": "counties_nc.cleveland_tax: CARRYOVER (9 stale from prior run)",
+   "NC|Gaston": "counties_nc.gaston_tax_foreclosures: \ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 120s",
+   "NC|Haywood": "counties_nc.haywood_tax_foreclosures: \ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 120s",
+   "SC|Abbeville": "counties_sc.abbeville_delinquent_tax: DORMANT \u2014 disabled: target page has no delinquent-property list (office/FAQ page",
+   "SC|Aiken": "counties_sc.aiken_delinquent_tax: DORMANT \u2014 disabled: target page has zero table rows (no delinquent-property list",
+   "SC|Beaufort": "counties_sc.beaufort_flc: DORMANT \u2014 disabled: CATALOG_URL is a closed 2017 Proxibid auction (page itself s",
+   "SC|Berkeley": "counties_sc.berkeley_paystar_tax: \u26a0\ufe0f PARTIAL (25) \u2014 exceeded soft timeout 900s \u2014 shipped 25 rows collected before ",
+   "SC|Colleton": "counties_sc.colleton_tax_sale: DORMANT \u2014 off-season (active months (12, 1, 2, 3))",
+   "SC|Darlington": "counties_sc.darlington_delinquent_tax: DORMANT \u2014 disabled: target page carries only an office-hours table, never a deli",
+   "SC|Dillon": "counties_sc.dillon_delinquent_tax: CARRYOVER (843 stale from prior run)",
+   "SC|Edgefield": "counties_sc.edgefield_delinquent_tax: DORMANT \u2014 disabled: target page is office-contact info only, no table - supersed",
+   "SC|Fairfield": "counties_sc.fairfield_delinquent_tax: DORMANT \u2014 disabled: target page is office-contact info only, no table - supersed",
+   "SC|Georgetown": "counties_sc.georgetown_civicengage: CARRYOVER (354 stale from prior run)",
+   "SC|Greenwood": "counties_sc.greenwood_delinquent_tax: DORMANT \u2014 disabled: target page is Treasurer office info only, no delinquent lis",
+   "SC|Lancaster": "counties_sc.lancaster_delinquent_tax: DORMANT \u2014 disabled: seasonal (~3wk/year) newspaper mirror, fully superseded by t",
+   "SC|Lexington": "counties_sc.lexington_flc: \ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 90s",
+   "SC|McCormick": "counties_sc.mccormick_flc: \ud83d\udd34 ALARM \u2014 0 listings for 3 consecutive runs (normally ~2/run) \u2014 source likely br",
+   "SC|Newberry": "counties_sc.newberry_delinquent_tax: DORMANT \u2014 disabled: target page links only a general-procedures PDF, no per-parc",
+   "SC|Oconee": "counties_sc.oconee_tax_sale: \ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 40s",
+   "SC|Pickens": "counties_sc.pickens_tax_sale: \ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 90s",
+   "SC|Richland": "counties_sc.richland_flc: \ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 60s",
+   "SC|Saluda": "counties_sc.saluda_delinquent_tax: DORMANT \u2014 disabled: seasonal (~3wk/year) newspaper mirror, fully superseded by t",
+   "SC|Sumter": "counties_sc.sumter_surplus: \ud83d\udd34 ALARM \u2014 0 listings for 3 consecutive runs (normally ~2/run) \u2014 source likely br"
+  },
+  "lt_tax_sale_overage": {
+   "SC|Laurens": "counties_sc.laurens_overage_claims: \ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 600s",
+   "SC|Orangeburg": "counties_sc.orangeburg_overage_claims: \ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 90s",
+   "SC|York": "counties_sc.york_overage_claims: CARRYOVER (115 stale from prior run)"
+  },
+  "multi_year_delinquent_tax": {
+   "NC|Alleghany": "counties_nc.nc_its_public_tax: \u26a0\ufe0f PARTIAL (19554) \u2014 exceeded soft timeout 3300s \u2014 shipped 19554 rows collected ",
+   "NC|Anson": "counties_nc.nc_its_public_tax: \u26a0\ufe0f PARTIAL (19554) \u2014 exceeded soft timeout 3300s \u2014 shipped 19554 rows collected ",
+   "NC|Buncombe": "counties_nc.buncombe_delinquent_tax: CARRYOVER (1182 stale from prior run)",
+   "NC|Caswell": "counties_nc.nc_its_public_tax: \u26a0\ufe0f PARTIAL (19554) \u2014 exceeded soft timeout 3300s \u2014 shipped 19554 rows collected ",
+   "NC|Cumberland": "counties_nc.cumberland_delinquent_tax: \ud83d\udd34 ALARM \u2014 TIMEOUT: network timeout (ConnectTimeout)",
+   "NC|Duplin": "counties_nc.nc_its_public_tax: \u26a0\ufe0f PARTIAL (19554) \u2014 exceeded soft timeout 3300s \u2014 shipped 19554 rows collected ",
+   "NC|Graham": "counties_nc.nc_its_public_tax: \u26a0\ufe0f PARTIAL (19554) \u2014 exceeded soft timeout 3300s \u2014 shipped 19554 rows collected ",
+   "NC|Granville": "counties_nc.nc_its_public_tax: \u26a0\ufe0f PARTIAL (19554) \u2014 exceeded soft timeout 3300s \u2014 shipped 19554 rows collected ",
+   "NC|Harnett": "counties_nc.nc_its_public_tax: \u26a0\ufe0f PARTIAL (19554) \u2014 exceeded soft timeout 3300s \u2014 shipped 19554 rows collected ",
+   "NC|Iredell": "counties_nc.iredell_delinquent_tax: \ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 180s",
+   "NC|Jones": "counties_nc.nc_its_public_tax: \u26a0\ufe0f PARTIAL (19554) \u2014 exceeded soft timeout 3300s \u2014 shipped 19554 rows collected ",
+   "NC|New Hanover": "counties_nc.nc_county_csv_delinquent_tax: \ud83d\udd34 ALARM \u2014 ERROR: PartialHarvest: counties_nc.nc_county_csv_delinquent_tax: parti",
+   "NC|Onslow": "counties_nc.nc_its_public_tax: \u26a0\ufe0f PARTIAL (19554) \u2014 exceeded soft timeout 3300s \u2014 shipped 19554 rows collected ",
+   "NC|Person": "counties_nc.nc_its_public_tax: \u26a0\ufe0f PARTIAL (19554) \u2014 exceeded soft timeout 3300s \u2014 shipped 19554 rows collected ",
+   "NC|Scotland": "counties_nc.nc_its_public_tax: \u26a0\ufe0f PARTIAL (19554) \u2014 exceeded soft timeout 3300s \u2014 shipped 19554 rows collected ",
+   "NC|Yadkin": "counties_nc.nc_its_public_tax: \u26a0\ufe0f PARTIAL (19554) \u2014 exceeded soft timeout 3300s \u2014 shipped 19554 rows collected ",
+   "SC|Abbeville": "counties_sc.abbeville_delinquent_tax: DORMANT \u2014 disabled: target page has no delinquent-property list (office/FAQ page",
+   "SC|Darlington": "counties_sc.darlington_delinquent_tax: DORMANT \u2014 disabled: target page carries only an office-hours table, never a deli",
+   "SC|Dillon": "counties_sc.dillon_delinquent_tax: CARRYOVER (843 stale from prior run)",
+   "SC|Dorchester": "counties_sc.dorchester_billtrax_delinquent_tax: CARRYOVER (1306 stale from prior run)",
+   "SC|Edgefield": "counties_sc.edgefield_delinquent_tax: DORMANT \u2014 disabled: target page is office-contact info only, no table - supersed",
+   "SC|Horry": "counties_sc.horry_delinquent_xlsx: \ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 180s",
+   "SC|Lancaster": "counties_sc.lancaster_delinquent_tax: DORMANT \u2014 disabled: seasonal (~3wk/year) newspaper mirror, fully superseded by t",
+   "SC|Marlboro": "counties_sc.marlboro_delinquent_tax: DORMANT \u2014 disabled: PAGE_URL is a generic meetings/publications page (budget tab",
+   "SC|Newberry": "counties_sc.newberry_delinquent_tax: DORMANT \u2014 disabled: target page links only a general-procedures PDF, no per-parc",
+   "SC|Saluda": "counties_sc.saluda_delinquent_tax: DORMANT \u2014 disabled: seasonal (~3wk/year) newspaper mirror, fully superseded by t",
+   "SC|Spartanburg": "counties_sc.spartanburg_delinquent_tax: CARRYOVER (1770 stale from prior run)"
+  },
+  "probate": {
+   "SC|Charleston": "counties_sc.sc_probate_net: \u26a0\ufe0f PARTIAL (180) \u2014 exceeded soft timeout 900s \u2014 shipped 180 rows collected befor",
+   "SC|Cherokee": "counties_sc.sc_probate_net: \u26a0\ufe0f PARTIAL (180) \u2014 exceeded soft timeout 900s \u2014 shipped 180 rows collected befor",
+   "SC|Colleton": "counties_sc.sc_probate_net: \u26a0\ufe0f PARTIAL (180) \u2014 exceeded soft timeout 900s \u2014 shipped 180 rows collected befor",
+   "SC|Dorchester": "counties_sc.sc_probate_net: \u26a0\ufe0f PARTIAL (180) \u2014 exceeded soft timeout 900s \u2014 shipped 180 rows collected befor",
+   "SC|Georgetown": "counties_sc.sc_probate_net: \u26a0\ufe0f PARTIAL (180) \u2014 exceeded soft timeout 900s \u2014 shipped 180 rows collected befor",
+   "SC|Oconee": "counties_sc.sc_probate_net: \u26a0\ufe0f PARTIAL (180) \u2014 exceeded soft timeout 900s \u2014 shipped 180 rows collected befor",
+   "SC|York": "counties_sc.sc_probate_net: \u26a0\ufe0f PARTIAL (180) \u2014 exceeded soft timeout 900s \u2014 shipped 180 rows collected befor"
+  },
+  "tax_aging_surfaced": {
+   "NC|Alleghany": "counties_nc.nc_its_public_tax: \u26a0\ufe0f PARTIAL (19554) \u2014 exceeded soft timeout 3300s \u2014 shipped 19554 rows collected ",
+   "NC|Anson": "counties_nc.nc_its_public_tax: \u26a0\ufe0f PARTIAL (19554) \u2014 exceeded soft timeout 3300s \u2014 shipped 19554 rows collected ",
+   "NC|Buncombe": "counties_nc.buncombe_delinquent_tax: CARRYOVER (1182 stale from prior run)",
+   "NC|Caswell": "counties_nc.nc_its_public_tax: \u26a0\ufe0f PARTIAL (19554) \u2014 exceeded soft timeout 3300s \u2014 shipped 19554 rows collected ",
+   "NC|Cumberland": "counties_nc.cumberland_delinquent_tax: \ud83d\udd34 ALARM \u2014 TIMEOUT: network timeout (ConnectTimeout)",
+   "NC|Duplin": "counties_nc.nc_its_public_tax: \u26a0\ufe0f PARTIAL (19554) \u2014 exceeded soft timeout 3300s \u2014 shipped 19554 rows collected ",
+   "NC|Graham": "counties_nc.nc_its_public_tax: \u26a0\ufe0f PARTIAL (19554) \u2014 exceeded soft timeout 3300s \u2014 shipped 19554 rows collected ",
+   "NC|Granville": "counties_nc.nc_its_public_tax: \u26a0\ufe0f PARTIAL (19554) \u2014 exceeded soft timeout 3300s \u2014 shipped 19554 rows collected ",
+   "NC|Harnett": "counties_nc.nc_its_public_tax: \u26a0\ufe0f PARTIAL (19554) \u2014 exceeded soft timeout 3300s \u2014 shipped 19554 rows collected ",
+   "NC|Iredell": "counties_nc.iredell_delinquent_tax: \ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 180s",
+   "NC|Jones": "counties_nc.nc_its_public_tax: \u26a0\ufe0f PARTIAL (19554) \u2014 exceeded soft timeout 3300s \u2014 shipped 19554 rows collected ",
+   "NC|New Hanover": "counties_nc.nc_county_csv_delinquent_tax: \ud83d\udd34 ALARM \u2014 ERROR: PartialHarvest: counties_nc.nc_county_csv_delinquent_tax: parti",
+   "NC|Onslow": "counties_nc.nc_its_public_tax: \u26a0\ufe0f PARTIAL (19554) \u2014 exceeded soft timeout 3300s \u2014 shipped 19554 rows collected ",
+   "NC|Person": "counties_nc.nc_its_public_tax: \u26a0\ufe0f PARTIAL (19554) \u2014 exceeded soft timeout 3300s \u2014 shipped 19554 rows collected ",
+   "NC|Scotland": "counties_nc.nc_its_public_tax: \u26a0\ufe0f PARTIAL (19554) \u2014 exceeded soft timeout 3300s \u2014 shipped 19554 rows collected ",
+   "NC|Yadkin": "counties_nc.nc_its_public_tax: \u26a0\ufe0f PARTIAL (19554) \u2014 exceeded soft timeout 3300s \u2014 shipped 19554 rows collected ",
+   "SC|Abbeville": "counties_sc.abbeville_delinquent_tax: DORMANT \u2014 disabled: target page has no delinquent-property list (office/FAQ page",
+   "SC|Darlington": "counties_sc.darlington_delinquent_tax: DORMANT \u2014 disabled: target page carries only an office-hours table, never a deli",
+   "SC|Dillon": "counties_sc.dillon_delinquent_tax: CARRYOVER (843 stale from prior run)",
+   "SC|Dorchester": "counties_sc.dorchester_billtrax_delinquent_tax: CARRYOVER (1306 stale from prior run)",
+   "SC|Edgefield": "counties_sc.edgefield_delinquent_tax: DORMANT \u2014 disabled: target page is office-contact info only, no table - supersed",
+   "SC|Horry": "counties_sc.horry_delinquent_xlsx: \ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 180s",
+   "SC|Lancaster": "counties_sc.lancaster_delinquent_tax: DORMANT \u2014 disabled: seasonal (~3wk/year) newspaper mirror, fully superseded by t",
+   "SC|Marlboro": "counties_sc.marlboro_delinquent_tax: DORMANT \u2014 disabled: PAGE_URL is a generic meetings/publications page (budget tab",
+   "SC|Newberry": "counties_sc.newberry_delinquent_tax: DORMANT \u2014 disabled: target page links only a general-procedures PDF, no per-parc",
+   "SC|Saluda": "counties_sc.saluda_delinquent_tax: DORMANT \u2014 disabled: seasonal (~3wk/year) newspaper mirror, fully superseded by t",
+   "SC|Spartanburg": "counties_sc.spartanburg_delinquent_tax: CARRYOVER (1770 stale from prior run)"
+  },
+  "two_year_delinquent": {
+   "NC|Alleghany": "counties_nc.nc_its_public_tax: \u26a0\ufe0f PARTIAL (19554) \u2014 exceeded soft timeout 3300s \u2014 shipped 19554 rows collected ",
+   "NC|Anson": "counties_nc.nc_its_public_tax: \u26a0\ufe0f PARTIAL (19554) \u2014 exceeded soft timeout 3300s \u2014 shipped 19554 rows collected ",
+   "NC|Buncombe": "counties_nc.buncombe_delinquent_tax: CARRYOVER (1182 stale from prior run)",
+   "NC|Caswell": "counties_nc.nc_its_public_tax: \u26a0\ufe0f PARTIAL (19554) \u2014 exceeded soft timeout 3300s \u2014 shipped 19554 rows collected ",
+   "NC|Cumberland": "counties_nc.cumberland_delinquent_tax: \ud83d\udd34 ALARM \u2014 TIMEOUT: network timeout (ConnectTimeout)",
+   "NC|Duplin": "counties_nc.nc_its_public_tax: \u26a0\ufe0f PARTIAL (19554) \u2014 exceeded soft timeout 3300s \u2014 shipped 19554 rows collected ",
+   "NC|Graham": "counties_nc.nc_its_public_tax: \u26a0\ufe0f PARTIAL (19554) \u2014 exceeded soft timeout 3300s \u2014 shipped 19554 rows collected ",
+   "NC|Granville": "counties_nc.nc_its_public_tax: \u26a0\ufe0f PARTIAL (19554) \u2014 exceeded soft timeout 3300s \u2014 shipped 19554 rows collected ",
+   "NC|Harnett": "counties_nc.nc_its_public_tax: \u26a0\ufe0f PARTIAL (19554) \u2014 exceeded soft timeout 3300s \u2014 shipped 19554 rows collected ",
+   "NC|Iredell": "counties_nc.iredell_delinquent_tax: \ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 180s",
+   "NC|Jones": "counties_nc.nc_its_public_tax: \u26a0\ufe0f PARTIAL (19554) \u2014 exceeded soft timeout 3300s \u2014 shipped 19554 rows collected ",
+   "NC|New Hanover": "counties_nc.nc_county_csv_delinquent_tax: \ud83d\udd34 ALARM \u2014 ERROR: PartialHarvest: counties_nc.nc_county_csv_delinquent_tax: parti",
+   "NC|Onslow": "counties_nc.nc_its_public_tax: \u26a0\ufe0f PARTIAL (19554) \u2014 exceeded soft timeout 3300s \u2014 shipped 19554 rows collected ",
+   "NC|Person": "counties_nc.nc_its_public_tax: \u26a0\ufe0f PARTIAL (19554) \u2014 exceeded soft timeout 3300s \u2014 shipped 19554 rows collected ",
+   "NC|Scotland": "counties_nc.nc_its_public_tax: \u26a0\ufe0f PARTIAL (19554) \u2014 exceeded soft timeout 3300s \u2014 shipped 19554 rows collected ",
+   "NC|Yadkin": "counties_nc.nc_its_public_tax: \u26a0\ufe0f PARTIAL (19554) \u2014 exceeded soft timeout 3300s \u2014 shipped 19554 rows collected ",
+   "SC|Abbeville": "counties_sc.abbeville_delinquent_tax: DORMANT \u2014 disabled: target page has no delinquent-property list (office/FAQ page",
+   "SC|Darlington": "counties_sc.darlington_delinquent_tax: DORMANT \u2014 disabled: target page carries only an office-hours table, never a deli",
+   "SC|Dillon": "counties_sc.dillon_delinquent_tax: CARRYOVER (843 stale from prior run)",
+   "SC|Dorchester": "counties_sc.dorchester_billtrax_delinquent_tax: CARRYOVER (1306 stale from prior run)",
+   "SC|Edgefield": "counties_sc.edgefield_delinquent_tax: DORMANT \u2014 disabled: target page is office-contact info only, no table - supersed",
+   "SC|Horry": "counties_sc.horry_delinquent_xlsx: \ud83d\udd34 ALARM \u2014 TIMEOUT: exceeded soft timeout 180s",
+   "SC|Lancaster": "counties_sc.lancaster_delinquent_tax: DORMANT \u2014 disabled: seasonal (~3wk/year) newspaper mirror, fully superseded by t",
+   "SC|Marlboro": "counties_sc.marlboro_delinquent_tax: DORMANT \u2014 disabled: PAGE_URL is a generic meetings/publications page (budget tab",
+   "SC|Newberry": "counties_sc.newberry_delinquent_tax: DORMANT \u2014 disabled: target page links only a general-procedures PDF, no per-parc",
+   "SC|Saluda": "counties_sc.saluda_delinquent_tax: DORMANT \u2014 disabled: seasonal (~3wk/year) newspaper mirror, fully superseded by t",
+   "SC|Spartanburg": "counties_sc.spartanburg_delinquent_tax: CARRYOVER (1770 stale from prior run)"
+  }
+ },
+ "excluded_sources": {
+  "counties_sc.qpaybill_delinquent_roll": "budgeted, pager-lossy enumeration (REQUEST_BUDGET_PER_COUNTY)",
+  "counties_sc.spartanburg_vacant": "City of Spartanburg registry, not the county",
+  "counties_sc.spartanburg_city_condemned": "city registry, not the county",
+  "city_websites.charlotte_open_data": "city of Charlotte only",
+  "counties_nc.hendersonville_vacant_structures": "city of Hendersonville only"
+ },
+ "cells_screened": 866
+}

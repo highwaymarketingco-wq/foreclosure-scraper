@@ -1,0 +1,90 @@
+{
+ "source": "LSC Civil Court Data Initiative (county-level eviction filings rate per 100 renter households; aggregate, not case-level)",
+ "counties": {
+  "NC:Buncombe": {
+   "filings_rate": 16.3,
+   "filings_count": 8555,
+   "tier": "med"
+  },
+  "NC:Transylvania": {
+   "filings_rate": 7.2,
+   "filings_count": 470,
+   "tier": "low"
+  },
+  "NC:Cleveland": {
+   "filings_rate": 27.2,
+   "filings_count": 4968,
+   "tier": "high"
+  },
+  "NC:Rutherford": {
+   "filings_rate": 12.6,
+   "filings_count": 1695,
+   "tier": "med"
+  },
+  "NC:Gaston": {
+   "filings_rate": 32.3,
+   "filings_count": 15782,
+   "tier": "high"
+  },
+  "NC:Polk": {
+   "filings_rate": 4.6,
+   "filings_count": 196,
+   "tier": "low"
+  },
+  "NC:Lincoln": {
+   "filings_rate": 17.2,
+   "filings_count": 2136,
+   "tier": "med"
+  },
+  "NC:Henderson": {
+   "filings_rate": 10.0,
+   "filings_count": 2278,
+   "tier": "low"
+  },
+  "NC:Mitchell": {
+   "filings_rate": 5.8,
+   "filings_count": 179,
+   "tier": "low"
+  },
+  "NC:Burke": {
+   "filings_rate": 10.9,
+   "filings_count": 1826,
+   "tier": "med"
+  },
+  "SC:Oconee": {
+   "filings_rate": 11.6,
+   "filings_count": 5881,
+   "tier": "med"
+  },
+  "SC:Pickens": {
+   "filings_rate": 12.2,
+   "filings_count": 10167,
+   "tier": "med"
+  },
+  "SC:Laurens": {
+   "filings_rate": 27.0,
+   "filings_count": 10699,
+   "tier": "high"
+  },
+  "SC:Union": {
+   "filings_rate": 13.4,
+   "filings_count": 2923,
+   "tier": "med"
+  },
+  "SC:Anderson": {
+   "filings_rate": 18.9,
+   "filings_count": 21895,
+   "tier": "med"
+  },
+  "SC:Cherokee": {
+   "filings_rate": 30.6,
+   "filings_count": 11119,
+   "tier": "high"
+  },
+  "SC:Spartanburg": {
+   "filings_rate": 35.1,
+   "filings_count": 56529,
+   "tier": "high"
+  }
+ }
+}

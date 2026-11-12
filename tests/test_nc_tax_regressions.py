@@ -1,0 +1,272 @@
+"""Regression tests for the two NC county-tax sources that fell to 0 rows.
+
+Both were flagged "REGRESSED (expected >= 1)" by the 2026-08-02 full run. Each
+fixture is the live page/feed saved on the day of the fix.
+
+polk_tax   — Kania posts "$TBD" until the upset-bid figure is set; the old row
+             regex required digits after the "$" and matched nothing.
+buncombe_tax — the Trumba event date is the BIDDING-BEGINS date (in the past for
+             every open parcel), custom fields are keyed by "label" not "name",
+             and redeemed parcels must be dropped.
+"""
+from __future__ import annotations
+
+import json
+from datetime import datetime, timedelta
+from pathlib import Path
+
+import pytest
+
+from foreclosure_scraper.scrapers.counties_nc.buncombe_tax import (
+    LOOKAHEAD_DAYS,
+    LOOKBACK_DAYS,
+    BuncombeTax,
+)
+from foreclosure_scraper.scrapers.counties_nc.polk_tax import PolkTaxAuction
+
+FIXTURES = Path(__file__).parent / "fixtures"
+
+
+# --- polk_tax ---------------------------------------------------------------
+
+def _polk_rows(html: str) -> list:
+    """Run the scraper's AUCTION-PAGE parse over fixture HTML without
+    touching the network.
+
+    ``PolkTaxAuction.fetch()`` now runs two independent sources (added
+    2026-10-12): the auction page this helper feeds via ``html``, plus
+    ``_fetch_delinquent_search()`` -- a second, real lead source that opens
+    a live (non-headless) browser and does live name searches against the
+    county's Cloudflare-protected cms.revize.com search site. That second
+    source ignores ``html`` entirely (it isn't HTML-driven at all) and
+    returns whatever is really on the live site right now -- which is
+    exactly why these auction-page regression tests started coming back
+    with ~1,674 unrelated ``polk_tax_search`` rows appended after real
+    parcels instead of just the fixture's row(s): nothing here was
+    isolating the test from that second code path, not a bug in the parser
+    itself. Stub `_fetch_delinquent_search` out so this helper keeps doing
+    what it's named for -- unit-testing the auction-page row/date/cancelled
+    parsing against synthetic HTML -- without a live browser launch inside
+    a unit test.
+    """
+    import asyncio
+
+    class _Resp:
+        status_code = 200
+        text = html
+
+    class _Client:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+        async def get(self, *a, **kw):
+            return _Resp()
+
+    import foreclosure_scraper.scrapers.counties_nc.polk_tax as mod
+
+    original_client = mod.client
+    original_delinquent_search = PolkTaxAuction._fetch_delinquent_search
+    mod.client = lambda **kw: _Client()
+
+    async def _no_delinquent_search(self):
+        return []
+
+    PolkTaxAuction._fetch_delinquent_search = _no_delinquent_search
+    try:
+        return list(asyncio.run(PolkTaxAuction().fetch()))
+    finally:
+        mod.client = original_client
+        PolkTaxAuction._fetch_delinquent_search = original_delinquent_search
+
+
+def test_polk_parses_tbd_opening_bid():
+    """The live page carries one parcel priced '$TBD'. It must still be emitted."""
+    html = (FIXTURES / "polk_tax_upcoming_auction.html").read_text()
+    rows = _polk_rows(html)
+    assert rows, "TBD-priced auction row was dropped (the 0-row regression)"
+    row = rows[0]
+    assert row.parcel_id == "P65-38"
+    assert row.opening_bid is None      # '$TBD' is not a price
+    assert row.sale_date is not None    # header date still parses
+    assert row.county == "Polk"
+    assert row.state == "NC"
+
+
+def test_polk_still_parses_a_numeric_bid():
+    """A priced row keeps working — the TBD branch must not swallow amounts."""
+    html = "<html><body>PARCEL OPENING BID P12-34 &nbsp; $1,234.56</body></html>"
+    rows = _polk_rows(html)
+    assert len(rows) == 1
+    assert rows[0].parcel_id == "P12-34"
+    assert rows[0].opening_bid == pytest.approx(1234.56)
+
+
+def test_polk_date_without_upcoming_prefix_still_parses():
+    """Live-verified 2026-10-01: the page currently reads 'Auction Date:' with
+    no 'Upcoming' prefix (a cancelled posting). The date regex must not
+    silently miss this shorter wording if a real future auction ever uses it
+    too."""
+    html = (
+        "<html><body>Auction Date: March 10th, 2026 11 AM "
+        "Location: Polk County Courthouse 1 Courthouse St. Columbus N.C. "
+        "PARCEL OPENING BID P12-34 &nbsp; $1,234.56</body></html>"
+    )
+    rows = _polk_rows(html)
+    assert len(rows) == 1
+    assert rows[0].sale_date is not None
+    assert rows[0].sale_date.month == 3 and rows[0].sale_date.day == 10
+
+
+def test_polk_cancelled_auction_withholds_sale_date_and_flags_raw():
+    """Live-verified 2026-10-01: the real page text is 'Auction Date:
+    September 1st, 2026&nbsp;&nbsp; CANCELLED 11 AM ...' with zero parcel
+    rows left (a genuine, correct empty result). This covers the defensive
+    case where a parcel row is left on the page under a cancelled notice --
+    it must not read as a live upcoming sale."""
+    html = (
+        "<html><body>Auction Date: September 1st, 2026&nbsp;&nbsp; CANCELLED "
+        "11 AM Location: Polk County Courthouse 1 Courthouse St. Columbus N.C. "
+        "PARCEL OPENING BID P99-01 &nbsp; $5,000.00</body></html>"
+    )
+    rows = _polk_rows(html)
+    assert len(rows) == 1
+    row = rows[0]
+    assert row.sale_date is None
+    assert row.auction_status == "cancelled"
+    assert row.raw["polk_tax"]["cancelled"] is True
+    assert "cancelled" in row.description.lower()
+
+
+def test_polk_non_cancelled_auction_unaffected_by_cancelled_check():
+    html = (
+        "<html><body>Auction Date: March 10th, 2026 11 AM "
+        "Location: Polk County Courthouse 1 Courthouse St. Columbus N.C. "
+        "PARCEL OPENING BID P12-34 &nbsp; $1,234.56</body></html>"
+    )
+    rows = _polk_rows(html)
+    assert rows[0].auction_status is None
+    assert rows[0].raw["polk_tax"]["cancelled"] is False
+
+
+# --- buncombe_tax -----------------------------------------------------------
+
+def _buncombe_rows(events: list[dict]) -> list:
+    import asyncio
+
+    class _Resp:
+        status_code = 200
+
+        def __init__(self, payload):
+            self.text = json.dumps(payload)
+
+    class _Client:
+        def __init__(self, payload):
+            self._payload = payload
+            self.params = None
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+        async def get(self, url, params=None, **kw):
+            self.params = params
+            captured.append(params)
+            return _Resp(self._payload)
+
+    import foreclosure_scraper.scrapers.counties_nc.buncombe_tax as mod
+
+    captured: list = []
+    original = mod.client
+    mod.client = lambda **kw: _Client(events)
+    try:
+        rows = list(asyncio.run(BuncombeTax().fetch()))
+    finally:
+        mod.client = original
+    return rows, captured[0]
+
+
+def test_buncombe_window_looks_backwards():
+    """The regression: querying from today matched 0 events because every open
+    parcel's bidding-begins date is in the past."""
+    _, params = _buncombe_rows([])
+    start = datetime.strptime(params["startdate"], "%Y%m%d")
+    end = datetime.strptime(params["enddate"], "%Y%m%d")
+    today = datetime.utcnow()
+    assert start < today - timedelta(days=365), "window must reach back past open parcels"
+    assert (today - start).days == pytest.approx(LOOKBACK_DAYS, abs=2)
+    assert (end - today).days == pytest.approx(LOOKAHEAD_DAYS, abs=2)
+
+
+def test_buncombe_parses_label_keyed_custom_fields_and_drops_redeemed():
+    events = json.loads((FIXTURES / "buncombe_trumba_events.json").read_text())
+    rows, _ = _buncombe_rows(events)
+
+    redeemed = [
+        e for e in events
+        if any((cf.get("label") == "Redeemed"
+                and str(cf.get("value", "")).lower().startswith("y"))
+               for cf in e.get("customFields") or [])
+    ]
+    assert redeemed, "fixture should contain redeemed events to prove they're dropped"
+    assert len(rows) == len(events) - len(redeemed)
+
+    # Custom fields are keyed by "label"; the old code read "name" and got None.
+    for row in rows:
+        assert row.case_number, "case number must come off the label-keyed field"
+        assert row.opening_bid and row.opening_bid > 0
+        assert row.parcel_id and row.parcel_id.isdigit(), "GIS PIN must be parsed"
+        assert row.county == "Buncombe"
+        assert row.state == "NC"
+
+
+def test_buncombe_past_bidding_start_is_not_stamped_as_sale_date():
+    """Recovering the rows is worthless if the board then drops them.
+
+    startDateTime is bidding-BEGINS, not an auction date, so every open parcel
+    carries a past date. Stamping it as sale_date made main._active_only discard
+    33 of 33 live rows — the fetch read 0 -> 33 while the board stayed at 0. A
+    past start must be withheld (and preserved in raw) so the row can travel the
+    dateless lane; a future start is a real scheduled event and keeps its date.
+    """
+    from foreclosure_scraper import main as m
+
+    events = json.loads((FIXTURES / "buncombe_trumba_events.json").read_text())
+    rows, _ = _buncombe_rows(events)
+    assert rows, "fixture must yield live rows"
+
+    # Fixture starts are all historic (2022-...), so nothing may carry a sale_date.
+    assert all(r.sale_date is None for r in rows)
+    for r in rows:
+        blob = r.raw["buncombe_tax"]
+        assert blob["sale_date_withheld"] is True
+        assert blob["bidding_begins_iso"], "the real date must survive in raw"
+
+    # Withholding alone is not enough — the source also needs the dateless
+    # whitelist entry. Both halves are now in place, so assert against the REAL
+    # config (rows survive), then remove the entry to prove it is load-bearing.
+    assert "counties_nc.buncombe_tax" in m.DATELESS_OK_SOURCES
+    assert all(m._active_only(r, 120) for r in rows)
+
+    stripped = set(m.DATELESS_OK_SOURCES) - {"counties_nc.buncombe_tax"}
+    original, m.DATELESS_OK_SOURCES = m.DATELESS_OK_SOURCES, stripped
+    try:
+        assert not any(m._active_only(r, 120) for r in rows), (
+            "without the dateless whitelist entry every recovered row is dropped"
+        )
+    finally:
+        m.DATELESS_OK_SOURCES = original
+
+    # A genuinely future start still gets dated.
+    future = json.loads(json.dumps(events[0]))
+    future["startDateTime"] = (datetime.utcnow() + timedelta(days=30)).isoformat()
+    for cf in future.get("customFields") or []:
+        if cf.get("label") == "Redeemed":
+            cf["value"] = "No"
+    dated, _ = _buncombe_rows([future])
+    assert dated and dated[0].sale_date is not None
+    assert dated[0].raw["buncombe_tax"]["sale_date_withheld"] is False

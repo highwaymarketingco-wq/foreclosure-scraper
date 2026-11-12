@@ -1,0 +1,289 @@
+{
+  "generated": "2026-07-01",
+  "window_days": 75,
+  "note": "Non-bank grantees on recorded MORTGAGES = private/gator lenders (subject-to / fix-flip funding). Banks/GSEs/servicers removed.",
+  "lenders": [
+    {
+      "name": "LOWER LLC",
+      "loans": 5,
+      "kind": "private_fund",
+      "counties": {
+        "Pickens,SC": 5
+      },
+      "sample_parcels": [
+        "Pickens,SC:5048-08-98-5049",
+        "Pickens,SC:5028-10-47-1317",
+        "Pickens,SC:5038-17-10-4951"
+      ]
+    },
+    {
+      "name": "RFLF 4 LLC",
+      "loans": 4,
+      "kind": "private_fund",
+      "counties": {
+        "Pickens,SC": 4
+      },
+      "sample_parcels": [
+        "Pickens,SC:5048-05-17-8860",
+        "Pickens,SC:4089-00-93-3530",
+        "Pickens,SC:4054-18-21-8732"
+      ]
+    },
+    {
+      "name": "JET HOMELOANS LP",
+      "loans": 3,
+      "kind": "private_fund",
+      "counties": {
+        "Pickens,SC": 3
+      },
+      "sample_parcels": [
+        "Pickens,SC:5008-11-56-6438",
+        "Pickens,SC:5008-11-56-3829",
+        "Pickens,SC:5008-11-56-8951"
+      ]
+    },
+    {
+      "name": "UNLOCK PARTNERSHIP SOLUTIONS INC",
+      "loans": 3,
+      "kind": "private_fund",
+      "counties": {
+        "Pickens,SC": 3
+      },
+      "sample_parcels": [
+        "Pickens,SC:5019-07-58-8811",
+        "Pickens,SC:4088-11-55-3424",
+        "Pickens,SC:4190-10-35-1279"
+      ]
+    },
+    {
+      "name": "GOODLEAP LLC",
+      "loans": 2,
+      "kind": "private_fund",
+      "counties": {
+        "Pickens,SC": 2
+      },
+      "sample_parcels": [
+        "Pickens,SC:5028-13-02-2673",
+        "Pickens,SC:4065-07-59-0097"
+      ]
+    },
+    {
+      "name": "HOMETAP HOMEOWNERSHIP SOLUTIONS LLC",
+      "loans": 2,
+      "kind": "private_fund",
+      "counties": {
+        "Pickens,SC": 2
+      },
+      "sample_parcels": [
+        "Pickens,SC:5019-11-65-5351",
+        "Pickens,SC:4140-00-55-3533"
+      ]
+    },
+    {
+      "name": "SUMMIT EDGE VENTURES LLC",
+      "loans": 2,
+      "kind": "private_fund",
+      "counties": {
+        "Pickens,SC": 2
+      },
+      "sample_parcels": [
+        "Pickens,SC:4078-16-84-9966",
+        "Pickens,SC:5029-13-14-3334"
+      ]
+    },
+    {
+      "name": "A & L INVESTMENTS INC",
+      "loans": 1,
+      "kind": "private_fund",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "sample_parcels": [
+        "Pickens,SC:5120-19-60-5339"
+      ]
+    },
+    {
+      "name": "ABL RPC RESIDENTIAL CREDIT ACQUISITION LLC",
+      "loans": 1,
+      "kind": "private_fund",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "sample_parcels": []
+    },
+    {
+      "name": "ACTIVE LINK INC",
+      "loans": 1,
+      "kind": "private_fund",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "sample_parcels": [
+        "Pickens,SC:5100-00-58-0297"
+      ]
+    },
+    {
+      "name": "ARP SERVICES LLC",
+      "loans": 1,
+      "kind": "private_fund",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "sample_parcels": [
+        "Pickens,SC:4076-18-30-8231 P/O"
+      ]
+    },
+    {
+      "name": "COMMERCIAL LENDER LLC",
+      "loans": 1,
+      "kind": "private_fund",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "sample_parcels": [
+        "Pickens,SC:5039-06-39-9249"
+      ]
+    },
+    {
+      "name": "CONVENTUS LLC",
+      "loans": 1,
+      "kind": "private_fund",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "sample_parcels": [
+        "Pickens,SC:5028-17-11-4938"
+      ]
+    },
+    {
+      "name": "HOMETAP EQUITY PARTNERS LLC",
+      "loans": 1,
+      "kind": "private_fund",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "sample_parcels": [
+        "Pickens,SC:4054-12-86-7271"
+      ]
+    },
+    {
+      "name": "INSTANT CASH INC",
+      "loans": 1,
+      "kind": "private_fund",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "sample_parcels": [
+        "Pickens,SC:5049-14-43-8364"
+      ]
+    },
+    {
+      "name": "MADISON HOMEBUILDERS LLC",
+      "loans": 1,
+      "kind": "private_fund",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "sample_parcels": [
+        "Pickens,SC:5134-00-38-4053 P/O"
+      ]
+    },
+    {
+      "name": "NEW VISION TRUST COMPANY",
+      "loans": 1,
+      "kind": "private_fund",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "sample_parcels": [
+        "Pickens,SC:5018-08-88-2962"
+      ]
+    },
+    {
+      "name": "NEXUS NOVA LLC",
+      "loans": 1,
+      "kind": "private_fund",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "sample_parcels": []
+    },
+    {
+      "name": "PINETREE INVESTORS LLC",
+      "loans": 1,
+      "kind": "private_fund",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "sample_parcels": [
+        "Pickens,SC:4078-11-55-1524"
+      ]
+    },
+    {
+      "name": "RUVANNA INVESTMENTS LLC",
+      "loans": 1,
+      "kind": "private_fund",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "sample_parcels": [
+        "Pickens,SC:5008-15-64-4544"
+      ]
+    },
+    {
+      "name": "RW PROPERTIES LLC",
+      "loans": 1,
+      "kind": "private_fund",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "sample_parcels": [
+        "Pickens,SC:4193-00-49-4768 P/O"
+      ]
+    },
+    {
+      "name": "SPRING EQ LLC",
+      "loans": 1,
+      "kind": "private_fund",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "sample_parcels": [
+        "Pickens,SC:4181-15-53-1194"
+      ]
+    },
+    {
+      "name": "TRUST CONSULTANTS INC",
+      "loans": 1,
+      "kind": "private_fund",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "sample_parcels": [
+        "Pickens,SC:4150-00-36-6097"
+      ]
+    },
+    {
+      "name": "UPSTART MORTAGE LLC",
+      "loans": 1,
+      "kind": "private_fund",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "sample_parcels": [
+        "Pickens,SC:4087-10-37-5440"
+      ]
+    },
+    {
+      "name": "WESLEYAN INVESTMENT FOUNDATION INC",
+      "loans": 1,
+      "kind": "private_fund",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "sample_parcels": [
+        "Pickens,SC:5029-15-54-3914"
+      ]
+    }
+  ]
+}

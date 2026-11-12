@@ -1,0 +1,30 @@
+{
+ "buckets": 1,
+ "counts": {
+  "confirmed": 8,
+  "refuted": 0,
+  "rows": 8,
+  "stale": 0,
+  "unconfirmed": 0,
+  "wall": 0
+ },
+ "generated_at": "2026-10-20T14:49:27Z",
+ "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
+ "host": "SMB-LTSEO05-discovery",
+ "kind": "verification_ledger_manifest",
+ "last_run": {},
+ "rows": 8,
+ "schema": 1,
+ "shard_max_bytes": 8388608,
+ "shards": [
+  {
+   "bucket": 0,
+   "bytes": 11273,
+   "file": "000.json",
+   "rows": 8,
+   "sha256": "ac49c41c1274f0656af68f598a58be234b18544da4aa584f798e42379e620fb4"
+  }
+ ],
+ "signal": "tax_lien_johnston_static",
+ "version": 1
+}

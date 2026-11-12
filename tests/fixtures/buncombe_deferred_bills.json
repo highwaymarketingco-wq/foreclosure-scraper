@@ -1,0 +1,128 @@
+[
+ {
+  "pin": "9702-79-6329-00000",
+  "bill": "0000742141-2025-2021-0070-00",
+  "deferred_value": "209800",
+  "total_value": "49400",
+  "original_bill_amount": "52.25",
+  "levy_due": "52.25",
+  "levy_year": "2025"
+ },
+ {
+  "pin": "9702-79-6329-00000",
+  "bill": "0000742141-2025-2022-0070-00",
+  "deferred_value": "209800",
+  "total_value": "49400",
+  "original_bill_amount": "52.25",
+  "levy_due": "52.25",
+  "levy_year": "2025"
+ },
+ {
+  "pin": "9702-79-6329-00000",
+  "bill": "0000742141-2025-2023-0070-00",
+  "deferred_value": "209800",
+  "total_value": "49400",
+  "original_bill_amount": "57.01",
+  "levy_due": "57.01",
+  "levy_year": "2025"
+ },
+ {
+  "pin": "9702-79-6329-00000",
+  "bill": "0000742141-2025-2024-0070-00",
+  "deferred_value": "209800",
+  "total_value": "49400",
+  "original_bill_amount": "58.56",
+  "levy_due": "58.56",
+  "levy_year": "2025"
+ },
+ {
+  "pin": "9710-45-4150-00000",
+  "bill": "0003010911-2025-2021-0070-00",
+  "deferred_value": "220800",
+  "total_value": "143400",
+  "original_bill_amount": "66.17",
+  "levy_due": "66.17",
+  "levy_year": "2025"
+ },
+ {
+  "pin": "9710-45-4150-00000",
+  "bill": "0003010911-2025-2022-0070-00",
+  "deferred_value": "220800",
+  "total_value": "143400",
+  "original_bill_amount": "66.17",
+  "levy_due": "66.17",
+  "levy_year": "2025"
+ },
+ {
+  "pin": "9710-45-4150-00000",
+  "bill": "0003010911-2025-2023-0070-00",
+  "deferred_value": "220800",
+  "total_value": "143400",
+  "original_bill_amount": "67.23",
+  "levy_due": "67.23",
+  "levy_year": "2025"
+ },
+ {
+  "pin": "9710-45-4150-00000",
+  "bill": "0003010911-2025-2024-0070-00",
+  "deferred_value": "220800",
+  "total_value": "143400",
+  "original_bill_amount": "69.31",
+  "levy_due": "69.31",
+  "levy_year": "2025"
+ },
+ {
+  "pin": "9676-51-6327-00000",
+  "bill": "0000706140-2025-2021-0070-00",
+  "deferred_value": "725200",
+  "total_value": "55400",
+  "original_bill_amount": "622.92",
+  "levy_due": "622.92",
+  "levy_year": "2025"
+ },
+ {
+  "pin": "9676-51-6327-00000",
+  "bill": "0000706140-2025-2022-0070-00",
+  "deferred_value": "725200",
+  "total_value": "55400",
+  "original_bill_amount": "622.92",
+  "levy_due": "622.92",
+  "levy_year": "2025"
+ },
+ {
+  "pin": "9676-51-6327-00000",
+  "bill": "0000706140-2025-2023-0070-00",
+  "deferred_value": "725200",
+  "total_value": "55400",
+  "original_bill_amount": "632.76",
+  "levy_due": "632.76",
+  "levy_year": "2025"
+ },
+ {
+  "pin": "9676-51-6327-00000",
+  "bill": "0000706140-2025-2024-0070-00",
+  "deferred_value": "725200",
+  "total_value": "55400",
+  "original_bill_amount": "666.81",
+  "levy_due": "666.81",
+  "levy_year": "2025"
+ },
+ {
+  "pin": "9761-82-8406-00000",
+  "bill": "0003077168-2025-2023-0070-00",
+  "deferred_value": "312900",
+  "total_value": "687100",
+  "original_bill_amount": "2077.65",
+  "levy_due": "2077.65",
+  "levy_year": "2025"
+ },
+ {
+  "pin": "9761-82-8406-00000",
+  "bill": "0003077168-2025-2024-0070-00",
+  "deferred_value": "312900",
+  "total_value": "687100",
+  "original_bill_amount": "2138.98",
+  "levy_due": "2138.98",
+  "levy_year": "2025"
+ }
+]

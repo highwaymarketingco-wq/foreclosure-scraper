@@ -1,0 +1,118 @@
+# GitHub Pages (Jekyll) config — trim the DEPLOYED site so the Pages build stays
+# well under the 10-minute deploy timeout. These files stay in git (CI + local
+# scripts still read them); they're just excluded from what Pages publishes:
+#   - listings.json / listings_detail.json / listings_slim.json -> the dashboard
+#     fetches the .gz copies (listings_part_NNN.json.gz for the board since the payload
+#     split, listings_detail.json.gz, listings_slim.json.gz), which are re-included below.
+#
+# MEASURED DEPLOY SIZE (2026-08-11, tracked files only, which is what CI checks
+# out — a local `du` over docs/ is bigger because it also sees gitignored
+# operator files like crm.json and untracked research dumps):
+#   listings.json.gz  26.6 MB   detail_shards/   26.5 MB
+#   listings_slim.gz   7.8 MB   listings_detail.json.gz  7.6 MB
+#   parcel_photos/   326.6 MB   everything else  ~2.5 MB
+#   -> ~398 MB deployed, against GitHub Pages' 1 GB published-site limit.
+# The header used to claim "~127 MB deploy -> ~8 MB". That was true before the
+# slim payload and the shards existed; it has been wrong by ~9x since 2026-08-10.
+# .github/workflows/pages.yml now MEASURES this every build and prints it to the
+# run summary, so the number cannot silently drift away from this comment again.
+#
+# WHY parcel_photos IS NO LONGER EXCLUDED. It was excluded as "not referenced by
+# dashboard.js or index.html (49 MB dead weight)". Both halves of that were
+# false, and the exclusion was breaking the live site:
+#   * docs/listings.json references `parcel_photos/...` 12,115 times, as RELATIVE
+#     urls, and the writers put them in the exact field the card photo reads.
+#     tests/test_assessor_photo.py:174 and tests/test_lrcpwa_photo.py:36 both
+#     assert `raw["zillow"]["photo"] == "parcel_photos/..."`, and
+#     dashboard.js:3121 renders raw.zillow.photo straight into the card image.
+#   * Measured over a 4,000-record sample: 101 of 4,000 (2.5%) zillow.photo
+#     values are parcel_photos paths — roughly 970 of 38,500 leads board-wide.
+#   * Verified against the deployed site on 2026-08-11:
+#       GET /foreclosure-scraper/parcel_photos/streetview/
+#           sc_spartanburg_7_16_11_086_00.jpg   -> 404
+#     while listings.json.gz, listings_slim.json.gz and detail_shards/00000
+#     all returned 200. So ~970 cards have been rendering an empty photo box
+#     over a real, committed assessor photograph.
+# The photos are also 326.6 MB of this repo's ~888 MB on GitHub — 34%, and the
+# second-largest incompressible thing in it (JPEG does not delta-compress; tar
+# +gzip -1 over the directory shrinks it by 4%). Committing them and then
+# refusing to serve them was the worst of both: full storage cost, zero benefit.
+#
+# This also unblocks the real fix for the wrong-photo defect: the card currently
+# falls back to a zoom-19 World_Imagery satellite tile of a shared centroid, and
+# the honest replacement is the assessor photo that was already on disk and
+# already in git. That fix is in dashboard.js (not this file), but it would have
+# 404'd on every lead until this line moved.
+#
+# Removing an `exclude` entry can only ever publish MORE files, so it cannot
+# spring the prefix trap described below. Adding one can.
+#
+# IMPORTANT: Jekyll's `exclude` matches by prefix (entry.start_with?(pattern)), so
+# excluding `listings.json` ALSO drops `listings.json.gz` (the gz name starts with
+# the excluded string). That silently 404'd the dashboard's data on the live site.
+# `include` overrides `exclude` in Jekyll, so we re-include the .gz files the
+# dashboard actually fetches. Do NOT remove the include block.
+#
+# THE RULE, so this never fires a third time: every `- <name>.json` you add to
+# `exclude` MUST be accompanied, in the SAME edit, by `- <name>.json.gz` in
+# `include`. Never land one without the other. `listings_slim.json` is the
+# third instance of this pair. Verify with:
+#   python3 scripts/check_pages_publish.py
+# which reimplements Jekyll's start_with? over these two lists and every real
+# filename in docs/, and fails if any dashboard payload would be dropped.
+#
+# detail_shards/ — the per-lead mobile detail payload (docs/detail_shards/
+# NNNNN.json.gz, 39 files, ~28 MB) — is DELIBERATELY ABSENT FROM BOTH LISTS, and
+# that is the whole design. It ships gzipped only, with no uncompressed twin in
+# docs/, so there is nothing to exclude and therefore no prefix trap to spring.
+# No entry above prefix-matches "detail_shards/...", and the directory name has
+# no leading `_`, `.` or `#`, so it does not trip Jekyll's special-entry rule
+# either. DO NOT "tidy up" by adding `- detail_shards` to exclude: one
+# `include:` line would NOT bring it back the way the .gz twins above are
+# brought back, because there are 39 differently-named files and the phone would
+# 404 on whichever ones you forgot. If the shard payload ever grows an
+# uncompressed twin, gitignore it instead of excluding it here.
+# tests/test_detail_shards.py asserts this against check_pages_publish.py's own
+# model of the rule, so an exclude added here fails the suite rather than the site.
+exclude:
+  - listings.json
+  - listings_detail.json
+  - listings_slim.json
+  - path_to_100.md
+  - path_to_100_deepdive.md
+  - path_to_100_roadmap.md
+  - path_to_100_reconciled_2026-10-15.md
+  - goliath_teardown.md
+  - completeness_audit.md
+  - gap_ledger.md
+  - rei_operator_playbook.md
+  - hermes_blueprint.md
+  - social_research_addendum.md
+  - strategy_sources_buyers_playbook.md
+  # Operator runbook — how the unattended jobs work, where the logs are, how to
+  # tell publishing has stopped. Internal documentation, same class as the
+  # strategy docs above, so it is not part of the published site. Safe to add
+  # here with no `include` counterpart: the prefix-trap rule is about `.json`
+  # entries whose `.gz` twin the dashboard fetches, and nothing fetches this.
+  - OPERATIONS.md
+  # docs/handoff/ is the Mac <-> VM hand-off data (verification ledgers, stealth leads, SoS agent
+  # results). Only scripts and the VM read it; nothing on the dashboard fetches it. It grew to
+  # ~120 MB (stealth_leads.json 98 MB, tax_lien.json 13 MB) and pushed the deployed site over the
+  # 950 MB limit on 2026-10-08, which stopped every Pages deploy. The trailing slash keeps this a
+  # directory prefix: it does not match handoff_scorer_to_others_2026-09-21.md. No `include`
+  # counterpart is needed: nothing under handoff/ is a .json twin the dashboard fetches.
+  - handoff/
+include:
+  # The board is listings_part_NNN.json.gz (audit O1: the single listings.json.gz was days
+  # from GitHub's 100 MiB file limit). No `exclude` entry above is a prefix of `listings_part_`
+  # (`listings.json`, `listings_detail.json` and `listings_slim.json` all differ at the 9th
+  # character or earlier), so the parts publish without this line. It is here so that a future
+  # exclude like `listings_p` or `listings_` cannot 404 the board silently: `include` overrides
+  # `exclude` in Jekyll. It is a PREFIX, on purpose, because the part count grows with the board.
+  - listings_part_
+  # Legacy single-file board. Kept until the dashboard's rollback path is retired (a rollback to
+  # the pre-split dashboard.js fetches it). Remove together with the file (git rm), see
+  # docs/payload_split_2026-09-21.md.
+  - listings.json.gz
+  - listings_detail.json.gz
+  - listings_slim.json.gz

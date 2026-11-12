@@ -1,0 +1,27 @@
+{
+ "run": "2026-08-06",
+ "results": {
+  "counties_sc.sc_flc": {
+   "bucket": "PIPELINE",
+   "detail": "2 rows, 2 IN FOOTPRINT but board has none",
+   "counties": {
+    "Anderson SC": 2
+   },
+   "secs": 45.3
+  },
+  "counties_sc.oconee_tax_sale": {
+   "bucket": "EMPTY",
+   "detail": "fetched clean, upstream returned nothing",
+   "counties": {},
+   "secs": 1.4
+  },
+  "counties_sc.charleston_delinquent_tax": {
+   "bucket": "POLICY",
+   "detail": "1760 rows, 0 in footprint",
+   "counties": {
+    "Charleston SC": 1760
+   },
+   "secs": 11.9
+  }
+ }
+}

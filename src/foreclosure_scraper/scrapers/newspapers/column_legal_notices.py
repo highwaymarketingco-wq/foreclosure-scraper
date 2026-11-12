@@ -1,0 +1,1672 @@
+"""Column unified legal-notice API — NC foreclosure + NC/SC estate/probate.
+
+Column (column.us / enotice-production) runs the legal-notice publishing
+back-end for hundreds of newspapers, including the NC + SC papers of record
+across our footprint. It exposes a single public search endpoint that returns
+the FULL OCR'd notice body, county, state, notice type, paper name, and a
+direct PDF link — no auth, no key, no token (a bare JSON POST works).
+
+This is the highest-value single source we have: instead of crawling each
+paper's site individually, one endpoint covers every county. We pull three
+notice classes:
+
+  (1) NC "Foreclosure Sale" notices — the pre-auction power-of-sale signal.
+      The body is label-structured ("Date of Sale", "Record Owners",
+      "Address of Property", "Special Proceedings No.", "Substitute Trustee",
+      "Deed of Trust Book/Page", "PIN"), so we parse a real Listing with
+      address + owner + sale_date + trustee + case_number + parcel.
+
+  (2) NC estate/decedent notices — the NC mortality lane. Column files NC
+      estate notices under TWO noticetype strings (verified live 2026-06-26
+      across the NC footprint, free/no-auth): "Estate (Probate) Filings" AND
+      "Notice to Creditors" (~280 rows in the last 120 days; McDowell, Burke,
+      Gaston, Buncombe, Onslow lead). Both bodies are the same NC-statutory
+      creditor notice ("Having qualified as Executor/Administrator of the
+      Estate of <decedent>, deceased ... File No: <NC estate file#> ... <PR>,
+      Executor"), so one parser handles both. Emitted as PROBATE_NOTICE leads:
+      owner_name = decedent, executor/PR + NC estate file# in raw["probate"],
+      address-less OK (the owner-to-GIS enricher backfills the property address
+      downstream from the decedent name).
+
+  (3) SC "Estate (Probate) Filings" notices: Probate "Notice to
+      Creditors" filings are emitted as PROBATE_NOTICE leads: owner_name =
+      decedent (from "Estate:"), address-less is OK (the owner-to-GIS enricher
+      backfills the property address downstream from the decedent name).
+      (The 2026-06-26 note that SC has no foreclosure notice type was wrong: SC
+      carries "Foreclosure Sale" too, ~98 notices in 120 days, read by the
+      statewide lane in fetch() step 4.)
+
+  (4) NC TAX foreclosure sales in counties OUTSIDE the 18-county flip footprint
+      (added 2026-09-21: Washington, Hertford, Bertie, Gates, Martin). The owner rule is
+      "flips only in the 18 counties, distressed anywhere in NC and SC", and a
+      mortgage foreclosure sale is a flip while a county TAX foreclosure is not. So for
+      these counties a "Foreclosure Sale" notice is kept ONLY when it is a tax
+      foreclosure ("NOTICE OF TAX FORECLOSURE SALE ... COUNTY OF X vs. <owner>"), and is
+      emitted as TAX_SALE (a real sale date) with the case number, parcel id and
+      plaintiff. Mortgage foreclosures there are counted and dropped, never emitted as
+      FORECLOSURE_SALE. Column tags a notice by newspaper coverage, not property county
+      (the "Hertford" tag carries most Northampton notices), so the county is read from
+      "District Court of X County" in the body. Their estate notices ride the existing
+      NC estate lane, and the SC Pee Dee counties (Florence, Marion, Marlboro) ride the
+      SC probate lane.
+
+  (5) PROBATE-LANE BREADTH EXTENSION (added 2026-10-02): 55 more NC counties
+      (NC_ESTATE_EXTRA_COUNTIES) and 3 more SC counties (SC_PROBATE_EXTRA_COUNTIES),
+      probed live and confirmed to carry real estate/probate notices, were added to
+      the estate/probate queries in steps (2)/(3) ONLY -- the foreclosure lanes
+      (steps 1/4) are untouched. See the constants' own comments for the probe
+      methodology and the full zero-hit list.
+
+Endpoint behavior (verified live 2026-06-26):
+  - POST https://us-central1-enotice-production.cloudfunctions.net/api/search/public-notices
+  - body keys: search (""), allFilters (array of single-key objects:
+    {state}, {county}, {noticetype}, {publishedtimestamp:{from,to}} in ms),
+    noneFilters ([]), sort ([{publishedtimestamp:"desc"}]), pageSize, isDemo.
+  - response: {results: [...], page, success}. Each item:
+    text, county, state, noticetype, newspapername, publishedtimestamp (ms),
+    pdfurl, filer, id, highlighted_text.
+  - the server `page` param is unreliable (duplicate rows). We use ONE large
+    pageSize per (county, type) over a ~120-day window and DEDUP on `id`.
+
+Free + compliant: public endpoint, no login/CAPTCHA/token defeat. We read the
+notice body the publisher posts publicly. Politeness is enforced by the shared
+http_client per-host throttle.
+"""
+from __future__ import annotations
+
+import re
+import time
+from datetime import datetime
+from typing import Iterable
+
+import httpx
+import structlog
+from dateutil import parser as dateparser
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
+
+from ...base_scraper import BaseScraper
+from ...http_client import client
+from ...models import Listing, ListingType, PropertyKind
+
+log = structlog.get_logger()
+
+API_URL = (
+    "https://us-central1-enotice-production.cloudfunctions.net"
+    "/api/search/public-notices"
+)
+
+# Full state names — Column filters on the spelled-out state.
+_NC = "North Carolina"
+_SC = "South Carolina"
+
+# NC footprint (mountains/foothills + coastal). Column wants exact-cased
+# county names (no "County" suffix).
+NC_FOOTPRINT = (
+    "Buncombe", "Burke", "Cleveland", "Gaston", "Henderson", "Lincoln",
+    "McDowell", "Mitchell", "Polk", "Rutherford", "Transylvania",
+    # coastal
+    "Brunswick", "New Hanover", "Onslow", "Carteret", "Pender", "Dare",
+)
+
+# SC footprint (upstate + coastal).
+SC_FOOTPRINT = (
+    "Anderson", "Cherokee", "Laurens", "Oconee", "Pickens", "Spartanburg",
+    "Union",
+    # coastal
+    "Charleston", "Horry", "Beaufort", "Georgetown", "Colleton",
+)
+
+#: Counties OUTSIDE the 18-county flip footprint whose Column notices are worth reading for
+#: DISTRESSED leads only (verified live 2026-09-21: Washington 16 foreclosure notices in a
+#: year, Hertford 14, Martin 16, Gates 8, Bertie 4). Foreclosure lane: tax foreclosures only.
+#: Estate lane: all estates. See _is_tax_foreclosure and the module docstring, item (4).
+NC_DISTRESSED_ONLY = ("Washington", "Hertford", "Bertie", "Gates", "Martin")
+
+#: SC Pee Dee counties, probate lane only (Florence 31 estate notices in 120 days, Marion 94,
+#: Marlboro 111, verified live 2026-09-21). SC's foreclosure lane is statewide (step 4 of
+#: fetch()) and its mortgage foreclosures in non-footprint counties are flips, dropped by
+#: the scope gate; SC tax sales are not court foreclosures and do not appear there.
+SC_DISTRESSED_ONLY = ("Florence", "Marion", "Marlboro")
+
+#: PROBATE-LANE-ONLY breadth extension (2026-10-02). Column's estate/creditor-notice
+#: mechanism is the SAME one already built for NC_FOOTPRINT/SC_FOOTPRINT -- it is a single
+#: stateless endpoint where "which county" is just a query parameter, so the only reason
+#: these counties weren't read before is that nobody had asked. Found while closing the
+#: project-wide probate/heir-estate breadth gap (28/148 counties had any probate signal):
+#: every NC county NOT already in NC_FOOTPRINT/NC_DISTRESSED_ONLY, and every SC county NOT
+#: already in SC_FOOTPRINT/SC_DISTRESSED_ONLY, was probed LIVE 2026-10-02 against
+#: NC_ESTATE_TYPES / SC_PROBATE_TYPE over a 365-day window. These are the ones that came
+#: back with real notices (23 NC counties returned zero and are NOT listed: Alleghany, Ashe,
+#: Camden, Cherokee, Currituck, Edgecombe, Graham, Greene, Harnett, Hoke, Hyde, Jackson,
+#: Jones, Macon, Northampton, Orange, Pamlico, Perquimans, Person, Surry, Swain, Tyrrell,
+#: Yancey; 28 SC counties returned zero and are likewise not listed). Several NC counties hit
+#: the 500-row page cap in the probe (Wake, Guilford, Forsyth, Mecklenburg, Cabarrus,
+#: Johnston, Robeson, Rockingham, Sampson, Richmond, Granville) -- their real volume is
+#: undercounted, not overcounted. These are PROBATE_NOTICE leads (never a flip), so every one
+#: of them is admissible under config.in_scope_distressed regardless of the 18-county flip
+#: footprint or SCOPE_DENY_COUNTIES (which only binds flip-type listings -- see main.py
+#: _county_in_scope). Read ONLY by the estate/probate lane in fetch() (steps 2 and 3); the
+#: NC foreclosure lane (step 1) and the SC statewide foreclosure lane (step 4) are untouched,
+#: so this cannot turn a mortgage foreclosure in e.g. Wake or Mecklenburg into a flip lead.
+NC_ESTATE_EXTRA_COUNTIES = (
+    "Cabarrus", "Forsyth", "Granville", "Guilford", "Johnston", "Richmond", "Robeson",
+    "Rockingham", "Sampson", "Wake", "Wilson", "Columbus", "Iredell", "Bladen", "Catawba",
+    "Scotland", "Haywood", "Anson", "Mecklenburg", "Durham", "Chatham", "Nash", "Cumberland",
+    "Craven", "Alamance", "Randolph", "Davidson", "Franklin", "Union", "Lee", "Lenoir",
+    "Wayne", "Duplin", "Pitt", "Halifax", "Moore", "Rowan", "Caswell", "Stanly", "Watauga",
+    "Caldwell", "Davie", "Montgomery", "Vance", "Wilkes", "Stokes", "Alexander", "Beaufort",
+    "Chowan", "Clay", "Madison", "Pasquotank", "Yadkin", "Avery", "Warren",
+)
+#: Same probe, SC side (Darlington 75 probate notices/year, Greenville 17, Chesterfield 3).
+#: Greenville is SCOPE_DENY'd for FLIP leads only; a probate notice here is a distressed lead
+#: and is unaffected by that deny entry (see main._in_scope / _is_flip).
+#: RE-PROBED 2026-10-23 (the "stale scope, needs periodic recheck" lane -- see
+#: gap_matrix.SC_QUIET_TITLE_WALL's own comment): re-ran the identical 2026-10-02 probe
+#: against all 28 then-empty SC counties. 27 are still genuinely empty (that finding holds);
+#: Aiken now returns a real notice -- Presstar 2023 LLC v. The Estate of James Simmons,
+#: case 2026-CP-02-02482, a quiet-title/lis-pendens action naming heirs by publication,
+#: real parcel (TMS 104-15-07-023) and address (707 Washington Circle). Added here.
+SC_PROBATE_EXTRA_COUNTIES = ("Darlington", "Greenville", "Chesterfield", "Aiken")
+
+NC_FORECLOSURE_TYPE = "Foreclosure Sale"
+
+#: Column stores the FULL state name. Every query filters by state, so a two-letter code
+#: here silently zeroes the entire source -- see the comment in _query().
+_STATE_NAME = {"NC": "North Carolina", "SC": "South Carolina"}
+# SC has no foreclosure type; probate is the actionable lead class. Verified
+# live as the exact string Column uses.
+SC_PROBATE_TYPE = "Estate (Probate) Filings"
+
+# NC mortality lane — decedent/estate notices. Column files NC estate notices
+# under TWO distinct noticetype strings (verified live 2026-06-26 across the NC
+# footprint, free/no-auth): "Estate (Probate) Filings" AND "Notice to
+# Creditors". Both bodies are the same NC-statutory creditor notice ("Having
+# qualified as Executor/Administrator of the Estate of <decedent>, deceased ...
+# File No: <NC estate file#> ... <PR name>, Executor"), so one parser handles
+# both. ~280 rows in the last 120 days across the footprint (McDowell, Burke,
+# Gaston, Buncombe, Onslow lead). Emitted as PROBATE_NOTICE leads:
+# owner_name = decedent, address-less OK (owner-to-GIS enricher backfills the
+# property from the decedent name downstream).
+NC_ESTATE_TYPES = ("Estate (Probate) Filings", "Notice to Creditors")
+
+# Recent window — about the last 120 days.
+WINDOW_DAYS = 120
+# One large page beats the unreliable `page` param (dup rows). 250 comfortably
+# covers any single county's foreclosure/probate volume over 120 days (the
+# busiest in-footprint county, Burke, returned ~26).
+PAGE_SIZE = 250
+
+
+# --------------------------------------------------------------------------- #
+# NC foreclosure-notice text parsing
+# --------------------------------------------------------------------------- #
+# The body is OCR'd with hard line breaks; labels sit on their own fragments.
+# We normalize whitespace first, then pull labelled values with anchored
+# patterns. Two common templates exist:
+#   A) SECU / Nodell-Glass: "Date of Sale: ...  Special Proceedings No. <case>
+#      ...  Substitute Trustee: <name> ...  Record Owners: <name> ...
+#      Address of Property: <addr> ...  Property Address: <addr>  PIN: <pin>"
+#   B) Hutchens style ("Under and by virtue ..."): case in the header
+#      ("26SP000132-110"), "RECORD OWNER(S): <name>", "ADDRESS/LOCATION: <addr>".
+
+_WS = re.compile(r"\s+")
+
+# Case / Special Proceedings number: "25SP001499-640", "26 SP 000132-110".
+# Accept it (a) after the "Special Proceedings No." label, or (b) standing
+# alone anywhere in the header.
+_CASE_TOKEN = re.compile(r"\b(\d{2}\s?SP\s?\d{4,6}-?\d{0,3})\b", re.I)
+_CASE_AFTER_LABEL = re.compile(
+    r"Special Proceedings(?:\s+No\.?)?[:\s]*([0-9][0-9A-Za-z\- ]{4,20})", re.I
+)
+
+_DATE_OF_SALE = re.compile(
+    r"Date of Sale[:\s]*([A-Z][a-z]+\.?\s+\d{1,2},?\s+\d{4})", re.I
+)
+_TIME_OF_SALE = re.compile(
+    r"Time of Sale[:\s]*([\d: ]+[AaPp]\.?[Mm]\.?)", re.I
+)
+
+# Fallback sale-date pass — only used when the structured "Date of Sale:" label
+# is absent (Hutchens / Green-Law / "Under and by virtue ..." templates bury the
+# auction date in prose). Verified live 2026-06-27 across Burke/Gaston: the
+# misses always phrase the date next to a sale-context cue, e.g.
+#   "the sale will be held on June 23, 2026 at 2:00 p.m."
+#   "...designated for foreclosure sales, at 2:30 PM on June 17, 2026 and will sell"
+#   "...designated for foreclosure sales, on June 3, 2026 at 3:00 PM..."
+#   "...courthouse for conducting the sale on March 11, 2026 at 1:00 PM..."
+#   "...courthouse for conducting the sale, April 28, 2026 at 11:00 AM..."
+# We REQUIRE the cue (and a short same-sentence window via [^.]{0,80}) so we never
+# pick up the Deed-of-Trust "recorded on <date>", a signature "This the <date>",
+# or a summons "no later than <date>" that also live in the body. Both a long
+# "Month D, YYYY" and a numeric "m/d/yyyy" date are accepted.
+_SALE_MONTH = (
+    r"(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|"
+    r"Jul(?:y)?|Aug(?:ust)?|Sep(?:t)?(?:ember)?|Oct(?:ober)?|Nov(?:ember)?|"
+    r"Dec(?:ember)?)"
+)
+_SALE_DATE_LONG = rf"{_SALE_MONTH}\.?\s+\d{{1,2}},?\s+\d{{4}}"
+_SALE_DATE_NUM = r"\d{1,2}/\d{1,2}/\d{2,4}"
+_SALE_DATE_ANY = rf"(?:{_SALE_DATE_LONG}|{_SALE_DATE_NUM})"
+_SALE_DATE_FALLBACK = re.compile(
+    r"(?:will be (?:offered for sale|sold|held|exposed)|sale will be held|"
+    r"conducting the sale|designated for foreclosure sales?|"
+    r"will sell(?: to the highest bidder)?|offer (?:the property )?for sale|"
+    r"sell the (?:above|property))"
+    rf"[^.]{{0,80}}?(?:\bon\b|\bat\b|,)?\s*({_SALE_DATE_ANY})",
+    re.I,
+)
+
+# Record owner(s) — stop at the next label or a comma-clause boundary. Also
+# stop at a closing paren: a common live template reads "...Deed of Trust
+# made by Robert R. Taylor (Deceased) (PRESENT RECORD OWNER(S): Robert R.
+# Taylor) to Jennifer Grant, Trustee(s)..." -- found live 2026-10-01 on Burke
+# County notices (a large share of that county's 41 live foreclosure
+# notices use this exact parenthetical form). Before adding `\)` as a stop
+# token, the capture had no label/EOL boundary to latch onto before hitting
+# the disallowed ")" character, so the WHOLE match failed and owner_name was
+# silently None even though the name is right there, explicitly re-labelled.
+_RECORD_OWNERS = re.compile(
+    r"Record Owner(?:\(s\)|s)?[:\s]*"
+    r"([A-Z][A-Za-z.,'&/\- ]+?)"
+    r"(?=\)|\s+(?:Address of Property|Property Address|ADDRESS|Deed of Trust|"
+    r"CONDITIONS|Place of Sale|Description of Property)\b|,?\s*$)",
+    re.I,
+)
+# Fallback for notices with NO "Record Owner(s)" label at all -- the owner is
+# named only as the grantor of the foreclosed Deed of Trust ("...executed and
+# delivered by Kenneth Sprouse and Adele Sprouse dated..."). Found live
+# 2026-10-01: a real, non-trivial share of Burke County's "SUBSTITUTE
+# TRUSTEE'S ... NOTICE OF SALE" bodies use only this prose form. Same proven
+# pattern already used in _townnews.py / coastland_times.py for the identical
+# NC Deed-of-Trust grantor clause.
+_GRANTOR_RE = re.compile(
+    r"(?:executed(?:\s+and\s+delivered)?|made)\s+by\s+"
+    r"([A-Z][A-Za-z0-9.'\- ]{2,70}?)"
+    r"(?:\s*\(|,|;|\s+(?:dated|to\s+[A-Z]|and\s+recorded|in\s+favor|"
+    r"as\s+grantor|Trustee)|$)",
+    re.I,
+)
+
+# Substitute Trustee NAME only — anchored to "Substitute Trustee:" with a name
+# that follows. The bare phrase "Substitute Trustee will offer ..." is
+# boilerplate, so we require a colon AND a CASE-SENSITIVE proper-name capture
+# (Title-cased tokens) — this is what rejects "...substitute trustee agrees
+# otherwise" / "or substitute trustee" boilerplate that a case-insensitive
+# [A-Z] would otherwise swallow. The label itself stays case-insensitive; only
+# the captured name is forced to look like a name.
+# A proper name token: a leading capital, then only lowercase / apostrophe /
+# hyphen (or an all-caps short token like a "P.A." / initials). The trailing
+# `(?![a-z])` after the capital block stops an OCR run-on like "GlassNOTICE"
+# from being swallowed as one token — a second capital after lowercase ends it.
+_NAME_TOK = r"[A-Z][a-z'\-]+\.?|[A-Z]\.?"
+# Only the LABELLED colon form is trusted ("Trustee: <Name>" / "Substitute
+# Trustee: <Name>"). Hutchens-style notices that bury the trustee in prose are
+# left with trustee=None rather than risk a boilerplate false-positive.
+_TRUSTEE_GENERIC = re.compile(
+    r"(?i:(?<![A-Za-z])Trustee:\s*)"
+    rf"((?:{_NAME_TOK})(?:\s+(?:{_NAME_TOK})){{1,3}})"
+)
+_SUB_TRUSTEE = re.compile(
+    r"(?i:Substitute Trustee:\s*)"
+    rf"((?:{_NAME_TOK})(?:\s+(?:{_NAME_TOK})){{1,3}})"
+)
+# Reject obvious non-name captures (firm boilerplate, address tokens, verbs /
+# legal-prose words that happen to be Title-cased mid-sentence).
+_TRUSTEE_REJECT = re.compile(
+    r"\b(Deed|Notice|Re-?notice|Will|Under|The|This|That|Said|Place|Date|Time|"
+    r"Book|Page|County|Property|Sale|Description|Conditions|Exhibit|Box|PO|P\.O|"
+    r"Attorney|Defendant|Defendants|Plaintiff|TO|Trustee|For)\b", re.I
+)
+
+# Address: prefer "Property Address" (usually the clean USPS form), fall back
+# to "Address of Property".
+_PROPERTY_ADDRESS = re.compile(
+    r"Property Address[:\s]*"
+    r"(\d+[A-Za-z0-9 .,'#\-]+?,\s*[A-Za-z .]+,\s*NC\s*\d{5})",
+    re.I,
+)
+# Also stop at a parenthetical aside ("149 Shenandoah Drive (PIN
+# 1630-21-5228)...") or a direct "PIN" label with no other boundary before
+# it. Found live 2026-10-01 on Rutherford County: the opening "(" isn't in
+# the capture's character class, and neither alternative stop word occurred
+# before it, so the whole match failed and street_address was silently None
+# even on a notice that states the address cleanly up front.
+_ADDRESS_OF_PROPERTY = re.compile(
+    r"Address of Property[:\s]*"
+    r"(\d+[A-Za-z0-9 .,'#\-]+?)"
+    r"(?=\s*\(|\s+(?:CONDITIONS|Deed of Trust|Description|Record Owner|PIN)\b|,?\s*$)",
+    re.I,
+)
+# Hutchens "ADDRESS/LOCATION: 1245 Harrison Loop, ..." form.
+_ADDRESS_LOCATION = re.compile(
+    r"ADDRESS\s*/?\s*LOCATION[:\s]*"
+    r"(\d+[A-Za-z0-9 .,'#\-]+?)(?=\s+(?:Present Record|Deed|Trustee|$))",
+    re.I,
+)
+# Prose fallback for notices with NO address label at all (none of the three
+# above): "...Together with improvements located thereon; said property
+# being located at 2101 Wildwood Drive, Hickory, North Carolina." Found live
+# 2026-10-01: 13 of 25 Burke County notices missing a street_address used
+# this exact Substitute Trustee Services / Hutchens-affiliate phrasing, with
+# the address sitting in plain prose near the end of the legal description.
+# Same proven pattern already used in _townnews.py / coastland_times.py.
+_LOCATED_AT = re.compile(
+    r"located\s+at\s+(\d{1,6}\s+[A-Za-z0-9][\w .'\-]*?),\s*"
+    r"([A-Za-z][A-Za-z .'\-]+?),\s*(?:North Carolina|NC)\b",
+    re.I,
+)
+
+# Parcel: "PIN: 9647795873C0208", "Tax Parcel I. D. No. 11-44-1-25",
+# "PIN NO. 1794384684".
+_PIN = re.compile(
+    r"(?:Tax Parcel(?:\s*I\.?\s*D\.?)?(?:\s*No\.?)?|PIN(?:\s*No\.?)?)"
+    r"[:\s]*([0-9][0-9A-Za-z.\-]{4,})",
+    re.I,
+)
+_DOT_BOOK_PAGE = re.compile(
+    r"Deed of Trust[:\s]*(?:Book|recorded[^0-9]*Book)?\s*([0-9A-Za-z ]{1,12}?)"
+    r"\s*Page[:\s]*([0-9]{1,8})",
+    re.I,
+)
+# EXTRACTION-COMPLETENESS AUDIT 2026-10-03: "Original Beneficiary: <Lender>" is
+# the lender/noteholder name -- the real party behind the sale, analogous to a
+# judicial-foreclosure plaintiff -- sitting labelled, clean, right in the body
+# on every Hutchens/Green-Law-style template (live-surveyed 30/44 recent NC
+# foreclosure notices across 7 footprint counties: Gaston, Buncombe, Burke,
+# Cleveland, Rutherford, Henderson, Brunswick). It was parsed nowhere. The
+# other 14/44 genuinely never name a beneficiary at all (anonymized
+# "the holder of the Note" / "the holder of the indebtedness" prose, confirmed
+# live on Buncombe's "NC R.E. Trustee" template and Burke's "Substitute
+# Trustee Services" template) -- a real template limitation, not a missed
+# regex; left as None there rather than guessed at.
+_BENEFICIARY_RE = re.compile(
+    r"Original\s+Beneficiary[:\s]*([A-Z][A-Za-z0-9 .,&'\-]{2,80}?)"
+    r"(?=\s+(?:This|The|Said|Subject|CONDITIONS|Grantors?|Dated|Description|"
+    r"Place of Sale|Date of Sale|Record Owner)\b|[.\n]|$)",
+    re.I,
+)
+
+# A residual zip we can salvage from any "..., NC 28409" tail in the body.
+_ZIP_IN_ADDR = re.compile(r"\b(\d{5})(?:-\d{4})?\b")
+
+
+# OCR hyphenates words across line wraps: "McDow- ell" (cap+lower) and the
+# Scottish-prefix case "Mc- Cracken" (cap+Cap). Join cap/lower fragment to a
+# following lowercase letter, OR a 2-3 char prefix (Mc/Mac/O') to a Cap.
+_OCR_HYPHEN = re.compile(r"([A-Za-z])-\s+([a-z])")
+_OCR_HYPHEN_MC = re.compile(r"\b(Ma?c|O')-\s+([A-Z])")
+
+
+#: Most characters of a notice's full text kept in raw['column']['text'].
+_TEXT_CAP = 8000
+
+
+def _norm(text: str) -> str:
+    t = (text or "").replace("\xa0", " ")
+    t = _WS.sub(" ", t).strip()
+    # Heal hyphenated line-wrap breaks (run twice for chained breaks).
+    t = _OCR_HYPHEN_MC.sub(r"\1\2", t)
+    t = _OCR_HYPHEN.sub(r"\1\2", t)
+    t = _OCR_HYPHEN.sub(r"\1\2", t)
+    return t
+
+
+def _clean_name(s: str | None) -> str | None:
+    if not s:
+        return None
+    s = s.strip().strip(",.;:").strip()
+    # OCR sometimes leaves a leading "s:" from "Owners:" splits — guard.
+    s = re.sub(r"^s[:\s]+", "", s, flags=re.I).strip()
+    return s or None
+
+
+def _parse_dt(s: str | None) -> datetime | None:
+    if not s:
+        return None
+    try:
+        return dateparser.parse(s, fuzzy=True)
+    except Exception:
+        return None
+
+
+def _split_addr(full: str | None) -> tuple[str | None, str | None, str | None]:
+    """Split '7120 Myrtle Grove Rd., Wilmington, NC 28409' →
+    (street, city, zip). Best-effort; street-only is fine."""
+    if not full:
+        return None, None, None
+    full = full.strip().strip(",")
+    zip_m = _ZIP_IN_ADDR.search(full)
+    zip_code = zip_m.group(1) if zip_m else None
+    parts = [p.strip() for p in full.split(",") if p.strip()]
+    street = parts[0] if parts else full
+    city = None
+    if len(parts) >= 2:
+        # city is the part before the "NC <zip>" tail
+        for p in parts[1:]:
+            if re.search(r"\bNC\b", p, re.I):
+                break
+            city = p
+    return (street or None), city, zip_code
+
+
+_EMAIL_RE = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
+_EMAIL_JUNK = re.compile(r"noreply|no-reply|column\.us|enotice|example\.|wordpress|sentry|\.(png|jpg|gif)", re.I)
+_FIRM_RE = re.compile(
+    r"([A-Z][A-Za-z&,.'\- ]{4,55}(?:PLLC|LLP|LLC|P\.?A\.?|P\.?C\.?|"
+    r"Law(?: Firm| Offices?| Group)?|Attorney|Substitute Trustee|Trustee|& Ingle))")
+# The bare "Trustee"/"Attorney" suffixes on _FIRM_RE exist to catch a real name used in
+# apposition ("John Q. Smith, Substitute Trustee"), but every NC power-of-sale notice also
+# carries a LIABILITY-DISCLAIMER clause built from the same words with no name attached
+# ("Neither the Trustee, the Substitute Trustee, nor the Attorney ... will be liable for
+# any lost profits ..."). Verified live 2026-09 against the board (docs/listings.json):
+# two distinct notices produced raw.notice_contact.name == "Neither the Trustee" / "Neither
+# the Trustee, Substitute Trustee, Attorney" -- the disclaimer sentence, not a firm. Reject
+# a candidate that OPENS on one of the generic referring words the disclaimer always starts
+# with; a real firm/attorney name never begins "Neither"/"Nor"/"The Trustee"/"Said Trustee".
+_FIRM_BOILERPLATE_RE = re.compile(
+    r"^(?:neither\b|nor\b|any\s+of\b|said\b|such\b|either\b|"
+    r"the\s+(?:trustee|substitute\s+trustee|attorney)\b)", re.I)
+
+
+def _firm_candidates(matches: list[str]) -> list[str]:
+    """_FIRM_RE hits with the liability-disclaimer boilerplate filtered out."""
+    return [m for m in matches if not _FIRM_BOILERPLATE_RE.match(m.strip())]
+
+# A REAL phone needs a separator or parens — a bare 10-digit string is almost always a
+# parcel PIN / case number in these bodies, never a phone (verified 2026-08-14: the naive
+# \d{10} pattern false-matched PINs like 1566620782). The context form pulls the number
+# that follows a "Phone:"/"Tel:"/"Call" label first.
+_PHONE_RE = re.compile(r"(?:\(\d{3}\)\s?|\b\d{3}[.\-\s])\d{3}[.\-\s]\d{4}\b")
+_PHONE_CTX_RE = re.compile(
+    r"(?:phone|telephone|tel|call|contact)\b[^\d]{0,20}(\(?\d{3}\)?[.\-\s]?\d{3}[.\-\s]?\d{4})", re.I)
+
+
+def _norm_phone(s: str) -> str | None:
+    """Normalize to '(AAA) PPP-NNNN'; reject non-phones (bad area/exchange = a PIN/id)."""
+    digs = re.sub(r"\D", "", s or "")
+    if len(digs) == 11 and digs[0] == "1":
+        digs = digs[1:]
+    if len(digs) != 10:
+        return None
+    if digs[0] in "01" or digs[3] in "01":   # NANP: area/exchange can't start 0 or 1
+        return None
+    return f"({digs[0:3]}) {digs[3:6]}-{digs[6:]}"
+
+
+def _notice_email(text: str) -> dict:
+    """Attributable case contact from the legal-notice body — the attorney/trustee/firm
+    EMAIL and/or PHONE published in the notice. It's the filer/trustee, not the owner, but a
+    real reachable case contact (call the trustee to work the sale). ~5% carry an email; the
+    published phone is more common (the trustee/attorney block at the notice foot)."""
+    if not text:
+        return {}
+    out: dict = {}
+    for m in _EMAIL_RE.finditer(text):
+        e = m.group(0).rstrip(".").lower()
+        if _EMAIL_JUNK.search(e) or len(e) > 60:
+            continue
+        out = {"email": e, "source": "column_notice_body"}
+        fm = _firm_candidates(_FIRM_RE.findall(text[max(0, m.start() - 180): m.start()]))
+        if fm:
+            out["name"] = re.sub(r"\s+", " ", fm[-1]).strip()
+        break
+    # Phone: prefer a labelled number; else the LAST formatted phone (the closing
+    # trustee/attorney contact block). Validated so parcel PINs can't leak in.
+    ph = None
+    cm = _PHONE_CTX_RE.search(text)
+    if cm:
+        ph = _norm_phone(cm.group(1))
+    if not ph:
+        cands = [p for p in (_norm_phone(x) for x in _PHONE_RE.findall(text)) if p]
+        if cands:
+            ph = cands[-1]
+    if ph:
+        out = out or {"source": "column_notice_body"}
+        out["phone"] = ph
+        out.setdefault("contact_role", "trustee/attorney")  # NOT the owner — a case contact
+        if "name" not in out:
+            fm = _firm_candidates(_FIRM_RE.findall(text))
+            if fm:
+                out["name"] = re.sub(r"\s+", " ", fm[-1]).strip()
+    return out
+
+
+def _parse_nc_foreclosure(text: str) -> dict:
+    """Extract structured fields from an NC foreclosure-sale notice body."""
+    t = _norm(text)
+    out: dict = {}
+
+    # Case number — label form first, then a bare token.
+    case = None
+    m = _CASE_AFTER_LABEL.search(t)
+    if m:
+        cand = m.group(1).strip()
+        if _CASE_TOKEN.search(cand):
+            case = _CASE_TOKEN.search(cand).group(1)
+    if not case:
+        m = _CASE_TOKEN.search(t)
+        if m:
+            case = m.group(1)
+    if case:
+        out["case_number"] = re.sub(r"\s+", "", case).upper()
+
+    m = _DATE_OF_SALE.search(t)
+    if m:
+        out["sale_date_raw"] = m.group(1).strip()
+        out["sale_date"] = _parse_dt(m.group(1))
+    else:
+        # No structured "Date of Sale:" label — scan the prose for a sale-context
+        # cue followed by a date (Hutchens / Green-Law / "Under and by virtue"
+        # templates). Cue-gated so a Deed-of-Trust recording date / signature
+        # date / summons deadline in the same body is never mistaken for it.
+        m = _SALE_DATE_FALLBACK.search(t)
+        if m:
+            raw_date = m.group(1).strip()
+            dt = _parse_dt(raw_date)
+            if dt is not None:
+                out["sale_date_raw"] = raw_date
+                out["sale_date"] = dt
+    m = _TIME_OF_SALE.search(t)
+    if m:
+        out["sale_time"] = _norm(m.group(1))
+
+    m = _RECORD_OWNERS.search(t)
+    if m:
+        out["owner_name"] = _clean_name(m.group(1))
+    if not out.get("owner_name"):
+        m = _GRANTOR_RE.search(t)
+        if m:
+            cand = _clean_name(m.group(1))
+            if cand:
+                out["owner_name"] = cand
+
+    # Trustee — the clean value is the header "Trustee: <Name>" form; the
+    # bottom-of-notice "..., Substitute Trustee <FirmName>" is the signature
+    # block (e.g. "Nodell, Glass & Haskell"), so try the named "Trustee:"
+    # form FIRST and fall back to "Substitute Trustee: <Name>".
+    for pat in (_TRUSTEE_GENERIC, _SUB_TRUSTEE):
+        for m in pat.finditer(t):
+            name = _clean_name(m.group(1))
+            if not name:
+                continue
+            # Drop a trailing bare single capital (OCR run-on: "Glass N" from
+            # "Glass NOTICE", "Glass R" from "Glass RE-NOTICE"). A real middle
+            # initial is dotted ("A.") and sits between two name words.
+            name = re.sub(r"\s+[A-Z]$", "", name).strip()
+            # require a real multi-token proper name; reject firm/boilerplate
+            # fragments and Title-cased non-name words.
+            if " " in name and not _TRUSTEE_REJECT.search(name):
+                out["trustee"] = name
+                break
+        if out.get("trustee"):
+            break
+
+    # Address — Property Address (clean) → Address of Property → ADDRESS/LOCATION
+    addr = None
+    m = _PROPERTY_ADDRESS.search(t)
+    if m:
+        addr = m.group(1)
+    if not addr:
+        m = _ADDRESS_OF_PROPERTY.search(t)
+        if m:
+            addr = m.group(1)
+    if not addr:
+        m = _ADDRESS_LOCATION.search(t)
+        if m:
+            addr = m.group(1)
+    if addr:
+        street, city, zip_code = _split_addr(addr)
+        out["street_address"] = street
+        out["city"] = city
+        out["zip_code"] = zip_code
+    else:
+        # No labelled address at all -- fall back to the "...said property
+        # being located at <street>, <city>, North Carolina" prose form.
+        m = _LOCATED_AT.search(t)
+        if m:
+            out["street_address"] = m.group(1).strip().rstrip(".,")
+            cand_city = m.group(2).strip().rstrip(".,")
+            if 2 <= len(cand_city) <= 40:
+                out["city"] = cand_city
+
+    m = _PIN.search(t)
+    if m:
+        out["parcel_id"] = m.group(1).strip().rstrip(".")
+
+    m = _DOT_BOOK_PAGE.search(t)
+    if m:
+        out["dot_book"] = m.group(1).strip()
+        out["dot_page"] = m.group(2).strip()
+
+    m = _BENEFICIARY_RE.search(t)
+    if m:
+        name = _clean_name(m.group(1))
+        if name:
+            out["plaintiff"] = name
+
+    return out
+
+
+# --------------------------------------------------------------------------- #
+# SC probate-notice text parsing
+# --------------------------------------------------------------------------- #
+# Decedent name from the two SC estate forms:
+#   (a) "Notice to Creditors": "Estate: John Q. Public" (clean label form)
+#   (b) quiet-title summons:   "the Estate of John Q. Public, Deceased, ..."
+# Stop the name at a comma / "Deceased" / "Heirs" / a following label so we
+# don't swallow the rest of the heir clause. Capture is forced case-sensitively
+# (proper-name tokens) so lowercase prose isn't grabbed.
+_DECEDENT_TOK = r"[A-Z][A-Za-z'\-]*\.?"
+_ESTATE = re.compile(
+    r"(?i:(?:the\s+)?Estate\s*(?:of|:)\s*)"
+    rf"((?:{_DECEDENT_TOK})(?:\s+(?:{_DECEDENT_TOK})){{0,4}})"
+    r"(?=\s*(?:,|;|\bDeceased\b|\bHeirs?\b|\bDate of Death\b|"
+    r"\bCase\b|\bPersonal\b|\bAddress\b|\bAttorney\b)|$)"
+)
+_DOD = re.compile(
+    r"Date of Death[:\s]*([A-Z]{3,9}\.?\s*\d{1,2}\s*,?\s*\d{4}"
+    r"|[A-Z][a-z]+\.?\s+\d{1,2},?\s+\d{4})",
+    re.I,
+)
+# SC probate case number, e.g. "2026-ES-26-00984" — OCR often inserts a space
+# after the year ("2026- ES-26-00984"), so tolerate whitespace around dashes.
+_SC_CASE = re.compile(
+    r"Case Number[:\s]*([0-9]{4}\s*-?\s*ES\s*-?\s*[0-9][0-9\s\-]*[0-9])", re.I
+)
+_PERSONAL_REP = re.compile(
+    r"Personal\s+Representative[:\s]*([A-Z][A-Za-z.,'\- ]{3,60}?)"
+    r"(?=\s+(?:Address|Attorney)\b|$)",
+    re.I,
+)
+
+
+def _parse_sc_probate(text: str) -> dict:
+    """Extract decedent + DOD + case + PR from an SC estate/probate notice."""
+    t = _norm(text)
+    out: dict = {}
+    m = _ESTATE.search(t)
+    if m:
+        out["owner_name"] = _clean_name(m.group(1))
+    m = _DOD.search(t)
+    if m:
+        raw = _norm(m.group(1))
+        out["date_of_death_raw"] = raw
+        out["date_of_death"] = _parse_dt(raw)
+    m = _SC_CASE.search(t)
+    if m:
+        out["case_number"] = re.sub(r"\s+", "", m.group(1)).upper()
+    m = _PERSONAL_REP.search(t)
+    if m:
+        out["personal_representative"] = _clean_name(m.group(1))
+    return out
+
+
+# --------------------------------------------------------------------------- #
+# SC quiet-title / constructive-service heir-naming publication
+# (Dirty Deeds Tier B #26, docs/dirty_deeds_synthesis_2026-09-10.md)
+# --------------------------------------------------------------------------- #
+# A rare but real sub-type of Column's SC "Estate (Probate) Filings" noticetype
+# (confirmed live 2026-09-29, 2 unique cases / ~400 notices across the 15-county
+# SC footprint over a 200-day window, each republished 3x): a tax-deed holder
+# (a buyer at a SC delinquent-tax sale) suing under S.C. Code Ann. SS 15-11-10
+# to -50 "to quiet tax title" against the deceased former owner's estate AND
+# heirs. Because the plaintiff could not locate every heir, SC lets it serve by
+# publication -- the caption names every heir it COULD identify individually,
+# then adds a catch-all "unknown Heirs-at-Law or Devisees ... John Doe and Mary
+# Roe" for anyone it could not. That individually-named list is exactly the
+# free, already-paid-for heir search described in the synthesis doc: the filer
+# paid a title company or law firm to run it, then had to publish it.
+#
+# This is NOT the tax-foreclosure-defendant publication service that
+# enrichment_notice_service_defect.py already claims (that is defective SERVICE
+# during the ORIGINAL tax-foreclosure suit against a live owner). This is
+# POST-sale: the tax deed has already been recorded to the plaintiff, and the
+# suit is to clear the chain against the prior owner's heirs. Different case
+# type, different plaintiff, different statute.
+#
+# The caption block repeats itself (case caption, then again in the Guardian ad
+# Litem / Order sections), always ending each decedent's boilerplate clause
+# with "...or by any such designation;" immediately before either the next
+# decedent's boilerplate OR the individually-named heirs. Scan every occurrence
+# (not just the first/last) and keep whatever semicolon-delimited segment looks
+# like a real 2-4 token person name and does NOT match an institutional/
+# boilerplate blocklist -- this is robust to however many decedents/repeats the
+# caption carries and never needs to guess which occurrence is "the" one.
+_QUIET_TITLE_RE = re.compile(r"to\s+quiet\s+(?:tax\s+)?title", re.I)
+_QT_PLAINTIFF_RE = re.compile(
+    r"\d{3,7}\s+([A-Z][A-Za-z0-9,.&'\- ]{2,60}?),\s*Plaintiffs?,?\s*v\.", re.I)
+_QT_PROPERTY_RE = re.compile(
+    r"real\s+property\s+known\s+as\s+([^,]+?),\s*([A-Za-z][A-Za-z ]+?)\s+"
+    r"County,\s*South\s*Caro[\-\s]*lina", re.I)
+_QT_PARCEL_RE = re.compile(r"(?:TMS\s*No\.?|PIN)[:\s]*([0-9][0-9A-Za-z.\-]{4,25})", re.I)
+_QT_HEIRS_OF_RE = re.compile(
+    r"Heirs-?\s*at-?\s*Law\s+of\s+([A-Z][A-Za-z.'\- ]{2,60}?)"
+    r"(?:,|;|\s+aka\b|\s+a/?k/?a\b|\s+Deceased)", re.I)
+_QT_DESIGNATION_RE = re.compile(r"or\s+by\s+any\s+such\s+designation[;,]\s*", re.I)
+_QT_DEFENDANTS_END_RE = re.compile(r"\bDefendants?\.")
+# Rejects institutional/government co-defendants and boilerplate role words that
+# would otherwise pass the bare "2-4 Title-Case tokens" shape test (a bank or
+# a law firm name looks exactly like a person name to a naive regex).
+_QT_NAME_BLOCKLIST = re.compile(
+    r"\b(Bank|Corp|Inc|LLC|LLP|N\.?A\.?|Trust|Association|Company|Co\.|"
+    r"Servicing|Mortgage|Hospital|Medical|Center|City|County|Department|"
+    r"United\s+States|Internal\s+Revenue|Doe|Roe|Estate|Heirs|Devisees|"
+    r"Deceased|Successors|Assigns|Administrator|Representative|Unknown|"
+    r"Court|Office|Revenue|Workforce|Employment|Acceptance|Savings|Loan|"
+    r"Federal|Merger|Guardian|Litem|Order|Notice|Plaintiff)\b", re.I)
+_QT_PERSON_NAME_RE = re.compile(
+    r"^[A-Z][a-zA-Z.'\-]+(?:\s+[A-Z][a-zA-Z.'\-]+){1,3}"
+    r"(?:,?\s*(?:Jr\.?|Sr\.?|III|II|IV))?$")
+
+
+def _extract_named_heirs(t: str) -> list[str]:
+    """The individually-named heirs/devisees from a quiet-title defendant
+    caption. Best-effort: returns [] rather than guessing when the shape
+    doesn't match (never emit a confidently wrong name)."""
+    heirs: list[str] = []
+    for m in _QT_DESIGNATION_RE.finditer(t):
+        start = m.end()
+        end_m = _QT_DEFENDANTS_END_RE.search(t, start, start + 900)
+        end = end_m.start() if end_m else start + 500
+        for seg in t[start:end].split(";"):
+            seg = re.sub(r"^(?:and\s+)", "", seg.strip(), flags=re.I).strip(" .")
+            if not seg or len(seg) > 40:
+                continue
+            if _QT_NAME_BLOCKLIST.search(seg):
+                continue
+            if _QT_PERSON_NAME_RE.match(seg):
+                heirs.append(seg)
+    seen: set[str] = set()
+    out: list[str] = []
+    for h in heirs:
+        k = h.lower()
+        if k not in seen:
+            seen.add(k)
+            out.append(h)
+    return out
+
+
+def _parse_sc_quiet_title(text: str) -> dict | None:
+    """SC quiet-tax-title action naming heirs by publication, or None if this
+    notice body isn't that sub-type (an ordinary Notice to Creditors is by far
+    the common case under the same Column noticetype)."""
+    t = _norm(text)
+    if not _QUIET_TITLE_RE.search(t):
+        return None
+    out: dict = {"is_quiet_title": True}
+    # SC Court of Common Pleas case number (2026-CP-39-00250), NOT the "ES"
+    # probate-court number _SC_CASE looks for -- this is a civil action, filed
+    # in a different court, over the SAME Column noticetype.
+    m = _SC_CASE_RE.search(t)
+    if m:
+        out["case_number"] = f"{m.group(1)}-CP-{m.group(2)}-{m.group(3)}"
+    m = _QT_PLAINTIFF_RE.search(t)
+    if m:
+        out["plaintiff"] = _clean_name(m.group(1))
+    m = _QT_PROPERTY_RE.search(t)
+    if m:
+        out["street_address"] = m.group(1).strip(" .,")
+        out["county"] = m.group(2).strip().title()
+    m = _QT_PARCEL_RE.search(t)
+    if m:
+        out["parcel_id"] = m.group(1).strip().rstrip(".")
+    decedents: list[str] = []
+    seen_dec: set[str] = set()
+    for dm in _QT_HEIRS_OF_RE.finditer(t):
+        name = _clean_name(dm.group(1))
+        if name and name.lower() not in seen_dec:
+            seen_dec.add(name.lower())
+            decedents.append(name)
+    if decedents:
+        out["decedents"] = decedents
+    heirs = _extract_named_heirs(t)
+    if heirs:
+        out["named_heirs"] = heirs
+    return out
+
+
+# --------------------------------------------------------------------------- #
+# NC estate / decedent-notice text parsing  (NC mortality lane)
+# --------------------------------------------------------------------------- #
+# The NC creditor notice is highly templated (verified live 2026-06-26):
+#   "[NOTICE TO CREDITORS] NORTH CAROLINA, <COUNTY> COUNTY  File No: <file#>
+#    Having qualified as Executor/Administrator/Executrix of the Estate of
+#    <DECEDENT>, deceased, this is to notify all persons ... This the <date>.
+#    <PR NAME>, Executor  <pr address>  Publication Dates: ..."
+# Two decedent phrasings appear: "Estate of <name>, deceased" and the Gaston
+# variant "estate of <name>, deceased, late of <County> County". The PR
+# (executor/administrator/executrix) shows up TWICE — a top header line
+# "<PR> - Executor" and a signature line "<PR>, Executor" — we read either.
+#
+# Decedent: case-SENSITIVE proper-name capture. The label ("Estate of" /
+# "estate of" / "ESTATE OF") is matched case-insensitively via an inline
+# (?i:...) group, but the captured name is NOT (no global re.I) — a global
+# re.I makes _DECEDENT_TOK's leading [A-Z] match lowercase, which over-captures
+# trailing prose like "PADGETT deceased" when no comma stops it. Two decedent
+# token shapes coexist in one body: Title-case ("Robert Ellis Harwood Sr") and
+# ALL-CAPS ("JANICE REBECCA PARKER PADGETT"). _DECEDENT_TOK already allows both
+# (a leading capital + any mix of letters), so a single case-sensitive pattern
+# covers them. Stop the name at a comma / ; / "deceased"|"DECEASED" / "A/K/A"
+# alias / "late of" clause so we don't swallow the rest of the sentence.
+_NC_ESTATE = re.compile(
+    r"(?i:Estate\s+of\s+)"
+    rf"((?:{_DECEDENT_TOK})(?:\s+(?:{_DECEDENT_TOK})){{0,5}}?)"
+    r"(?=\s*(?:,|;|[Dd]eceased\b|DECEASED\b|\bA\s*/\s*K\s*/\s*A\b|"
+    r"\bAKA\b|\blate of\b)|$)"
+)
+
+# NC estate file number. Forms seen live:
+#   labelled: "File No: 24E477", "File No: 26 E 210", "File No: 26E000231-580",
+#             "File No: 26E00349-110", "Case Number: 26E000307- 350".
+#   bare (Buncombe template): "NORTH CAROLINA BUNCOMBE COUNTY 25E001625-100".
+# OCR inserts spaces around the 'E' and the trailing dash, so tolerate them.
+# A bare file# must carry a dash-suffixed county code ("-100") so we don't grab
+# random "<2 digits>E<digits>" tokens out of body prose; the labelled form is
+# tried first and is the more permissive of the two.
+_NC_FILE_NO = re.compile(
+    r"(?:File\s*No\.?|Case\s*Number)[:\s]*"
+    r"(\d{2}\s*E\s*[0-9][0-9\s\-]*\d)",
+    re.I,
+)
+_NC_FILE_NO_BARE = re.compile(
+    r"\bCOUNTY\b[\s:]*?(\d{2}\s*E\s*\d{3,7}\s*-\s*\d{2,4})\b",
+    re.I,
+)
+
+# Personal representative + role. The role word (Executor/Executrix/
+# Administrator/Administratrix/Co-Executor/Collector) anchors a real name that
+# sits immediately before it on the header line ("Betina Renee Harwood -
+# Executor") or after the closing date on the signature line ("... 2026.
+# Carl Eric Resh, Executor"). We prefer the signature form (name then role).
+_PR_ROLE = r"(?:Co-?\s*)?(?:Executor|Executrix|Administrator|Administratrix|Administrator\s+CTA|Collector)"
+# Signature form: "<Name>, Executor" / "<Name> , Executrix"
+_NC_PR_SIG = re.compile(
+    rf"((?:{_DECEDENT_TOK})(?:\s+(?:{_DECEDENT_TOK})){{1,4}})\s*[,\-]\s*({_PR_ROLE})\b"
+)
+# Header form: "<Name> - Executor"
+_NC_PR_HDR = re.compile(
+    rf"((?:{_DECEDENT_TOK})(?:\s+(?:{_DECEDENT_TOK})){{1,4}})\s+[\-–]\s+({_PR_ROLE})\b"
+)
+# Reject captures that are really the boilerplate run-in ("Estate of X,
+# deceased ... Having qualified as Executor") rather than a person name.
+_PR_REJECT = re.compile(
+    r"\b(Estate|Notice|Creditors|County|Carolina|Qualified|Having|Deceased|"
+    r"Decedent|Said|This|Date|File|Court|Clerk|The|Of|As)\b", re.I
+)
+
+
+# --------------------------------------------------------------------------- #
+# Personal representative's mailing address (owner decision 2026-10-07: when the
+# public notice prints it, it may be captured and published, like an owner mailing).
+# --------------------------------------------------------------------------- #
+_US_STATE = (r"(?:NC|SC|GA|VA|TN|FL|N\.\s?C\.|S\.\s?C\.|North Carolina|South Carolina|"
+             r"[A-Z]{2})")
+#: "<number> <street>[, unit], <city>, <ST> <zip>" or "P.O. Box <n>, <city>, <ST> <zip>".
+_MAIL_ADDR = re.compile(
+    r"((?:P\.?\s?O\.?\s*Box\s*\d+|\d{1,6}\s+[A-Za-z0-9.#'\- ]{2,60}?)"
+    r"[,\s]+(?:(?:Apt|Suite|Ste|Unit|#)\.?\s*[\w-]+[,\s]+)?"
+    r"[A-Za-z][A-Za-z .'\-]{1,30}?,?\s+" + _US_STATE + r"\s*,?\s*\d{5}(?:-\d{4})?)\b"
+)
+#: Between the PR's name and the address: the address is the attorney's, not the PR's.
+_VIA_COUNSEL = re.compile(r"\b(?:c/o|care of|attorney|law|pllc|p\.\s?a\.|llp|esq)\b", re.I)
+_PR_LABEL = re.compile(r"Personal\s+Representative\b", re.I)
+
+
+def _pr_mailing(text: str, pr_name: str | None, role: str | None = None) -> dict:
+    """The personal representative's mailing address printed in the notice, if any.
+
+    Read from the PR's own name (or the 'Personal Representative' label, or the role
+    word) forward, at most 300 characters: the court's address and the decedent's own
+    'late of' address sit BEFORE it and are never taken. When an attorney/firm/'c/o'
+    sits between the name and the address, the address is counsel's: kept apart as
+    pr_mailing_care_of. Returns {} when no address follows."""
+    t = _norm(text)
+    start = -1
+    if pr_name:
+        start = t.lower().find(pr_name.lower())
+    if start < 0:
+        m = _PR_LABEL.search(t)
+        if m:
+            start = m.start()
+    if start < 0 and role:
+        start = t.find(role)
+    if start < 0:
+        return {}
+    win = t[start:start + 300]
+    m = _MAIL_ADDR.search(win, len(pr_name or ""))
+    if not m:
+        return {}
+    addr = re.sub(r"^(?:Address\s*:\s*)", "", m.group(1).strip(" ,:"), flags=re.I)
+    between = win[len(pr_name or ""):m.start()]
+    key = "pr_mailing_care_of" if _VIA_COUNSEL.search(between) else "pr_mailing"
+    return {key: addr}
+
+
+def _parse_nc_estate(text: str) -> dict:
+    """Extract decedent + NC file# + executor/PR from an NC creditor notice.
+
+    Address-less by design for the PROPERTY — owner_name = decedent drives the
+    owner-to-GIS backfill downstream. An address in the body is the PR's (or their
+    attorney's) mailing address, NOT the decedent's property, so it never becomes
+    street_address; since 2026-10-07 the PR's own printed address is kept as
+    raw['probate']['pr_mailing'] (see _pr_mailing; owner decision).
+    """
+    t = _norm(text)
+    out: dict = {}
+
+    m = _NC_ESTATE.search(t)
+    if m:
+        out["owner_name"] = _clean_name(m.group(1))
+
+    m = _NC_FILE_NO.search(t) or _NC_FILE_NO_BARE.search(t)
+    if m:
+        # Collapse OCR whitespace; keep the dash structure ("26E000231-580").
+        out["file_number"] = re.sub(r"\s+", "", m.group(1)).upper()
+
+    # PR — signature form first (name precedes role), then header form. Reject
+    # boilerplate fragments.
+    for pat in (_NC_PR_SIG, _NC_PR_HDR):
+        for m in pat.finditer(t):
+            name = _clean_name(m.group(1))
+            role = m.group(2).strip()
+            if not name or " " not in name:
+                continue
+            if _PR_REJECT.search(name):
+                continue
+            out["personal_representative"] = name
+            out["pr_role"] = role
+            break
+        if out.get("personal_representative"):
+            break
+
+    return out
+
+
+# --------------------------------------------------------------------------- #
+# NC TAX-foreclosure notice parsing  (counties outside the flip footprint)
+# --------------------------------------------------------------------------- #
+# A county or town tax foreclosure is a civil action (CV / CVD), not a special proceeding,
+# and its notice reads (verified live 2026-09-21, Washington / Gates / Martin / Northampton):
+#   "NOTICE OF TAX FORECLOSURE SALE Under and by virtue of an order of the District Court of
+#    Washington County, North Carolina, made and entered in the action entitled COUNTY OF
+#    WASHINGTON & TOWN OF PLYMOUTH vs. <OWNER> and <OWNER>'S SPOUSE, if any, and all possible
+#    heirs ... et al, 25CV000168-930, the undersigned Commissioner will on the 23rd day of
+#    July, 2026, offer for sale ... Parcel Identification Number: 6767.12-85-4828 ..."
+# OCR hyphenates across line wraps ("FORECLO- SURE", "enti- tled"), which _norm heals for
+# lower-case continuations only, so the classifier tolerates the upper-case break itself.
+_TAX_FC = re.compile(r"TAX\s+FORE-?\s*CLO-?\s*SURE", re.I)
+_TAX_PLAINTIFF = re.compile(
+    r"action\s+entitled\s+"
+    r"((?:COUNTY|TOWN|CITY|VILLAGE)\s+OF\s+[A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)?"
+    r"(?:\s*&\s*(?:COUNTY|TOWN|CITY|VILLAGE)\s+OF\s+[A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)?)?)"
+    r"\s+vs?\.?\s+",
+    re.I,
+)
+_TAX_CASE = re.compile(r"\b(\d{2}\s?CVD?\s?\d{3,6}\s?-\s?\d{2,3})\b", re.I)
+_TAX_SALE_DATE = re.compile(
+    r"on\s+the\s+(\d{1,2})(?:st|nd|rd|th)?\s+day\s+of\s+([A-Za-z]+),?\s+(\d{4})", re.I)
+_TAX_SALE_TIME = re.compile(r"at\s+(\d{1,2}(?::\d{2})?)\s*o.?clock,?\s*(noon|a\.?m\.?|p\.?m\.?)?", re.I)
+_TAX_PARCEL = re.compile(
+    r"Parcel\s+Identification\s+Number(?:s)?[:\s]*([0-9][0-9A-Za-z.\-]{3,})", re.I)
+_TAX_FC_PID = re.compile(r"FC\s*/\s*PID\s*[:\s]*([0-9][0-9A-Za-z.\-]{3,})", re.I)
+_TAX_COURT_COUNTY = re.compile(
+    r"District\s+Court\s+of\s+([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)?)\s+County", re.I)
+#: Where the first named defendant ends. Owners are followed by their spouse, "et al",
+#: heirs and assigns, or an "a/k/a".
+_DEF_CUT = re.compile(
+    r"\s+and\s+(?:[A-Z][A-Za-z.' \-]{0,40}?)?\s*spouse\b|,\s*and\s|\s+and\s+all\s+possible"
+    r"|,?\s+et\s+al\b|\s+a/k/a\b|,\s*if\s+any\b|,\s+or\s+any\b|,\s*the\s+undersigned",
+    re.I)
+_MONTHS_NUM = {m: i for i, m in enumerate(
+    ["january", "february", "march", "april", "may", "june", "july", "august",
+     "september", "october", "november", "december"], 1)}
+
+
+def is_tax_foreclosure(text: str) -> bool:
+    """True for a county / town TAX foreclosure sale notice, False for a mortgage
+    (deed-of-trust) foreclosure. The mortgage form never says "TAX FORECLOSURE"."""
+    return bool(_TAX_FC.search(text or ""))
+
+
+def _parse_nc_tax_foreclosure(text: str) -> dict:
+    """Fields from an NC tax foreclosure sale notice. Every field is optional."""
+    t = _norm(text)
+    out: dict = {}
+    m = _TAX_PLAINTIFF.search(t)
+    if m:
+        out["plaintiff"] = _clean_name(m.group(1))
+        rest = t[m.end():m.end() + 260]
+        cut = _DEF_CUT.search(rest)
+        owner = rest[:cut.start()] if cut else rest.split(",", 1)[0]
+        owner = _clean_name(owner)
+        if owner:
+            out["owner_name"] = owner[:120]
+    m = _TAX_CASE.search(t)
+    if m:
+        out["case_number"] = re.sub(r"\s+", "", m.group(1)).upper()
+    m = _TAX_SALE_DATE.search(t)
+    if m:
+        mon = _MONTHS_NUM.get(m.group(2).lower())
+        if mon:
+            try:
+                out["sale_date"] = datetime(int(m.group(3)), mon, int(m.group(1)))
+                out["sale_date_raw"] = m.group(0)
+            except ValueError:
+                pass
+    if "sale_date" not in out:
+        m = _SALE_DATE_FALLBACK.search(t)
+        if m:
+            dt = _parse_dt(m.group(1))
+            if dt is not None:
+                out["sale_date"], out["sale_date_raw"] = dt, m.group(1)
+    m = _TAX_SALE_TIME.search(t)
+    if m:
+        out["sale_time"] = (m.group(1) + (" " + m.group(2) if m.group(2) else "")).strip()
+    parcels = [x.rstrip(".") for x in _TAX_PARCEL.findall(t)]
+    if not parcels:
+        parcels = [x.rstrip(".") for x in _TAX_FC_PID.findall(t)]
+    if parcels:
+        out["parcel_id"] = parcels[0]
+        out["parcel_ids"] = list(dict.fromkeys(parcels))
+    m = _TAX_COURT_COUNTY.search(t)
+    if m:
+        out["county"] = m.group(1).title()
+    elif out.get("plaintiff"):
+        # The "Hertford" newspaper tag carries Northampton notices; when OCR loses the court
+        # line, the plaintiff still names the county ("COUNTY OF NORTHAMPTON vs.").
+        pm = re.match(r"COUNTY\s+OF\s+([A-Za-z]+(?:\s+[A-Za-z]+)?)", out["plaintiff"], re.I)
+        if pm:
+            out["county"] = pm.group(1).split(" & ")[0].title()
+    return out
+
+
+#: "NORTH CAROLINA, NORTHAMPTON COUNTY File No ..." -- the property county of an estate
+#: notice, which can differ from Column's newspaper tag (Hertford carries Northampton).
+_NC_ESTATE_COUNTY = re.compile(
+    r"NORTH\s+CAROLINA,?\s+([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)?)\s+COUNTY\b")
+
+
+def estate_county(text: str, tag_county: str) -> str:
+    """County for an NC estate notice: the body's own county when it names one, else the tag."""
+    m = _NC_ESTATE_COUNTY.search(_norm(text or ""))
+    return m.group(1).title() if m else tag_county
+
+
+# --------------------------------------------------------------------------- #
+# API call
+# --------------------------------------------------------------------------- #
+#: Smallest window _query will split a full page into (one day).
+_MIN_SPLIT_MS = 24 * 3600 * 1000
+#: Depth limit for the window split: 2**6 = 64 slices of the 120-day window at most.
+_MAX_SPLIT_DEPTH = 6
+
+
+async def _query(
+    c, state: str, county: str, noticetype: str, from_ms: int, to_ms: int,
+    _depth: int = 0,
+) -> list[dict]:
+    """All items of a (state, county, noticetype) window.
+
+    2026-10-08 (source-completeness audit): one POST returns at most PAGE_SIZE
+    (250) rows, newest first, and the response says how many there are
+    (`page.total_results`). When a window holds more, the older rows were cut
+    (the 2026-10-07 extraction audit found one county with 391). The window is
+    now halved until every slice fits, so a busy county costs a few more POSTs
+    instead of losing its oldest notices; a quiet one costs nothing extra."""
+    items, total, n_raw = await _query_once(c, state, county, noticetype, from_ms, to_ms)
+    if total is None or total <= n_raw or n_raw < PAGE_SIZE:
+        return items
+    if _depth >= _MAX_SPLIT_DEPTH or (to_ms - from_ms) <= _MIN_SPLIT_MS:
+        log.warning("column.window_still_capped", county=county, type=noticetype,
+                    total=total, kept=n_raw, window_days=round((to_ms - from_ms) / 86_400_000, 1))
+        return items
+    mid = from_ms + (to_ms - from_ms) // 2
+    log.info("column.window_split", county=county, type=noticetype, total=total,
+             page=n_raw, depth=_depth + 1)
+    newer = await _query(c, state, county, noticetype, mid + 1, to_ms, _depth + 1)
+    older = await _query(c, state, county, noticetype, from_ms, mid, _depth + 1)
+    return newer + older
+
+
+async def _query_once(
+    c, state: str, county: str, noticetype: str, from_ms: int, to_ms: int
+) -> tuple[list[dict], int | None, int]:
+    """One POST for a (state, county, noticetype) window.
+
+    Returns (items inside the window, the server's total_results or None, rows on the page)."""
+    body = {
+        "search": "",
+        "allFilters": [
+            # THE STATE FIELD HOLDS THE FULL NAME, NOT THE TWO-LETTER CODE.
+            #
+            # Measured against the live API 2026-09-13. A record's own `state` reads
+            # "New York", not "NY". Filtering on {"state": "NC"} therefore matched
+            # NOTHING -- and since every query this scraper makes filters by state, the
+            # whole source had been returning zero rows for every county, reporting
+            # success each time:
+            #     {"state": "NC"}              -> total_results 0
+            #     {"state": "North Carolina"}  -> total_results 10,000
+            #     NC + "Foreclosure Sale"      -> 7,827
+            #     SC + "Foreclosure Sale"      ->   737   (a lane we never had)
+            {"state": _STATE_NAME.get((state or "").upper(), state)},
+            {"noticetype": noticetype},
+            # The server-side date filter is RESTORED. The note that used to sit here said
+            # the nested {from,to} "silently matches 0 rows"; it does not. It returned 0
+            # because the state filter above was matching nothing, and the date filter got
+            # the blame. With the correct state name: no date filter 7,827, nested
+            # {from,to} over 120 days 805. Filtering server-side means correct paging
+            # instead of hoping the newest page covers the window.
+            {"publishedtimestamp": {"from": from_ms, "to": to_ms}},
+        ],
+        "noneFilters": [],
+        "sort": [{"publishedtimestamp": "desc"}],
+        "pageSize": PAGE_SIZE,
+        "isDemo": False,
+    }
+    # county is OPTIONAL: SC foreclosure notices are filed under newspaper coverage
+    # regions ('Orangeburg, Bamberg and Calhoun'), so that lane queries statewide.
+    if county:
+        body["allFilters"].insert(1, {"county": county})
+
+    # Retried up to 3 times (short exponential-jitter backoff) on a transport error or
+    # timeout -- 2026-10-16: http_client.client() sets the transport's own retries=0 BY
+    # DESIGN ("callers already wrap their own AsyncRetrying"; see its docstring), and this
+    # call never did, so a single short-lived blip during a busy run start silently zeroes
+    # the whole source for the run (found via the sibling nc_heir_notices.py hitting exactly
+    # that on its only run so far). A non-200 status still raises unretried below so safe_run
+    # can classify a real block/server-error.
+    try:
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                r = await c.post(
+                    API_URL,
+                    json=body,
+                    headers={"Content-Type": "application/json", "Accept": "application/json"},
+                )
+    except Exception as exc:  # noqa: BLE001
+        log.warning("column.post_fail", county=county, type=noticetype,
+                    error=f"{type(exc).__name__}: {str(exc)[:160]}")
+        return [], None, 0
+    if r.status_code != 200:
+        log.warning("column.bad_status", county=county, type=noticetype, code=r.status_code)
+        # raise so safe_run classifies block/server-error correctly
+        r.raise_for_status()
+        return [], None, 0
+    try:
+        data = r.json()
+    except Exception:
+        return [], None, 0
+    results = data.get("results") if isinstance(data, dict) else data
+    if not isinstance(results, list):
+        return [], None, 0
+    total = None
+    if isinstance(data, dict):
+        pg = data.get("page")
+        if isinstance(pg, dict) and isinstance(pg.get("total_results"), int):
+            total = pg["total_results"]
+    # Client-side window filter (replaces the dropped server-side range filter). Results arrive
+    # newest-first, so the page already favors recent notices; keep only those in [from_ms, to_ms].
+    return ([it for it in results
+             if isinstance(it.get("publishedtimestamp"), (int, float))
+             and from_ms <= it["publishedtimestamp"] <= to_ms],
+            total, len(results))
+
+
+#: SC Master-in-Equity case number: 2025-CP-38-01441, also written 2025CP3801109.
+_SC_CASE_RE = re.compile(r"\b(20\d\d)[- ]?CP[- ]?(\d{2})[- ]?(\d{3,6})\b", re.I)
+#: The REAL county, from the notice body. Column's SC `county` field is a newspaper
+#: coverage region ('Orangeburg, Bamberg and Calhoun'), which routes nothing.
+_SC_COUNTY_RE = re.compile(r"COUNTY OF ([A-Z][A-Za-z ]{3,20}?)\s*(?:\n|,|\.|IN THE)", re.I)
+_SC_ADDR_RE = re.compile(
+    r"(?:street address|property address|known as|located at)[:\s]*([^\n]{8,80})", re.I)
+
+
+def _sc_foreclosure_fields(text: str) -> dict:
+    """Case number, county and address pulled from an SC foreclosure notice body.
+
+    Column gives none of these usefully for SC: the case number is not a field at all,
+    and `county` is the newspaper's coverage area rather than the county the property is
+    in. All three are in the text, and all three are needed for the row to be routable.
+    """
+    out: dict = {}
+    m = _SC_CASE_RE.search(text or "")
+    if m:
+        out["case_number"] = f"{m.group(1)}-CP-{m.group(2)}-{m.group(3)}"
+    m = _SC_COUNTY_RE.search(text or "")
+    if m:
+        out["county"] = m.group(1).strip().title()
+    elif out.get("case_number"):
+        # The county CODE inside the case number is a better key than the prose: it is
+        # present whenever the case number is. Measured on this lane, 11 of 37 parsed
+        # rows carried no "COUNTY OF ..." line and every one of them had a case number.
+        from ...sc_case_county import county_from_sc_case
+        got = county_from_sc_case(out["case_number"])
+        if got:
+            out["county"] = got
+    m = _SC_ADDR_RE.search(text or "")
+    if m:
+        addr = " ".join(m.group(1).split()).strip(" .,")
+        # trim boilerplate that runs on after the address
+        addr = re.split(r"\s+(?:TERMS OF|SUBJECT TO|TMS|Tax Map)", addr, 1)[0].strip(" .,")
+        if len(addr) >= 8:
+            out["street_address"] = addr
+    return out
+
+
+class ColumnLegalNotices(BaseScraper):
+    slug = "counties.column_legal_notices"
+    name = "Column Unified Legal Notices (NC foreclosure + tax foreclosure, NC/SC probate)"
+    category = "newspaper_legal"
+    requires_apify = False
+    # Legal-notice volume swings week-to-week; some weeks a small county runs 0
+    # foreclosure notices. A true regression (endpoint down / shape change) is
+    # surfaced via the block-signal + outcome classifier, not this floor.
+    expected_min_count = 0
+    # Raised 240 -> 420 on 2026-10-02 when NC_ESTATE_EXTRA_COUNTIES (55 counties) and
+    # SC_PROBATE_EXTRA_COUNTIES (3) were added to the estate/probate lane: the shared
+    # http_client per-host throttle serializes every request to this one API host at
+    # ~0.8-1.5s/request regardless of concurrency (measured live: ~1.14s/query average),
+    # and this source makes one query per (county, noticetype) pair -- the 58 new
+    # counties add ~113 more sequential queries (55*2 NC + 3 SC), ~130s. Old baseline
+    # (~82 queries) ran in ~90-100s; new total is ~210-230s, too close to the old 240s
+    # ceiling to leave safety margin for network variance.
+    timeout_s = 420.0
+
+    #: True reads ONLY the counties added 2026-09-21 (NC_DISTRESSED_ONLY / SC_DISTRESSED_ONLY)
+    #: and skips the footprint lanes and the statewide SC foreclosure query. Used by
+    #: scripts/ingest_new_county_sources.py so a one-off landing of the new counties does not
+    #: re-read (and re-emit) every existing lane.
+    only_new_counties: bool = False
+
+    async def fetch(self) -> Iterable[Listing]:
+        now_ms = int(time.time() * 1000)
+        from_ms = now_ms - WINDOW_DAYS * 24 * 3600 * 1000
+        nc_fp = () if self.only_new_counties else NC_FOOTPRINT
+        sc_fp = () if self.only_new_counties else SC_FOOTPRINT
+
+        # Bank rows as they're fetched: `self.partial` is what base_scraper.safe_run
+        # ships if the soft timeout (`timeout_s` above) fires mid-run instead of
+        # discarding everything fetched so far. This source never banked incrementally
+        # before (`out` was a bare local list returned only at the end) -- harmless
+        # while the whole fetch comfortably beat the timeout, but the 2026-10-02
+        # breadth extension made a mid-run timeout realistic for the first time (see
+        # the timeout_s comment above), so a bare local list would now risk the exact
+        # "gather-then-extend defeats self.partial" loss class
+        # counties_sc.sc_probate_notices / counties_sc.qpaybill_delinquent_roll
+        # document fixing. `out` may carry pre-dedup duplicates if a timeout lands
+        # mid-county; the final `deduped` pass below still runs on whatever is in
+        # `out` on a normal (non-timeout) completion.
+        out = self.partial
+        seen_ids: set[str] = set()
+
+        async with client(timeout=60.0) as c:
+            # (1) NC foreclosure sales across the NC footprint.
+            for county in nc_fp:
+                items = await _query(
+                    c, _NC, county, NC_FORECLOSURE_TYPE, from_ms, now_ms
+                )
+                for it in items:
+                    li = self._nc_listing(it, county)
+                    if li is not None:
+                        out.append(li)
+                        # dedup tracked inside _nc_listing via seen_ids closure
+                # NOTE: dedup handled below in a single pass to keep id set unified
+            # (2) NC estate/decedent notices across the NC footprint — the NC
+            # mortality lane. Column files these under TWO noticetype strings
+            # ("Estate (Probate) Filings" + "Notice to Creditors"), so loop both
+            # per county. Emitted as PROBATE_NOTICE leads (decedent = owner_name,
+            # address-less OK). Base-id dedup below collapses any overlap between
+            # the two noticetypes / publication runs.
+            for county in nc_fp + NC_DISTRESSED_ONLY + NC_ESTATE_EXTRA_COUNTIES:
+                for ntype in NC_ESTATE_TYPES:
+                    items = await _query(c, _NC, county, ntype, from_ms, now_ms)
+                    for it in items:
+                        li = self._nc_estate_listing(it, county)
+                        if li is not None:
+                            if county in NC_DISTRESSED_ONLY:
+                                li.county = estate_county(it.get("text") or "", county)
+                            out.append(li)
+            # (1b) NC TAX foreclosures in counties outside the flip footprint. A mortgage
+            # foreclosure there is a flip and is dropped; a county tax foreclosure is a
+            # distressed lead and is kept (module docstring, item 4).
+            _tax_seen: set = set()
+            _tax_kept = _mortgage_dropped = 0
+            for county in NC_DISTRESSED_ONLY:
+                for it in await _query(c, _NC, county, NC_FORECLOSURE_TYPE, from_ms, now_ms):
+                    if not is_tax_foreclosure(it.get("text") or ""):
+                        _mortgage_dropped += 1
+                        continue
+                    li = self._nc_tax_listing(it, county)
+                    if li is None:
+                        continue
+                    k = (li.county, li.case_number, li.parcel_id or li.owner_name)
+                    if k in _tax_seen:
+                        continue
+                    _tax_seen.add(k)
+                    out.append(li)
+                    _tax_kept += 1
+            log.info("column.nc_tax_foreclosure", kept=_tax_kept,
+                     mortgage_foreclosures_dropped=_mortgage_dropped,
+                     counties=len(NC_DISTRESSED_ONLY))
+            # (3) SC estate/probate filings across the SC footprint.
+            for county in sc_fp + SC_DISTRESSED_ONLY + SC_PROBATE_EXTRA_COUNTIES:
+                items = await _query(
+                    c, _SC, county, SC_PROBATE_TYPE, from_ms, now_ms
+                )
+                for it in items:
+                    li = self._sc_probate_listing(it, county)
+                    if li is not None:
+                        out.append(li)
+
+            # (4) SC FORECLOSURE SALES — STATEWIDE, deliberately without a county filter.
+            #
+            # Column's SC `county` values are NEWSPAPER COVERAGE REGIONS, not counties.
+            # Measured over the last 120 days, all 98 SC foreclosure notices carry one of
+            # only five values:
+            #     'Orangeburg, Bamberg and Calhoun' 58 · 'Florence' 23
+            #     'Darlington' 7 · 'Marion' 6 · 'Richland' 4
+            # So a per-county loop returns zero for every footprint county, which is
+            # exactly what it did: Anderson, Cherokee, Laurens, Oconee, Pickens,
+            # Spartanburg and Union all came back 0 while the statewide query returned 98.
+            # Filtering by county here cannot work; the county is recovered from the
+            # notice text downstream instead.
+            #
+            # HONEST SCOPE NOTE: none of those five regions is in the FORECLOSURE
+            # footprint. This lane serves the statewide SC DISTRESSED scope. It does not
+            # improve footprint foreclosure coverage, and should not be described as if
+            # it does.
+            sc_fc = ([] if self.only_new_counties else
+                     await _query(c, _SC, None, NC_FORECLOSURE_TYPE, from_ms, now_ms))
+            _sc_kept = 0
+            for it in sc_fc:
+                got = _sc_foreclosure_fields(it.get("text") or "")
+                if not (got.get("case_number") or got.get("street_address")):
+                    continue          # nothing to route or underwrite on
+                li = self._nc_listing(it, got.get("county") or "")
+                if li is None:
+                    continue
+                li.state = "SC"
+                if got.get("county"):
+                    li.county = got["county"]
+                if got.get("case_number"):
+                    li.case_number = got["case_number"]
+                if got.get("street_address") and not li.street_address:
+                    li.street_address = got["street_address"]
+                out.append(li)
+                _sc_kept += 1
+            log.info("column.sc_foreclosure", notices=len(sc_fc), kept=_sc_kept,
+                     note="statewide; SC county values are newspaper regions, not counties")
+
+        # Dedup on Column `id`. Every id carries a "-N" publication-run suffix
+        # (verified live: the SAME notice reappears as "...-0", "...-1" across
+        # publication dates), so we collapse on the BASE id (suffix stripped).
+        # Results arrive newest-first (sort desc by publishedtimestamp), so the
+        # first row per base id is the most recent run — keep it.
+        deduped: list[Listing] = []
+        for li in out:
+            cid = (li.raw.get("column", {}) or {}).get("id") or ""
+            base = re.sub(r"-\d+$", "", cid) if cid else ""
+            key = base or li.source_url
+            if key in seen_ids:
+                continue
+            seen_ids.add(key)
+            deduped.append(li)
+
+        log.info(
+            "column.done",
+            total=len(out), deduped=len(deduped),
+            nc_counties=len(nc_fp), sc_counties=len(sc_fp),
+        )
+        return deduped
+
+    # ----------------------------------------------------------------- #
+    def _common_raw(self, it: dict) -> dict:
+        raw: dict = {
+            "column": {
+                "id": it.get("id"),
+                "newspapername": it.get("newspapername"),
+                "filer": it.get("filer"),
+                "pdfurl": it.get("pdfurl"),
+                "noticetype": it.get("noticetype"),
+                "publishedtimestamp": it.get("publishedtimestamp"),
+            }
+        }
+        # The full notice (2026-10-07 extraction audit): only an 800-character snippet was
+        # kept, which cut the personal representative's address, the attorney block and the
+        # sale terms off most notices (live median ~1,000-1,200 characters). Up to
+        # _TEXT_CAP characters are kept here; the phone payload (_SLIM_RAW) carries no
+        # `column` block at all, and `snippet` / Listing.description stay short.
+        full = _norm(it.get("text") or "")
+        if full:
+            raw["column"]["text"] = full[:_TEXT_CAP]
+            raw["column"]["text_len"] = len(full)
+            if len(full) > _TEXT_CAP:
+                raw["column"]["text_truncated"] = True
+        nc = _notice_email(it.get("text") or "")
+        if nc:
+            raw["notice_contact"] = nc   # attributable attorney/trustee email
+        # Stamp the notice PDF into raw["documents"] so enrich_doc_ocr picks it
+        # up. Column returns pdfurl on every result row but it was only being
+        # used as source_url — the OCR pipeline never saw it.
+        pdfurl = it.get("pdfurl")
+        if pdfurl and isinstance(pdfurl, str) and pdfurl.startswith("http"):
+            raw["documents"] = [pdfurl]
+            raw["document_url"] = pdfurl
+        return raw
+
+    def _published_dt(self, it: dict) -> datetime:
+        ts = it.get("publishedtimestamp")
+        try:
+            return datetime.utcfromtimestamp(int(ts) / 1000.0)
+        except Exception:
+            return datetime.utcnow()
+
+
+    def _nc_listing(self, it: dict, county: str) -> Listing | None:
+        text = it.get("text") or ""
+        if not text.strip():
+            return None
+        parsed = _parse_nc_foreclosure(text)
+        raw = self._common_raw(it)
+        raw["column"]["snippet"] = _norm(text)[:800]
+        if parsed.get("sale_date_raw"):
+            raw["column"]["sale_date_raw"] = parsed["sale_date_raw"]
+        if parsed.get("dot_book"):
+            raw["column"]["deed_of_trust"] = {
+                "book": parsed.get("dot_book"), "page": parsed.get("dot_page")
+            }
+        # pdfurl is the reachable detail link; fall back to the API URL anchored
+        # by id so source_url is always unique + dedupe-safe.
+        src_url = it.get("pdfurl") or f"{API_URL}#{it.get('id') or ''}"
+        published = self._published_dt(it)
+        return Listing(
+            source=self.slug,
+            source_url=src_url,
+            listing_type=ListingType.FORECLOSURE_SALE,
+            property_kind=PropertyKind.UNKNOWN,
+            foreclosure_process="power_of_sale",
+            state="NC",
+            county=county,
+            street_address=parsed.get("street_address"),
+            city=parsed.get("city"),
+            zip_code=parsed.get("zip_code"),
+            parcel_id=parsed.get("parcel_id"),
+            owner_name=parsed.get("owner_name"),
+            trustee=parsed.get("trustee"),
+            plaintiff=parsed.get("plaintiff"),
+            case_number=parsed.get("case_number"),
+            sale_date=parsed.get("sale_date"),
+            sale_time=parsed.get("sale_time"),
+            description=_norm(text)[:500],
+            first_seen=published,
+            last_seen=datetime.utcnow(),
+            raw=raw,
+        )
+
+    def _nc_tax_listing(self, it: dict, tag_county: str) -> Listing | None:
+        """NC county/town TAX foreclosure sale notice -> TAX_SALE lead.
+
+        Only called for counties outside the 18-county flip footprint, where a mortgage
+        foreclosure is out of scope but a tax foreclosure is a distressed lead. Needs an
+        owner or a parcel; a notice OCR reduced to a case number alone is not routable.
+        """
+        text = it.get("text") or ""
+        if not text.strip():
+            return None
+        parsed = _parse_nc_tax_foreclosure(text)
+        if not (parsed.get("owner_name") or parsed.get("parcel_id")):
+            return None
+        county = parsed.get("county") or tag_county
+        raw = self._common_raw(it)
+        raw["column"]["snippet"] = _norm(text)[:800]
+        raw["column"]["tax_foreclosure"] = {
+            "plaintiff": parsed.get("plaintiff"),
+            "parcel_ids": parsed.get("parcel_ids"),
+            "column_county_tag": tag_county,
+            "sale_date_raw": parsed.get("sale_date_raw"),
+        }
+        src_url = it.get("pdfurl") or f"{API_URL}#{it.get('id') or ''}"
+        published = self._published_dt(it)
+        sale = parsed.get("sale_date")
+        return Listing(
+            source=self.slug,
+            source_url=src_url,
+            # A real sale date makes it a TAX_SALE; without one it is only a standing lien.
+            listing_type=ListingType.TAX_SALE if sale else ListingType.TAX_LIEN,
+            property_kind=PropertyKind.UNKNOWN,
+            foreclosure_process="tax",
+            state="NC",
+            county=county,
+            parcel_id=parsed.get("parcel_id"),
+            owner_name=parsed.get("owner_name"),
+            defendant=parsed.get("owner_name"),
+            plaintiff=parsed.get("plaintiff"),
+            case_number=parsed.get("case_number"),
+            sale_date=sale,
+            sale_time=parsed.get("sale_time"),
+            description=_norm(text)[:500],
+            first_seen=published,
+            last_seen=datetime.utcnow(),
+            raw=raw,
+        )
+
+    def _sc_probate_listing(self, it: dict, county: str) -> Listing | None:
+        text = it.get("text") or ""
+        if not text.strip():
+            return None
+        parsed = _parse_sc_probate(text)
+        raw = self._common_raw(it)
+        raw["column"]["snippet"] = _norm(text)[:800]
+        probate: dict = {}
+        if parsed.get("date_of_death_raw"):
+            probate["date_of_death"] = parsed["date_of_death_raw"]
+        if parsed.get("personal_representative"):
+            probate["personal_representative"] = parsed["personal_representative"]
+            probate.update(_pr_mailing(text, parsed["personal_representative"]))
+        if probate:
+            raw["probate"] = probate
+
+        # Dirty Deeds Tier B #26: a rare sub-type of this same noticetype is a
+        # SC quiet-tax-title suit naming heirs by publication, not an ordinary
+        # Notice to Creditors. When present it carries a real property address
+        # + parcel + plaintiff this lane otherwise never has (probate notices
+        # are address-less by design) -- so those fields backfill the Listing
+        # here rather than only riding along in raw.
+        county_out = county
+        street_address = None
+        parcel_id = None
+        plaintiff = None
+        case_number = parsed.get("case_number")
+        owner_name = parsed.get("owner_name")
+        qt = _parse_sc_quiet_title(text)
+        if qt:
+            raw["heir_naming_publication"] = qt
+            if qt.get("county"):
+                county_out = qt["county"]
+            street_address = qt.get("street_address")
+            parcel_id = qt.get("parcel_id")
+            plaintiff = qt.get("plaintiff")
+            if qt.get("case_number"):
+                case_number = qt["case_number"]
+            # Prefer the FIRST named decedent over the bare _ESTATE capture --
+            # _ESTATE stops at the first "Heirs" token, which on a multi-decedent
+            # quiet-title caption (co-owned property, both since deceased) can
+            # land mid-name; _QT_HEIRS_OF_RE is anchored on the cleaner
+            # "Heirs-at-Law of <name>" phrasing instead.
+            if qt.get("decedents"):
+                owner_name = qt["decedents"][0]
+
+        src_url = it.get("pdfurl") or f"{API_URL}#{it.get('id') or ''}"
+        published = self._published_dt(it)
+        # Probate leads are address-less by design; the owner-to-GIS enricher
+        # backfills the property from the decedent name. owner_name = decedent.
+        return Listing(
+            source=self.slug,
+            source_url=src_url,
+            listing_type=ListingType.PROBATE_NOTICE,
+            property_kind=PropertyKind.UNKNOWN,
+            state="SC",
+            county=county_out,
+            street_address=street_address,
+            parcel_id=parcel_id,
+            plaintiff=plaintiff,
+            owner_name=owner_name,
+            defendant=owner_name,  # decedent — drives name backfill
+            case_number=case_number,
+            description=_norm(text)[:500],
+            first_seen=published,
+            last_seen=datetime.utcnow(),
+            raw=raw,
+        )
+
+    def _nc_estate_listing(self, it: dict, county: str) -> Listing | None:
+        """NC decedent/estate notice -> PROBATE_NOTICE lead (NC mortality lane).
+
+        Same emit shape as the SC probate lead: owner_name = decedent (drives
+        the owner-to-GIS address backfill), address-less by design. Executor/PR
+        + NC estate file number land in raw["probate"]. The NC estate file# is
+        NOT a foreclosure SP case number, so it goes in raw, not case_number,
+        to avoid polluting cross-source case-number dedup.
+        """
+        text = it.get("text") or ""
+        if not text.strip():
+            return None
+        parsed = _parse_nc_estate(text)
+        # A real lead needs at least a decedent name; skip un-parseable bodies
+        # (the snippet still records the raw notice for audit).
+        if not parsed.get("owner_name"):
+            return None
+        raw = self._common_raw(it)
+        raw["column"]["snippet"] = _norm(text)[:800]
+        probate: dict = {}
+        if parsed.get("file_number"):
+            probate["nc_estate_file_no"] = parsed["file_number"]
+        if parsed.get("personal_representative"):
+            probate["personal_representative"] = parsed["personal_representative"]
+        if parsed.get("pr_role"):
+            probate["pr_role"] = parsed["pr_role"]
+        probate.update(_pr_mailing(text, parsed.get("personal_representative"),
+                                   parsed.get("pr_role")))
+        if probate:
+            raw["probate"] = probate
+        src_url = it.get("pdfurl") or f"{API_URL}#{it.get('id') or ''}"
+        published = self._published_dt(it)
+        return Listing(
+            source=self.slug,
+            source_url=src_url,
+            listing_type=ListingType.PROBATE_NOTICE,
+            property_kind=PropertyKind.UNKNOWN,
+            state="NC",
+            county=county,
+            owner_name=parsed.get("owner_name"),
+            defendant=parsed.get("owner_name"),  # decedent — drives name backfill
+            description=_norm(text)[:500],
+            first_seen=published,
+            last_seen=datetime.utcnow(),
+            raw=raw,
+        )

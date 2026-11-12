@@ -1,0 +1,621 @@
+"""Shared parser for TownNews (TNCMS) legal-classifieds RSS feeds.
+
+Many SC/NC community papers run on the TownNews / BLOX (TNCMS) platform, which
+exposes every classifieds category as an RSS feed via `?f=rss`. Adding a free
+keyword filter (`&q=foreclosure`) returns ONLY the foreclosure / trustee-sale /
+mortgage-foreclosure legal notices — published days-to-weeks BEFORE the auction,
+which is exactly the pre-auction signal we want.
+
+Why RSS and not the HTML detail page -- CORRECTED 2026-10-13 (HERMES source-
+completeness audit, Pattern D): the `.asset-body` div IS empty/client-rendered
+as this docstring long claimed, but that was never the only server-side text on
+the detail page. The notice text is fully present in THREE server-side places:
+
+  1. the RSS `<title>` — TownNews uses the FIRST line of the legal ad as the
+     title, so for trustee-SALE notices it carries the case number AND the
+     property street address (e.g. "NOTICE OF SUBSTITUTE TRUSTEE'S FORECLOSURE
+     SALE OF REAL PROPERTY 26SP000053-150 294 CAPE LOOKOUT DR HARKERS ISLAND,
+     NC ..."); for SC mortgage-foreclosure summonses it carries the county +
+     C/A number.
+  2. the RSS `<description>` — the opening ~250-550 chars of the body, which
+     adds the parties (plaintiff / defendant).
+  3. the detail page's `[itemprop="description"]` element — a schema.org
+     microdata node TNCMS renders SERVER-SIDE (confirmed by its presence in
+     the raw httpx response body, no JS), carrying the FULL notice (1.5-6 KB)
+     that the RSS description truncates. newspapers.daily_courier.py (a
+     sibling TNCMS paper) already proved this element exists and is fetchable;
+     live-confirmed 2026-10-13 the SAME selector also server-renders the full
+     text on indexjournal.com and postandcourier.com (both the classifieds_new
+     and journal-scene sections) -- same platform, same selector, no theme
+     difference. `fetch_full_text()` below fetches it as a best-effort
+     enrichment on top of the RSS-only parse this module has always done; the
+     RSS-derived Listing is never dropped or blocked on this fetch failing.
+
+All of the above are static server-rendered HTML/XML — no JS, no login, no
+WAF. Compliant.
+
+This module is import-safe (no `BaseScraper` subclass), so the registry's
+auto-discovery skips it (the registry only picks up concrete subclasses, and
+underscore-prefixed module names are excluded anyway).
+"""
+from __future__ import annotations
+
+import asyncio
+import html
+import os
+import re
+from datetime import datetime
+from typing import Iterable
+
+from dateutil import parser as dateparser
+from selectolax.parser import HTMLParser
+
+from ...http_client import get_text
+
+from ...models import Listing, ListingType, PropertyKind
+from ...validation import NC_COUNTIES, SC_COUNTIES
+
+# Street suffix alternation, shared by the address matcher.
+_SUFFIX = (
+    r"Road|Rd|Street|St|Drive|Dr|Lane|Ln|Avenue|Ave|Highway|Hwy|"
+    r"Boulevard|Blvd|Circle|Cir|Court|Ct|Way|Place|Pl|Trail|Trl|"
+    r"Parkway|Pkwy|Terrace|Ter|Loop|Cove|Cv|Run|Pass|Point|Pt|Path|"
+    r"Crossing|Xing|Landing|Ldg|Bay|Walk"
+)
+# A street address embedded in a legal-notice headline / body.
+# The street NAME must start with a letter (so a bare suffix immediately after
+# the house number — e.g. "001497 ... ST" from a mangled case number — won't
+# match). 1-4 name tokens before the suffix.
+ADDR_RE = re.compile(
+    r"\b(\d{1,6}\s+[A-Za-z][A-Za-z0-9.'\-]*"
+    r"(?:\s+[A-Za-z][A-Za-z0-9.'\-]*){0,3}\s+"
+    rf"(?:{_SUFFIX})\.?)\b",
+    re.I,
+)
+# NC: 26SP000053-150 / 24 SP 123
+NC_CASE_RE = re.compile(
+    r"\b(\d{2,4}\s?-?\s?(?:SP|CVD|CVS|CV|M)\s?-?\s?\d{1,6}(?:-\d{2,4})?)\b",
+    re.I,
+)
+# SC: 2026-CP-10-01481 / 2026CP1001636 / "Case No: 2025-CP-10-01481" / the
+# "NOTICE OF SALE" post-judgment form, which uses PERIODS not hyphens
+# ("C/A No. 2026.CP.02.00605" — found live 2026-10-01 on the Aiken Standard
+# feed). A period separator was previously unmatched, which silently dropped
+# case_number AND let the un-stripped case digits get picked up by ZIP_RE as
+# a fake ZIP code (e.g. "2026.CP.02.00605" -> zip_code="00605").
+SC_CASE_RE = re.compile(
+    r"\b(\d{4}\s?[-.]?\s?CP\s?[-.]?\s?\d{2}\s?[-.]?\s?\d{3,6})\b",
+    re.I,
+)
+ZIP_RE = re.compile(r"\b(\d{5})(?:-\d{4})?\b")
+# City directly preceding the state token. Allow ALL-CAPS or Title-case names.
+CITY_STATE_RE = re.compile(
+    r"([A-Z][A-Za-z.'\-]+(?:\s+[A-Z][A-Za-z.'\-]+){0,2}),\s*(NC|SC)\b"
+)
+SALE_DATE_RE = re.compile(
+    r"\b((?:January|February|March|April|May|June|July|August|September|"
+    r"October|November|December)\s+\d{1,2},?\s+\d{4})"
+    # Optional clock time that follows the date ("... on June 23, 2026 at 2:00 PM").
+    r"(?:,?\s+(?:at\s+)?(\d{1,2}(?::\d{2})?\s*[AaPp]\.?[Mm]\.?))?",
+    re.I,
+)
+# A county name explicitly stated in the notice ("COUNTY OF BERKELEY",
+# "BERKELEY COUNTY", "CARTERET COUNTY").
+COUNTY_OF_RE = re.compile(r"COUNTY\s+OF\s+([A-Z][A-Za-z]+)", re.I)
+COUNTY_SUFFIX_RE = re.compile(r"\b([A-Z][A-Za-z]+)\s+COUNTY\b", re.I)
+
+_COUNTY_NAMES_BY_STATE = {
+    "NC": {c.lower(): c for c in NC_COUNTIES},
+    "SC": {c.lower(): c for c in SC_COUNTIES},
+}
+
+
+def _best_county_match(candidate: str, names: dict[str, str]) -> str | None:
+    cand_lower = candidate.lower()
+    hit = names.get(cand_lower)
+    if hit:
+        return hit
+    # Longest-prefix match, longest name first so a short name doesn't
+    # shadow a longer one that also prefixes the candidate.
+    for name_lower, canonical in sorted(names.items(), key=lambda kv: -len(kv[0])):
+        if cand_lower.startswith(name_lower):
+            return canonical
+    return None
+
+
+def _resolve_county(candidate: str, state: str, default: str | None) -> str | None:
+    """Recover the real county name when the source text collapsed the
+    whitespace after it into the next word.
+
+    Found live 2026-09-15: the Index-Journal's RSS description read "...
+    COUNTY OF GREENWOODIN THE COURT OF COMMON PLEAS..." with no space before
+    "IN" -- COUNTY_OF_RE's `[A-Za-z]+` has no way to know where a real name
+    ends without a delimiter, so it captured "Greenwoodin" whole. That value
+    then failed validation.py's SC_COUNTIES/NC_COUNTIES membership check and
+    got NULLED to None -- Greenwood's own dedicated scraper had been
+    producing usable rows all along, silently losing every one to this.
+
+    Tries an exact match first (case-insensitive), then the longest known
+    county name that PREFIXES the candidate (covers exactly the "name+next-
+    word" glue case) -- scoped to `state`'s own county list first (a few
+    names like "Union"/"Cherokee" exist in both states, but the string is
+    identical either way so this only matters for names that DON'T
+    collide), falling back to the other state's list for the rare case of
+    a paper naming a neighboring state's county, then to `default` (never
+    None) -- a real notice always names SOME county; guessing the paper's
+    own home county is far better than discarding the row's county tag.
+    """
+    primary = _COUNTY_NAMES_BY_STATE.get(state, {})
+    hit = _best_county_match(candidate, primary)
+    if hit:
+        return hit
+    for other_state, names in _COUNTY_NAMES_BY_STATE.items():
+        if other_state == state:
+            continue
+        hit = _best_county_match(candidate, names)
+        if hit:
+            return hit
+    return default
+
+# Substitute-trustee / firm name often appears in the body.
+TRUSTEE_RE = re.compile(
+    r"([A-Z][A-Za-z &,.'\-]+?(?:LLC|LLP|PLLC|P\.?A\.?|P\.?C\.?|Law Firm|"
+    r"Attorneys?|Trustee Services|Default Services))",
+)
+
+# --- Party captions (plaintiff / defendant / record owner) ------------------
+# SC civil captions read "<Plaintiff>, Plaintiff ... vs. <Defendant>, Defendant".
+# The name char-class deliberately excludes '/' ':' '(' ')' so a capture can't run
+# backward through the court-caption boilerplate ("... COMMON PLEAS C/A NO: 2026CP...
+# (NON-JURY MORTGAGE FORECLOSURE)"); any leftover boilerplate prefix that survives
+# ("SUMMONS AND NOTICES") is trimmed by _strip_caption().
+PLAINTIFF_RE = re.compile(
+    r"([A-Z][A-Za-z0-9 &,.'\-]{2,70}?),?\s+Plaintiffs?\b", re.I
+)
+DEFENDANT_RE = re.compile(
+    r"\bvs?\.?\s+([A-Z][A-Za-z0-9 &,.'\-]{2,70}?),?\s+Defendants?\b", re.I
+)
+# NC substitute-trustee notices name the current owner under this label.
+RECORD_OWNER_RE = re.compile(
+    r"PRESENT RECORD OWNER\(?S?\)?\s*:?\s*"
+    r"([A-Z][A-Za-z.'\- ]{2,70}?)(?:\)|,|\s+to\s+|$)", re.I
+)
+# Many NC power-of-sale notices never use the "PRESENT RECORD OWNER(S)" label
+# at all -- they name the current owner only as the grantor of the foreclosed
+# Deed of Trust ("...Deed of Trust executed by Jodi O. Exampleson dated...").
+# Found live 2026-10-01 on newspapers.carolina_coast (Onslow/Carteret NC): 6 of
+# 7 live rows had this exact shape and owner_name/defendant were silently None
+# for ALL of them even though the name is right there in the RSS text -- the
+# same grantor pattern coastland_times.py already solved for its own (non-
+# TownNews) parser; reused here verbatim as a fallback for every TownNews NC
+# paper. Known limitation carried over unchanged from that original: a name
+# containing "a/k/a"/"f/k/a" (a '/' character, not in the class) still breaks
+# the match at that point, same as the existing coastland_times.py behavior.
+GRANTOR_RE = re.compile(
+    r"(?:executed(?:\s+and\s+delivered)?|made|given)\s+by\s+"
+    r"([A-Z][A-Za-z0-9.'\- ]{2,70}?)"
+    r"(?:\s*\(|,|;|\s+(?:dated|to\s+[A-Z]|and\s+recorded|in\s+favor|"
+    r"as\s+grantor|Trustee)|$)",
+    re.I,
+)
+# SC "NOTICE OF SALE" (post-judgment, Master-in-Equity) captions never use the
+# literal words "Plaintiff"/"Defendant" that PLAINTIFF_RE/DEFENDANT_RE require
+# -- they instead read "...heretofore granted in the case of: <Plaintiff>
+# against/v. <Defendant>; <other parties>...". Found live 2026-10-01 on the
+# Aiken Standard feed: this shape is 62/86 (72%) of rows, and before this
+# regex, EVERY one of them had defendant/owner_name silently None even though
+# the name sits in plain text within the RSS feed's ~250-char truncation
+# window (unlike the SUMMONS caption, where the defendant name usually falls
+# AFTER the truncation point and genuinely can't be recovered from RSS alone).
+# Self-anchored on "in the case of:" so it can't bleed backward into the
+# preceding case-number/caption boilerplate the way a bare PLAINTIFF_RE/
+# DEFENDANT_RE scan could.
+NOTICE_OF_SALE_PARTIES_RE = re.compile(
+    r"in\s+the\s+case\s+of:?\s*"
+    r"(?P<plaintiff>[A-Z][A-Za-z0-9 &,./'\-]{2,90}?)\s+"
+    r"(?:against|vs?\.)\s+"
+    r"(?P<defendant>[A-Z][A-Za-z0-9 .&'\-]{2,90}?)"
+    r"(?=\s+and\s+(?:[Tt]he\s+)?[Uu]nited\s+[Ss]tates|;|,|$)",
+    re.I,
+)
+# Boilerplate that may cling to the FRONT of a captured party name — trimmed off.
+_CAPTION_BOILER_RE = re.compile(
+    r".*\b(?:COMMON PLEAS|SUMMONS(?:\s+AND\s+NOTICES?)?|NOTICES?|CIVIL ACTION|"
+    r"FORECLOSURE)\)?\s*", re.I | re.S
+)
+# A stripped name still carrying caption words is not a real party -> reject.
+_PARTY_REJECT_RE = re.compile(
+    r"\b(STATE OF|COUNTY OF|COURT|VIRTUE|JUDGMENT|COMMON PLEAS|NOTICE|"
+    r"SUMMONS|CIVIL ACTION|PLEAS|IN THE)\b", re.I
+)
+
+FORECLOSURE_HINTS = (
+    "foreclos",
+    "substitute trustee",
+    "trustee's sale",
+    "trustees sale",
+    "master in equity",
+    "notice of sale",
+    "mortgage fore",
+    "sale of real",
+    "judicial sale",
+)
+
+
+def _clean(s: str) -> str:
+    out = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", s or ""))).strip()
+    # TownNews appends a literal ellipsis ("…", from the RSS entity &#8230;)
+    # when it truncates a title/description at its character cap. Left in
+    # place, it sits between the last real word and the string's true end,
+    # silently breaking every name-capture regex in this module that relies
+    # on `$` (end of string) as a valid stop token for a name that happens to
+    # be the very last thing before the cutoff. Found live 2026-10-01 on
+    # newspapers.carolina_coast: GRANTOR_RE failed to capture "DARREN G.
+    # SAMPLER" purely because of the trailing "…", even though the full name
+    # was present right up to it. Stripping it moves the string's real end
+    # back to the last real character, as if no truncation marker were there.
+    return out.rstrip("…").rstrip()
+
+
+def _strip_caption(name: str | None) -> str | None:
+    """Trim leading court-caption boilerplate off a captured party name and
+    reject a capture that is really boilerplate (not a person/entity)."""
+    if not name:
+        return None
+    n = _CAPTION_BOILER_RE.sub("", name).strip(" ,.;:-")
+    n = re.sub(r"\s+", " ", n)
+    if len(n) < 3 or not re.search(r"[A-Za-z]{2}", n):
+        return None
+    if _PARTY_REJECT_RE.search(n):
+        return None
+    return n
+
+
+def _is_foreclosure(text: str) -> bool:
+    t = text.lower()
+    return any(h in t for h in FORECLOSURE_HINTS)
+
+
+def _classify(text: str) -> ListingType:
+    t = text.lower()
+    if "master in equity" in t:
+        return ListingType.FORECLOSURE_SALE
+    if "substitute trustee" in t or "trustee's sale" in t or "trustees sale" in t:
+        return ListingType.FORECLOSURE_SALE
+    if "notice of sale" in t or "sale of real" in t:
+        return ListingType.FORECLOSURE_SALE
+    # SC mortgage-foreclosure summons = lis-pendens-stage (pre-sale) signal
+    if "summons" in t and "foreclos" in t:
+        return ListingType.LIS_PENDENS
+    return ListingType.FORECLOSURE_SALE
+
+
+def _process(text: str, state: str) -> str | None:
+    t = text.lower()
+    if state == "SC" or "master in equity" in t or "common pleas" in t:
+        return "judicial"
+    if "substitute trustee" in t or "power of sale" in t or "deed of trust" in t:
+        return "power_of_sale"
+    return None
+
+
+def parse_rss_items(
+    xml: str,
+    *,
+    source_slug: str,
+    default_state: str,
+    default_county: str | None,
+    allowed_states: tuple[str, ...] = ("NC", "SC"),
+    sale_location: str | None = None,
+) -> Iterable[Listing]:
+    """Parse a TownNews legal-classifieds RSS feed into foreclosure Listings.
+
+    `default_county` is the paper's home county (used when the notice text
+    doesn't name a county explicitly). Notices that DO name a county override it,
+    so a regional paper that publishes a neighboring county's notice is routed
+    correctly.
+    """
+    out: list[Listing] = []
+    seen: set[str] = set()
+    items = re.findall(r"<item>(.*?)</item>", xml, re.S | re.I)
+    for raw_item in items:
+        title_m = re.search(r"<title>(.*?)</title>", raw_item, re.S | re.I)
+        link_m = re.search(r"<link>(.*?)</link>", raw_item, re.S | re.I)
+        desc_m = re.search(r"<description>(.*?)</description>", raw_item, re.S | re.I)
+        date_m = re.search(r"<pubDate>(.*?)</pubDate>", raw_item, re.S | re.I)
+
+        title = _clean(title_m.group(1)) if title_m else ""
+        link = _clean(link_m.group(1)) if link_m else ""
+        desc = _clean(desc_m.group(1)) if desc_m else ""
+        blob = f"{title} {desc}".strip()
+        if not blob or not link:
+            continue
+        if not _is_foreclosure(blob):
+            continue
+
+        key = link
+        if key in seen:
+            continue
+        seen.add(key)
+
+        # State: prefer an explicit state token in the notice.
+        st = default_state
+        st_m = re.search(r"\b(NORTH CAROLINA|SOUTH CAROLINA|\bNC\b|\bSC\b)", blob, re.I)
+        if st_m:
+            tok = st_m.group(1).upper()
+            st = "NC" if "NORTH" in tok or tok == "NC" else "SC"
+        if allowed_states and st not in allowed_states:
+            continue
+
+        # County: explicit "COUNTY OF X" / "X COUNTY" wins over the paper default.
+        county = default_county
+        c_m = COUNTY_OF_RE.search(blob) or COUNTY_SUFFIX_RE.search(blob)
+        if c_m:
+            cand = c_m.group(1).strip().title()
+            # Guard against grabbing court words.
+            if cand.lower() not in {"common", "general", "the", "this"}:
+                county = _resolve_county(cand, st, default_county)
+
+        # Case number: try the full SC C/A form first (so we don't truncate
+        # 2025-CP-10-01481 to 2025-CP-10), then the NC SP/CV forms.
+        case_number = None
+        case_raw = None
+        sc_m = SC_CASE_RE.search(blob)
+        nc_m = NC_CASE_RE.search(blob)
+        if st == "SC" and sc_m:
+            case_raw, case_number = sc_m.group(1), re.sub(r"\s+", "", sc_m.group(1)).upper()
+        elif st == "NC" and nc_m:
+            case_raw, case_number = nc_m.group(1), re.sub(r"\s+", "", nc_m.group(1)).upper()
+        elif sc_m:
+            case_raw, case_number = sc_m.group(1), re.sub(r"\s+", "", sc_m.group(1)).upper()
+        elif nc_m:
+            case_raw, case_number = nc_m.group(1), re.sub(r"\s+", "", nc_m.group(1)).upper()
+
+        # Remove the literal case number from the text before address parsing —
+        # otherwise the case suffix digits (e.g. "...053-150 294 CAPE LOOKOUT
+        # DR") glue onto the house number and corrupt the address. TownNews
+        # descriptions commonly repeat the ENTIRE title as their own opening
+        # sentence, so the case number usually appears TWICE in `blob`; a
+        # count=1 replace only strips the first copy and leaves the second
+        # one intact. Found live 2026-10-01 on the Aiken Standard feed: 20 of
+        # 49 case-bearing items (41%) then had ZIP_RE match the leftover
+        # case-number suffix (e.g. "2026-CP-02-01967" -> zip_code="01967") as
+        # if it were a real ZIP code. Replace ALL occurrences, not just one.
+        addr_blob = blob.replace(case_raw, " ") if case_raw else blob
+
+        addr_m = ADDR_RE.search(addr_blob)
+        street = addr_m.group(1).strip() if addr_m else None
+        if street:
+            street = re.sub(r"\s+", " ", street).rstrip(".,").strip()
+            # Reject obvious non-addresses (a bare suffix word, or all-caps
+            # legal boilerplate that slipped through).
+            if len(street) < 6 or not re.search(r"[A-Za-z]{3,}", street):
+                street = None
+
+        city = None
+        zip_code = None
+        cs_m = CITY_STATE_RE.search(addr_blob)
+        if cs_m:
+            cand = cs_m.group(1).strip()
+            # Drop a leading street-suffix token misread as part of the city
+            # ("DR HARKERS ISLAND" -> "HARKERS ISLAND").
+            cand = re.sub(rf"^(?:{_SUFFIX})\s+", "", cand, flags=re.I).strip()
+            # Title-case ALL-CAPS city names for consistency with other sources.
+            if cand.isupper():
+                cand = cand.title()
+            if 2 <= len(cand) <= 40:
+                city = cand or None
+        z_m = ZIP_RE.search(addr_blob)
+        if z_m:
+            zip_code = z_m.group(1)
+
+        sale_date = None
+        sale_time = None
+        sd_m = SALE_DATE_RE.search(blob)
+        if sd_m:
+            try:
+                sale_date = dateparser.parse(sd_m.group(1), fuzzy=True)
+            except (ValueError, TypeError, OverflowError):
+                sale_date = None
+            if sd_m.group(2):
+                sale_time = re.sub(r"\s+", " ", sd_m.group(2)).strip().upper().rstrip(".")
+
+        # Parties: NC "PRESENT RECORD OWNER(S)" names the owner directly; SC civil
+        # captions carry "<Plaintiff>, Plaintiff ... vs. <Defendant>, Defendant".
+        # owner_name mirrors the defendant/record-owner (the property owner).
+        plaintiff = None
+        pl_m = PLAINTIFF_RE.search(blob)
+        if pl_m:
+            plaintiff = _strip_caption(pl_m.group(1))
+
+        defendant = None
+        owner_name = None
+        ro_m = RECORD_OWNER_RE.search(blob)
+        if ro_m:
+            cand = _clean(ro_m.group(1)).rstrip(",.;: ")
+            if len(cand) >= 3 and re.search(r"[A-Za-z]{2}", cand):
+                owner_name = cand
+                defendant = cand
+        if defendant is None:
+            df_m = DEFENDANT_RE.search(blob)
+            if df_m:
+                cand = _strip_caption(df_m.group(1))
+                if cand:
+                    defendant = cand
+                    owner_name = cand
+
+        # Fallback: SC "NOTICE OF SALE" judicial caption (no literal
+        # "Plaintiff"/"Defendant" words -- see NOTICE_OF_SALE_PARTIES_RE).
+        # Only fills whichever of plaintiff/defendant the shapes above missed.
+        nos_m = NOTICE_OF_SALE_PARTIES_RE.search(blob)
+        if nos_m:
+            if plaintiff is None:
+                cand = _strip_caption(nos_m.group("plaintiff"))
+                if cand:
+                    plaintiff = cand
+            if defendant is None:
+                cand = _strip_caption(nos_m.group("defendant"))
+                if cand:
+                    defendant = cand
+                    owner_name = cand
+
+        # Fallback: NC Deed-of-Trust grantor clause (see GRANTOR_RE above).
+        if defendant is None:
+            g_m = GRANTOR_RE.search(blob)
+            if g_m:
+                cand = _strip_caption(g_m.group(1))
+                if cand:
+                    defendant = cand
+                    owner_name = cand
+
+        # TRUSTEE_RE is written for NC substitute-trustee notices, where an
+        # "...LLC"/"...Trustee Services, Inc." entity really is the party
+        # conducting a non-judicial sale. SC has no such role at all -- SC
+        # mortgages aren't deeds of trust and every SC foreclosure is a
+        # judicial Master-in-Equity sale (see _process(): state=="SC" is
+        # always "judicial") -- so on SC notices TRUSTEE_RE was instead
+        # matching the PLAINTIFF lender's own "...LLC" name (e.g. "ROCKET
+        # MORTGAGE LLC") or the law-firm caption's "...LLC" name and
+        # mislabeling it as the trustee. Found live 2026-10-01 on the Aiken
+        # Standard feed: 41 of 86 rows (48%) had a "trustee" that was really
+        # the plaintiff, sometimes with a huge chunk of caption boilerplate
+        # glued on ("BY VIRTUE OF A DECREE of the Court of Common Pleas for
+        # Aiken County, South Carolina, heretofore issued in the case of
+        # Movement Mortgage, LLC"). Skip TRUSTEE_RE for SC notices and for the
+        # judicial "in the case of" caption shape regardless of state.
+        trustee = None
+        if st != "SC" and nos_m is None:
+            tr_m = TRUSTEE_RE.search(desc) or TRUSTEE_RE.search(title)
+            if tr_m:
+                cand = tr_m.group(1).strip()[:160]
+                if len(cand) > 4 and cand.lower() not in {"the", "this"}:
+                    trustee = cand
+
+        listing_type = _classify(blob)
+        proc = _process(blob, st)
+
+        pub_dt = None
+        if date_m:
+            try:
+                pub_dt = dateparser.parse(_clean(date_m.group(1)))
+            except (ValueError, TypeError, OverflowError):
+                pub_dt = None
+
+        out.append(
+            Listing(
+                source=source_slug,
+                source_url=link,
+                listing_type=listing_type,
+                property_kind=PropertyKind.UNKNOWN,
+                state=st,
+                county=county,
+                street_address=street,
+                city=city,
+                zip_code=zip_code,
+                sale_date=sale_date,
+                sale_time=sale_time,
+                sale_location=sale_location,
+                foreclosure_process=proc,
+                case_number=case_number,
+                plaintiff=plaintiff,
+                defendant=defendant,
+                owner_name=owner_name,
+                trustee=trustee,
+                description=(title or desc)[:500] or None,
+                first_seen=datetime.utcnow(),
+                last_seen=datetime.utcnow(),
+                raw={
+                    "townnews_legal": {
+                        "title": title,
+                        "desc": desc[:1500],
+                        "published": pub_dt.isoformat() if pub_dt else None,
+                    }
+                },
+            )
+        )
+    return out
+
+
+# --- full-text detail-page enrichment (added 2026-10-13) -------------------
+# See the module docstring point 3: the RSS <description> this module has
+# always parsed is truncated to ~250-550 chars, but every sibling TNCMS paper
+# server-renders the FULL notice body in the detail page's
+# `[itemprop="description"]` element. This is pure, best-effort enrichment on
+# top of the RSS-only Listing already built above — it never raises and a
+# failed/blocked/short fetch simply leaves the RSS snippet as the only text,
+# exactly like the detail-fetch fixes landed the same day on
+# counties_nc/polk_tax.py and counties_sc/horry_probate.py.
+
+#: Seconds between detail-page fetches (politeness; these TNCMS sites 429/403
+#: aggressively under back-to-back requests per every sibling scraper's own
+#: docstring). get_text()'s transport already paces per-host at ~0.8 s; this
+#: adds a slower, scraper-level cadence on top for the extra GET per listing.
+DETAIL_FETCH_DELAY_S = float(os.environ.get("TOWNNEWS_DETAIL_DELAY_S", "1.5"))
+#: Hard cap on detail fetches per run — bounds worst-case runtime on a busy
+#: feed day instead of fetching every matching row.
+DETAIL_FETCH_MAX_DEFAULT = 20
+
+
+async def fetch_full_text(url: str, *, timeout: float = 20.0) -> str | None:
+    """Best-effort fetch of one TNCMS ad detail page's full server-rendered
+    notice text (the `[itemprop="description"]` element) -- the same selector
+    newspapers.daily_courier.py already uses on its own TNCMS section, live-
+    confirmed 2026-10-13 to also work unchanged on indexjournal.com and
+    postandcourier.com. Never raises: any network error, non-200, or missing
+    element returns None so the caller keeps the RSS snippet."""
+    try:
+        resp_html = await get_text(url, timeout=timeout)
+    except Exception:  # noqa: BLE001 - enrichment must never break the caller
+        return None
+    try:
+        tree = HTMLParser(resp_html or "")
+        node = tree.css_first('[itemprop="description"]')
+        if node is None:
+            return None
+        txt = re.sub(r"\s+", " ", node.text(separator=" ")).strip()
+        return txt or None
+    except Exception:  # noqa: BLE001 - a parse bug must not break the caller
+        return None
+
+
+class DetailFetchBudget:
+    """Per-run state for `fetch_full_text()` enrichment, shared by every
+    TNCMS scraper that calls it (index_journal.py / journal_scene.py /
+    post_and_courier.py).
+
+    Caps the number of detail fetches per run (`max_fetches`), paces them
+    (`delay_s`), and trips a circuit breaker after 3 consecutive failures so
+    a run that hits a 403/429 wall stops asking instead of working through
+    every remaining row the same way — the exact "stop instead of asking
+    again" reasoning these scrapers' own listing-fetch loops already use.
+    `enrich()` never raises and never touches a Listing beyond adding
+    raw['townnews_legal']['full_text'] when the fetch succeeds and is longer
+    than the RSS preview already there.
+    """
+
+    def __init__(self, *, max_fetches: int = DETAIL_FETCH_MAX_DEFAULT,
+                 delay_s: float | None = None):
+        self.remaining = max_fetches
+        self.consecutive_failures = 0
+        self.delay_s = DETAIL_FETCH_DELAY_S if delay_s is None else delay_s
+        self._started = False
+
+    @property
+    def blocked(self) -> bool:
+        return self.consecutive_failures >= 3
+
+    async def enrich(self, li: Listing) -> None:
+        if self.remaining <= 0 or self.blocked:
+            return
+        self.remaining -= 1
+        if self._started:
+            await asyncio.sleep(self.delay_s)
+        self._started = True
+        full_text = await fetch_full_text(li.source_url)
+        if not full_text:
+            self.consecutive_failures += 1
+            return
+        self.consecutive_failures = 0
+        block = li.raw.get("townnews_legal")
+        if isinstance(block, dict) and len(full_text) > len(block.get("desc") or ""):
+            block["full_text"] = full_text[:8000]

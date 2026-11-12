@@ -1,0 +1,4344 @@
+{
+ "generated": "2026-10-07",
+ "method": "One read-only iter_board_rows pass for baselines (counts only); at most 4 requests per source, 1.6 s or more between requests to one host, ordinary browser User-Agent; no CAPTCHA, login, paywall or bot check was solved or routed around; no person was searched.",
+ "findings": {
+  "weakest_10_counties": {
+   "definition": "Counties with at least 900 board rows, ranked by owner-contact coverage (mail or usable phone), lowest first. Board of 2026-10-07, 350,013 rows, one read-only iter_board_rows pass.",
+   "counties": [
+    {
+     "county": "Williamsburg SC",
+     "rows": 2476,
+     "mail_pct": 0.0,
+     "phone_pct": 0.0,
+     "parcel_id_pct": 91.0,
+     "value_pct": 0.0,
+     "sqft_pct": 0.0
+    },
+    {
+     "county": "Richland SC",
+     "rows": 2229,
+     "mail_pct": 0.0,
+     "phone_pct": 0.0,
+     "parcel_id_pct": 0.2,
+     "value_pct": 0.0,
+     "sqft_pct": 59.8
+    },
+    {
+     "county": "Dorchester SC",
+     "rows": 1735,
+     "mail_pct": 0.0,
+     "phone_pct": 0.0,
+     "parcel_id_pct": 75.3,
+     "value_pct": 0.0,
+     "sqft_pct": 31.6
+    },
+    {
+     "county": "Clarendon SC",
+     "rows": 1649,
+     "mail_pct": 0.0,
+     "phone_pct": 0.0,
+     "parcel_id_pct": 86.4,
+     "value_pct": 0.0,
+     "sqft_pct": 0.0
+    },
+    {
+     "county": "Chesterfield SC",
+     "rows": 1011,
+     "mail_pct": 0.0,
+     "phone_pct": 0.0,
+     "parcel_id_pct": 71.7,
+     "value_pct": 0.0,
+     "sqft_pct": 0.0
+    },
+    {
+     "county": "Newberry SC",
+     "rows": 977,
+     "mail_pct": 0.0,
+     "phone_pct": 0.0,
+     "parcel_id_pct": 54.2,
+     "value_pct": 0.3,
+     "sqft_pct": 0.0
+    },
+    {
+     "county": "Edgefield SC",
+     "rows": 921,
+     "mail_pct": 0.0,
+     "phone_pct": 0.0,
+     "parcel_id_pct": 81.4,
+     "value_pct": 0.0,
+     "sqft_pct": 0.0
+    },
+    {
+     "county": "Marlboro SC",
+     "rows": 1250,
+     "mail_pct": 0.2,
+     "phone_pct": 0.0,
+     "parcel_id_pct": 81.8,
+     "value_pct": 0.1,
+     "sqft_pct": 0.0
+    },
+    {
+     "county": "Beaufort SC",
+     "rows": 1695,
+     "mail_pct": 0.2,
+     "phone_pct": 0.0,
+     "parcel_id_pct": 1.5,
+     "value_pct": 0.2,
+     "sqft_pct": 45.6
+    },
+    {
+     "county": "Kershaw SC",
+     "rows": 1927,
+     "mail_pct": 0.2,
+     "phone_pct": 0.0,
+     "parcel_id_pct": 88.1,
+     "value_pct": 68.7,
+     "sqft_pct": 0.0
+    }
+   ],
+   "next_tier": "Jasper SC (989 rows, 0.5% mail), Dillon SC (1,502, 0.8%), Hyde NC (2,652, 1.7%), Washington NC (1,744, 0.6%)"
+  },
+  "board_totals": {
+   "rows": 350013,
+   "NC": {
+    "rows": 241423,
+    "mail": 114195,
+    "phone": 77748,
+    "sqft": 52389,
+    "year_built": 8936,
+    "beds": 4968,
+    "last_sale": 45169,
+    "value": 124337
+   },
+   "SC": {
+    "rows": 108590,
+    "mail": 44177,
+    "phone": 4,
+    "sqft": 44990,
+    "year_built": 10896,
+    "beds": 9460,
+    "last_sale": 29017,
+    "value": 45688
+   }
+  },
+  "cached_mailing_not_yet_joined": {
+   "rows": 36469,
+   "what": "Board rows with a parcel id and no owner mailing whose county parcel cache (data/parcel_cache) already holds a mailing for that parcel. The cache join (scripts/join_parcel_cache_to_board.py, or apply_board_fixes.py --steps join) has not been applied since the caches gained mailing. No new source needed.",
+   "top": {
+    "NC:Gaston": 15899,
+    "NC:Transylvania": 5439,
+    "SC:Charleston": 2201,
+    "NC:Perquimans": 1518,
+    "NC:Onslow": 1087,
+    "SC:Horry": 914,
+    "NC:Chowan": 878,
+    "NC:Mecklenburg": 726,
+    "NC:Forsyth": 581,
+    "SC:Jasper": 460,
+    "NC:McDowell": 451,
+    "NC:Rutherford": 426,
+    "NC:Bertie": 418,
+    "SC:Greenville": 370
+   }
+  },
+  "nc_sos_automation_notice": "sosnc.gov business registration page, 2026-10-07: 'Automated or scripted searches may degrade system performance and are not permitted. For bulk access to public data, please use our Data Subscription Services.' The repo's automated NC SoS entity lookups (enrichment_sos_agent, sos_agent hand-off) run against that stated term; the Master Files subscription ($750 setup + $2,000/yr) is the compliant route.",
+  "sc_ust_phone_policy": "SC DES UST registry detail pages carry Tank Owner Phone (30 of 30 in the repo's sample); sc_ust_registry.py fetches the list only, by policy. It is the largest free SC phone source found (about 3,125 rows in the weakest 10, mostly business lines). Owner decision, not code.",
+  "cache_schema_gap": "Already-downloaded layers publish year built, beds, baths, condition or grade in Gaston, Transylvania, Greenville, Lexington, Greenwood, Darlington, York, Barnwell, Saluda, McDowell and Chester; parcel_cache has no columns for them, so the weekly refresh drops them. One schema change unlocks about 23,000 Gaston and 11,000 Transylvania year-built fills."
+ },
+ "sources": [
+  {
+   "id": "jasper_sc_parcels_hardeeville",
+   "name": "Jasper County SC parcel layer (city-hosted copy)",
+   "owner": "City of Hardeeville (ArcGIS Online item 43bd2a2f6efa4ddb8c8c6d8379ee2f77), data from Jasper County",
+   "url": "https://services6.arcgis.com/UXJOITFCLbn0Ibm0/arcgis/rest/services/Jasper_County_Parcels/FeatureServer/2",
+   "geography": "SC: Jasper",
+   "category": "property_facts",
+   "fields": [
+    "TMS",
+    "owner name",
+    "owner mailing (street, city state, ZIP)",
+    "E911 situs",
+    "market appraisal",
+    "consideration (sale price)",
+    "deed book/page",
+    "year built (2%)"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": "SC Code 30-2-50: personal information obtained from a state agency or local government may not be used for commercial solicitation; whether a cash offer to buy a house is solicitation is an open question for SC counsel (docs/sc_phone_research_2026-09-21.md section 4). The layer is a city's copy last edited 2025-08-12, so owners who sold since then still show.",
+   "coverage": "20,258 parcels (returnCountOnly). 2,000-row page: mailing street 98%, city/state 95%, market appraisal 95%, consideration 65%, year built 2%. Board proof (one iter_board_rows pass): parcel-id join hits 465 of 821 Jasper rows with a parcel id; owner name agrees on 302 of 465.",
+   "already_ingested": {
+    "status": "yes",
+    "module": "parcel_cache.PARCEL_LAYERS['Jasper'] (built 2026-10-07)",
+    "completeness": "cache built, 20,258 of 20,258 parcels; the board gains it when scripts/join_parcel_cache_to_board.py next runs"
+   },
+   "previously_documented": null,
+   "build_effort_hours": 3,
+   "lift_weakest10": {
+    "estimate": "0 in the weakest 10 (Jasper is 11th); Jasper itself: mail 0.5% -> 48.6%, value 0% -> 51.4%, sale 0% -> 33.5%",
+    "reasoning": "Measured on the board 2026-10-07 by scripts/measure_parcel_cache_lift.py: +476 mail, +508 value, +331 last sale of 989 rows. 276 board ids carry a letter suffix the layer does not have, so they miss.",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": "Jasper SC: +476 mail, +508 value, +331 last sale (measured)",
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07: service, layer, count and a 2,000-row page (4 requests), then the build (11 pages, 1.7 s apart)",
+   "fit": "BUILT. Best open source found for a county the weak tail shares (qPublic-walled at the county)."
+  },
+  {
+   "id": "beaufort_sc_energov_parcels",
+   "name": "Beaufort County SC EnerGov parcel layer",
+   "owner": "Beaufort County SC GIS",
+   "url": "https://gis.beaufortcountysc.gov/server/rest/services/EnerGov/MapServer/1",
+   "geography": "SC: Beaufort",
+   "category": "property_facts",
+   "fields": [
+    "PIN",
+    "owner 1/2",
+    "mailing street, city, state, ZIP",
+    "situs",
+    "appraised (market) value",
+    "land/improvement",
+    "capped/assessed/taxable",
+    "residential and commercial sqft",
+    "min/max year built",
+    "sale date, price, qualification",
+    "deed book/page",
+    "legal description"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": "SC Code 30-2-50: personal information obtained from a state agency or local government may not be used for commercial solicitation; whether a cash offer to buy a house is solicitation is an open question for SC counsel (docs/sc_phone_research_2026-09-21.md section 4).",
+   "coverage": "141,367 parcels. 2,000-row page: mailing 100%, situs 92%, appraised 95%, residential sqft 56%, year built 64%, sale date 95%. Board proof: 25 rows join by parcel id; the situs-address resolver finds a unique parcel for 712 of 1,233 address-only rows, owner agrees on 54 (the rest are SC DEW lien and UST rows whose party is a tenant or operator, so the join withholds their mailing).",
+   "already_ingested": {
+    "status": "yes",
+    "module": "parcel_cache.SC_DUAL_LAYERS['Beaufort'] (built 2026-10-07)",
+    "completeness": "cache built, 141,367 of 141,367 parcels; board gains it on the next join + address-resolver pass"
+   },
+   "previously_documented": "docs/county_breadth_research_2026-09-21.md (section 3c, verified, not added: no board demand then)",
+   "build_effort_hours": 4,
+   "lift_weakest10": {
+    "estimate": "Beaufort SC: value 0.2% -> 41.6% (+702), last sale 0.1% -> 38.2% (+645), sqft 45.6% -> 49.6%, mail 0.2% -> 5.5% (+91)",
+    "reasoning": "Measured on the board 2026-10-07. Mail stays low because 1,672 of 1,695 Beaufort rows have no parcel id and their street belongs to a lien debtor or tank operator, not the parcel owner.",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 750,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07: layer, count, iteminfo (no license text) and a 2,000-row page (4 requests), then the build (29 pages of 5,000, 1.7 s apart)",
+   "fit": "BUILT. The only open, readable owner layer for one of the weakest 10."
+  },
+  {
+   "id": "dorchester_parcels_public",
+   "name": "Dorchester County SC Parcels_Public",
+   "owner": "Dorchester County GIS",
+   "url": "https://gisportal.dorchestercounty.net/hosting/rest/services/General_Data/Parcels_Public/MapServer/0",
+   "geography": "SC: Dorchester",
+   "category": "property_facts",
+   "fields": [
+    "FULL_TMS",
+    "owner",
+    "care-of",
+    "mailing address",
+    "city state zip",
+    "property location",
+    "taxed acres",
+    "sale price",
+    "sale date",
+    "plat/lot"
+   ],
+   "access_class": "terms-only",
+   "price": null,
+   "legal_notes": "Service iteminfo: 'Basic Public data - not to be added to any pay for use locations without prior written approval of Dorchester County Assessor or GIS Director.' The board is free and public, but the owner must decide whether the clause reaches it. SC Code 30-2-50: personal information obtained from a state agency or local government may not be used for commercial solicitation; whether a cash offer to buy a house is solicitation is an open question for SC counsel (docs/sc_phone_research_2026-09-21.md section 4).",
+   "coverage": "80,111 parcels (2026-09-21 research). Board: 1,306 Dorchester rows carry a parcel id in the layer's FULL_TMS shape (999-99-99-999-999) and have no mailing.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": "config ready in docs/county_breadth_research_2026-09-21.md section 3c"
+   },
+   "previously_documented": "docs/county_breadth_research_2026-09-21.md section 3c; docs/county_records/county_records_matrix.json",
+   "build_effort_hours": 1,
+   "lift_weakest10": {
+    "estimate": "Dorchester: mail 0% -> about 75% (+1,306), plus last sale on the same rows",
+    "reasoning": "1,306 board rows share the layer's id shape; the 9/21 sample joined. Hit rate assumed 90-100%.",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 1306,
+   "lift_other": null,
+   "manual_steps": "Owner decision on the license clause, then add the ready config (one dict) and run refresh_parcel_cache.py Dorchester.",
+   "verified": "repo verification 2026-09-21 and 2026-10-07 (not re-fetched today)",
+   "fit": "Highest single-county mail lift in the weakest 10; blocked only by the license clause."
+  },
+  {
+   "id": "richland_richlandmaps_api",
+   "name": "Richland County SC data viewer API (GetParcelData, RCGeoGetParcelAtLatLon, RCGeoSearchData)",
+   "owner": "Richland County SC GIS",
+   "url": "https://www.richlandmaps.com/apps/dataviewer/ (api/GetParcelData.php?taxId=, api/RCGeoGetParcelAtLatLon.php)",
+   "geography": "SC: Richland",
+   "category": "property_facts",
+   "fields": [
+    "TMS",
+    "Owner_Name",
+    "Owner_Addr / Owner_Ad_1 / Owner_City / Owner_Stat / Owner_Zip",
+    "Heated_SQF",
+    "Beds",
+    "Bath",
+    "sales history"
+   ],
+   "access_class": "disclaimer-click",
+   "price": null,
+   "legal_notes": "The viewer shows a liability disclaimer with a 'Got it' button (rc-disclaimer.js); the API calls need no acceptance. Repo rule treats click-throughs as walls, so this needs an owner call. SC Code 30-2-50: personal information obtained from a state agency or local government may not be used for commercial solicitation; whether a cash offer to buy a house is solicitation is an open question for SC counsel (docs/sc_phone_research_2026-09-21.md section 4).",
+   "coverage": "Not sampled (no parcel query sent). Field names read from rc-parcel-dialog.js. Board: 2,229 Richland rows, 95.5% with a street, 0.2% with a parcel id, 0% mail/value.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": "docs/county_breadth_research_2026-09-21.md (delinquent layer only)",
+   "build_effort_hours": 8,
+   "lift_weakest10": {
+    "estimate": "Richland: mail and facts up to +900 to +1,800 rows",
+    "reasoning": "Per-lead lat/lon to TMS to parcel record; 972 Columbia code-vacant rows are parcel owners (good), 1,072 UST rows often are not. Guess.",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 1300,
+   "lift_other": null,
+   "manual_steps": "Open richlandmaps.com/apps/dataviewer, accept the disclaimer, search the address, read owner and mailing off the parcel dialog.",
+   "verified": "fetched 2026-10-07: viewer page and three JS files (4 requests); no data query",
+   "fit": "Worth an owner decision: the only route to Richland owner mail and facts."
+  },
+  {
+   "id": "newberry_propertyparcel",
+   "name": "Newberry County SC PropertyParcel MapServer",
+   "owner": "Newberry County GIS",
+   "url": "https://map.newberrycounty.net/gis/rest/services/PropertyParcel/MapServer",
+   "geography": "SC: Newberry",
+   "category": "property_facts",
+   "fields": [
+    "unknown until the service runs"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": "SC Code 30-2-50: personal information obtained from a state agency or local government may not be used for commercial solicitation; whether a cash offer to buy a house is solicitation is an open question for SC counsel (docs/sc_phone_research_2026-09-21.md section 4).",
+   "coverage": "Service answered {'code': 500, 'message': 'Service PropertyParcel/MapServer not started'} on 2026-10-07; the folder lists only geocoders, a school map, a tax-district map and a voting-location layer.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": "docs/county_records/county_records_matrix.json (URL only)",
+   "build_effort_hours": 3,
+   "lift_weakest10": {
+    "estimate": "Newberry: mail up to +530 rows when the service runs",
+    "reasoning": "530 board rows have a parcel id and no mail. Fields unknown.",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 530,
+   "lift_other": null,
+   "manual_steps": "Recheck the service in a week; if it stays down, ask the county GIS office for a parcel export.",
+   "verified": "fetched 2026-10-07: service, root, Mercator and Hosted folders (4 requests)",
+   "fit": "Recheck; nothing to build while stopped."
+  },
+  {
+   "id": "kershaw_parcels_view",
+   "name": "Kershaw County Parcel Boundaries (Parcels_view)",
+   "owner": "Kershaw County GIS",
+   "url": "https://services6.arcgis.com/kyYrMHheB5jkAnFA/arcgis/rest/services/Parcels_view/FeatureServer/0",
+   "geography": "SC: Kershaw",
+   "category": "property_facts",
+   "fields": [
+    "PRSNTP_ID",
+    "taxTotalAc"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": null,
+   "coverage": "43,646 rows, no owner or mailing field (2026-09-21). ArcGIS Online search 2026-10-07 found no other Kershaw owner layer.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": "docs/county_breadth_research_2026-09-21.md",
+   "build_effort_hours": 0,
+   "lift_weakest10": {
+    "estimate": "0",
+    "reasoning": "No owner or mailing fields.",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": "Request the assessor roll (see sc_assessor_roll_records_request).",
+   "verified": "fetched 2026-10-07: ArcGIS Online search (1 request)",
+   "fit": "Dead end for contact."
+  },
+  {
+   "id": "jasper_county_parcels_county_org",
+   "name": "Jasper County Parcels (county ArcGIS Online org)",
+   "owner": "Jasper County (its own ArcGIS Online org)",
+   "url": "https://services3.arcgis.com/oJaBluQKw5aLHpzj/arcgis/rest/services/County_Parcels/FeatureServer/0",
+   "geography": "SC: Jasper",
+   "category": "property_facts",
+   "fields": [
+    "TaxPIN",
+    "acreage",
+    "edit fields"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": null,
+   "coverage": "Fields: OBJECTID, TaxPIN, EditDate, ECode, GISAC, MapSub, DeedAc, Mapped_By, County_Parcel, Comments. No owner.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": 0,
+   "lift_weakest10": {
+    "estimate": "0",
+    "reasoning": "No owner fields; the city-hosted layer above has them.",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07: layer metadata (1 request)",
+   "fit": "Geometry only."
+  },
+  {
+   "id": "sc_wth_tgis_viewers",
+   "name": "WTH 'tgis' county map viewers",
+   "owner": "WTH Technology for Williamsburg, Marlboro, Chesterfield, Dillon, McCormick, Marion (Kershaw's host answered 400)",
+   "url": "https://williamsburgsc.wthgis.com/ (and marlborosc., chesterfieldsc., dillonsc., marionsc.)",
+   "geography": "SC: Williamsburg, Marlboro, Chesterfield, Dillon, McCormick, Marion",
+   "category": "property_facts",
+   "fields": [
+    "owner, mailing and card data inside a proprietary viewer"
+   ],
+   "access_class": "JS-app",
+   "price": null,
+   "legal_notes": "No documented endpoint; reverse engineering the viewer protocol is not done.",
+   "coverage": "No ArcGIS REST root exists on any *.wthgis.com host tried (2026-09-21). ArcGIS Online search 2026-10-07 found only the token-walled SCDOT layer for these counties.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": "docs/county_breadth_research_2026-09-21.md (Walled table)",
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "0 automated; manual card lookups only",
+    "reasoning": "Proprietary viewer.",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": "Open the county's wthgis.com viewer, search the TMS from the board row, copy owner and mailing.",
+   "verified": "fetched 2026-10-07: ArcGIS Online search per county (5 requests)",
+   "fit": "Manual lane for 4 of the weakest 10."
+  },
+  {
+   "id": "sc_qpublic_schneider",
+   "name": "qPublic / Beacon county property sites (Schneider)",
+   "owner": "Schneider Geospatial for Clarendon, Edgefield, Jasper, Abbeville, Allendale, Bamberg, Lee, Cherokee, Fairfield and about 20 more SC counties",
+   "url": "https://qpublic.schneidercorp.com/",
+   "geography": "SC: about 30 counties",
+   "category": "property_facts",
+   "fields": [
+    "owner",
+    "mailing",
+    "values",
+    "building card (sqft, year, beds/baths)",
+    "sales"
+   ],
+   "access_class": "bot-check",
+   "price": null,
+   "legal_notes": "Cloudflare 'Just a moment...' interstitial on a plain GET. Never automated.",
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": "docs/county_breadth_research_2026-09-21.md; docs/county_records/README.md",
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "0 automated",
+    "reasoning": "Walled.",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": "Open qpublic.schneidercorp.com in a browser, pick the county, search the parcel id, read owner, mailing and the building card.",
+   "verified": "repo verification 2026-09-21 and 2026-10-07 (not re-fetched)",
+   "fit": "Manual lane only."
+  },
+  {
+   "id": "scdot_sc_parcels",
+   "name": "SCDOT statewide SC_Parcels MapServer",
+   "owner": "SC Department of Transportation",
+   "url": "https://smpesri.scdot.org/arcgis/rest/services/GISMapping/SC_Parcels/MapServer/<county layer>",
+   "geography": "SC statewide (one layer per county; Kershaw 27, Williamsburg 44, Clarendon 13, Chesterfield 12, Marlboro 33, Edgefield 18, Dillon 16, Newberry 35)",
+   "category": "property_facts",
+   "fields": [
+    "county parcel attributes as each county supplies them (owner and mailing for the counties the repo read before the token wall)"
+   ],
+   "access_class": "login",
+   "price": null,
+   "legal_notes": "Token required (HTTP 499 'Token Required'). Getting a token through a data-sharing request is legitimate; guessing or borrowing one is not.",
+   "coverage": "Layer list confirmed via ArcGIS Online search 2026-10-07 (GDITAdmin items). Not queried.",
+   "already_ingested": {
+    "status": "partial",
+    "module": "enrichment_owner_mailing (pre-wall)",
+    "completeness": "token-walled since mid-2026"
+   },
+   "previously_documented": "docs/sc_phone_research_2026-09-21.md; docs/county_breadth_research_2026-09-21.md",
+   "build_effort_hours": 4,
+   "lift_weakest10": {
+    "estimate": "Up to +9,700 rows mail across the weakest 10 if a token is granted and the layers carry mailing",
+    "reasoning": "Sum of rows with a parcel id and no mail in the 10 counties. Field content of the walled layers today is unknown.",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 9700,
+   "lift_other": null,
+   "manual_steps": "Email SCDOT GIS (the layer owner) asking for read access for parcel attributes under a data-sharing agreement; if granted, store the token as an environment secret.",
+   "verified": "fetched 2026-10-07: ArcGIS Online search only",
+   "fit": "The one statewide SC route; worth one email."
+  },
+  {
+   "id": "sc_assessor_roll_records_request",
+   "name": "County assessor roll export by public records request",
+   "owner": "Each SC county assessor (Williamsburg, Kershaw, Clarendon, Marlboro, Chesterfield, Edgefield, Newberry, Dillon, Cherokee, ...)",
+   "url": "county assessor offices (SC FOIA, Code 30-4-30)",
+   "geography": "SC: per county",
+   "category": "contact_public_record",
+   "fields": [
+    "owner",
+    "mailing address",
+    "TMS",
+    "values",
+    "often building and sale fields"
+   ],
+   "access_class": "paid",
+   "price": "Not verified: actual cost of the copy, usually small; varies by county",
+   "legal_notes": "SC FOIA (30-4-30) allows reasonable fees. Agencies attach the 30-2-50 notice and may ask for a use statement. SC Code 30-2-50: personal information obtained from a state agency or local government may not be used for commercial solicitation; whether a cash offer to buy a house is solicitation is an open question for SC counsel (docs/sc_phone_research_2026-09-21.md section 4).",
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": 4,
+   "lift_weakest10": {
+    "estimate": "Up to +8,395 rows mail in 7 of the weakest 10",
+    "reasoning": "Rows with a parcel id and no mail: Williamsburg 2,252, Kershaw 1,693, Clarendon 1,424, Marlboro 1,021, Edgefield 750, Chesterfield 725, Newberry 530. Assumes a roll file joins by TMS at 90%+.",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 8395,
+   "lift_other": null,
+   "manual_steps": "Send each assessor a written FOIA request for the current real-property roll (TMS, owner, mailing address, values) as CSV; pay the copy fee; drop the file in data/ and load it with a sc_parcel_mailing-style reader.",
+   "verified": "not fetched (no county site reached without a wall)",
+   "fit": "The cheapest broad fix for the walled SC counties; needs a person and the 30-2-50 decision."
+  },
+  {
+   "id": "sc_georgetown_gcgis",
+   "name": "Georgetown County SC GCGIS parcel data",
+   "owner": "Georgetown County GIS",
+   "url": "https://gis1.georgetowncountysc.org/server/rest/services/GCGIS_OpenData/MapServer/7",
+   "geography": "SC: Georgetown",
+   "category": "property_facts",
+   "fields": [
+    "TMS",
+    "owner 1/2",
+    "billing (mailing) address",
+    "street",
+    "sale",
+    "legal description"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": "SC Code 30-2-50: personal information obtained from a state agency or local government may not be used for commercial solicitation; whether a cash offer to buy a house is solicitation is an open question for SC counsel (docs/sc_phone_research_2026-09-21.md section 4).",
+   "coverage": "57,530 attribute rows (2026-09-21). Board: 877 rows, 355 with a parcel id and no mail, 0.5% mail.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": "docs/county_breadth_research_2026-09-21.md section 3c",
+   "build_effort_hours": 3,
+   "lift_weakest10": {
+    "estimate": "0 (not in the weakest 10); Georgetown up to +355 mail by id plus address joins",
+    "reasoning": "Two board id shapes (with and without a .999 suffix) need checking against the layer.",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": "Georgetown SC: up to +355 mail",
+   "manual_steps": null,
+   "verified": "repo verification 2026-09-21 (not re-fetched)",
+   "fit": "Next open SC build after the two done today."
+  },
+  {
+   "id": "sc_union_parcels",
+   "name": "Union County SC parcels (UNION_SC_PARCELS_WFL1)",
+   "owner": "Union County SC",
+   "url": "https://services6.arcgis.com/xQgypOVdY84tFTiW/arcgis/rest/services/UNION_SC_PARCELS_WFL1/FeatureServer/2",
+   "geography": "SC: Union",
+   "category": "property_facts",
+   "fields": [
+    "MapNumber",
+    "ParcelID",
+    "Name",
+    "Address_1-3 (owner mailing)"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": "SC Code 30-2-50: personal information obtained from a state agency or local government may not be used for commercial solicitation; whether a cash offer to buy a house is solicitation is an open question for SC counsel (docs/sc_phone_research_2026-09-21.md section 4).",
+   "coverage": "Board: 1,351 rows, 38.4% mail, 132 with a parcel id and no mail.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": "docs/sc_phone_research_2026-09-21.md section 7; county_records_matrix.json",
+   "build_effort_hours": 3,
+   "lift_weakest10": {
+    "estimate": "0 (not in the weakest 10)",
+    "reasoning": "Union is a two-state name; needs an SC_DUAL_LAYERS entry like Beaufort's.",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": "Union SC: up to +132 mail by id",
+   "manual_steps": null,
+   "verified": "repo verification (not re-fetched)",
+   "fit": "Small lift; the SC_DUAL_LAYERS mechanism built today makes it a one-dict add."
+  },
+  {
+   "id": "qpaybill_detail_pass",
+   "name": "qPayBill tax bill detail pages (Total Appraisal, Building Appraisal, Buildings, assessment ratio)",
+   "owner": "County treasurers on qPayBill (Catalis)",
+   "url": "https://<county>.qpaybill.com/Taxes/TaxesDetailsType4.aspx?receiptNo=...",
+   "geography": "SC: 19+ counties incl. Williamsburg, Clarendon, Marlboro, Chesterfield, Edgefield, Newberry, Kershaw",
+   "category": "valuation_input",
+   "fields": [
+    "county total appraisal (100% basis)",
+    "land/building appraisal",
+    "buildings count",
+    "assessment ratio 4%/6% (owner-occupancy flag)",
+    "full legal description"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": null,
+   "coverage": "Repo verified 4 Barnwell records 2026-09-10. Board: value 0% on the qPayBill rows of Williamsburg (2,249), Clarendon (1,422), Marlboro (1,022), Edgefield (750), Chesterfield (725), Newberry (712).",
+   "already_ingested": {
+    "status": "partial",
+    "module": "scrapers/counties_sc/qpaybill_delinquent_roll.py (QPAYBILL_ROLL_DETAIL=1, opt-in)",
+    "completeness": "built, not run on these counties (value 0%)"
+   },
+   "previously_documented": "qpaybill_delinquent_roll.py docstring",
+   "build_effort_hours": 1,
+   "lift_weakest10": {
+    "estimate": "Value +6,000 to +6,900 rows in 6 of the weakest 10; no contact",
+    "reasoning": "One request per parcel; 6,880 rows; fill per detail page assumed 85-100%.",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 6500,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "repo docstring (not re-fetched)",
+   "fit": "Run the opt-in detail pass for the weak counties (about 6,900 requests at 1.6 s, 3 hours)."
+  },
+  {
+   "id": "sc_des_ust_registry_details",
+   "name": "SC DES underground storage tank registry: facility Details page (Tank Owner Phone)",
+   "owner": "SC Department of Environmental Services",
+   "url": "https://apps.des.sc.gov/USTRegistry/",
+   "geography": "SC statewide (46 counties)",
+   "category": "contact_public_record",
+   "fields": [
+    "tank owner name",
+    "tank owner phone",
+    "facility address"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": "SC Code 30-2-50: personal information obtained from a state agency or local government may not be used for commercial solicitation; whether a cash offer to buy a house is solicitation is an open question for SC counsel (docs/sc_phone_research_2026-09-21.md section 4). TCPA, National DNC and state telemarketing rules govern any call or text. The repo deliberately does not fetch detail pages (sc_ust_registry.py docstring: contact data belongs to the skip-trace path under DNC rules).",
+   "coverage": "Repo sample: phone on 30 of 30 Spartanburg detail pages. Board SC UST rows without mail in the weakest 10: Richland 1,072, Beaufort 361, Dorchester 285, Chesterfield 254, Newberry 238, Clarendon 222, Kershaw 210, Williamsburg 196, Marlboro 170, Edgefield 117.",
+   "already_ingested": {
+    "status": "partial",
+    "module": "scrapers/counties_sc/sc_ust_registry.py (list only, by policy)",
+    "completeness": "list ingested; detail page with phone never fetched"
+   },
+   "previously_documented": "sc_ust_registry.py docstring",
+   "build_effort_hours": 3,
+   "lift_weakest10": {
+    "estimate": "Phone +3,125 rows in the weakest 10 (mostly business lines of tank owners)",
+    "reasoning": "One detail request per facility; 30/30 fill in the repo sample. These are the only measured free SC owner phones. Many owners are oil companies or store operators, not the parcel owner.",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 3125,
+   "lift_other": null,
+   "manual_steps": "A person opens the facility's Details page on apps.des.sc.gov and copies the Tank Owner Phone into the skip-trace worksheet.",
+   "verified": "repo docstring (not re-fetched)",
+   "fit": "Largest free SC phone source found; held by an explicit repo policy, so it needs the owner's call, not code."
+  },
+  {
+   "id": "sc_rfa_geocoder",
+   "name": "SC RFA statewide geocoder (RFA_MultiRole GeocodeServer)",
+   "owner": "SC Revenue and Fiscal Affairs Office",
+   "url": "https://gis.state.sc.us/arcgis/rest/services/Geocode/RFA_MultiRole/GeocodeServer",
+   "geography": "SC statewide",
+   "category": "open_dataset",
+   "fields": [
+    "address point",
+    "match score",
+    "reverse geocode",
+    "suggest"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": "Page footer links a privacy statement and disclaimers; the service needs no acceptance.",
+   "coverage": "Capabilities Geocode, ReverseGeocode, Suggest; SuggestedBatchSize 1,000; MinimumMatchScore 75.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": 4,
+   "lift_weakest10": {
+    "estimate": "Indirect: better points for the 2,229 Richland and 1,672 Beaufort address-only rows",
+    "reasoning": "A precise point lets a point-in-parcel query find the parcel; the 9/29 audit blamed tract-level geocodes for 31,500 unresolved rows.",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07: GeocodeServer ?f=json (1 request)",
+   "fit": "Cheap precision fix for SC parcel resolution."
+  },
+  {
+   "id": "sc_state_gis_server",
+   "name": "SC state GIS server (gis.state.sc.us)",
+   "owner": "SC RFA",
+   "url": "https://gis.state.sc.us/arcgis/rest/services",
+   "geography": "SC statewide",
+   "category": "open_dataset",
+   "fields": [
+    "boundaries",
+    "districts",
+    "NG911 PSAP",
+    "census",
+    "geocoders"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": null,
+   "coverage": "Folders: Boundaries_Districts, Census, District_Info, Geocode, Geodetic, NG911, Transportation_Network_Carrier. No parcel or owner layer. RFA's ArcGIS Online org holds imagery and a few one-off 'affected parcels' layers.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": 0,
+   "lift_weakest10": {
+    "estimate": "0",
+    "reasoning": "No parcels.",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07: services root and ArcGIS Online owner search (2 requests)",
+   "fit": "Rules out a statewide SC parcel layer from the state."
+  },
+  {
+   "id": "sc_cherokee_parcels",
+   "name": "Cherokee County SC parcels",
+   "owner": "Cherokee County SC",
+   "url": "https://qpublic.schneidercorp.com/Application.aspx?App=CherokeeCountySC",
+   "geography": "SC: Cherokee",
+   "category": "property_facts",
+   "fields": [
+    "owner",
+    "mailing",
+    "values"
+   ],
+   "access_class": "bot-check",
+   "price": null,
+   "legal_notes": "Cloudflare (qPublic).",
+   "coverage": "Board: 3,229 rows, 7.8% mail, 1,646 with a parcel id and no mail.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": "docs/county_records/county_records_matrix.json",
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "0 (not in the weakest 10)",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": "Cherokee SC: up to +1,646 mail by a roll file",
+   "manual_steps": "Records request for the roll, or qPublic by hand.",
+   "verified": "not fetched (walled)",
+   "fit": "Largest single SC joinable mail gap outside the weakest 10."
+  },
+  {
+   "id": "gaston_parcels_unmapped",
+   "name": "Gaston parcel layer fields the cache does not keep",
+   "owner": "Gaston County GIS (already in parcel_cache.PARCEL_LAYERS)",
+   "url": "see parcel_cache.PARCEL_LAYERS url",
+   "geography": "NC: Gaston",
+   "category": "property_facts",
+   "fields": [
+    "YEARBLT",
+    "XBEDRM",
+    "XBATHS",
+    "XHBATHS",
+    "SALEDATE",
+    "SALESAMT",
+    "BLDQUAL_CODE",
+    "DEEDQUAL_CODEDESC",
+    "PRVYRNAME1/2 (prior owner)"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": null,
+   "coverage": "Field names read from the layer metadata 2026-10-07. Board Gaston: 25,472 rows; 23,301 with a parcel id lack year built, 16,167 lack a last sale.",
+   "already_ingested": {
+    "status": "partial",
+    "module": "parcel_cache.PARCEL_LAYERS",
+    "completeness": "layer already downloaded weekly; the cache table has no year_built/beds/baths/condition columns, so these are dropped"
+   },
+   "previously_documented": null,
+   "build_effort_hours": 8,
+   "lift_weakest10": {
+    "estimate": "0 (none of these counties is in the weakest 10)",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": "Gaston: year built up to +23,301, last sale up to +16,167",
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07: layer ?f=json (1 request)",
+   "fit": "Part of one build: add year_built, beds, baths, condition columns to the cache schema and map them."
+  },
+  {
+   "id": "transylvania_parcels_unmapped",
+   "name": "Transylvania parcel layer fields the cache does not keep",
+   "owner": "Transylvania County GIS (already in parcel_cache.PARCEL_LAYERS)",
+   "url": "see parcel_cache.PARCEL_LAYERS url",
+   "geography": "NC: Transylvania",
+   "category": "property_facts",
+   "fields": [
+    "BEDROOMS",
+    "BATHS",
+    "HALF_BATHS",
+    "SALE_DATE",
+    "SALE_QUALI",
+    "QualityFactor"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": null,
+   "coverage": "Field names read from the layer metadata 2026-10-07. Board: 12,089 rows; 11,709 with a parcel id; beds 0.7%.",
+   "already_ingested": {
+    "status": "partial",
+    "module": "parcel_cache.PARCEL_LAYERS",
+    "completeness": "layer already downloaded weekly; the cache table has no year_built/beds/baths/condition columns, so these are dropped"
+   },
+   "previously_documented": null,
+   "build_effort_hours": 8,
+   "lift_weakest10": {
+    "estimate": "0 (none of these counties is in the weakest 10)",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": "Transylvania: beds/baths up to +11,000",
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07: layer ?f=json (1 request)",
+   "fit": "Part of one build: add year_built, beds, baths, condition columns to the cache schema and map them."
+  },
+  {
+   "id": "greenville_querylayers_unmapped",
+   "name": "Greenville parcel layer fields the cache does not keep",
+   "owner": "Greenville County GIS (already in parcel_cache.PARCEL_LAYERS)",
+   "url": "see parcel_cache.PARCEL_LAYERS url",
+   "geography": "SC: Greenville",
+   "category": "property_facts",
+   "fields": [
+    "BEDROOMS",
+    "BATHRMS",
+    "HALFBATH",
+    "RESGRADE",
+    "COMGRADE1-6",
+    "TOTFLAREA1-6"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": null,
+   "coverage": "Field names read from the layer metadata 2026-10-07. Board: 5,308 rows; 3,325 with a parcel id lack year; beds 0.2%.",
+   "already_ingested": {
+    "status": "partial",
+    "module": "parcel_cache.PARCEL_LAYERS",
+    "completeness": "layer already downloaded weekly; the cache table has no year_built/beds/baths/condition columns, so these are dropped"
+   },
+   "previously_documented": null,
+   "build_effort_hours": 8,
+   "lift_weakest10": {
+    "estimate": "0 (none of these counties is in the weakest 10)",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": "Greenville SC: beds/baths/grade up to +3,300",
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07: layer ?f=json (1 request)",
+   "fit": "Part of one build: add year_built, beds, baths, condition columns to the cache schema and map them."
+  },
+  {
+   "id": "lexington_sc_unmapped",
+   "name": "Lexington parcel layer fields the cache does not keep",
+   "owner": "Lexington County GIS (already in parcel_cache.PARCEL_LAYERS)",
+   "url": "see parcel_cache.PARCEL_LAYERS url",
+   "geography": "SC: Lexington",
+   "category": "property_facts",
+   "fields": [
+    "YearBuilt",
+    "Nbr_Bedroom",
+    "Nbr_FullBath",
+    "Nbr_HalfBath",
+    "Stories",
+    "Heat"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": null,
+   "coverage": "Field names read from the layer metadata 2026-10-07. Board: 3,029 rows; 1,477 with a parcel id lack year built.",
+   "already_ingested": {
+    "status": "partial",
+    "module": "parcel_cache.PARCEL_LAYERS",
+    "completeness": "layer already downloaded weekly; the cache table has no year_built/beds/baths/condition columns, so these are dropped"
+   },
+   "previously_documented": null,
+   "build_effort_hours": 8,
+   "lift_weakest10": {
+    "estimate": "0 (none of these counties is in the weakest 10)",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": "Lexington SC: year/beds/baths up to +1,477",
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07: layer ?f=json (1 request)",
+   "fit": "Part of one build: add year_built, beds, baths, condition columns to the cache schema and map them."
+  },
+  {
+   "id": "greenwood_sc_unmapped",
+   "name": "Greenwood parcel layer fields the cache does not keep",
+   "owner": "Greenwood County GIS (already in parcel_cache.PARCEL_LAYERS)",
+   "url": "see parcel_cache.PARCEL_LAYERS url",
+   "geography": "SC: Greenwood",
+   "category": "property_facts",
+   "fields": [
+    "YearBuilt",
+    "Bedrooms",
+    "Bathrooms",
+    "HalfBaths",
+    "Quality",
+    "Condition",
+    "basement/garage sqft"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": null,
+   "coverage": "Field names read from the layer metadata 2026-10-07. Board: 1,040 rows; 719 with a parcel id; sqft, year and beds all 0%.",
+   "already_ingested": {
+    "status": "partial",
+    "module": "parcel_cache.PARCEL_LAYERS",
+    "completeness": "layer already downloaded weekly; the cache table has no year_built/beds/baths/condition columns, so these are dropped"
+   },
+   "previously_documented": null,
+   "build_effort_hours": 8,
+   "lift_weakest10": {
+    "estimate": "0 (none of these counties is in the weakest 10)",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": "Greenwood SC: year/beds/condition up to +719",
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07: layer ?f=json (1 request)",
+   "fit": "Part of one build: add year_built, beds, baths, condition columns to the cache schema and map them."
+  },
+  {
+   "id": "darlington_sc_unmapped",
+   "name": "Darlington parcel layer fields the cache does not keep",
+   "owner": "Darlington County GIS (already in parcel_cache.PARCEL_LAYERS)",
+   "url": "see parcel_cache.PARCEL_LAYERS url",
+   "geography": "SC: Darlington",
+   "category": "property_facts",
+   "fields": [
+    "BED",
+    "YEAR_BUILT"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": null,
+   "coverage": "Field names read from the layer metadata 2026-10-07. Board: 2,844 rows; 2,514 with a parcel id; sqft/year/beds 0%.",
+   "already_ingested": {
+    "status": "partial",
+    "module": "parcel_cache.PARCEL_LAYERS",
+    "completeness": "layer already downloaded weekly; the cache table has no year_built/beds/baths/condition columns, so these are dropped"
+   },
+   "previously_documented": null,
+   "build_effort_hours": 8,
+   "lift_weakest10": {
+    "estimate": "0 (none of these counties is in the weakest 10)",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": "Darlington SC: year/beds up to +2,514",
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07: layer ?f=json (1 request)",
+   "fit": "Part of one build: add year_built, beds, baths, condition columns to the cache schema and map them."
+  },
+  {
+   "id": "york_sc_unmapped",
+   "name": "York parcel layer fields the cache does not keep",
+   "owner": "York County GIS (already in parcel_cache.PARCEL_LAYERS)",
+   "url": "see parcel_cache.PARCEL_LAYERS url",
+   "geography": "SC: York",
+   "category": "property_facts",
+   "fields": [
+    "YearBuilt",
+    "MailAddr2",
+    "MailApt"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": null,
+   "coverage": "Field names read from the layer metadata 2026-10-07. Board: 830 rows; 116 with a parcel id lack year.",
+   "already_ingested": {
+    "status": "partial",
+    "module": "parcel_cache.PARCEL_LAYERS",
+    "completeness": "layer already downloaded weekly; the cache table has no year_built/beds/baths/condition columns, so these are dropped"
+   },
+   "previously_documented": null,
+   "build_effort_hours": 8,
+   "lift_weakest10": {
+    "estimate": "0 (none of these counties is in the weakest 10)",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": "York SC: small",
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07: layer ?f=json (1 request)",
+   "fit": "Part of one build: add year_built, beds, baths, condition columns to the cache schema and map them."
+  },
+  {
+   "id": "barnwell_saluda_unmapped",
+   "name": "Barnwell and Saluda parcel layer fields the cache does not keep",
+   "owner": "Barnwell and Saluda County GIS (already in parcel_cache.PARCEL_LAYERS)",
+   "url": "see parcel_cache.PARCEL_LAYERS url",
+   "geography": "SC: Barnwell and Saluda",
+   "category": "property_facts",
+   "fields": [
+    "Year_Built",
+    "SqFt_1st/2nd",
+    "F__Bedrms",
+    "F__Baths",
+    "Consideration__",
+    "True_Sale_Code"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": null,
+   "coverage": "Field names read from the layer metadata 2026-10-07. Board: Barnwell 1,103 and Saluda 416 parcel-id rows; year 0%.",
+   "already_ingested": {
+    "status": "partial",
+    "module": "parcel_cache.PARCEL_LAYERS",
+    "completeness": "layer already downloaded weekly; the cache table has no year_built/beds/baths/condition columns, so these are dropped"
+   },
+   "previously_documented": null,
+   "build_effort_hours": 8,
+   "lift_weakest10": {
+    "estimate": "0 (none of these counties is in the weakest 10)",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": "Barnwell + Saluda: year/sqft/beds up to +1,500",
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07: layer ?f=json (1 request)",
+   "fit": "Part of one build: add year_built, beds, baths, condition columns to the cache schema and map them."
+  },
+  {
+   "id": "mcdowell_chester_unmapped",
+   "name": "McDowell (NC) and Chester (SC) parcel layer fields the cache does not keep",
+   "owner": "McDowell (NC) and Chester (SC) County GIS (already in parcel_cache.PARCEL_LAYERS)",
+   "url": "see parcel_cache.PARCEL_LAYERS url",
+   "geography": "NC/SC: McDowell (NC) and Chester (SC)",
+   "category": "property_facts",
+   "fields": [
+    "structyear, saledate (McDowell)",
+    "Bedrooms, Stories, DEED_SQFT (Chester)"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": null,
+   "coverage": "Field names read from the layer metadata 2026-10-07. Board: McDowell 2,875 parcel-id rows lack year.",
+   "already_ingested": {
+    "status": "partial",
+    "module": "parcel_cache.PARCEL_LAYERS",
+    "completeness": "layer already downloaded weekly; the cache table has no year_built/beds/baths/condition columns, so these are dropped"
+   },
+   "previously_documented": null,
+   "build_effort_hours": 8,
+   "lift_weakest10": {
+    "estimate": "0 (none of these counties is in the weakest 10)",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": "McDowell: year built up to +2,875",
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07: layer ?f=json (1 request)",
+   "fit": "Part of one build: add year_built, beds, baths, condition columns to the cache schema and map them."
+  },
+  {
+   "id": "mecklenburg_taxparcel_camadata",
+   "name": "Mecklenburg County TaxParcel_camadata",
+   "owner": "Mecklenburg County GIS",
+   "url": "https://meckgis.mecklenburgcountync.gov/server/rest/services/TaxParcel_camadata/FeatureServer/0",
+   "geography": "NC: Mecklenburg",
+   "category": "property_facts",
+   "fields": [
+    "nc_pin",
+    "owner names",
+    "mailaddr1/2",
+    "saleprice",
+    "saledate",
+    "validsale",
+    "heatedarea",
+    "yearbuilt",
+    "effyearblt",
+    "bedrooms",
+    "fullbath/halfbath",
+    "grade",
+    "storyheight",
+    "total market value"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": null,
+   "coverage": "448,705 rows (returnCountOnly). Board Mecklenburg: 15,820 rows; 6,802 with a parcel id; sqft 0.1%, year 0.2%, sale 0%.",
+   "already_ingested": {
+    "status": "partial",
+    "module": "enrichment_arcgis.py reads TaxParcel_Camaownershipvalues (ownership/values) for situs only",
+    "completeness": "the CAMA layer is not read"
+   },
+   "previously_documented": null,
+   "build_effort_hours": 4,
+   "lift_weakest10": {
+    "estimate": "0 (NC)",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": "Mecklenburg: sqft/year/beds/sale up to +6,800",
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07: layer fields and count (2 requests)",
+   "fit": "High facts lift; one PARCEL_LAYERS entry (sqft, sale) plus the schema columns for year/beds."
+  },
+  {
+   "id": "wake_parcels_mapserver",
+   "name": "Wake County Property/Parcels MapServer",
+   "owner": "Wake County GIS",
+   "url": "https://maps.wake.gov/arcgis/rest/services/Property/Parcels/MapServer/0",
+   "geography": "NC: Wake",
+   "category": "property_facts",
+   "fields": [
+    "PIN_NUM",
+    "OWNER",
+    "ADDR1-3 (mailing)",
+    "SITE_ADDRESS",
+    "HEATEDAREA",
+    "YEAR_BUILT",
+    "TOTSALPRICE",
+    "SALE_DATE",
+    "BLDG_VAL",
+    "LAND_VAL"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": null,
+   "coverage": "maxRecordCount 2,000. Board Wake: 10,553 rows; 4,768 with a parcel id; sqft 0%, year 0%, sale 2%.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": "Wake is cached from NC OneMap, which has no sqft, year or sale price"
+   },
+   "previously_documented": null,
+   "build_effort_hours": 3,
+   "lift_weakest10": {
+    "estimate": "0 (NC)",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": "Wake: sqft/year/sale up to +4,766",
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07: layer fields (1 request)",
+   "fit": "High facts lift for a big county."
+  },
+  {
+   "id": "cumberland_tax_parcels",
+   "name": "Cumberland County NC Tax/Parcels",
+   "owner": "Cumberland County GIS",
+   "url": "https://gis.co.cumberland.nc.us/server/rest/services/Tax/Parcels/MapServer/0",
+   "geography": "NC: Cumberland",
+   "category": "property_facts",
+   "fields": [
+    "PIN",
+    "OWNER",
+    "ADDRESS",
+    "HEATED_AREA",
+    "YEAR_BUILT",
+    "EFF_YEAR",
+    "GRADE",
+    "CONDITION",
+    "BEDROOMS",
+    "BATH_FULL/HALF",
+    "PKG_SALE_DATE/PRICE",
+    "values"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": null,
+   "coverage": "Board Cumberland: 3,436 rows; 537 with a parcel id; facts about 3%.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": "cached from NC OneMap"
+   },
+   "previously_documented": null,
+   "build_effort_hours": 3,
+   "lift_weakest10": {
+    "estimate": "0 (NC)",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": "Cumberland: +537 facts by id",
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07: layer fields (1 request)",
+   "fit": "Includes CONDITION and GRADE: a direct condition input."
+  },
+  {
+   "id": "onslow_parcels_full_data",
+   "name": "Onslow County 'Parcels - Full Data'",
+   "owner": "Onslow County GIS",
+   "url": "https://gismaps.onslowcountync.gov/server/rest/services/WEB_PUBLICATIONS/County_Map_Layers/MapServer/0",
+   "geography": "NC: Onslow",
+   "category": "property_facts",
+   "fields": [
+    "PIN",
+    "OWNER1/2",
+    "ADDRLINE1-3, MAILCITY/STATE/ZIP",
+    "PHYSICALADDRESS",
+    "SALEDATE/PRICE",
+    "YEARBUILT",
+    "NUMBEROFBEDROOMS",
+    "baths",
+    "HEATEDSQUAREFEET",
+    "TAXMARKETVALUE"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": null,
+   "coverage": "Board Onslow: 3,952 rows; 1,209 with a parcel id; sqft 1.1%, mail 27.3%; 1,087 parcel-id rows already have a cached mailing not yet joined.",
+   "already_ingested": {
+    "status": "partial",
+    "module": "enrichment_arcgis.py (live GISWebsiteLayers/7 for situs)",
+    "completeness": "the full-data layer is not cached"
+   },
+   "previously_documented": null,
+   "build_effort_hours": 3,
+   "lift_weakest10": {
+    "estimate": "0 (NC)",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": "Onslow: facts up to +1,178",
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07: layer fields (1 request)",
+   "fit": "Facts and mail for a coastal county."
+  },
+  {
+   "id": "guilford_gc_parcels",
+   "name": "Guilford County GC_Parcels",
+   "owner": "Guilford County GIS",
+   "url": "https://gcgis.guilfordcountync.gov/arcgis/rest/services/GC_Cadastral_Current/GC_Parcels/FeatureServer/0",
+   "geography": "NC: Guilford",
+   "category": "property_facts",
+   "fields": [
+    "PIN",
+    "PROPERTY_OWNER",
+    "OWNER_MAIL_1-3, city, state, ZIP",
+    "situs parts",
+    "assessed values",
+    "PKG_SALE_DATE",
+    "more fields past the 600-character print"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": null,
+   "coverage": "132 fields, maxRecordCount 2,000. Board Guilford: 10,326 rows; 998 with a parcel id; mail 13.7%; sqft 1.1%.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": "repo notes Guilford's OneMap cache has no situs"
+   },
+   "previously_documented": null,
+   "build_effort_hours": 3,
+   "lift_weakest10": {
+    "estimate": "0 (NC)",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": "Guilford: mail/situs for up to +998 by id",
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07: layer fields (1 request)",
+   "fit": "Mail and situs for Guilford; facts fields not fully listed."
+  },
+  {
+   "id": "durham_county_parcels_chapel_hill",
+   "name": "Durham County Parcels (Town of Chapel Hill open data copy)",
+   "owner": "Town of Chapel Hill GIS (Durham County data)",
+   "url": "https://gis-portal.townofchapelhill.org/server/rest/services/OpenData/DurhamCountyParcels/MapServer/0",
+   "geography": "NC: Durham",
+   "category": "property_facts",
+   "fields": [
+    "PIN",
+    "PROPERTY_OWNER",
+    "OWNER_MAIL_1-3 + city/state/ZIP",
+    "situs parts",
+    "values"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": "A town's copy of county data; currency not checked.",
+   "coverage": "maxRecordCount 10,000; 98 fields. Board Durham: 5,030 rows; 2,343 with a parcel id; sqft 0.6%.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": 3,
+   "lift_weakest10": {
+    "estimate": "0 (NC)",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": "Durham: values/mail",
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07: layer fields (1 request)",
+   "fit": "Mail and values; no heated area seen in the field list."
+  },
+  {
+   "id": "forsyth_property_cityofws",
+   "name": "Forsyth parcels (City of Winston-Salem Property2 layer 3)",
+   "owner": "City of Winston-Salem",
+   "url": "https://arcgis2.cityofws.org/arcgissmwa02/rest/services/OICv2/Property2/MapServer/3",
+   "geography": "NC: Forsyth",
+   "category": "property_facts",
+   "fields": [
+    "PIN",
+    "T_OWNERS_NAME/2",
+    "T_OWNER_ADR_1/2",
+    "PO box",
+    "unit"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": null,
+   "coverage": "44 fields; no sqft/year. Board Forsyth: 9,581 rows; 6,348 with a parcel id; sqft 0.8%.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": 2,
+   "lift_weakest10": {
+    "estimate": "0 (NC)",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": "Forsyth: mail",
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07: layer fields (1 request)",
+   "fit": "Mail only; Forsyth facts still need another source."
+  },
+  {
+   "id": "new_hanover_property_owners",
+   "name": "New Hanover County PropertyOwners",
+   "owner": "New Hanover County GIS",
+   "url": "https://gis.nhcgov.com/server/rest/services/Layers/PropertyOwners/FeatureServer/0",
+   "geography": "NC: New Hanover",
+   "category": "sale_transfer",
+   "fields": [
+    "owner",
+    "owner street/city/state/ZIP",
+    "SALE_DATE",
+    "SALE_PRICE",
+    "SALE_BOOK/PAGE",
+    "AREASUM",
+    "appraised value year"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": null,
+   "coverage": "54 fields. Board New Hanover: 5,129 rows; 3,477 with a parcel id; sale 0%, year 0%.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": 3,
+   "lift_weakest10": {
+    "estimate": "0 (NC)",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": "New Hanover: last sale up to +3,476",
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07: layer fields (1 request)",
+   "fit": "Last sale for 3,476 parcel-id rows."
+  },
+  {
+   "id": "wayne_nc_appraisal_file",
+   "name": "Wayne County NC appraisal data file",
+   "owner": "Wayne County NC Tax Department",
+   "url": "https://www.waynegov.com/ (no data-file link found)",
+   "geography": "NC: Wayne",
+   "category": "property_facts",
+   "fields": [
+    "not verified"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": null,
+   "coverage": "The county home page lists Pay Taxes, GIS Maps and a Property Tax Simulator; no appraisal-file link was found in one fetch, and the session's web-search budget was spent. Board Wayne: 1,087 rows, 156 with a parcel id.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "0 (NC)",
+    "reasoning": "",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": "Ask the Wayne tax office for the appraisal export, or find it under the GIS Maps link.",
+   "verified": "fetched 2026-10-07: home page (1 request)",
+   "fit": "Could not confirm the file exists today."
+  },
+  {
+   "id": "nc_voter_file_statewide",
+   "name": "NC State Board of Elections voter file (statewide)",
+   "owner": "NCSBE",
+   "url": "https://s3.amazonaws.com/dl.ncsbe.gov/data/ncvoter_Statewide.zip",
+   "geography": "NC statewide",
+   "category": "contact_public_record",
+   "fields": [
+    "name",
+    "residential address",
+    "full_phone_number",
+    "registration status"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": "NC G.S. 163-82.10: registration records are public; phone and address are public, birth date is not released.",
+   "coverage": "522,471,884 bytes (HEAD, 2026-09-21). About 69% of voters carry a phone per the module docstring.",
+   "already_ingested": {
+    "status": "partial",
+    "module": "enrichment_voter_phone.py",
+    "completeness": "13 footprint county files cached 2026-06-28; other NC counties not matched"
+   },
+   "previously_documented": "docs/sc_phone_research_2026-09-21.md section 3",
+   "build_effort_hours": 3,
+   "lift_weakest10": {
+    "estimate": "0 (SC)",
+    "reasoning": "NC only.",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": "NC non-footprint counties: phone up to +20 pts on owner-occupied rows (guess)",
+   "manual_steps": null,
+   "verified": "repo (not re-fetched)",
+   "fit": "Extending to all 100 counties lifts NC owner-occupant phones outside the footprint."
+  },
+  {
+   "id": "sc_voter_list",
+   "name": "SC Election Commission voter list",
+   "owner": "SC Election Commission",
+   "url": "https://scvotes.gov/resources/sale-of-voter-registration-lists/",
+   "geography": "SC statewide",
+   "category": "contact_public_record",
+   "fields": [
+    "name",
+    "address",
+    "no phone",
+    "no email"
+   ],
+   "access_class": "paid",
+   "price": "$25 to $2,500",
+   "legal_notes": "Buyer must be a registered SC voter (7-3-20(D)(13)); 30-2-50 notice.",
+   "coverage": "No phone column.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": "docs/sc_phone_research_2026-09-21.md",
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "0 phone; mail already comes from the roll",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "repo 2026-09-21",
+   "fit": "Not worth buying for contact."
+  },
+  {
+   "id": "nc_sos_master_files",
+   "name": "NC Secretary of State Business Registration Master Files subscription",
+   "owner": "NC Department of the Secretary of State",
+   "url": "https://www.sosnc.gov/online_services/data_subscriptions",
+   "geography": "NC statewide",
+   "category": "contact_public_record",
+   "fields": [
+    "entity names",
+    "registered agents and addresses",
+    "officers (as filed)",
+    "principal office"
+   ],
+   "access_class": "paid",
+   "price": "$750 one-time setup + $2,000 per state fiscal year",
+   "legal_notes": "The SoS business registration page states: 'Automated or scripted searches may degrade system performance and are not permitted. For bulk access to public data, please use our Data Subscription Services.' This bears on the repo's automated NC SoS lookups (enrichment_sos_agent / sos_agent hand-off).",
+   "coverage": "Not measured; fields per the subscription contract.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": "per-entity lookups exist via enrichment_sos_agent; the bulk file is not bought"
+   },
+   "previously_documented": "docs/blocked_sources_forensic.md (mentions data subscription)",
+   "build_effort_hours": 6,
+   "lift_weakest10": {
+    "estimate": "0 (NC)",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": "NC entity-owned rows: registered agent/officer contact for all, without scripted searches",
+   "manual_steps": "Email the SoS data-subscription contact, sign the contract, pay $2,750 for year one, load the file.",
+   "verified": "fetched 2026-10-07: data_subscriptions page and fee page",
+   "fit": "The compliant replacement for automated SoS lookups; also covers every NC entity owner at once."
+  },
+  {
+   "id": "nc_sos_federal_tax_lien_files",
+   "name": "NC Secretary of State Federal Tax Lien data files",
+   "owner": "NC Department of the Secretary of State",
+   "url": "https://www.sosnc.gov/fees/by_title/_data_subscriptions",
+   "geography": "NC statewide",
+   "category": "contact_public_record",
+   "fields": [
+    "federal tax liens filed with SoS (debtor name, address, amount)"
+   ],
+   "access_class": "paid",
+   "price": "$1,600 per year (no images), plus the $750 setup",
+   "legal_notes": null,
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": 4,
+   "lift_weakest10": {
+    "estimate": "0 (NC)",
+    "reasoning": "",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07: fee page",
+   "fit": "A distress signal with debtor addresses; entity debtors mainly (individuals' liens file with the county register)."
+  },
+  {
+   "id": "nc_sos_ucc_files",
+   "name": "NC Secretary of State UCC data files",
+   "owner": "NC Department of the Secretary of State",
+   "url": "https://www.sosnc.gov/fees/by_title/_data_subscriptions",
+   "geography": "NC statewide",
+   "category": "contact_public_record",
+   "fields": [
+    "UCC debtor names and addresses",
+    "secured parties"
+   ],
+   "access_class": "paid",
+   "price": "$4,000 per year (no images); images $5,200 per year",
+   "legal_notes": null,
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "no",
+    "module": "scrapers nc_sos_ucc (disabled, dormant)",
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": 4,
+   "lift_weakest10": {
+    "estimate": "0 (NC)",
+    "reasoning": "",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07: fee page",
+   "fit": "Debtor addresses for businesses; low lift for houses."
+  },
+  {
+   "id": "sc_sos_business_filings",
+   "name": "SC Secretary of State business filings search",
+   "owner": "SC Secretary of State",
+   "url": "https://businessfilings.sc.gov/BusinessFiling/Entity/Search",
+   "geography": "SC statewide",
+   "category": "contact_public_record",
+   "fields": [
+    "registered agent",
+    "registered office"
+   ],
+   "access_class": "CAPTCHA",
+   "price": null,
+   "legal_notes": "reCAPTCHA; no phone or email even when it works.",
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": "docs/sc_phone_research_2026-09-21.md",
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "0",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": "Search the entity by hand in a browser.",
+   "verified": "repo 2026-09-21",
+   "fit": "Manual only."
+  },
+  {
+   "id": "nclbgc_licensee_search",
+   "name": "NC Licensing Board for General Contractors licensee search",
+   "owner": "NCLBGC",
+   "url": "https://nclbgc.org/",
+   "geography": "NC statewide",
+   "category": "contact_public_record",
+   "fields": [
+    "licensee name",
+    "business address",
+    "phone (business)"
+   ],
+   "access_class": "bot-check",
+   "price": null,
+   "legal_notes": "Cloudflare 'Just a moment...' on a plain GET.",
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "0",
+    "reasoning": "Builder-owned NC parcels only.",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": "Look the builder up by hand.",
+   "verified": "fetched 2026-10-07 (HTTP 403 Cloudflare)",
+   "fit": "Low value; walled."
+  },
+  {
+   "id": "ncrec_licensee_search",
+   "name": "NC Real Estate Commission licensee search",
+   "owner": "NCREC",
+   "url": "https://www.ncrec.gov/",
+   "geography": "NC statewide",
+   "category": "contact_public_record",
+   "fields": [
+    "broker name",
+    "firm",
+    "business contact"
+   ],
+   "access_class": "JS-app",
+   "price": null,
+   "legal_notes": null,
+   "coverage": "Not measured; broker contacts are agents, not owners.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "0",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07 (HTTP 200, search behind a JS app)",
+   "fit": "Not an owner source."
+  },
+  {
+   "id": "sc_llr_licensee_lists",
+   "name": "SC LLR licensee lists",
+   "owner": "SC Labor, Licensing and Regulation",
+   "url": "https://llr.sc.gov/",
+   "geography": "SC statewide",
+   "category": "contact_public_record",
+   "fields": [
+    "licensee names and addresses"
+   ],
+   "access_class": "paid",
+   "price": "$10 per board list by mailed check",
+   "legal_notes": "Signed intended-use statement citing 30-2-50.",
+   "coverage": "Not sampled.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": "docs/sc_phone_research_2026-09-21.md",
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "0",
+    "reasoning": "Only licensed owners.",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": "Mail the request form with a check.",
+   "verified": "repo 2026-09-21",
+   "fit": "Tiny."
+  },
+  {
+   "id": "nc_aoc_remote_public_access",
+   "name": "NC court records remote public access (bulk/remote program)",
+   "owner": "NC Administrative Office of the Courts",
+   "url": "https://www.nccourts.gov/ (program page not found at the guessed path)",
+   "geography": "NC statewide",
+   "category": "contact_public_record",
+   "fields": [
+    "party names",
+    "party addresses on some case types"
+   ],
+   "access_class": "paid",
+   "price": "not verified",
+   "legal_notes": "Licence agreement; eCourts portal itself is AWS-WAF CAPTCHA for automated use.",
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": "docs/county_records/README.md (eCourts)",
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "0 (NC)",
+    "reasoning": "",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": "Ask NCAOC about the current remote/bulk data program and its licence.",
+   "verified": "fetched 2026-10-07 (HTTP 404 at /services/remote-public-access)",
+   "fit": "Unverified."
+  },
+  {
+   "id": "nc_cash_unclaimed_property",
+   "name": "NC Cash unclaimed property search",
+   "owner": "NC Department of State Treasurer",
+   "url": "https://www.nccash.com/",
+   "geography": "NC statewide",
+   "category": "contact_heir",
+   "fields": [
+    "owner name",
+    "last known address (city)",
+    "holder",
+    "amount band"
+   ],
+   "access_class": "JS-app",
+   "price": null,
+   "legal_notes": "Per-name search; no bulk file offered on the site.",
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": "docs/OWNER_MANUAL_LANES.md (unclaimed mention)",
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "0",
+    "reasoning": "A lead-qualifying signal, not contact.",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": "Search an owner or estate name by hand; unclaimed funds in an estate name hint at heirs.",
+   "verified": "fetched 2026-10-07 (HTTP 200)",
+   "fit": "Manual heir research aid."
+  },
+  {
+   "id": "sc_unclaimed_property",
+   "name": "SC State Treasurer unclaimed property search",
+   "owner": "SC State Treasurer",
+   "url": "https://treasurer.sc.gov/what-we-do/for-citizens/unclaimed-property-program/",
+   "geography": "SC statewide",
+   "category": "contact_heir",
+   "fields": [
+    "owner name",
+    "last known city"
+   ],
+   "access_class": "JS-app",
+   "price": null,
+   "legal_notes": "SC Code 30-2-50: personal information obtained from a state agency or local government may not be used for commercial solicitation; whether a cash offer to buy a house is solicitation is an open question for SC counsel (docs/sc_phone_research_2026-09-21.md section 4).",
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "0",
+    "reasoning": "",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": "Search by hand.",
+   "verified": "fetched 2026-10-07 (HTTP 200)",
+   "fit": "Manual heir research aid."
+  },
+  {
+   "id": "faa_releasable_airmen",
+   "name": "FAA releasable airmen database download",
+   "owner": "Federal Aviation Administration",
+   "url": "https://www.faa.gov/licenses_certificates/airmen_certification/releasable_airmen_download",
+   "geography": "US",
+   "category": "contact_public_record",
+   "fields": [
+    "name",
+    "mailing address (unless the airman opted out)",
+    "certificates"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": "Federal; not a 30-2-50 source. Airmen may withhold their address.",
+   "coverage": "Page confirms TXT/CSV downloads updated monthly (upload date October 1). Not sampled.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": 3,
+   "lift_weakest10": {
+    "estimate": "+0 to +20 rows mail (guess)",
+    "reasoning": "Only owners who are pilots; mail already comes from the roll where a roll exists.",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 10,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07 (HTTP 200)",
+   "fit": "Negligible."
+  },
+  {
+   "id": "faa_aircraft_registry",
+   "name": "FAA aircraft registry download (ReleasableAircraft.zip)",
+   "owner": "Federal Aviation Administration",
+   "url": "https://registry.faa.gov/database/ReleasableAircraft.zip",
+   "geography": "US",
+   "category": "contact_public_record",
+   "fields": [
+    "registered owner name",
+    "owner address"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": null,
+   "coverage": "HEAD answered 503; size not confirmed.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": 3,
+   "lift_weakest10": {
+    "estimate": "~0",
+    "reasoning": "",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07 (HEAD 503)",
+   "fit": "Negligible."
+  },
+  {
+   "id": "atf_ffl_listing",
+   "name": "ATF federal firearms licensee listing",
+   "owner": "ATF",
+   "url": "https://www.atf.gov/firearms/listing-federal-firearms-licensees",
+   "geography": "US",
+   "category": "contact_public_record",
+   "fields": [
+    "licensee name",
+    "premises address",
+    "mailing address",
+    "voice phone"
+   ],
+   "access_class": "bot-check",
+   "price": null,
+   "legal_notes": "Akamai 'Access Denied' to a plain GET.",
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "~0",
+    "reasoning": "",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": "Download the monthly file in a browser.",
+   "verified": "fetched 2026-10-07 (HTTP 403 Akamai)",
+   "fit": "Negligible."
+  },
+  {
+   "id": "irs_eo_bmf",
+   "name": "IRS Exempt Organizations Business Master File (state extracts)",
+   "owner": "IRS SOI",
+   "url": "https://www.irs.gov/pub/irs-soi/eo_nc.csv and eo_sc.csv",
+   "geography": "NC, SC",
+   "category": "contact_public_record",
+   "fields": [
+    "organization name",
+    "EIN",
+    "street, city, state, ZIP (mailing)",
+    "subsection/classification"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": null,
+   "coverage": "Both state CSVs answered HTTP 200 to HEAD. Not downloaded.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": 3,
+   "lift_weakest10": {
+    "estimate": "+0 to +50 rows mail (guess)",
+    "reasoning": "Church, VFW and nonprofit owners on the board can be matched by exact name for a mailing address and EIN.",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 25,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07 (HEAD 200 x2)",
+   "fit": "Small, clean entity-owner mail source."
+  },
+  {
+   "id": "sba_ppp_foia",
+   "name": "SBA PPP loan-level FOIA data",
+   "owner": "US Small Business Administration",
+   "url": "https://data.sba.gov/dataset/ppp-foia",
+   "geography": "US",
+   "category": "contact_public_record",
+   "fields": [
+    "borrower business name",
+    "address",
+    "NAICS",
+    "loan amount"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": null,
+   "coverage": "Files public_150k_plus_240930.csv and public_up_to_150k_*_240930.csv listed.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": "docs/net_new_source_register.md",
+   "build_effort_hours": 3,
+   "lift_weakest10": {
+    "estimate": "+0 to +30 rows (guess)",
+    "reasoning": "Entity-owner corroboration only; no phone.",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 15,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07 (HTTP 200)",
+   "fit": "Low."
+  },
+  {
+   "id": "sec_edgar_company",
+   "name": "SEC EDGAR company submissions API",
+   "owner": "SEC",
+   "url": "https://data.sec.gov/submissions/",
+   "geography": "US",
+   "category": "contact_public_record",
+   "fields": [
+    "registrant business address",
+    "business phone"
+   ],
+   "access_class": "terms-only",
+   "price": null,
+   "legal_notes": "SEC fair-access policy requires a declared User-Agent with contact details and 10 requests per second at most.",
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": 2,
+   "lift_weakest10": {
+    "estimate": "~0",
+    "reasoning": "Public companies rarely own distressed houses.",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "not fetched",
+   "fit": "Negligible."
+  },
+  {
+   "id": "fmcsa_company_census",
+   "name": "FMCSA company census",
+   "owner": "US DOT FMCSA",
+   "url": "https://data.transportation.gov/resource/az4n-8mr2.json",
+   "geography": "US",
+   "category": "contact_public_record",
+   "fields": [
+    "legal name",
+    "phone",
+    "cell phone",
+    "email"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": null,
+   "coverage": "SC: 62,750 records, 98% phone; 0 corroborated matches of 20 (2026-09-21).",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": "docs/sc_phone_research_2026-09-21.md",
+   "build_effort_hours": 4,
+   "lift_weakest10": {
+    "estimate": "+0 to +0.3 pts phone",
+    "reasoning": "",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 30,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "repo 2026-09-21",
+   "fit": "Low."
+  },
+  {
+   "id": "nppes_npi",
+   "name": "NPPES NPI registry",
+   "owner": "CMS",
+   "url": "https://npiregistry.cms.hhs.gov/api/",
+   "geography": "US",
+   "category": "contact_public_record",
+   "fields": [
+    "provider name",
+    "practice address",
+    "phone"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": null,
+   "coverage": "0 of 14 sampled persons (2026-09-21).",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": "docs/sc_phone_research_2026-09-21.md",
+   "build_effort_hours": 4,
+   "lift_weakest10": {
+    "estimate": "~0",
+    "reasoning": "",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "repo 2026-09-21",
+   "fit": "Low."
+  },
+  {
+   "id": "fcc_uls_amateur",
+   "name": "FCC ULS amateur licence file",
+   "owner": "FCC",
+   "url": "https://data.fcc.gov/download/pub/uls/complete/l_amat.zip",
+   "geography": "US",
+   "category": "contact_public_record",
+   "fields": [
+    "name",
+    "address",
+    "phone/email columns (empty in practice)"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": null,
+   "coverage": "0 phone of 124 in a daily file (2026-09-21).",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": "docs/sc_phone_research_2026-09-21.md",
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "0",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "repo 2026-09-21",
+   "fit": "Dead."
+  },
+  {
+   "id": "osm_overture_places",
+   "name": "OpenStreetMap / Overture Places phone tags",
+   "owner": "OSM contributors / Overture Maps Foundation",
+   "url": "https://docs.overturemaps.org/",
+   "geography": "US",
+   "category": "contact_commercial",
+   "fields": [
+    "business phone",
+    "email"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": "ODbL / CDLA.",
+   "coverage": "About 1% of addressed objects in Spartanburg carry a phone (2026-09-21).",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": "docs/sc_phone_research_2026-09-21.md",
+   "build_effort_hours": 6,
+   "lift_weakest10": {
+    "estimate": "+0 to +0.3 pts",
+    "reasoning": "Business lines at commercial parcels.",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 20,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "repo 2026-09-21",
+   "fit": "Low."
+  },
+  {
+   "id": "nc_wrc_boat_registration",
+   "name": "NC Wildlife Resources Commission boat registrations",
+   "owner": "NC WRC",
+   "url": "https://www.ncwildlife.gov/",
+   "geography": "NC statewide",
+   "category": "contact_public_record",
+   "fields": [
+    "owner name",
+    "address"
+   ],
+   "access_class": "paid",
+   "price": "not verified (records request)",
+   "legal_notes": "Public-records status of registrant data not verified.",
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "~0",
+    "reasoning": "",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": "File a records request.",
+   "verified": "fetched 2026-10-07 (HTTP 404 at the guessed registration page)",
+   "fit": "Unverified, low."
+  },
+  {
+   "id": "sc_dnr_watercraft",
+   "name": "SC DNR watercraft and outboard registrations",
+   "owner": "SC DNR",
+   "url": "https://www.dnr.sc.gov/boating/",
+   "geography": "SC statewide",
+   "category": "contact_public_record",
+   "fields": [
+    "owner name",
+    "address"
+   ],
+   "access_class": "paid",
+   "price": "not verified",
+   "legal_notes": "SC Code 30-2-50: personal information obtained from a state agency or local government may not be used for commercial solicitation; whether a cash offer to buy a house is solicitation is an open question for SC counsel (docs/sc_phone_research_2026-09-21.md section 4). Disclosure rules for registrant data not verified.",
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "~0",
+    "reasoning": "",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": "File a records request.",
+   "verified": "fetched 2026-10-07 (HTTP 200, boating index only)",
+   "fit": "Unverified, low."
+  },
+  {
+   "id": "concealed_carry_permits",
+   "name": "Concealed handgun permit holders",
+   "owner": "County sheriffs (NC), SLED (SC)",
+   "url": "n/a",
+   "geography": "NC, SC",
+   "category": "contact_public_record",
+   "fields": [
+    "holder name and address"
+   ],
+   "access_class": "login",
+   "price": null,
+   "legal_notes": "Confidential: NC G.S. 14-415.17(c) bars release of the permit-holder list; SC status not verified.",
+   "coverage": "n/a",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "0",
+    "reasoning": "Legally closed.",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "not fetched",
+   "fit": "Closed by statute (NC)."
+  },
+  {
+   "id": "dmv_records",
+   "name": "NC DMV / SC DMV owner records",
+   "owner": "NC DMV, SC DMV",
+   "url": "n/a",
+   "geography": "NC, SC",
+   "category": "contact_public_record",
+   "fields": [
+    "name",
+    "address"
+   ],
+   "access_class": "login",
+   "price": null,
+   "legal_notes": "Driver's Privacy Protection Act, 18 U.S.C. 2721: permissible-purpose access only.",
+   "coverage": "n/a",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "0",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "not fetched",
+   "fit": "Closed."
+  },
+  {
+   "id": "utility_customer_records",
+   "name": "Municipal and county utility customer accounts",
+   "owner": "Local utilities",
+   "url": "n/a",
+   "geography": "NC, SC",
+   "category": "contact_public_record",
+   "fields": [
+    "account holder",
+    "phone",
+    "service address"
+   ],
+   "access_class": "login",
+   "price": null,
+   "legal_notes": "NC G.S. 132-1.1(c): billing information of a public utility enterprise is not a public record. SC: not verified.",
+   "coverage": "n/a",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "0",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "not fetched",
+   "fit": "Closed in NC."
+  },
+  {
+   "id": "nc_onemap_address_points",
+   "name": "NC 911 Board address points (NC OneMap)",
+   "owner": "NC 911 Board / NC OneMap",
+   "url": "https://www.nconemap.gov/",
+   "geography": "NC statewide",
+   "category": "open_dataset",
+   "fields": [
+    "site address",
+    "point"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": null,
+   "coverage": "Catalog page reachable (HTTP 200); dataset not opened.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": 4,
+   "lift_weakest10": {
+    "estimate": "0 (NC)",
+    "reasoning": "Geocode precision for NC address-only rows.",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07 (HTTP 200)",
+   "fit": "Precision aid for the NC resolver backlog."
+  },
+  {
+   "id": "usdot_national_address_database",
+   "name": "USDOT National Address Database",
+   "owner": "US DOT",
+   "url": "https://www.transportation.gov/gis/national-address-database",
+   "geography": "US",
+   "category": "open_dataset",
+   "fields": [
+    "address points from state partners"
+   ],
+   "access_class": "bot-check",
+   "price": null,
+   "legal_notes": "Akamai 'Access Denied' to a plain GET.",
+   "coverage": "NC/SC participation not confirmed.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "0",
+    "reasoning": "",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": "Download in a browser.",
+   "verified": "fetched 2026-10-07 (HTTP 403)",
+   "fit": "Unverified."
+  },
+  {
+   "id": "openaddresses",
+   "name": "OpenAddresses",
+   "owner": "OpenAddresses project",
+   "url": "https://batch.openaddresses.io/data",
+   "geography": "US",
+   "category": "open_dataset",
+   "fields": [
+    "address points with source attribution"
+   ],
+   "access_class": "JS-app",
+   "price": null,
+   "legal_notes": "Per-source licences.",
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": "docs/hermes_blueprint.md",
+   "build_effort_hours": 4,
+   "lift_weakest10": {
+    "estimate": "0",
+    "reasoning": "",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07 (JS app)",
+   "fit": "Precision aid."
+  },
+  {
+   "id": "overture_buildings",
+   "name": "Overture Maps buildings (height, num_floors)",
+   "owner": "Overture Maps Foundation",
+   "url": "https://docs.overturemaps.org/guides/buildings/",
+   "geography": "US",
+   "category": "property_facts",
+   "fields": [
+    "footprint",
+    "height",
+    "num_floors"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": "ODbL for the buildings theme.",
+   "coverage": "Not sampled for NC/SC.",
+   "already_ingested": {
+    "status": "partial",
+    "module": "enrichment_footprint_sqft.py (Microsoft footprints)",
+    "completeness": "levels not used"
+   },
+   "previously_documented": null,
+   "build_effort_hours": 6,
+   "lift_weakest10": {
+    "estimate": "+0 to +5 pts sqft estimate in the weakest 10 (guess)",
+    "reasoning": "Footprint x levels refines the existing footprint sqft estimate where levels exist.",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 300,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07 (docs page)",
+   "fit": "Refinement of an existing estimate."
+  },
+  {
+   "id": "twilio_lookup",
+   "name": "Twilio Lookup (line type, caller name, Identity Match)",
+   "owner": "Twilio",
+   "url": "https://www.twilio.com/en-us/user-authentication-identity/pricing/lookup",
+   "geography": "US",
+   "category": "contact_commercial",
+   "fields": [
+    "line type",
+    "carrier",
+    "caller name",
+    "identity match vs name/address"
+   ],
+   "access_class": "paid",
+   "price": "$0.01 per request for one US-only package; Identity Match $0.10 per request; tiered $0.02 to $0.003 for another package by volume",
+   "legal_notes": "TCPA, National DNC and state telemarketing rules govern any call or text.",
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "partial",
+    "module": "outreach.py (sending); enrichment_line_type.py",
+    "completeness": "Identity Match not used"
+   },
+   "previously_documented": "docs/blocked_sources_forensic.md",
+   "build_effort_hours": 4,
+   "lift_weakest10": {
+    "estimate": "0 new phones; verifies existing ones",
+    "reasoning": "Identity Match would turn the quarantined SC xref phones (enrichment_sc_phone gate) into verified or dropped.",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07 (pricing page)",
+   "fit": "Precision tool for phones already held."
+  },
+  {
+   "id": "national_dnc_registry",
+   "name": "National Do Not Call Registry access",
+   "owner": "FTC",
+   "url": "https://telemarketing.donotcall.gov/",
+   "geography": "US",
+   "category": "contact_commercial",
+   "fields": [
+    "DNC status by number"
+   ],
+   "access_class": "paid",
+   "price": "per-area-code annual fee (not verified today)",
+   "legal_notes": "TCPA, National DNC and state telemarketing rules govern any call or text.",
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "partial",
+    "module": "enrichment_dnc.py",
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "0",
+    "reasoning": "Compliance, not coverage.",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07 (HTTP 200)",
+   "fit": "Required before any calling."
+  },
+  {
+   "id": "tracerfy",
+   "name": "Tracerfy skip tracing",
+   "owner": "Tracerfy",
+   "url": "https://www.tracerfy.com/pricing",
+   "geography": "US",
+   "category": "contact_commercial",
+   "fields": [
+    "phones",
+    "emails",
+    "mailing"
+   ],
+   "access_class": "paid",
+   "price": "$0.02 per skip-trace hit (misses free); $0.10 per property record",
+   "legal_notes": "GLBA/DPPA-sourced data; TCPA, National DNC and state telemarketing rules govern any call or text.",
+   "coverage": "SC match rate not measured; 60-75% assumed from a comparable vendor.",
+   "already_ingested": {
+    "status": "partial",
+    "module": "contact_ingest.py (operator export lane)",
+    "completeness": null
+   },
+   "previously_documented": "docs/sc_phone_research_2026-09-21.md section 10",
+   "build_effort_hours": 2,
+   "lift_weakest10": {
+    "estimate": "Phone +9,500 to +11,900 rows across the weakest 10 for at most $317",
+    "reasoning": "15,870 rows x 60-75% match x $0.02. Match rate is an assumption.",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 10700,
+   "lift_other": null,
+   "manual_steps": "Export the rows, upload to Tracerfy, import the result through contact_ingest.",
+   "verified": "fetched 2026-10-07 (pricing page, $0.02/hit confirmed)",
+   "fit": "The only large phone lever for SC; a 25-lead pilot first."
+  },
+  {
+   "id": "reiskip",
+   "name": "REISkip",
+   "owner": "REISkip",
+   "url": "https://reiskip.com/pricing",
+   "geography": "US",
+   "category": "contact_commercial",
+   "fields": [
+    "phones",
+    "emails"
+   ],
+   "access_class": "paid",
+   "price": "$0.15 per match (introductory; minimum 50)",
+   "legal_notes": "TCPA, National DNC and state telemarketing rules govern any call or text.",
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": "docs/OWNER_MANUAL_LANES.md",
+   "build_effort_hours": 1,
+   "lift_weakest10": {
+    "estimate": "Same rows as Tracerfy at 7.5x the price",
+    "reasoning": "",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07",
+   "fit": "Dearer than Tracerfy."
+  },
+  {
+   "id": "batchdata_api",
+   "name": "BatchData property and skip-trace API",
+   "owner": "BatchData",
+   "url": "https://batchdata.io/pricing",
+   "geography": "US",
+   "category": "contact_commercial",
+   "fields": [
+    "property data",
+    "skip trace",
+    "reverse skip trace"
+   ],
+   "access_class": "paid",
+   "price": "Growth $1,000/mo for 100,000 records; Professional $2,500/mo 300,000; Scale $5,000/mo 750,000; Enterprise $10,000/mo",
+   "legal_notes": "TCPA, National DNC and state telemarketing rules govern any call or text.",
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": "docs/sc_phone_research_2026-09-21.md (as batchskiptracing.com)",
+   "build_effort_hours": 4,
+   "lift_weakest10": {
+    "estimate": "Phone, as Tracerfy",
+    "reasoning": "",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07",
+   "fit": "Volume API; overkill at this scale."
+  },
+  {
+   "id": "enformion_go",
+   "name": "EnformionGO (formerly Endato) people/contact API",
+   "owner": "Enformion",
+   "url": "https://endato.com/pricing/",
+   "geography": "US",
+   "category": "contact_commercial",
+   "fields": [
+    "contact enrichment",
+    "phones",
+    "emails",
+    "addresses"
+   ],
+   "access_class": "paid",
+   "price": "Starter from $0.25 per match (up to 5,000 searches); Pro as low as $0.01 per match",
+   "legal_notes": "GLBA/DPPA permissible purpose; TCPA, National DNC and state telemarketing rules govern any call or text.",
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": "docs/path_to_100.md",
+   "build_effort_hours": 4,
+   "lift_weakest10": {
+    "estimate": "Phone, as Tracerfy",
+    "reasoning": "",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07",
+   "fit": "API alternative."
+  },
+  {
+   "id": "propertyradar",
+   "name": "PropertyRadar",
+   "owner": "PropertyRadar",
+   "url": "https://www.propertyradar.com/pricing",
+   "geography": "US",
+   "category": "contact_commercial",
+   "fields": [
+    "owner",
+    "mailing",
+    "phones/emails (append)",
+    "property data"
+   ],
+   "access_class": "paid",
+   "price": "Solo $119/mo ($99 annual); team $249/mo ($199 annual)",
+   "legal_notes": "TCPA, National DNC and state telemarketing rules govern any call or text.",
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": "docs/OWNER_MANUAL_LANES.md",
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "Phone/mail by export",
+    "reasoning": "",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": "Operator export lane.",
+   "verified": "fetched 2026-10-07",
+   "fit": "Operator tool."
+  },
+  {
+   "id": "dealmachine",
+   "name": "DealMachine",
+   "owner": "DealMachine",
+   "url": "https://www.dealmachine.com/pricing",
+   "geography": "US",
+   "category": "contact_commercial",
+   "fields": [
+    "owner",
+    "phones",
+    "emails",
+    "property data"
+   ],
+   "access_class": "paid",
+   "price": "Basic $99/seat/mo (10,000 data credits); Pro $149/seat/mo (20,000)",
+   "legal_notes": "TCPA, National DNC and state telemarketing rules govern any call or text.",
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": "docs/path_to_100_deepdive.md",
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "Operator export",
+    "reasoning": "",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": "Operator export lane.",
+   "verified": "fetched 2026-10-07",
+   "fit": "Operator tool."
+  },
+  {
+   "id": "batchleads",
+   "name": "BatchLeads",
+   "owner": "BatchService",
+   "url": "https://batchleads.io/pricing",
+   "geography": "US",
+   "category": "contact_commercial",
+   "fields": [
+    "owner",
+    "phones and emails on every plan",
+    "lists"
+   ],
+   "access_class": "paid",
+   "price": "Growth $119/mo; Professional $349/mo; Scale $749/mo",
+   "legal_notes": "TCPA, National DNC and state telemarketing rules govern any call or text.",
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": "docs/MASTER_CHECKLIST.md",
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "Operator export",
+    "reasoning": "",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": "Operator export lane.",
+   "verified": "fetched 2026-10-07",
+   "fit": "Operator tool."
+  },
+  {
+   "id": "melissa",
+   "name": "Melissa address and identity APIs",
+   "owner": "Melissa",
+   "url": "https://www.melissa.com/pricing",
+   "geography": "US",
+   "category": "contact_commercial",
+   "fields": [
+    "CASS/DPV address verification",
+    "Personator identity (pricing not shown)"
+   ],
+   "access_class": "paid",
+   "price": "Address: pay-as-you-go from $40 for 10,000 credits (10 credits/address); free 250 records/month",
+   "legal_notes": null,
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "partial",
+    "module": "enrichment_court_owner_verify.py mentions Melissa",
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": 2,
+   "lift_weakest10": {
+    "estimate": "0 coverage; mail deliverability",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07",
+   "fit": "Verifies mail, adds none."
+  },
+  {
+   "id": "regrid_parcels",
+   "name": "Regrid nationwide parcel data",
+   "owner": "Regrid",
+   "url": "https://regrid.com/pricing",
+   "geography": "US",
+   "category": "property_facts",
+   "fields": [
+    "owner",
+    "owner mailing",
+    "situs",
+    "values",
+    "building fields where the county supplies them"
+   ],
+   "access_class": "paid",
+   "price": "not verified (pricing page carried no plain prices)",
+   "legal_notes": null,
+   "coverage": "NC/SC county coverage not verified; Regrid's tile service appears on ArcGIS Online.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": "docs/MASTER_SOURCE_AND_COUNTY_REGISTER.md",
+   "build_effort_hours": 6,
+   "lift_weakest10": {
+    "estimate": "Up to +9,700 rows mail in the weakest 10 if Regrid carries these counties' owner mailing",
+    "reasoning": "Guess: same row base as the SCDOT route.",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 9700,
+   "lift_other": null,
+   "manual_steps": "Buy a county or state extract; load it like an assessor roll.",
+   "verified": "fetched 2026-10-07 (page, no prices)",
+   "fit": "Paid substitute for walled SC rolls; price unknown."
+  },
+  {
+   "id": "reportall_usa",
+   "name": "ReportAll USA parcel API",
+   "owner": "ReportAll",
+   "url": "https://reportallusa.com/products/api",
+   "geography": "US",
+   "category": "property_facts",
+   "fields": [
+    "owner",
+    "mailing",
+    "parcel attributes"
+   ],
+   "access_class": "paid",
+   "price": "not verified",
+   "legal_notes": null,
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": 6,
+   "lift_weakest10": {
+    "estimate": "As Regrid (guess)",
+    "reasoning": "",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07 (page, no prices)",
+   "fit": "Alternative to Regrid."
+  },
+  {
+   "id": "attom_api",
+   "name": "ATTOM property data API",
+   "owner": "ATTOM",
+   "url": "https://www.attomdata.com/solutions/property-data-api/",
+   "geography": "US",
+   "category": "property_facts",
+   "fields": [
+    "owner",
+    "mailing",
+    "AVM",
+    "sales",
+    "building"
+   ],
+   "access_class": "paid",
+   "price": "not verified (enterprise)",
+   "legal_notes": null,
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": "docs/path_to_100.md",
+   "build_effort_hours": 6,
+   "lift_weakest10": {
+    "estimate": "As Regrid (guess)",
+    "reasoning": "",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07 (page behind a challenge)",
+   "fit": "Enterprise pricing."
+  },
+  {
+   "id": "realestateapi",
+   "name": "RealEstateAPI.com property and skip-trace API",
+   "owner": "RealEstateAPI",
+   "url": "https://www.realestateapi.com/pricing",
+   "geography": "US",
+   "category": "contact_commercial",
+   "fields": [
+    "property",
+    "owner",
+    "skip trace"
+   ],
+   "access_class": "paid",
+   "price": "not verified (prices rendered by JavaScript)",
+   "legal_notes": "TCPA, National DNC and state telemarketing rules govern any call or text.",
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": 4,
+   "lift_weakest10": {
+    "estimate": "As Tracerfy (guess)",
+    "reasoning": "",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07 (JS page)",
+   "fit": "Unpriced."
+  },
+  {
+   "id": "skip_genie_directskip_skipforce",
+   "name": "Skip Genie, DirectSkip, SkipForce",
+   "owner": "various",
+   "url": "skipgenie.com, directskip.com, skipforce.com",
+   "geography": "US",
+   "category": "contact_commercial",
+   "fields": [
+    "phones",
+    "emails"
+   ],
+   "access_class": "paid",
+   "price": "not verified (404, 404, TLS error on the pricing URLs tried)",
+   "legal_notes": "TCPA, National DNC and state telemarketing rules govern any call or text.",
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "As Tracerfy",
+    "reasoning": "",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07",
+   "fit": "Unpriced."
+  },
+  {
+   "id": "credentialed_aggregators",
+   "name": "TLOxp, IDI idiCORE, LexisNexis Accurint, Tracers",
+   "owner": "TransUnion, IDI, LexisNexis, Tracers",
+   "url": "n/a",
+   "geography": "US",
+   "category": "contact_commercial",
+   "fields": [
+    "phones",
+    "addresses",
+    "relatives (heirs)",
+    "deaths"
+   ],
+   "access_class": "login",
+   "price": "subscription after credentialing (not verified)",
+   "legal_notes": "GLBA/DPPA permissible purpose and a site inspection; FCRA does not allow use for eligibility decisions.",
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": "docs/path_to_100.md",
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "Highest match rates and heir relatives, if the business qualifies",
+    "reasoning": "",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": "Apply for an account; credentialing is a business decision.",
+   "verified": "not fetched",
+   "fit": "Heir tracing quality; gated."
+  },
+  {
+   "id": "data_axle",
+   "name": "Data Axle consumer and business lists",
+   "owner": "Data Axle",
+   "url": "https://www.data-axle.com/",
+   "geography": "US",
+   "category": "contact_commercial",
+   "fields": [
+    "name",
+    "address",
+    "phone (listed)"
+   ],
+   "access_class": "paid",
+   "price": "not verified",
+   "legal_notes": "TCPA, National DNC and state telemarketing rules govern any call or text.",
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "Unknown",
+    "reasoning": "",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "not fetched",
+   "fit": "List rental; not pursued."
+  },
+  {
+   "id": "people_search_spokeo",
+   "name": "Spokeo",
+   "owner": "Spokeo",
+   "url": "https://www.spokeo.com",
+   "geography": "US",
+   "category": "contact_commercial",
+   "fields": [
+    "names",
+    "phones",
+    "addresses",
+    "relatives"
+   ],
+   "access_class": "terms-only",
+   "price": null,
+   "legal_notes": "Excluded by the repo compliance constitution (rule 3) whatever the access class; FCRA disclaimers on most.",
+   "coverage": "Not measured (no search sent).",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": "docs/free_skip_tracing_options.md",
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "0 (excluded)",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": "A person may look a name up in their own browser.",
+   "verified": "fetched 2026-10-07: robots.txt only (1 request). robots.txt disallows /search, /people/profile for all agents",
+   "fit": "Excluded."
+  },
+  {
+   "id": "people_search_whitepages",
+   "name": "Whitepages",
+   "owner": "Whitepages",
+   "url": "https://www.whitepages.com",
+   "geography": "US",
+   "category": "contact_commercial",
+   "fields": [
+    "names",
+    "phones",
+    "addresses",
+    "relatives"
+   ],
+   "access_class": "terms-only",
+   "price": null,
+   "legal_notes": "Excluded by the repo compliance constitution (rule 3) whatever the access class; FCRA disclaimers on most.",
+   "coverage": "Not measured (no search sent).",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": "docs/free_skip_tracing_options.md",
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "0 (excluded)",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": "A person may look a name up in their own browser.",
+   "verified": "fetched 2026-10-07: robots.txt only (1 request). robots.txt: User-agent * allows only the home page and some /name paths; disallows deeper /name pages",
+   "fit": "Excluded."
+  },
+  {
+   "id": "people_search_thatsthem",
+   "name": "That's Them",
+   "owner": "That's Them",
+   "url": "https://thatsthem.com",
+   "geography": "US",
+   "category": "contact_commercial",
+   "fields": [
+    "names",
+    "phones",
+    "addresses",
+    "relatives"
+   ],
+   "access_class": "terms-only",
+   "price": null,
+   "legal_notes": "Excluded by the repo compliance constitution (rule 3) whatever the access class; FCRA disclaimers on most.",
+   "coverage": "Not measured (no search sent).",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "0 (excluded)",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": "A person may look a name up in their own browser.",
+   "verified": "fetched 2026-10-07: robots.txt only (1 request). robots.txt disallows /search, /api, /challenge; lists AI agents in a block group",
+   "fit": "Excluded."
+  },
+  {
+   "id": "people_search_cyberbackgroundchecks",
+   "name": "CyberBackgroundChecks",
+   "owner": "CyberBackgroundChecks",
+   "url": "https://www.cyberbackgroundchecks.com",
+   "geography": "US",
+   "category": "contact_commercial",
+   "fields": [
+    "names",
+    "phones",
+    "addresses",
+    "relatives"
+   ],
+   "access_class": "bot-check",
+   "price": null,
+   "legal_notes": "Excluded by the repo compliance constitution (rule 3) whatever the access class; FCRA disclaimers on most.",
+   "coverage": "Not measured (no search sent).",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "0 (excluded)",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": "A person may look a name up in their own browser.",
+   "verified": "fetched 2026-10-07: robots.txt only (1 request). robots.txt itself answered HTTP 403 'Managed Challenge'",
+   "fit": "Excluded."
+  },
+  {
+   "id": "people_search_peoplefinders",
+   "name": "PeopleFinders",
+   "owner": "PeopleFinders",
+   "url": "https://www.peoplefinders.com",
+   "geography": "US",
+   "category": "contact_commercial",
+   "fields": [
+    "names",
+    "phones",
+    "addresses",
+    "relatives"
+   ],
+   "access_class": "bot-check",
+   "price": null,
+   "legal_notes": "Excluded by the repo compliance constitution (rule 3) whatever the access class; FCRA disclaimers on most.",
+   "coverage": "Not measured (no search sent).",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "0 (excluded)",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": "A person may look a name up in their own browser.",
+   "verified": "fetched 2026-10-07: robots.txt only (1 request). HTTP 403 'Security Challenge'",
+   "fit": "Excluded."
+  },
+  {
+   "id": "people_search_intelius",
+   "name": "Intelius",
+   "owner": "Intelius",
+   "url": "https://www.intelius.com",
+   "geography": "US",
+   "category": "contact_commercial",
+   "fields": [
+    "names",
+    "phones",
+    "addresses",
+    "relatives"
+   ],
+   "access_class": "bot-check",
+   "price": null,
+   "legal_notes": "Excluded by the repo compliance constitution (rule 3) whatever the access class; FCRA disclaimers on most.",
+   "coverage": "Not measured (no search sent).",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "0 (excluded)",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": "A person may look a name up in their own browser.",
+   "verified": "fetched 2026-10-07: robots.txt only (1 request). Cloudflare 'Just a moment...'",
+   "fit": "Excluded."
+  },
+  {
+   "id": "people_search_zabasearch",
+   "name": "ZabaSearch",
+   "owner": "ZabaSearch",
+   "url": "https://www.zabasearch.com",
+   "geography": "US",
+   "category": "contact_commercial",
+   "fields": [
+    "names",
+    "phones",
+    "addresses",
+    "relatives"
+   ],
+   "access_class": "bot-check",
+   "price": null,
+   "legal_notes": "Excluded by the repo compliance constitution (rule 3) whatever the access class; FCRA disclaimers on most.",
+   "coverage": "Not measured (no search sent).",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "0 (excluded)",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": "A person may look a name up in their own browser.",
+   "verified": "fetched 2026-10-07: robots.txt only (1 request). Cloudflare 'Just a moment...'",
+   "fit": "Excluded."
+  },
+  {
+   "id": "people_search_usphonebook",
+   "name": "USPhoneBook",
+   "owner": "USPhoneBook",
+   "url": "https://www.usphonebook.com",
+   "geography": "US",
+   "category": "contact_commercial",
+   "fields": [
+    "names",
+    "phones",
+    "addresses",
+    "relatives"
+   ],
+   "access_class": "terms-only",
+   "price": null,
+   "legal_notes": "Excluded by the repo compliance constitution (rule 3) whatever the access class; FCRA disclaimers on most.",
+   "coverage": "Not measured (no search sent).",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "0 (excluded)",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": "A person may look a name up in their own browser.",
+   "verified": "fetched 2026-10-07: robots.txt only (1 request). robots.txt allows / for most agents; terms not read; excluded by the repo compliance rule 3 regardless",
+   "fit": "Excluded."
+  },
+  {
+   "id": "people_search_beenverified",
+   "name": "BeenVerified",
+   "owner": "BeenVerified",
+   "url": "https://www.beenverified.com",
+   "geography": "US",
+   "category": "contact_commercial",
+   "fields": [
+    "names",
+    "phones",
+    "addresses",
+    "relatives"
+   ],
+   "access_class": "terms-only",
+   "price": null,
+   "legal_notes": "Excluded by the repo compliance constitution (rule 3) whatever the access class; FCRA disclaimers on most.",
+   "coverage": "Not measured (no search sent).",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "0 (excluded)",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": "A person may look a name up in their own browser.",
+   "verified": "fetched 2026-10-07: robots.txt only (1 request). robots.txt disallows /people/ and /property/ for some bots; consumer reports carry FCRA disclaimers",
+   "fit": "Excluded."
+  },
+  {
+   "id": "people_search_truepeoplesearch",
+   "name": "TruePeopleSearch",
+   "owner": "TruePeopleSearch",
+   "url": "https://www.truepeoplesearch.com",
+   "geography": "US",
+   "category": "contact_commercial",
+   "fields": [
+    "names",
+    "phones",
+    "addresses",
+    "relatives"
+   ],
+   "access_class": "bot-check",
+   "price": null,
+   "legal_notes": "Excluded by the repo compliance constitution (rule 3) whatever the access class; FCRA disclaimers on most.",
+   "coverage": "Not measured (no search sent).",
+   "already_ingested": {
+    "status": "no",
+    "module": "enrichment_free_phones.py drives two of these and is dormant by policy",
+    "completeness": null
+   },
+   "previously_documented": "docs/free_skip_tracing_options.md",
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "0 (excluded)",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": "A person may look a name up in their own browser.",
+   "verified": "fetched 2026-10-07: robots.txt only (1 request). robots.txt disallows /search for named bots; terms page answered a CAPTCHA challenge on 2026-09-21",
+   "fit": "Excluded."
+  },
+  {
+   "id": "people_search_fastpeoplesearch",
+   "name": "FastPeopleSearch",
+   "owner": "FastPeopleSearch",
+   "url": "https://www.fastpeoplesearch.com",
+   "geography": "US",
+   "category": "contact_commercial",
+   "fields": [
+    "names",
+    "phones",
+    "addresses",
+    "relatives"
+   ],
+   "access_class": "terms-only",
+   "price": null,
+   "legal_notes": "Excluded by the repo compliance constitution (rule 3) whatever the access class; FCRA disclaimers on most.",
+   "coverage": "Not measured (no search sent).",
+   "already_ingested": {
+    "status": "no",
+    "module": "enrichment_free_phones.py drives two of these and is dormant by policy",
+    "completeness": null
+   },
+   "previously_documented": "docs/free_skip_tracing_options.md",
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "0 (excluded)",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": "A person may look a name up in their own browser.",
+   "verified": "fetched 2026-10-07: robots.txt only (1 request). terms bar automated copying (2026-09-21); robots.txt disallows /bot-check*, /api/*",
+   "fit": "Excluded."
+  },
+  {
+   "id": "people_search_familytreenow",
+   "name": "FamilyTreeNow",
+   "owner": "FamilyTreeNow",
+   "url": "https://www.familytreenow.com",
+   "geography": "US",
+   "category": "contact_commercial",
+   "fields": [
+    "names",
+    "phones",
+    "addresses",
+    "relatives"
+   ],
+   "access_class": "terms-only",
+   "price": null,
+   "legal_notes": "Excluded by the repo compliance constitution (rule 3) whatever the access class; FCRA disclaimers on most.",
+   "coverage": "Not measured (no search sent).",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "0 (excluded)",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": "A person may look a name up in their own browser.",
+   "verified": "fetched 2026-10-07: robots.txt only (1 request). robots.txt disallows search result paths",
+   "fit": "Excluded."
+  },
+  {
+   "id": "people_search_radaris",
+   "name": "Radaris",
+   "owner": "Radaris",
+   "url": "https://radaris.com",
+   "geography": "US",
+   "category": "contact_commercial",
+   "fields": [
+    "names",
+    "phones",
+    "addresses",
+    "relatives"
+   ],
+   "access_class": "terms-only",
+   "price": null,
+   "legal_notes": "Excluded by the repo compliance constitution (rule 3) whatever the access class; FCRA disclaimers on most.",
+   "coverage": "Not measured (no search sent).",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": "docs/free_skip_tracing_options.md",
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "0 (excluded)",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": "A person may look a name up in their own browser.",
+   "verified": "fetched 2026-10-07: robots.txt only (1 request). radaris.com/robots.txt returned a page titled 'This Domain Has Been Transferred by Court Order'",
+   "fit": "Excluded."
+  },
+  {
+   "id": "legacy_com_obituaries",
+   "name": "Legacy.com obituaries",
+   "owner": "Legacy.com",
+   "url": "https://www.legacy.com/",
+   "geography": "US",
+   "category": "contact_heir",
+   "fields": [
+    "decedent",
+    "survivors (heir names)",
+    "funeral home"
+   ],
+   "access_class": "terms-only",
+   "price": null,
+   "legal_notes": "robots.txt disallows /obituaries/name paths and many search paths; page carries challenge markers.",
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "0 contact (names only)",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": "Read by hand.",
+   "verified": "fetched 2026-10-07: robots.txt",
+   "fit": "Heir names only."
+  },
+  {
+   "id": "findagrave",
+   "name": "Find a Grave",
+   "owner": "Ancestry",
+   "url": "https://www.findagrave.com/",
+   "geography": "US",
+   "category": "contact_heir",
+   "fields": [
+    "burials",
+    "family links"
+   ],
+   "access_class": "terms-only",
+   "price": null,
+   "legal_notes": "Terms not read today; robots.txt is short.",
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "0 contact",
+    "reasoning": "",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": "Read by hand.",
+   "verified": "fetched 2026-10-07: robots.txt",
+   "fit": "Heir names only."
+  },
+  {
+   "id": "echovita_obituaries",
+   "name": "Echovita obituaries",
+   "owner": "Echovita",
+   "url": "https://www.echovita.com/",
+   "geography": "US",
+   "category": "contact_heir",
+   "fields": [
+    "decedent",
+    "obituary text with survivors"
+   ],
+   "access_class": "terms-only",
+   "price": null,
+   "legal_notes": "robots.txt permissive for obituaries; terms not read.",
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": 4,
+   "lift_weakest10": {
+    "estimate": "0 contact",
+    "reasoning": "Names only; the board already has funeral-home RSS.",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07: robots.txt",
+   "fit": "Overlaps funeral_home_rss."
+  },
+  {
+   "id": "estate_notice_pr_address",
+   "name": "Estate notices to creditors: personal representative name and address",
+   "owner": "Newspapers / public-notice sites (NC G.S. 28A-14-1)",
+   "url": "column.us API; ncpublicnotices; sc_public_notices",
+   "geography": "NC, SC",
+   "category": "contact_heir",
+   "fields": [
+    "decedent",
+    "personal representative name",
+    "PR mailing address",
+    "estate file number"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": "NC G.S. 28A-14-1 requires the notice to state the representative's name and address. ncnotices.com detail pages are reCAPTCHA (wall).",
+   "coverage": "Extraction exists (pr_address in ncpublicnotices.py, sc_probate_notices.py, sc_probate_net.py, sc_public_notices.py, spartan_weekly_legals.py).",
+   "already_ingested": {
+    "status": "yes",
+    "module": "scrapers/public_notices/ncpublicnotices.py and SC notice scrapers",
+    "completeness": "breadth limited by which papers are reachable"
+   },
+   "previously_documented": "docs/new_county_sources_2026-09-21.md",
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "Small: Marlboro 63 estates a year via Column",
+    "reasoning": "",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 50,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "repo (not re-fetched)",
+   "fit": "Already the best heir-contact route; widen papers, not sources."
+  },
+  {
+   "id": "sc_probate_index",
+   "name": "SC probate index (southcarolinaprobate.net)",
+   "owner": "SC probate courts",
+   "url": "https://www.southcarolinaprobate.net/search/",
+   "geography": "SC",
+   "category": "contact_heir",
+   "fields": [
+    "case name",
+    "party",
+    "appointment date"
+   ],
+   "access_class": "bot-check",
+   "price": null,
+   "legal_notes": "HTTP 403 to curl (2026-09-21).",
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "partial",
+    "module": "scrapers/counties_sc/sc_probate_net.py",
+    "completeness": null
+   },
+   "previously_documented": "docs/sc_phone_research_2026-09-21.md",
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "0 contact",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": "Search by hand.",
+   "verified": "repo 2026-09-21",
+   "fit": "Names only."
+  },
+  {
+   "id": "ssa_death_master_file",
+   "name": "SSA Death Master File (limited access)",
+   "owner": "NTIS / SSA",
+   "url": "https://ladmf.ntis.gov/",
+   "geography": "US",
+   "category": "contact_heir",
+   "fields": [
+    "deceased name",
+    "dates"
+   ],
+   "access_class": "paid",
+   "price": "certified subscriber fee (not verified)",
+   "legal_notes": "15 CFR 1110 certification required; birth dates must never be stored here.",
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "0 contact",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "not fetched",
+   "fit": "Not needed: obituaries and estate notices cover the signal."
+  },
+  {
+   "id": "hud_safmr",
+   "name": "HUD Small Area Fair Market Rents (ZIP level)",
+   "owner": "HUD USER",
+   "url": "https://www.huduser.gov/portal/datasets/fmr/smallarea/index.html",
+   "geography": "US",
+   "category": "valuation_input",
+   "fields": [
+    "ZIP-level FMR by bedroom count"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": null,
+   "coverage": "Page reachable (HTTP 200).",
+   "already_ingested": {
+    "status": "partial",
+    "module": "enrichment_hud_fmr.py (county FMR)",
+    "completeness": "SAFMR not used"
+   },
+   "previously_documented": "docs/path_to_100_deepdive.md",
+   "build_effort_hours": 3,
+   "lift_weakest10": {
+    "estimate": "Rent estimate precision in all 10 counties",
+    "reasoning": "Rent comps are thin in rural SC; a ZIP FMR beats a county FMR.",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07",
+   "fit": "Cheap rent-input upgrade."
+  },
+  {
+   "id": "census_acs_5yr",
+   "name": "Census ACS 5-year API (2024 release)",
+   "owner": "US Census Bureau",
+   "url": "https://www.census.gov/data/developers/data-sets/acs-5year.html",
+   "geography": "US",
+   "category": "valuation_input",
+   "fields": [
+    "median rent B25064",
+    "median value B25077",
+    "vacancy"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": null,
+   "coverage": "ACS 5-year 2009-2024 listed.",
+   "already_ingested": {
+    "status": "yes",
+    "module": "enrichment_census_rent.py, enrichment_census_demographics.py",
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "Already in",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07",
+   "fit": "Already ingested."
+  },
+  {
+   "id": "zillow_research_data",
+   "name": "Zillow research data (ZHVI, ZORI CSVs)",
+   "owner": "Zillow",
+   "url": "https://www.zillow.com/research/data/",
+   "geography": "US",
+   "category": "valuation_input",
+   "fields": [
+    "home value index",
+    "observed rent index"
+   ],
+   "access_class": "bot-check",
+   "price": null,
+   "legal_notes": "Research page answered HTTP 403 'Access to this page has been denied' (PerimeterX). The CSVs sit on a separate file host (not fetched).",
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": "docs/path_to_100.md",
+   "build_effort_hours": 2,
+   "lift_weakest10": {
+    "estimate": "ZIP-level value/rent trend",
+    "reasoning": "",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": "Download the CSVs in a browser and drop them in data/.",
+   "verified": "fetched 2026-10-07 (HTTP 403)",
+   "fit": "Manual download."
+  },
+  {
+   "id": "redfin_data_center",
+   "name": "Redfin Data Center",
+   "owner": "Redfin",
+   "url": "redfin-public-data S3",
+   "geography": "US",
+   "category": "valuation_input",
+   "fields": [
+    "median sale price",
+    "DOM",
+    "inventory by county/ZIP"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": null,
+   "coverage": "Ingested.",
+   "already_ingested": {
+    "status": "yes",
+    "module": "enrichment_redfin_datacenter.py",
+    "completeness": null
+   },
+   "previously_documented": "docs/MASTER_CHECKLIST.md",
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "Already in",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "repo",
+   "fit": "Already ingested."
+  },
+  {
+   "id": "realtor_research_data",
+   "name": "Realtor.com research data",
+   "owner": "Realtor.com",
+   "url": "econdata S3 CSVs",
+   "geography": "US",
+   "category": "valuation_input",
+   "fields": [
+    "list price, inventory by county/ZIP"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": null,
+   "coverage": "Ingested.",
+   "already_ingested": {
+    "status": "yes",
+    "module": "enrichment_realtor_data.py",
+    "completeness": null
+   },
+   "previously_documented": "docs/path_to_100_deepdive.md",
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "Already in",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "repo",
+   "fit": "Already ingested."
+  },
+  {
+   "id": "fhfa_hpi",
+   "name": "FHFA house price index",
+   "owner": "FHFA",
+   "url": "fhfa.gov",
+   "geography": "US",
+   "category": "valuation_input",
+   "fields": [
+    "HPI by county/ZIP3/ZIP5"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": null,
+   "coverage": "Ingested.",
+   "already_ingested": {
+    "status": "yes",
+    "module": "enrichment_fhfa_value.py",
+    "completeness": null
+   },
+   "previously_documented": "docs/MASTER_CHECKLIST.md",
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "Already in",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "repo",
+   "fit": "Already ingested."
+  },
+  {
+   "id": "hud_usps_vacancy",
+   "name": "HUD-USPS aggregated vacancy",
+   "owner": "HUD USER",
+   "url": "huduser.gov USPS vacancy",
+   "geography": "US",
+   "category": "valuation_input",
+   "fields": [
+    "tract vacancy rates"
+   ],
+   "access_class": "login",
+   "price": "free with a HUD USER account",
+   "legal_notes": null,
+   "coverage": "Ingested.",
+   "already_ingested": {
+    "status": "yes",
+    "module": "enrichment_usps_vacancy.py",
+    "completeness": null
+   },
+   "previously_documented": "docs/completeness_document.md",
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "Already in",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "repo",
+   "fit": "Already ingested."
+  },
+  {
+   "id": "rentcast_api",
+   "name": "RentCast property and rent API",
+   "owner": "RentCast",
+   "url": "https://www.rentcast.io/api",
+   "geography": "US",
+   "category": "valuation_input",
+   "fields": [
+    "rent AVM",
+    "rental comps",
+    "property records",
+    "sale comps"
+   ],
+   "access_class": "paid",
+   "price": "Developer $0 (50 requests/mo); Foundation $74/mo (1,000); Growth $199/mo (5,000); Scale $449/mo (25,000); overage $0.20 to $0.015 per request",
+   "legal_notes": null,
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "partial",
+    "module": "referenced in enrichment_data_quality.py and main.py",
+    "completeness": null
+   },
+   "previously_documented": "docs/MASTER_SOURCE_AND_COUNTY_REGISTER.md",
+   "build_effort_hours": 4,
+   "lift_weakest10": {
+    "estimate": "Rent and sale comps for HOT leads in the weakest 10",
+    "reasoning": "50 free calls a month cover the HOT tier only.",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07",
+   "fit": "Good for HOT-lead comps."
+  },
+  {
+   "id": "rentometer",
+   "name": "Rentometer",
+   "owner": "Rentometer",
+   "url": "https://www.rentometer.com/pricing",
+   "geography": "US",
+   "category": "valuation_input",
+   "fields": [
+    "rent estimate",
+    "rent comps"
+   ],
+   "access_class": "paid",
+   "price": "Basic $59/yr (10 estimates); Essential $16/mo or $96/yr (unlimited estimates, 3 reports)",
+   "legal_notes": null,
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": "docs/path_to_100.md",
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "Manual rent checks",
+    "reasoning": "",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": "Operator checks rent for HOT leads.",
+   "verified": "fetched 2026-10-07",
+   "fit": "Operator tool."
+  },
+  {
+   "id": "rsmeans_data_online",
+   "name": "RSMeans Data Online",
+   "owner": "Gordian",
+   "url": "https://www.rsmeans.com/products/online",
+   "geography": "US (city cost indexes)",
+   "category": "repair_cost",
+   "fields": [
+    "unit costs",
+    "labor",
+    "city cost index"
+   ],
+   "access_class": "paid",
+   "price": "Core from $408/yr; Complete from $1,049/yr; Complete Plus from $5,973/yr",
+   "legal_notes": "Licence bars redistribution.",
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": "docs/path_to_100_deepdive.md",
+   "build_effort_hours": 6,
+   "lift_weakest10": {
+    "estimate": "Repair-cost precision",
+    "reasoning": "",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07",
+   "fit": "The standard reference; Core tier is enough."
+  },
+  {
+   "id": "craftsman_national_estimator",
+   "name": "Craftsman National Construction Estimator 2026",
+   "owner": "Craftsman Book Company",
+   "url": "https://craftsman-book.com/national-construction-estimator",
+   "geography": "US",
+   "category": "repair_cost",
+   "fields": [
+    "unit costs with area modifiers"
+   ],
+   "access_class": "paid",
+   "price": "$117.50 paperback; $58.75 PDF; cloud $13.99/mo or $167.88/yr",
+   "legal_notes": null,
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": 4,
+   "lift_weakest10": {
+    "estimate": "Repair-cost table for the rehab estimate",
+    "reasoning": "",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07",
+   "fit": "Cheapest credible repair table."
+  },
+  {
+   "id": "remodeling_cost_vs_value",
+   "name": "Remodeling Cost vs Value report",
+   "owner": "Zonda / Remodeling magazine",
+   "url": "https://www.costvsvalue.com/",
+   "geography": "US regions",
+   "category": "repair_cost",
+   "fields": [
+    "project cost and resale value by region"
+   ],
+   "access_class": "bot-check",
+   "price": null,
+   "legal_notes": "Cloudflare 'Attention Required!' (HTTP 403).",
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": 2,
+   "lift_weakest10": {
+    "estimate": "Rough ARV uplift per project",
+    "reasoning": "",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": "Download the South Atlantic report by hand.",
+   "verified": "fetched 2026-10-07 (HTTP 403)",
+   "fit": "Manual."
+  },
+  {
+   "id": "fema_nfip_redacted_claims",
+   "name": "OpenFEMA NFIP redacted claims",
+   "owner": "FEMA",
+   "url": "https://www.fema.gov/openfema-data-page/fima-nfip-redacted-claims-v2",
+   "geography": "US",
+   "category": "valuation_input",
+   "fields": [
+    "claims by ZIP/tract",
+    "building damage amounts"
+   ],
+   "access_class": "bot-check",
+   "price": null,
+   "legal_notes": "Dataset page answered Akamai 'Access Denied'; the OpenFEMA API host was not tried.",
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "partial",
+    "module": "enrichment_fema_repetitive_loss.py, enrichment_flood.py",
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "Condition/flood context",
+    "reasoning": "",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07 (HTTP 403)",
+   "fit": "Already partly covered."
+  },
+  {
+   "id": "county_permit_valuation",
+   "name": "County building-permit job values",
+   "owner": "Counties (Accela, EnerGov, CitizenServe)",
+   "url": "see docs/permit_sources.md",
+   "geography": "NC, SC",
+   "category": "repair_cost",
+   "fields": [
+    "permit type",
+    "job value",
+    "contractor"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": null,
+   "coverage": "Ingested where open.",
+   "already_ingested": {
+    "status": "yes",
+    "module": "enrichment_building_permits.py",
+    "completeness": null
+   },
+   "previously_documented": "docs/permit_sources.md",
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "Already in",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "repo",
+   "fit": "Already ingested."
+  },
+  {
+   "id": "guilford_historical_parcels",
+   "name": "Guilford County historical parcel snapshots (2016-2025)",
+   "owner": "Guilford County GIS",
+   "url": "https://gcgis.guilfordcountync.gov/arcgis/rest/services/Map_Metrics/MapMetrics_GISRP/FeatureServer/30 (2025; 31=2024, 33=2021, 38=2016)",
+   "geography": "NC: Guilford",
+   "category": "sale_transfer",
+   "fields": [
+    "parcel snapshot per year (owner, values as published)"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": null,
+   "coverage": "Layer titles from ArcGIS Online search; fields not read.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": 4,
+   "lift_weakest10": {
+    "estimate": "0 (NC)",
+    "reasoning": "",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": "Guilford: tenure/prior-owner signal",
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07: ArcGIS Online search only",
+   "fit": "Owner-change history (prior owner, tenure) for Guilford rows; unverified fields."
+  },
+  {
+   "id": "wake_address_points",
+   "name": "Wake County parcel address points",
+   "owner": "Wake County GIS",
+   "url": "https://maps.wake.gov/arcgis/rest/services/Property/Addresses/MapServer/0",
+   "geography": "NC: Wake",
+   "category": "open_dataset",
+   "fields": [
+    "site address points keyed to parcels"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": null,
+   "coverage": "Title from ArcGIS Online search; fields not read.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": 2,
+   "lift_weakest10": {
+    "estimate": "0 (NC)",
+    "reasoning": "",
+    "is_guess": true
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07: ArcGIS Online search only",
+   "fit": "Address-to-parcel precision for Wake's 5,785 rows with no parcel id."
+  },
+  {
+   "id": "charlotte_residential_reval",
+   "name": "Charlotte Residential Parcel Revaluation and Tax Change",
+   "owner": "City of Charlotte",
+   "url": "https://services.arcgis.com/9Nl857LBlQVyzq54/arcgis/rest/services/Residential_Parcel_Revaluation_and_Tax_Change/FeatureServer/0",
+   "geography": "NC: Mecklenburg (Charlotte)",
+   "category": "valuation_input",
+   "fields": [
+    "TaxYear",
+    "PreviousValue",
+    "CurrentValue",
+    "DifferenceInValue",
+    "ValueRatio"
+   ],
+   "access_class": "open",
+   "price": null,
+   "legal_notes": null,
+   "coverage": "25 fields read 2026-10-07.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": 2,
+   "lift_weakest10": {
+    "estimate": "0 (NC)",
+    "reasoning": "",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07: layer fields (1 request)",
+   "fit": "Reval jump as a tax-shock distress input for Charlotte rows."
+  },
+  {
+   "id": "nc_sos_charitable_notary_files",
+   "name": "NC Secretary of State Notary Public and Charitable Solicitation data files",
+   "owner": "NC Department of the Secretary of State",
+   "url": "https://www.sosnc.gov/fees/by_title/_data_subscriptions",
+   "geography": "NC statewide",
+   "category": "contact_public_record",
+   "fields": [
+    "notary name and business address",
+    "charitable organization contacts"
+   ],
+   "access_class": "paid",
+   "price": "$2,400 per year each (no images), plus the $750 setup",
+   "legal_notes": null,
+   "coverage": "Not measured.",
+   "already_ingested": {
+    "status": "no",
+    "module": null,
+    "completeness": null
+   },
+   "previously_documented": null,
+   "build_effort_hours": null,
+   "lift_weakest10": {
+    "estimate": "~0",
+    "reasoning": "Not owner data.",
+    "is_guess": false
+   },
+   "lift_weakest10_rows_est": 0,
+   "lift_other": null,
+   "manual_steps": null,
+   "verified": "fetched 2026-10-07: fee page",
+   "fit": "Listed for completeness; not worth buying."
+  }
+ ]
+}

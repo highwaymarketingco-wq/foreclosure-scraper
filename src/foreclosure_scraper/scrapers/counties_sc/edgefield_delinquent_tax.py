@@ -1,0 +1,119 @@
+"""Edgefield County SC - Delinquent Tax Sale properties.
+
+Edgefield County publishes delinquent tax sale properties on its county
+website. Annual tax sale lists with owner names, TMS numbers, addresses.
+
+Free, public, no login.
+
+DISABLED 2026-10-01: confirmed live this page is office-contact info only
+(no table of any kind) with a "Pay Your Property Taxes Here" link out to the
+real portal. That portal IS the same treasurer system
+counties_sc.qpaybill_delinquent_roll.py already sweeps for Edgefield
+(QPAYBILL_SUBS["Edgefield"] = "edgefieldcountysc", added 2026-09-23, verified
+via the county's own "Online Tax Payment Center" link). Found via the
+2026-10-01 counties_sc per-source extraction audit. Do not re-enable without
+a different, real per-parcel source at this URL.
+
+RE-VERIFIED LIVE 2026-10-13: still holds. Direct curl of PAGE_URL (200, 287KB)
+has 0 `<table>`/`<tr>` tags and the only "Pay Your Property Taxes Here" link
+still points to edgefieldcountysc.qpaybill.com/Taxes/TaxesDefaultType4.aspx
+(200, still live) -- the exact portal qpaybill_delinquent_roll.py already
+sweeps via QPAYBILL_SUBS["Edgefield"]. Also checked the sibling
+/tax-collector/ page (linked from the treasurer nav) as a second avenue: also
+200, also 0 tables, same office-contact/hours copy, states tax sales are held
+"the 1st Monday in December" with no online per-parcel list -- bidders are
+told to contact the office directly. No new URL or data source found.
+
+Slug: counties_sc.edgefield_delinquent_tax
+Category: county_tax
+ListingType: TAX_SALE
+"""
+from __future__ import annotations
+
+import re
+from datetime import datetime
+from typing import Iterable
+
+import structlog
+
+from ...base_scraper import BaseScraper
+from ...http_client import get_text
+from ...models import Listing, ListingType, PropertyKind
+
+log = structlog.get_logger()
+
+PAGE_URL = "https://edgefieldcounty.sc.gov/treasurer/"
+
+
+class EdgefieldDelinquentTax(BaseScraper):
+    slug = "counties_sc.edgefield_delinquent_tax"
+    name = "Edgefield County SC Delinquent Tax Sale"
+    disabled = True
+    disabled_reason = ("target page is office-contact info only, no table - "
+                       "superseded by counties_sc.qpaybill_delinquent_roll (Edgefield) - "
+                       "confirmed 2026-10-01, re-confirmed live 2026-10-13")
+    category = "county_tax"
+    timeout_s = 120.0
+    expected_min_count = 0
+    optional = True
+    active_months = (10, 11, 12, 1)
+
+    async def fetch(self) -> Iterable[Listing]:
+        out: list[Listing] = []
+        try:
+            html = await get_text(PAGE_URL, impersonate=True, timeout=40.0)
+        except Exception as exc:
+            log.warning("edgefield_tax.fetch_fail", error=str(exc)[:160])
+            return out
+
+        if not html or len(html) < 200:
+            return out
+
+        rows = re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.I | re.S)
+        for row in rows:
+            cells = re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", row, re.I | re.S)
+            if len(cells) < 2:
+                continue
+            clean = [re.sub(r"<[^>]+>", "", c).strip() for c in cells]
+            if any(h in c.lower() for c in clean[:2] for h in ("owner", "name", "tms", "map", "#")):
+                continue
+            if not any(re.search(r"\d", c) for c in clean):
+                continue
+
+            parcel = None
+            for c in clean:
+                m = re.search(r"\b(\d{3}[-\s]?\d{2}[-\s]?\d{2}[-\s]?[\d.]+)\b", c)
+                if m:
+                    parcel = m.group(1).strip()
+                    break
+                m = re.search(r"\b(\d{8,})\b", c)
+                if m and not parcel:
+                    parcel = m.group(1)
+
+            owner = clean[0] if clean else None
+            addr = None
+            for c in clean[1:]:
+                if re.search(r"\d+\s+\w+", c):
+                    addr = c
+                    break
+            if not addr and len(clean) > 1:
+                addr = clean[1] if len(clean[1]) > 5 else None
+
+            out.append(Listing(
+                source="counties_sc.edgefield_delinquent_tax",
+                source_url=PAGE_URL,
+                listing_type=ListingType.TAX_SALE,
+                property_kind=PropertyKind.UNKNOWN,
+                state="SC",
+                county="Edgefield",
+                parcel_id=parcel,
+                defendant=owner,
+                street_address=addr,
+                description=" | ".join(clean[:6]),
+                first_seen=datetime.utcnow(),
+                last_seen=datetime.utcnow(),
+                raw={"edgefield_delinquent_tax": {"cells": clean[:10]}},
+            ))
+
+        log.info("edgefield_tax.done", count=len(out))
+        return out

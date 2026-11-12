@@ -1,0 +1,296 @@
+{
+ "_doc": "The intended run profile the pre-run gate (scripts/prerun_gate.py) holds the next VM run to. Change it ON PURPOSE, in the same commit as the vm_lib.sh / code change it describes: the gate fails when vm_lib.sh exports a value this file does not declare, when a module the run never imports is not listed below with a reason, when a whole-file json load appears in the run path that is not listed below, or when the memory projection crosses the kill line. Audit 2026-10-09 (pipeline_gate).",
+ "profile": "vm_full_gated",
+ "description": "Oracle VM full run, FORECLOSURE_ROLE=vm, launched with vm_run.sh --stop-before-publish under a pinned commit; published after review with vm_resume.sh --publish-only.",
+ "flags": {
+  "VISION_PROVIDER": "anthropic",
+  "VISION_USE_OLLAMA": "0",
+  "SKIP_TRACE_PROVIDER": "free",
+  "LOG_LEVEL": "INFO",
+  "PYTHONUNBUFFERED": "1",
+  "FORECLOSURE_ROLE": "vm",
+  "ASSESSOR_CARD_ON": "1",
+  "ASSESSOR_CARD_MAX": "900",
+  "FORECLOSURE_ASSESSOR_PHOTO": "1",
+  "FORECLOSURE_STREETVIEW": "1",
+  "STREETVIEW_MAX": "300",
+  "STREETVIEW_MONTHLY_MAX": "9000",
+  "BOARD_PRIOR_MERGE_ALLOW_LARGE": "1",
+  "FORECLOSURE_ROD_CHAIN": "1",
+  "FORECLOSURE_ROD_CHAIN_BUDGET_S": "1800",
+  "FORECLOSURE_NC_COTT_ROD": "1",
+  "FORECLOSURE_NC_LOOKUP_ROD": "1",
+  "FORECLOSURE_NC_ORS_ROD": "1",
+  "FORECLOSURE_NC_CCHS_CLASSIC_ROD": "1",
+  "FORECLOSURE_NC_TYLER_ROD": "1",
+  "FORECLOSURE_SC_ORS_ROD": "1",
+  "FORECLOSURE_SC_ACPASS_ROD": "1",
+  "FORECLOSURE_NC_HARRIS_ROD": "0",
+  "FORECLOSURE_NC_HARRIS_MARRIAGE": "0",
+  "FORECLOSURE_NC_LOGAN_BLAZOR_ROD": "0",
+  "FORECLOSURE_NC_LOGAN_REMOTE_ROD": "0",
+  "FORECLOSURE_SC_PUBLICSEARCH_ROD": "1",
+  "FORECLOSURE_SC_ACCLAIM_ROD": "1",
+  "FORECLOSURE_SC_GREENWOOD_ROD": "1",
+  "FORECLOSURE_SC_RECORDROOM_ROD": "1",
+  "FORECLOSURE_SC_COTT_ESEARCH_ROD": "1",
+  "FORECLOSURE_SC_LOOKUP_ROD": "1",
+  "FORECLOSURE_SC_LIEN_SWEEP": "1",
+  "FORECLOSURE_LIEN_SWEEP_BUDGET_S": "600",
+  "FORECLOSURE_REGISTER_CHECKS": "1",
+  "FORECLOSURE_REGISTER_CHECKS_BUDGET_S": "900",
+  "FORECLOSURE_REGISTER_SWEEP": "1",
+  "FORECLOSURE_REGISTER_SWEEP_BUDGET_S": "1800",
+  "FORECLOSURE_REGISTER_SWEEP_SINCE": "2020-01-01",
+  "FORECLOSURE_PROBATE_SPARTAN": "1",
+  "FORECLOSURE_PROBATE_SPARTAN_BUDGET_S": "1500",
+  "FORECLOSURE_GENERIC_ROD_BUDGET_S": "2400",
+  "GENERIC_ROD_COUNTY_CONCURRENCY": "8",
+  "ROD_CHAIN_COUNTY_CONCURRENCY": "8",
+  "FORECLOSURE_GIS_FILL": "1",
+  "FORECLOSURE_GIS_FILL_BUDGET_S": "3600",
+  "OBITUARY_LOOKUPS": "0",
+  "FORECLOSURE_MECKLENBURG_DELINQUENT": "0",
+  "RICHLAND_PARCEL_MAX": "500",
+  "FORECLOSURE_COUNTY_LIEN_SWEEP": "1",
+  "FORECLOSURE_COUNTY_MARRIAGE_SWEEP": "1",
+  "FORECLOSURE_COUNTY_SWEEP_BUDGET_S": "900",
+  "FORECLOSURE_SC_COUNTYFUSION_ROD": "1",
+  "FORECLOSURE_NC_LRSEARCH_ROD": "1"
+ },
+ "flags_notes": {
+  "VISION_PROVIDER": "vm_lib.sh picks gemini when a Gemini key file exists, else anthropic; the declared value is vm_lib.sh's text default",
+  "FORECLOSURE_STREETVIEW": "exported only when a maps key file exists (free tier clamp 9,000/month)",
+  "FORECLOSURE_NC_HARRIS_ROD": "browser-rendered register platforms stay OFF until a run has measured their memory and time (HANDOFF item 82)",
+  "FORECLOSURE_NC_HARRIS_MARRIAGE": "Mecklenburg/Carteret Marriage index in the same guest browser (rod/nc_harris.marriage_search); a second browser lookup per lead (measured 15-20 s, 540 MB peak on 2026-10-09), so OFF with the Harris flag it depends on",
+  "FORECLOSURE_SC_LIEN_SWEEP": "county-wide AcclaimWeb lien sweep (Horry, Pickens), enrichment_register_lien_sweep; plain HTTP, cached, newest month first inside FORECLOSURE_LIEN_SWEEP_BUDGET_S (needs the main.py wiring line in docs/audit_2026-10-09/top80_logan_harris.md)",
+  "FORECLOSURE_GENERIC_ROD_BUDGET_S": "the generic register pass's own budget (enrichment_generic_rod); it only applies in full once main.py runs generic_rod under its own _await_capped (audit 2026-10-09 additions_verify wiring), before that the ROD group's 900 s cap still cancels it (its counts are then logged as generic_rod.cancelled)",
+  "FORECLOSURE_REGISTER_SWEEP": "county-wide Date Range sweeps of the ten Cott v4 counties (rod/cott_sweep.py): adverse kinds -> raw.rod_lien_sweep, the MARRIAGES index -> raw.marriage_license, each for the window swept only; cached in data/county_sweeps/, newest window first, per-county budget FORECLOSURE_REGISTER_SWEEP_BUDGET_S; the cotthosting.com tenants share one host so their sweeps queue (about 2.5 min per county per 1.75 years of data measured); runs inside enrichment_register_checks (same wiring)",
+  "FORECLOSURE_REGISTER_CHECKS": "marriage-index check (enrichment_register_checks) on the six Cott v4 tenants with a MARRIAGES index; needs main.py to run it after generic_rod (wiring in docs/audit_2026-10-09/top80_register_other.md); also needs FORECLOSURE_NC_COTT_ROD=1",
+  "FORECLOSURE_GIS_FILL": "county parcel-record fill (gis_fill): NC OneMap + 15 SC county layers, deed book/page, short legal, value, acreage, and the Orangeburg qPayBill account-to-parcel join; plain HTTP, 40 parcels a request, 2 s a host; needs the main.py wiring line in docs/audit_2026-10-09/top80_fill.md",
+  "GENERIC_ROD_COUNTY_CONCURRENCY": "register counties read side by side; each county is its own host and the adapters hold a per-host lock, so never two requests on one host",
+  "OBITUARY_LOOKUPS": "live obituary name lookups (Echovita / Find a Grave) per dead-owner lead: OFF until the owner decides (HANDOFF item 82)",
+  "FORECLOSURE_MECKLENBURG_DELINQUENT": "Mecklenburg delinquent XLSX (one-year balances, +29k rows, +12 min geocoding): OFF by the 10/7 decision (vm_lib 9edff1f3)",
+  "RICHLAND_PARCEL_MAX": "Richland map-viewer lookups per run (one host, about 4 s a row, inside RESOLVER_PHASE_MAX_SECONDS 3,000); HOT and WARM rows first",
+  "FORECLOSURE_COUNTY_LIEN_SWEEP": "county-wide adverse-instrument sweeps of 23 counties (20 Courthouse Computer Systems classic ASP, Beaufort LRSearch, Sumter GovOS CountyFusion, Oconee GovOS/Kofile PublicSearch) (enrichment_county_lien_sweep, rod/county_sweeps): plain HTTP and one WebSocket, cached in data/county_sweeps, 'screened, none found' only for the window read; needs the main.py wiring line in unwired_wire_pending",
+  "FORECLOSURE_COUNTY_MARRIAGE_SWEEP": "Beaufort NC Marriages index swept by date (about 275 licences a year) and matched to person owners; part of the same pass",
+  "FORECLOSURE_COUNTY_SWEEP_BUDGET_S": "each county's register reads inside the sweep pass (a cold Sumter sweep took 395 s on 2026-10-09, the others 30 to 55 s; later runs read only the new end)",
+  "FORECLOSURE_SC_COUNTYFUSION_ROD": "Sumter by owner name through GovOS CountyFusion (rod/sc_countyfusion): no-credential 'Login as Guest' and a plain Accept click-through, about 5 s a lookup once the session is held; 30 lookups a run (FORECLOSURE_SC_COUNTYFUSION_ROD_MAX)",
+  "FORECLOSURE_NC_LRSEARCH_ROD": "Beaufort by owner name through CCS LRSearch (rod/nc_lrsearch): open, no login or CAPTCHA; 30 lookups a run (FORECLOSURE_NC_LRSEARCH_ROD_MAX)"
+ },
+ "must_not_set": {
+  "GRANDFATHER_CARRIED": {
+   "values": [
+    "1"
+   ],
+   "why": "main.run json.loads the whole prior plain board (4.1 GB at 350K rows) and keeps a second 350K-Listing snapshot: certain watchdog kill; restored rows also skip verification and scoring"
+  },
+  "FULLRUN_PERSIST": {
+   "values": [
+    "0"
+   ],
+   "why": "a fresh-only board replaces the cumulative one; pulled_sales then reads the whole prior board"
+  },
+  "FULLRUN_PRIOR_CORRECTION": {
+   "values": [
+    "0"
+   ],
+   "why": "turns off correct_prior_rows (fallback-point parcels, name-derived counties, exemption-claim withdrawal)"
+  },
+  "SCORE_BOARD_FAIL_SOFT": {
+   "values": [
+    "1",
+    "true",
+    "yes"
+   ],
+   "why": "publishes stale HOT/WARM/COLD tiers when scoring fails"
+  },
+  "VERIFICATION_APPLY": {
+   "values": [
+    "0"
+   ],
+   "why": "refuted and stale verdicts would not remove their signals"
+  },
+  "FORECLOSURE_CHECKPOINT": {
+   "values": [
+    "0"
+   ],
+   "why": "no checkpoint: a crash costs the whole run and the gated publish has nothing to publish"
+  },
+  "ENRICH_PHASE_MAX_SECONDS": {
+   "values": [
+    "*"
+   ],
+   "why": "overrides every _await_capped / _gather_phases cap, including dot_ocr, rod_chain and nc_rod_render whose own budgets main.py passes as default_s (the 2026-09-23 dot_ocr zero-visibility bug)"
+  }
+ },
+ "unwired_allowlist": {
+  "enrichment_census_geocoder": "RETIRED 2026-10-09 (audit unwired_enrichers; module and board keys kept, not run): the run geocodes through enrichment_geocode; its batch merge re-checks the filter after writing, so a miss shifts every later result onto the wrong row; census_tract / block_group / state_fips / standardized_address are on 0 rows of the 10/7 board and only the retired fbi_ucr / usda_ers read them",
+  "enrichment_charlotte_code": "RETIRED 2026-10-09 (audit unwired_enrichers; module and board keys kept, not run): its ArcGIS URL has no /query (returns layer metadata, never a case) and it sends spoofed-browser 403 workaround headers (BRIEF: never extend bypass handling); code cases come from the run's enrichment_code_enforcement",
+  "enrichment_email_extract": "RETIRED 2026-10-09 (audit unwired_enrichers; module and board keys kept, not run): owner_email_of() reads the owner's e-mail from the primary sources (LiensNC owner block, skip-trace e-mails) at read time; the scan copy classified 46,961 of 46,963 e-mail blocks 'other' (the context path bug) and goes stale; owner_email keeps its other writer (liensnc_handoff)",
+  "enrichment_envirofacts": "RETIRED 2026-10-09 (audit unwired_enrichers; module and board keys kept, not run): EPA overlay duplicating the run's enrichment_environmental; sends meters where ECHO expects miles, re-queries misses forever, writes a bool that export_board's enviro_risk column cannot read; envirofacts / nearby_facilities on 0 rows",
+  "enrichment_fbi_ucr": "RETIRED 2026-10-09 (audit unwired_enrichers; module and board keys kept, not run): needs FBI_API_KEY, up to 11 calls a row with no county cache, its 'rate' is a per-agency average (not per capita), a missing key stamps {} forever; crime_stats on 0 rows, nothing reads it",
+  "enrichment_free_phones": "RETIRED 2026-10-09 (audit unwired_enrichers; module and board keys kept, not run): people-search phones through a stealth browser that the site answers with a CAPTCHA 403 (a wall: BRIEF keeps the code as it is and never runs it); the phone gate marks every people-search phone do_not_dial anyway",
+  "enrichment_greensboro_code": "RETIRED 2026-10-09 (audit unwired_enrichers; module and board keys kept, not run): clone of charlotte_code (same broken FeatureServer URL, same workaround headers); the run's enrichment_code_enforcement reads Greensboro's own layer",
+  "enrichment_irs_lien": "RETIRED 2026-10-09 (audit unwired_enrichers; module and board keys kept, not run): CourtListener name search: first+last token of surname-first owner names, keywords that can never match, no amount, misses never stamped (the same 300 rows every run); a false federal lien would enter raw['liens'], which equity reads. Needs a rebuild before any wiring",
+  "enrichment_lexington_assessment": "RETIRED 2026-10-09 (audit unwired_enrichers; module and board keys kept, not run): Lexington SC value and the 4%/6% ratio are already in the run: parcel_cache's maps.lex-co.com layer (value) and the qPayBill roll (ratio, owner-occupied); the 1,159 board blocks (9/13) stay as they are",
+  "enrichment_marriage_license": "RETIRED 2026-10-09 (audit unwired_enrichers; module and board keys kept, not run): the same Aumentum name search enrichment_aumentum_rod already runs (raw['rod']) through a curl_cffi impersonation adapter (BRIEF: never extend); 27 rows (22 no_match)",
+  "enrichment_nc_doj": "RETIRED 2026-10-09 (audit unwired_enrichers; module and board keys kept, not run): spoofed-browser 403 workaround (BRIEF); its landing-page branch ignores the name, so it would flag every NC row with the same alert list; 0 rows, nothing reads nc_doj",
+  "enrichment_nc_onemap": "RETIRED 2026-10-09 (audit unwired_enrichers; module and board keys kept, not run): parcel, flood and zoning already come from enrichment_arcgis / parcel_cache (NC1Map) and enrichment_flood; empty blocks are never retried; 0 rows, nothing reads nc_onemap",
+  "enrichment_nc_sos": "RETIRED 2026-10-09 (audit unwired_enrichers; module and board keys kept, not run): spoofed-browser 403 workaround (BRIEF); its batch merge has the shifted-index bug; the NC SOS lane runs on the Mac through enrichment_sos_agent / sos_dissolution",
+  "enrichment_ncpts_lrc": "RETIRED 2026-10-09 (audit unwired_enrichers; module and board keys kept, not run): searches by house number only and accepts any parcel with that number (another property's owner and value onto the row); the run reads the same host by parcel id in enrichment_lrcpwa_parcel; its keys are on 0 rows",
+  "enrichment_ocr": "RETIRED 2026-10-09 (audit unwired_enrichers; module and board keys kept, not run): the run OCRs the same notices in enrichment_doc_ocr; this one loads EasyOCR/torch (memory) and writes attorney phones into owner_phone; ocr_extraction (2,220 rows, 8/20) stays as it is",
+  "enrichment_probate_search": "RETIRED 2026-10-09 (audit unwired_enrichers; module and board keys kept, not run): a stealth browser written to get past an F5 anti-bot wall (BRIEF: never extend or run it); the SC URL puts a name where a case number goes and the NC regex reads any case-shaped text, and it would overwrite raw['probate'], which call_ready lane B reads",
+  "enrichment_realtor_data": "RETIRED 2026-10-09 (audit unwired_enrichers; module and board keys kept, not run): its TSV URL answers 404 (checked 2026-10-08); the research data moved to a different file with other columns; nothing reads housing_market (0 rows)",
+  "enrichment_redfin_datacenter": "RETIRED 2026-10-09 (audit unwired_enrichers; module and board keys kept, not run): its download URL is dead (404/429, docs/gap_closure_plan_2026-09-06.md); the live file is a 1.5 GB gzip it would read into memory whole; nothing reads market_stats (0 rows)",
+  "enrichment_rod_name_index": "RETIRED 2026-10-09 (audit unwired_enrichers; module and board keys kept, not run): curl_cffi impersonation (BRIEF: never extend); the run reads the same eight SC Online Record System counties plus Laurens and Lancaster through enrichment_generic_rod (FORECLOSURE_SC_ORS_ROD=1); 7 rows",
+  "enrichment_sc_voter_xref": "RETIRED 2026-10-09 (audit unwired_enrichers; module and board keys kept, not run): of 1,458 board phones from this lane 3 are corroborated (1,172 unverified, 283 contradicted): the phone gate makes the rest do_not_dial; it also builds an index over 565 MB of voter files",
+  "enrichment_surface_contacts": "RETIRED 2026-10-09 (audit unwired_enrichers; module and board keys kept, not run): copies agent / office phones into owner_phone, which then stops enrichment_voter_phone from finding the owner's own number on that row; its e-mail half is owner_email_of's job",
+  "enrichment_usda_ers": "RETIRED 2026-10-09 (audit unwired_enrichers; module and board keys kept, not run): the 3-digit county FIPS it reads is zero-padded to 5 and never matches, so every row gets {}; income and unemployment come from enrichment_census_demographics and valuation/location; economic on 0 rows",
+  "enrichment_recaptcha_audio": "NOT WIRED, by owner decision (2026-10-11): this module solves CAPTCHAs / defeats anti-bot protection. The project's standing rule (CLAUDE.md compliance line, every prior owner decision in this profile and in docs/audit_2026-10-09/) is that walls go to the manual lane; this module is excluded from that rule by a separate, narrower authorization the owner gave to a different tool for its own work, not to this pipeline. It stays in the repo unwired and unrun by any script this profile governs; its output, if the owner supplies any, is ingested as data like any other manual-lane drop, never executed here.",
+  "enrichment_recaptcha_v3": "NOT WIRED, by owner decision (2026-10-11): this module solves CAPTCHAs / defeats anti-bot protection. The project's standing rule (CLAUDE.md compliance line, every prior owner decision in this profile and in docs/audit_2026-10-09/) is that walls go to the manual lane; this module is excluded from that rule by a separate, narrower authorization the owner gave to a different tool for its own work, not to this pipeline. It stays in the repo unwired and unrun by any script this profile governs; its output, if the owner supplies any, is ingested as data like any other manual-lane drop, never executed here."
+ },
+ "unwired_wire_pending": {},
+ "tail_calls_required": [
+  [
+   "enrichment_dnc",
+   "enrich_dnc_scrub"
+  ],
+  [
+   "enrichment_tail_extras",
+   "enrich_local_pre_gate"
+  ],
+  [
+   "enrichment_tail_extras",
+   "enrich_network_pre_value"
+  ],
+  [
+   "enrichment_tail_extras",
+   "enrich_local_after_qa"
+  ],
+  [
+   "enrichment_tail_extras",
+   "enrich_network_geo"
+  ]
+ ],
+ "_unwired_doc": "audit 2026-10-09 unwired_enrichers (docs/audit_2026-10-09/unwired_enrichers.md): every module the run does not reach is RETIRED with a reason (unwired_allowlist) or decided WIRE (unwired_wire_pending: the main.py line that wires it). The gate fails while a WIRE module is still unreached ('wiring pending'); once the lines are in, the entries here are tidied away (the gate says so).",
+ "board_load_allowlist": {
+  "main:run": "the GRANDFATHER_CARRIED=1 snapshot (json.loads of the whole prior plain board); unreachable while must_not_set holds GRANDFATHER_CARRIED",
+  "checkpoint:manifest": "data/checkpoint/manifest.json (one small dict)",
+  "checkpoint:load_publish_state": "data/checkpoint/resume_state.json (summary + stats, small)",
+  "web_artifact:verify_manifest": "board.manifest.json / run_meta.json (small)",
+  "web_artifact:reseal_board": "run_meta.json (small)",
+  "web_artifact:write_artifact": "run_meta.json and the high-water mark (small)",
+  "web_artifact:append_new_rows": "run_meta.json and the high-water mark (small)",
+  "web_artifact:patch_existing_rows": "run_meta.json and the high-water mark (small)",
+  "web_artifact:merge_duplicate_rows": "run_meta.json and the high-water mark (small)",
+  "web_artifact:delete_rows": "run_meta.json and the high-water mark (small)",
+  "web_artifact:_count_guard_and_backup": "the high-water mark (small)",
+  "enrichment_comps:carry_forward_from_board": "run_meta.json only (its run_time); the prior board itself is streamed with iter_board_rows_with_detail (fee0428a)"
+ },
+ "memory": {
+  "kill_mb": 25600,
+  "warn_fraction": 0.9,
+  "growth_factor": 1.15,
+  "_growth_doc": "next run's rows = prior board rows x growth_factor. The 10/6 run grew 223,832 -> 350,013 (x1.56) when the 10/7 sources landed; 1.15 assumes no new source of that size. Raise it when adding sources.",
+  "calibration": [
+   {
+    "run": "vm-run-20261006T175148",
+    "kind": "full",
+    "pin": "7d5b7ae1",
+    "prior_rows": 223832,
+    "rows_out": 350013,
+    "peak_mb": 19731,
+    "note": "gated full run, exit 0, no swap used"
+   },
+   {
+    "run": "vm-resume-20261007T165654",
+    "kind": "publish_only",
+    "rows_out": 350013,
+    "peak_mb": 17021
+   },
+   {
+    "run": "vm-resume-20261007T125242",
+    "kind": "enrich_only",
+    "rows_out": 350013,
+    "peak_mb": 12508
+   }
+  ],
+  "_killed_doc": "vm-run-20261007T233726 and vm-run-20261008T003844 were stopped by the watchdog at 25,629 / 25,606 MB 36 minutes in, in carryover (json.loads of the 4.1 GB prior board); fixed by d42058b3. Not calibration points: a defect, not a per-row cost."
+ },
+ "ledgers": {
+  "dir": "docs/handoff/verification",
+  "max_age_h": 36
+ },
+ "handoff": {
+  "dir": "docs/handoff/stealth_leads",
+  "file": "docs/handoff/stealth_leads.json",
+  "_doc": "dir is the sharded hand-off (manifest.json + one JSON Lines shard per source) since 2026-10-09; file is the legacy single file, read as a fallback. The age is the newer of the two.",
+  "max_age_h": 36
+ },
+ "repo_size": {
+  "max_file_mib": 90,
+  "warn_file_mib": 40,
+  "max_pages_mb": 900,
+  "warn_pages_mb": 800,
+  "_doc": "scripts/repo_size_check.py limits (prerun_gate repo-size, CI tests.yml job repo-size). The pre-commit gate refuses 95 MiB and GitHub 100 MiB per file; pages.yml stops a deploy at 950 MB and Pages refuses 1 GB."
+ },
+ "test_results": "data/test_results/latest.json",
+ "code_paths": [
+  "src",
+  "scripts",
+  "deploy",
+  "tests",
+  "pyproject.toml",
+  "uv.lock"
+ ],
+ "frozen_keys_known": [
+  "bankruptcy_petition",
+  "block_group",
+  "building_value_assessed",
+  "campaign_queue",
+  "census_tract",
+  "contact",
+  "crime_stats",
+  "deficiency_amount",
+  "economic",
+  "housing_market",
+  "land_value_assessed",
+  "lexington_assessment",
+  "market_stats",
+  "nearby_facilities",
+  "ocr_extraction",
+  "rod_name_index",
+  "standardized_address",
+  "state_fips",
+  "tax_bill_url",
+  "workflow_status",
+  "workflow_status_at",
+  "workflow_tags"
+ ],
+ "frozen_keys_why": {
+  "bankruptcy_petition": "petition_address (scripts/bankruptcy_petition_sweep.py, an operator sweep outside the run); 0 rows on the 10/7 board",
+  "block_group": "retired enrichment_census_geocoder; 0 rows",
+  "building_value_assessed": "retired enrichment_ncpts_lrc; 0 rows",
+  "campaign_queue": "workflow_engine (scripts/enrich_board.py, hourly_refresh, neither run): retired, its min_equity trigger never fires (equity is a dict); 0 rows",
+  "census_tract": "retired enrichment_census_geocoder; 0 rows",
+  "contact": "contact_ingest (scripts/ingest_contacts.py, the operator's skip-trace file import); 0 rows on the 10/7 board",
+  "crime_stats": "retired enrichment_fbi_ucr; 0 rows",
+  "deficiency_amount": "retired enrichment_ocr; 0 rows",
+  "economic": "retired enrichment_usda_ers; 0 rows",
+  "housing_market": "retired enrichment_realtor_data; 0 rows",
+  "land_value_assessed": "retired enrichment_ncpts_lrc; 0 rows",
+  "lexington_assessment": "retired enrichment_lexington_assessment; 1,159 rows from 2026-09-13, kept",
+  "market_stats": "retired enrichment_redfin_datacenter; 0 rows",
+  "nearby_facilities": "retired enrichment_envirofacts; 0 rows",
+  "ocr_extraction": "retired enrichment_ocr; 2,220 rows from 2026-08-20, kept",
+  "rod_name_index": "retired enrichment_rod_name_index; 7 rows, kept",
+  "standardized_address": "retired enrichment_census_geocoder; 0 rows",
+  "state_fips": "retired enrichment_census_geocoder / fbi_ucr / usda_ers; 0 rows",
+  "tax_bill_url": "retired enrichment_ncpts_lrc; 0 rows",
+  "workflow_status": "workflow_engine, retired; 0 rows",
+  "workflow_status_at": "workflow_engine, retired; 0 rows",
+  "workflow_tags": "workflow_engine, retired; 0 rows"
+ },
+ "_frozen_doc": "RAW_KEEP keys whose only writers are modules the run never imports (scripts/pipeline_wiring.raw_key_producers, 2026-10-09): their values on the board are whatever a script last wrote. Each needs a wire-or-retire decision; the gate fails on a NEW one. Since the unwired_enrichers audit (2026-10-09) the list holds only keys of retired modules or operator lanes outside the run; the keys of the eight wired modules (bt_appraisal_card, dnc_scrub, flood_zone, hud_fmr, land_distress, property_category, septic, wetlands) leave it."
+}

@@ -1,0 +1,624 @@
+"""Pickens County SC pre-sale delinquent-tax parcels (multi-year GIS rolls).
+
+Offline tests run against a SAVED slice of all eight real layers
+(``tests/fixtures/pickens_delinquent_layers.json``), built from the live
+services and kept verbatim: four parcels that appear in EVERY cycle 2020-2025
+(the chronic-delinquency case) plus three that appear only in the current 2025
+posting cycle (the case where owner + amount exist but situs/mailing must come
+from nowhere). That exercises the per-layer column map, the cross-cycle
+backfill, PIN normalization across the MAP_NUMBER / PIN / DelqParcel spellings,
+and the pre-sale flag on real shapes.
+
+RUN_LIVE=1 adds an opt-in smoke test against the live org.
+"""
+from __future__ import annotations
+
+import asyncio
+import json
+import os
+from pathlib import Path
+
+import pytest
+
+from foreclosure_scraper import arcgis_webmap as agw
+from foreclosure_scraper.layer_guard import LayerHarvest, PartialHarvest
+from foreclosure_scraper.models import ListingType, PropertyKind
+from foreclosure_scraper.scrapers.counties_sc import pickens_delinquent_parcels as mod
+
+from tests._arcgis_fakes import FakeHttp
+
+FIX = Path(__file__).parent / "fixtures"
+
+
+def _payloads() -> dict:
+    return json.loads((FIX / "pickens_delinquent_layers.json").read_text())
+
+
+def _routes(payloads: dict | None = None) -> dict:
+    p = payloads if payloads is not None else _payloads()
+    # A layer the recorded fixture predates (the 2026 cycle, wired 2026-10-07) answers
+    # cleanly empty, the same stand-in _only() uses.
+    out = {f"/services/{L.service}/FeatureServer": {"objectIdFieldName": "FID", "features": []}
+           for L in mod.LAYERS}
+    out.update({f"/services/{svc}/FeatureServer": body for svc, body in p.items()})
+    return out
+
+
+class _ctx:
+    def __init__(self, http):
+        self.http = http
+
+    async def __aenter__(self):
+        return self.http
+
+    async def __aexit__(self, *a):
+        return False
+
+
+#: A layer that is alive and simply has nothing for this fixture's parcels.
+_EMPTY = {"objectIdFieldName": "FID", "features": []}
+
+
+def _only(payload: dict) -> FakeHttp:
+    """FakeHttp where the named layers carry rows and every OTHER declared layer
+    answers cleanly EMPTY.
+
+    Unrouted layers must answer empty rather than error, because since the
+    LayerHarvest guard an erroring layer deliberately fails the whole run. These
+    tests exercise the cross-cycle fold, not layer death — "this roll year holds
+    nothing for this parcel" is the honest stand-in. Layer death has its own
+    tests below.
+    """
+    routes = {f"/services/{L.service}/FeatureServer": _EMPTY for L in mod.LAYERS}
+    routes.update(payload)
+    return FakeHttp(routes)
+
+
+def _run(http=None) -> list:
+    http = http or FakeHttp(_routes())
+    original = mod.client
+    mod.client = lambda *a, **kw: _ctx(http)      # noqa: E731
+    try:
+        return list(asyncio.run(mod.PickensDelinquentParcels().fetch()))
+    finally:
+        mod.client = original
+
+
+# --------------------------------------------------------------------------- #
+# layer enumeration
+# --------------------------------------------------------------------------- #
+
+def test_every_delinquent_layer_on_the_org_is_wired():
+    """The eight services enumerated off the org's /services listing. FLC_2022
+    is deliberately absent — that is post-sale inventory owned by sc_flc."""
+    assert [L.service for L in mod.LAYERS] == [
+        "delinquent_2020", "del_2021", "dqnt_2022", "dqnt_2023", "dqnt_2024",
+        "DelParces_October2025NewsAd", "DelqParcels_Ad_paperlisting2", "Posting3",
+        "WeekOne2027", "DELQ_TAX_WEEK1_2026",
+    ]
+    assert not any(L.service.startswith("FLC") for L in mod.LAYERS)
+
+
+def test_layers_are_ordered_oldest_to_newest():
+    """build_listing's 'newest value wins' backfill depends on this order."""
+    cycles = [L.cycle for L in mod.LAYERS]
+    assert cycles == sorted(cycles)
+
+
+def test_only_the_2026_layer_is_the_current_cycle():
+    """Owner decision 2026-10-07: the 2026 list is current; 2025 is the prior cycle."""
+    assert {L.service for L in mod.LAYERS if L.current} == {"DELQ_TAX_WEEK1_2026", "WeekOne2027"}
+    assert (mod.CURRENT_CYCLE, mod.PRIOR_CYCLE) == (2026, 2025)
+
+
+def _with_2026(pins: list[str], payloads: dict | None = None) -> FakeHttp:
+    """The recorded fixture (which predates the 2026 list) plus a 2026 list naming `pins`."""
+    routes = _routes(payloads)
+    routes["/services/DELQ_TAX_WEEK1_2026/FeatureServer"] = {
+        "objectIdFieldName": "FID", "features": [
+            {"attributes": {"FID": i + 1, "GISADMIN_P": p, "T_WEEK_1_1": "SAMPLE OWNER",
+                            "T_WEEK_1_2": 100.0 + i}} for i, p in enumerate(pins)]}
+    return FakeHttp(routes)
+
+
+def test_out_fields_are_enumerated_never_star():
+    """PRIVACY: query_features hard-rejects '*'; every layer must name columns."""
+    for L in mod.LAYERS:
+        assert L.out_fields and "*" not in L.out_fields
+        assert L.out_fields.startswith("FID,")
+        assert L.pin in L.out_fields
+
+
+def test_every_layer_url_is_the_pickens_org():
+    for L in mod.LAYERS:
+        assert L.url.startswith(
+            "https://services1.arcgis.com/59960rq18IxUcAVI/arcgis/rest/services/")
+
+
+def test_query_uses_enumerated_fields_and_paginates_properly():
+    http = FakeHttp(_routes())
+    _run(http)
+    assert len(http.calls) == len(mod.LAYERS)
+    for _verb, url, params in http.calls:
+        assert params["outFields"] != "*"
+        assert params["where"] == "1=1"
+        assert params["orderByFields"] == "FID ASC"
+        assert "resultOffset" in params and "resultRecordCount" in params
+        assert params["returnGeometry"] == "true" and params["outSR"] == "4326"
+
+
+# --------------------------------------------------------------------------- #
+# PIN normalization
+# --------------------------------------------------------------------------- #
+
+@pytest.mark.parametrize("raw,want", [
+    ("4065-16-73-6947", "4065-16-73-6947"),
+    ("406516736947", "4065-16-73-6947"),        # undashed spelling normalizes
+    # Interior whitespace is a data-entry artifact, not a different parcel: the
+    # digit run is still unambiguously 12 long. Same convention as
+    # counties_nc.henderson_code_violations, whose county data ships a
+    # tab-prefixed PIN.
+    ("4065167 36947", "4065-16-73-6947"),
+    ("\t4065-16-73-6947", "4065-16-73-6947"),
+    (" 5019-11-66-7470 ", "5019-11-66-7470"),
+    ("R0056724", None),                         # account number, not a PIN
+    ("40651673694", None),                      # 11 digits — too short
+    ("4065167369477", None),                    # 13 digits — too long
+    ("", None), (None, None), (" ", None),
+])
+def test_norm_pin(raw, want):
+    assert mod._norm_pin(raw) == want
+
+
+def test_map_number_and_delqparcel_spellings_reach_the_same_parcel_key():
+    """delinquent_2020 keys on MAP_NUMBER, the 2025 ad keys on DelqParcel, the
+    rest on PIN. All three must fold into one parcel, or a chronic delinquent
+    would read as three separate one-off leads."""
+    rows = _run()
+    multi = [li for li in rows
+             if li.raw["pickens_delinquent"]["cycle_count"] >= 6]
+    assert len(multi) == 4, "fixture holds four parcels present in all six cycles"
+    for li in multi:
+        d = li.raw["pickens_delinquent"]
+        assert d["cycles"] == [2020, 2021, 2022, 2023, 2024, 2025]
+        assert d["first_cycle"] == 2020 and d["latest_cycle"] == 2025
+        assert d["chronic"] is True and d["repeat_delinquent"] is True
+
+
+# --------------------------------------------------------------------------- #
+# cross-cycle backfill — the whole point of folding the layers together
+# --------------------------------------------------------------------------- #
+
+def test_current_cycle_rows_are_backfilled_with_situs_and_mailing_from_older_rolls():
+    """The 2025 posting layers publish owner + amount ONLY. Everything that
+    makes the lead mailable (situs, owner mailing address) comes from the
+    2022-2024 rolls at the same parcel."""
+    li = next(li for li in _run(_with_2026(["4065-16-73-6947"]))
+              if li.parcel_id == "4065-16-73-6947")
+    assert li.raw["pickens_delinquent"]["pre_sale"] is True
+    assert "pickens_prior_cycle_only" not in li.raw
+    assert li.street_address                      # from a 20xx roll
+    assert li.city and li.zip_code
+    assert li.raw["owner_mailing"]["street"]      # from a 20xx roll
+    assert li.owner_name
+
+
+def test_a_2025_only_parcel_has_owner_and_amount_but_no_situs():
+    """Honest about what the 2025 posting layers actually carry — no invention. Since the
+    2026 list is current (2026-10-07) a parcel on 2025 only is prior-cycle-only."""
+    li = next(li for li in _run() if li.parcel_id == "4053-10-46-7469")
+    d = li.raw["pickens_delinquent"]
+    assert d["cycles"] == [2025] and d["pre_sale"] is False
+    assert li.raw["pickens_prior_cycle_only"] is True
+    assert li.owner_name and d["amount_owed"]
+    assert li.street_address is None
+    assert "owner_mailing" not in li.raw
+
+
+def test_amount_comes_from_the_newest_publication_not_the_oldest():
+    payload = {
+        "/services/dqnt_2022/FeatureServer": {"objectIdFieldName": "FID", "features": [
+            {"attributes": {"FID": 1, "PIN": "4065-16-73-6947", "AMOUNT_DUE": 111.0,
+                            "NAME1": "OLD OWNER", "LOCADD": "1 OLD RD"}}]},
+        "/services/Posting3/FeatureServer": {"objectIdFieldName": "FID", "features": [
+            {"attributes": {"FID": 1, "PIN": "4065-16-73-6947", "AMOUNT_DUE": 999.0,
+                            "OWNER__NOW": "NEW OWNER"}}]},
+    }
+    rows = _run(_only(payload))
+    li = rows[0]
+    assert li.raw["pickens_delinquent"]["amount_owed"] == 999.0
+    assert li.owner_name == "NEW OWNER"
+    assert li.street_address == "1 OLD RD"        # backfilled, not overwritten
+
+
+def test_owner_now_long_form_beats_the_terse_name1_index_form():
+    """'KIRKLAND, DELIA F., HEIRS OF,' carries the heirship the index form
+    ('KIRKLAND DELIA F') throws away."""
+    payload = {"/services/dqnt_2023/FeatureServer": {
+        "objectIdFieldName": "FID", "features": [
+            {"attributes": {"FID": 1, "PIN": "4046-20-90-7980",
+                            "NAME1": "KIRKLAND DELIA F",
+                            "OWNER__NOW": "KIRKLAND, DELIA F., HEIRS OF,",
+                            "AMOUNT_DUE": 2802.17}}]}}
+    li = _run(_only(payload))[0]
+    assert li.owner_name == "KIRKLAND, DELIA F., HEIRS OF,"
+
+
+# --------------------------------------------------------------------------- #
+# listing shape / joining
+# --------------------------------------------------------------------------- #
+
+def test_listing_shape():
+    li = next(li for li in _run() if li.parcel_id == "5019-11-66-7470")
+    assert li.source == "counties_sc.pickens_delinquent_parcels"
+    assert li.listing_type is ListingType.TAX_LIEN
+    assert li.state == "SC" and li.county == "Pickens"
+    assert li.sale_date is None
+    assert li.foreclosure_process == "tax"
+    assert li.defendant == li.owner_name
+    d = li.raw["pickens_delinquent"]
+    assert d["source"] == "pickens_county_gis_delinquent_layers"
+    assert d["parcel_id"] == li.parcel_id
+    assert len(d["publications"]) >= d["cycle_count"]
+
+
+def test_assessed_value_sale_price_and_zoning_are_captured():
+    """2026-10-04 extraction-completeness fix.
+
+    Live schema/data check found ACTUALVAL (assessed value, real on 246/834
+    dqnt_2022 rows and 123/362 dqnt_2023 rows; 2024 dropped the column
+    entirely), SALEP/SALEDT (last recorded sale amount/date, real on all
+    three dqnt_* rolls, e.g. PIN 4054-15-53-7539 sold $6,262,000 on
+    2006-06-07 per dqnt_2023), and ZONINGDESC (dqnt_2023 only, e.g. "Cp 2
+    Community Bus Dist") were all fetched by ``out_fields`` once wired into
+    the per-layer column map but never read in ``build_listing`` before this
+    fix — this is the dedicated test for that wiring.
+    """
+    layer = mod.LAYERS[3]  # dqnt_2023
+    assert layer.service == "dqnt_2023"
+    feat = {
+        "attributes": {
+            "PIN": "4054-15-53-7539",
+            "NAME1": "SOME OWNER",
+            "ACTUALVAL": 5376700,
+            "SALEP": 6262000,
+            "SALEDT": 1149638400000,  # 2006-06-07
+            "ZONINGDESC": "Cp 2 Community Bus Dist",
+            "LOCADD": "123 MAIN ST",
+        },
+        "geometry": None,
+    }
+    pin, row = mod.parse_feature(feat, layer)
+    assert pin == "4054-15-53-7539"
+    assert row.assessed_val == 5376700
+    assert row.sale_price == 6262000
+    assert row.sale_date is not None and row.sale_date.date().isoformat() == "2006-06-07"
+    assert row.zoning_desc == "Cp 2 Community Bus Dist"
+
+    li = mod.build_listing(pin, [row])
+    assert li is not None
+    assert li.assessed_value == 5376700
+    assert li.zoning == "Cp 2 Community Bus Dist"
+    assert li.raw["gis"]["last_sale"] == {
+        "amount": 6262000, "date": "2006-06-07", "source": "pickens_delinquent_roll",
+    }
+    # the delinquent-balance field stays completely separate (see
+    # test_delinquent_balance_never_lands_in_a_property_value_field).
+    assert li.tax_value is None
+    assert li.market_value is None
+
+
+def test_dqnt_2024_has_no_actualval_column():
+    """The county dropped ACTUALVAL for the 2024 roll (field absent from the
+    service's own live schema, not just blank) — assert the layer map does not
+    request a column that 400s the query."""
+    layer = next(L for L in mod.LAYERS if L.service == "dqnt_2024")
+    assert layer.assessed_val is None
+    assert "ACTUALVAL" not in layer.out_fields
+    assert "SALEP" in layer.out_fields and "SALEDT" in layer.out_fields
+
+
+def test_parcel_is_the_join_key_onto_the_rest_of_the_board():
+    for li in _run():
+        assert li.dedupe_key() == f"parcel:SC:pickens:{li.parcel_id.replace('-', '').lower()}"
+
+
+def test_delinquent_balance_never_lands_in_a_property_value_field():
+    """calc.py prices ARV off tax_value — a $300 tax bill there would collapse
+    every valuation at the parcel."""
+    for li in _run():
+        assert li.tax_value is None
+        assert li.assessed_value is None
+        assert li.market_value is None
+        assert li.opening_bid is None
+        assert li.judgment_amount is None
+    # ...and the balance really is present somewhere, so this is not vacuous.
+    assert any(li.raw["pickens_delinquent"]["amount_owed"] for li in _run())
+
+
+def test_amount_owed_is_normalized_by_enrichment_tax_owed():
+    """The generic _TAXISH scan keys off 'delinquent' in the slug plus an
+    'amount_owed' key in a raw subdict. Assert the contract really holds rather
+    than assuming it."""
+    from foreclosure_scraper.enrichment_tax_owed import enrich_tax_owed
+    rows = [li for li in _run() if li.raw["pickens_delinquent"]["amount_owed"]]
+    assert rows
+    enrich_tax_owed(rows)
+    for li in rows:
+        assert li.raw["tax_owed"]["balance"] == li.raw["pickens_delinquent"]["amount_owed"]
+        assert li.raw["tax_owed"]["kind"] == "delinquent_tax"
+
+
+def test_chronic_delinquency_raises_the_tax_weight_and_is_not_a_property_signal():
+    # CHANGED 2026-09-21 (audit F5): this used to assert raw['distressed'] is True and that the
+    # scorer then read it as PROPERTY "distressed_condition" (8). One delinquency record therefore
+    # made FINANCIAL 20 + PROPERTY 8 = stack 2. Three roll years is a tax fact: it stays as
+    # raw['pickens_delinquent']['chronic'] and now raises the FINANCIAL weight (tax_lien_chronic).
+    from foreclosure_scraper.distress_score import _signals_for
+    chronic = [li.parcel_id for li in _run() if li.raw["pickens_delinquent"]["cycle_count"] >= 3]
+    li = next(li for li in _run(_with_2026(chronic))     # on the current 2026 list too
+              if li.raw["pickens_delinquent"]["cycle_count"] >= 3)
+    assert li.raw["pickens_delinquent"]["chronic"] is True
+    assert "distressed" not in li.raw
+    sigs = _signals_for(li)
+    assert "distressed_condition" not in [n for n, _c, _w in sigs]
+    assert ("tax_lien_chronic", "FINANCIAL", 24) in sigs
+    assert {c for _n, c, _w in sigs} == {"FINANCIAL"}
+
+
+def test_a_single_cycle_parcel_is_not_flagged_chronic():
+    li = next(li for li in _run()
+              if li.raw["pickens_delinquent"]["cycle_count"] == 1)
+    assert li.raw["pickens_delinquent"]["chronic"] is False
+    assert "distressed" not in li.raw
+
+
+def test_absentee_owner_flagged_from_the_mailing_address():
+    payload = {"/services/dqnt_2023/FeatureServer": {
+        "objectIdFieldName": "FID", "features": [
+            {"attributes": {"FID": 1, "PIN": "4046-04-83-6249", "NAME1": "DAVIS JOHN THOMAS",
+                            "ADD1": "30343 TAKARA TERRACE", "CITY": "MOUNT DORA",
+                            "STATE": "FL", "ZIP": 32757, "AMOUNT_DUE": 295.22}}]}}
+    li = _run(_only(payload))[0]
+    assert li.raw["absentee_owner"] is True
+    assert li.raw["owner_mailing"]["state"] == "FL"
+    # 2026-10-04 audit: enrichment_lead_signals.py / distress_score.py read
+    # raw['owner_mailing']['absentee'] (mailing_shape.mailing_of), never the
+    # bare raw['absentee_owner'] key above -- both must agree.
+    assert li.raw["owner_mailing"]["absentee"] is True
+
+
+def test_owner_occupied_parcel_is_not_flagged_absentee():
+    payload = {"/services/dqnt_2023/FeatureServer": {
+        "objectIdFieldName": "FID", "features": [
+            {"attributes": {"FID": 1, "PIN": "4037-00-83-2164", "NAME1": "LADD PEGGY S",
+                            "ADD1": "126 SHEMAIAH RD", "CITY": "CENTRAL", "STATE": "SC",
+                            "ZIP": 29630, "LOCADD": "126  SHEMAIAH RD",
+                            "LOCCITY": "CENTRAL", "LOCZIP": 29630, "AMOUNT_DUE": 231.39}}]}}
+    li = _run(_only(payload))[0]
+    assert "absentee_owner" not in li.raw
+
+
+def test_zip_plus_four_padding_is_reduced_to_five_digits():
+    assert mod._zip5(296730000) == "29673"
+    assert mod._zip5(29640) == "29640"
+    assert mod._zip5(0) is None and mod._zip5(" ") is None
+
+
+def test_vacant_flag_drives_property_kind_but_a_zero_building_count_does_not():
+    """BLDGS=0 shows up on parcels that plainly have a house; only the
+    assessor's own IMPVAC flag is trusted to call LAND."""
+    assert mod._property_kind("Vacant", 0) is PropertyKind.LAND
+    assert mod._property_kind(" ", 0) is PropertyKind.UNKNOWN
+    assert mod._property_kind(None, 1) is PropertyKind.UNKNOWN
+
+
+def test_government_owners_are_dropped():
+    payload = {"/services/Posting3/FeatureServer": {
+        "objectIdFieldName": "FID", "features": [
+            {"attributes": {"FID": 1, "PIN": "4053-10-46-7469",
+                            "OWNER__NOW": "CITY OF EASLEY", "AMOUNT_DUE": 100.0}},
+            {"attributes": {"FID": 2, "PIN": "4054-11-55-7793",
+                            "OWNER__NOW": "WILLIAMS, ALVIN M., JR.", "AMOUNT_DUE": 638.8}}]}}
+    rows = _run(_only(payload))
+    assert [li.owner_name for li in rows] == ["WILLIAMS, ALVIN M., JR."]
+
+
+def test_row_without_a_parseable_pin_is_dropped():
+    payload = {"/services/Posting3/FeatureServer": {
+        "objectIdFieldName": "FID", "features": [
+            {"attributes": {"FID": 1, "PIN": " ", "OWNER__NOW": "X", "AMOUNT_DUE": 5.0}}]}}
+    assert _run(_only(payload)) == []
+
+
+# --------------------------------------------------------------------------- #
+# resilience
+# --------------------------------------------------------------------------- #
+
+def test_one_dead_layer_fails_the_run_instead_of_shrinking_it():
+    """THE REGRESSION THIS GUARD EXISTS FOR.
+
+    This used to assert the opposite ("costs that layer, not the run"), and
+    that contract is exactly how the source shipped 1,977 leads instead of
+    2,161 when one of the eight services was retired: seven layers' worth of
+    parcels is a plausible number, and expected_min_count=1500 waved it
+    through. A short harvest is indistinguishable from a roll that genuinely
+    shrank, so it must be an ERROR, not a smaller OK.
+
+    Note the retired service answers HTTP **200** with an error body, so there
+    is no status code anywhere for anything else to notice.
+    """
+    p = _payloads()
+    p["dqnt_2024"] = {"error": {"code": 400, "message": "Invalid URL"}}
+    with pytest.raises(PartialHarvest) as ei:
+        _run(FakeHttp(_routes(p)))
+    assert "dqnt_2024" in str(ei.value)
+    assert f"{len(mod.LAYERS) - 1}/{len(mod.LAYERS)} declared layers alive" in str(ei.value)
+
+
+def test_safe_run_reports_a_partial_harvest_as_an_error_not_a_zero():
+    """The orchestrator must be able to tell "a layer died" from "no parcels
+    are delinquent" — which is the distinction that hid the upset-bid outage."""
+    p = _payloads()
+    p["dqnt_2024"] = {"error": {"code": 400, "message": "Invalid URL"}}
+    http = FakeHttp(_routes(p))
+    original = mod.client
+    mod.client = lambda *a, **kw: _ctx(http)      # noqa: E731
+    try:
+        s = mod.PickensDelinquentParcels()
+        rows = asyncio.run(s.safe_run())
+    finally:
+        mod.client = original
+    assert rows == []                      # partial rows are discarded, not shipped
+    assert s.last_outcome == "ERROR"
+    assert "partial harvest" in s.last_reason
+    assert "dqnt_2024" in s.last_reason    # survives the 160-char truncation
+
+
+def test_all_layers_dead_raises_rather_than_looking_like_an_empty_county():
+    with pytest.raises(PartialHarvest):
+        _run(FakeHttp({}))                 # every route 400s
+
+
+def test_a_retired_layer_can_be_retired_deliberately_via_tolerate():
+    """Retiring a layer stays possible — it just has to be a code change
+    somebody reviewed, rather than a warning in the log."""
+    guard = LayerHarvest("counties_sc.pickens_delinquent_parcels",
+                         [L.service for L in mod.LAYERS], tolerate=["dqnt_2024"])
+    for L in mod.LAYERS:
+        if L.service == "dqnt_2024":
+            guard.failed(L.service, "Invalid URL")
+        else:
+            guard.ok(L.service, 400)
+    guard.verify()                         # does not raise
+
+
+def test_env_gate_skips_without_fetching(monkeypatch):
+    monkeypatch.setenv(mod.ENV_OFF, "0")
+    http = FakeHttp(_routes())
+    assert _run(http) == []
+    assert http.calls == []
+
+
+def test_where_clause_passes_the_safe_expression_guard():
+    assert agw.is_safe_expression("1=1")
+
+
+# --------------------------------------------------------------------------- #
+# wiring guard (fails until main.py is updated — see the report)
+# --------------------------------------------------------------------------- #
+
+def test_slug_must_be_in_dateless_ok_sources():
+    """A delinquent balance is a standing debt, not a dated sale. Without the
+    whitelist entry main._active_only silently drops all ~2,100 rows."""
+    from foreclosure_scraper import main
+    slug = mod.PickensDelinquentParcels.slug
+    assert slug in main.DATELESS_OK_SOURCES, (
+        f'add "{slug}" to main.DATELESS_OK_SOURCES')
+
+
+def test_scraper_is_auto_discovered_by_the_registry():
+    from foreclosure_scraper.scrapers._registry import discover
+    assert mod.PickensDelinquentParcels in discover()
+
+
+# --------------------------------------------------------------------------- #
+# live smoke
+# --------------------------------------------------------------------------- #
+
+@pytest.mark.skipif(not os.environ.get("RUN_LIVE"), reason="live smoke; set RUN_LIVE=1")
+def test_live():
+    s = mod.PickensDelinquentParcels()
+    rows = asyncio.run(s.safe_run())
+    assert s.last_outcome == "OK"
+    assert len(rows) >= s.expected_min_count
+    d = [li.raw["pickens_delinquent"] for li in rows]
+    assert sum(1 for x in d if x["pre_sale"]) >= 300      # current cycle
+    assert sum(1 for x in d if x["repeat_delinquent"]) >= 500
+    assert sum(1 for li in rows if li.owner_name) / len(rows) > 0.8
+    assert all(li.parcel_id for li in rows)
+    print(f"live pickens delinquent parcels={len(rows)} "
+          f"pre_sale={sum(1 for x in d if x['pre_sale'])} "
+          f"repeat={sum(1 for x in d if x['repeat_delinquent'])} "
+          f"chronic={sum(1 for x in d if x['chronic'])} "
+          f"situs={sum(1 for li in rows if li.street_address)}")
+
+
+
+# --- 2026-10-07 extraction audit. Values below are made up. ---
+
+def test_the_2026_cycle_layer_reads_pin_owner_and_amount():
+    lay = next(L for L in mod.LAYERS if L.service == "DELQ_TAX_WEEK1_2026")
+    assert lay.current and lay.cycle == 2026
+    assert (lay.pin, lay.owner, lay.amount) == ("GISADMIN_P", "T_WEEK_1_1", "T_WEEK_1_2")
+    assert lay.out_fields.split(",") == ["FID", "GISADMIN_P", "T_WEEK_1_1", "T_WEEK_1_2"]
+
+
+def test_the_pickens_block_keeps_cycle_history_through_the_publish_slim():
+    from foreclosure_scraper.web_artifact import _slim_raw
+    blk = {"chronic": True, "cycle_count": 3, "cycles": [2022, 2024, 2026],
+           "publications": [{"service": "x", "cycle": 2026, "amount": 10.0, "current": True}],
+           "tax_year": "2025", "acres": 1.0, "buildings": 1, "improved_vacant": "V",
+           "account_no": "1", "pin_ext": "000", "parcel_id": "4000-00-00-0000"}
+    out = _slim_raw({"pickens_delinquent": blk})["pickens_delinquent"]
+    for k in ("cycles", "publications", "tax_year", "acres", "buildings",
+              "improved_vacant", "account_no", "pin_ext"):
+        assert k in out, k
+    assert "parcel_id" not in out          # a duplicate of the row's own parcel_id
+
+
+
+# --- owner decision 2026-10-07: the 2025 list is the prior cycle ---------------------------
+
+def _sig_names(li):
+    from foreclosure_scraper.distress_score import _signals_for
+    return [n for n, _c, _w in _signals_for(li)]
+
+
+def test_a_2025_only_parcel_earns_no_tax_credit_but_stays_as_context():
+    rows = _run()
+    prior = [li for li in rows if li.raw.get("pickens_prior_cycle_only")]
+    assert prior, "fixture parcels are on the 2025 lists and no 2026 list"
+    for li in prior:
+        names = _sig_names(li)
+        assert "tax_lien" not in names and "tax_lien_chronic" not in names
+        assert li.raw["pickens_delinquent"]["pre_sale"] is False
+        assert "not the current 2026 list" in li.description
+
+
+def test_a_parcel_on_both_lists_keeps_its_tax_credit():
+    pins = [li.parcel_id for li in _run()]
+    rows = _run(_with_2026(pins))
+    assert not any(li.raw.get("pickens_prior_cycle_only") for li in rows)
+    both = next(li for li in rows if li.raw["pickens_delinquent"]["chronic"])
+    names = _sig_names(both)
+    assert "tax_lien" in names and "tax_lien_chronic" in names
+    assert both.raw["pickens_delinquent"]["pre_sale"] is True
+
+
+def test_an_old_roll_only_parcel_is_not_marked_prior_cycle():
+    """Only the prior (2025) cycle is in the rule; a 2023-only parcel is unchanged."""
+    payload = {"/services/dqnt_2023/FeatureServer": {
+        "objectIdFieldName": "FID", "features": [
+            {"attributes": {"FID": 1, "PIN": "4000-00-00-0001", "NAME1": "SAMPLE PAT",
+                            "AMOUNT_DUE": 50.0}}]}}
+    li = _run(_only(payload))[0]
+    assert "pickens_prior_cycle_only" not in li.raw
+
+
+
+def test_the_week_one_republication_adds_its_parcels_and_newer_amounts():
+    """WeekOne2027 (2026-10-09 source audit): the county's re-publication of week one with
+    amounts as of 9/17/2026; a parcel only there is a current-cycle lead, and a parcel on
+    both takes the newer amount."""
+    http = _with_2026(["4000-00-00-0001", "4000-00-00-0002"])
+    http.routes["/services/WeekOne2027/FeatureServer"] = {
+        "objectIdFieldName": "FID", "features": [
+            {"attributes": {"FID": 1, "MAP_PARCEL": "4000-00-00-0002", "OWNER__NOW": "SAMPLE OWNER",
+                            "AMOUNT_DUE": 555.0}},
+            {"attributes": {"FID": 2, "MAP_PARCEL": "4000-00-00-0003", "OWNER__NOW": "SAMPLE OWNER Z",
+                            "AMOUNT_DUE": 77.0}}]}
+    rows = {li.parcel_id: li for li in _run(http)}
+    assert {"4000-00-00-0001", "4000-00-00-0002", "4000-00-00-0003"} <= set(rows)
+    assert rows["4000-00-00-0002"].raw["pickens_delinquent"]["amount_owed"] == 555.0
+    assert not rows["4000-00-00-0003"].raw.get("pickens_prior_cycle_only")

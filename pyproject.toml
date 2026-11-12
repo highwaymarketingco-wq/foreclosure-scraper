@@ -1,0 +1,84 @@
+[project]
+name = "foreclosure-scraper"
+version = "0.1.0"
+description = "Comprehensive weekly foreclosure / tax sale / tax lien scraper for upstate SC and nearby NC counties"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "httpx[http2]>=0.27",
+    "selectolax>=0.3.21",
+    "beautifulsoup4>=4.12",
+    "lxml>=5.2",
+    "pydantic>=2.7",
+    "tenacity>=8.3",
+    "python-dateutil>=2.9",
+    "rapidfuzz>=3.9",
+    "gspread>=6.1",
+    "google-auth>=2.30",
+    "google-auth-oauthlib>=1.2",
+    "playwright>=1.45",
+    "pdfplumber>=0.11",
+    "pypdf>=4.3",
+    "tldextract>=5.1",
+    "rich>=13.7",
+    "structlog>=24.2",
+    "tqdm>=4.66",
+    "feedparser>=6.0",
+    "trafilatura>=1.12",
+    "homeharvest>=0.8.18",
+    "scrapling[fetchers]>=0.4.8",
+    # pydoll-python is an A/B-test alternate browser-automation library
+    # — used by scrapers/law_firms/korn_pydoll.py to compare bypass
+    # success vs Scrapling stealth on the same Korn target. Safe to
+    # remove once we decide which library wins.
+    "pydoll-python>=2.0",
+    "curl-cffi>=0.15.0",
+    # WebSocket client — rod/kofile.py speaks Kofile PublicSearch's
+    # @kofile/ WS protocol directly (wss://{host}/ws). Was only present
+    # transitively (playwright/nodriver); now a direct import.
+    "websockets>=12.0",
+    "anthropic>=0.97.0",
+    "google-genai>=1.0.0",
+    # AWS WAF invisible/PoW solver deps for src/.../_vendor/awswaf/.
+    # Lets Tyler get an aws-waf-token cookie without launching a browser,
+    # avoiding the image-grid escalation we hit with Scrapling stealth.
+    "pyscrypt>=1.6.2",
+    "cryptography>=42",
+    # Undetected-Chrome driver — the ONLY method that passes SC Public
+    # Index's F5 BIG-IP JS challenge (enrichment_case_detail.py,
+    # scrapers/national/sc_public_index.py). Was installed into the venv
+    # by hand at some point without ever being added here, so a plain
+    # `uv sync` silently uninstalled it as an "extra" package and quietly
+    # disabled the SC Public Index bypass. Keep this declared.
+    "nodriver>=0.50.3",
+]
+
+[project.scripts]
+foreclosure-scraper = "foreclosure_scraper.main:cli"
+porsche-scraper = "porsche_scraper.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/foreclosure_scraper", "src/porsche_scraper"]
+
+[tool.pytest.ini_options]
+# Default retention (3 sessions, policy="all") let pytest's own tmp_path
+# fixture accumulate to 57GB in /private/var/.../T across one day's many
+# separate agent-run invocations (2026-10-03). Keep tmp dirs only for
+# failed tests, and only the most recent session, so routine green runs
+# never pile up.
+tmp_path_retention_count = 1
+tmp_path_retention_policy = "failed"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.2",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "pyyaml>=6.0.3",
+    "pytest-timeout>=2.4.0",
+]

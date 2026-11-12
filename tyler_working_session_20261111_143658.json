@@ -1,0 +1,57 @@
+{
+  "timestamp": "2026-11-11T14:36:58.735363",
+  "url": "https://portal-nc.tylertech.cloud/Portal/Home/Dashboard/29",
+  "title": "Smart Search - Portal",
+  "cookies": [
+    {
+      "name": "aws-waf-token",
+      "value": "437c3a2a-36cd-475d-aab6-f0b0bd9f887b:FgoAZCgLDfv+AAAA:7p6Qe2TcTP28WTrug+NQ3aaR/GN3zfY8CIj513kCeTDlUhrTJGgwY0udJ2V2MgS8qx4HPLNcSuJBOK3St0UJSc1qi/OnWGAY4EIG0qtRiCwzmhgWbaig+9pasrw4N8FHu9zxqvYFGHulJgOGvDtkBu3ZU7FKmbpuUHPOue7imSK8f+0QLRco8cBV7FRjfU/yjCQV39NInTEPHt4lcXRQWpjW9lOfugTqiT46CR8n79w+39/gMxNL+I5pHeu4aQf1w/0S3rBqXa9icGOxgJwrZuuKbIdkH9GcB/O8pTiD8ewlvEiKKTSQqIkf1bWqiMFR/EUju8xLF49rseiiP/yzLVZ6nsEF43mhTEX8DHxTIZUKb0dVOlxp0icVl/fJsQ==",
+      "domain": ".tylertech.cloud",
+      "path": "/",
+      "expires": 1794771417,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "AWSALB",
+      "value": "vfDSdKqxdvAf8b7vZ7OlGBSSABPn+aCWEHgXcMyPD90BSkOcOCJEOJzkSbMYY7TrEuH24js86Ef9KaegBKuwTmTyHL+D0PJJmgP1AbLmfpZcaITf1STimH9ZpjtM",
+      "domain": "portal-nc.tylertech.cloud",
+      "path": "/",
+      "expires": 1795030617.647246,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "AWSALBCORS",
+      "value": "vfDSdKqxdvAf8b7vZ7OlGBSSABPn+aCWEHgXcMyPD90BSkOcOCJEOJzkSbMYY7TrEuH24js86Ef9KaegBKuwTmTyHL+D0PJJmgP1AbLmfpZcaITf1STimH9ZpjtM",
+      "domain": "portal-nc.tylertech.cloud",
+      "path": "/",
+      "expires": 1795030617.647421,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "ASP.NET_SessionId",
+      "value": "5isclluz2ceo34py4zjyhxl3",
+      "domain": "portal-nc.tylertech.cloud",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    }
+  ],
+  "storage": {
+    "localStorage": {
+      "awswaf_token_refresh_timestamp": "1794425805815",
+      "awswaf_captcha_solve_timestamp": "1794425817762",
+      "awswaf_session_storage": "437c3a2a-36cd-475d-aab6-f0b0bd9f887b:FgoAaoEKmIUCAQAA:E96iv4R+9WiQgZnRyMjFOtTvNIoRPJhcgw1Ntw2vMJwFG79/+Qbw6clgJTpJsWNER++OkBKie59Lx09hZns6C0Px+9HL9UK+/srXJrmw6JtGXecv15w2mCjKMh5Eu3cewLz4rUjY00ZJACd+FTDWjaJZF9gzOIuE98JKQufLTAAV8cKQk74A2K6Xfh3w69lpL/ihLg92OxtJ9+GHx4UOzHjfWmvVLC5wV9xSgsA4qcGMGp61erUAe/6A96V2xmOu7kV29ThBn6DNk+MJ6FV8sYPm54Yr/XYdKBDQRRJPDCibkcnW4+TtxxgGWQGZ9qEePMZ4zay/I1gl93Oh2MjK6Fw3iGU9fbzQC6dzFuVyAqxdtkSln6OZ3Jk98Yoz8Jm2lCTpaoNWwPEGiAb0XfRik5PdBJ/CU/evP5KKfHSF7gm/VPTR3cgfCm1xOgD+i8kF1OgP3IJxVv6ja0gZduRAfZggLskbx23MHZJlGG/NbOH2yN1wsFPHU5gxKT9vyDuitA7sM7Ao5Og/edqDe8TjXG6SCSVar5JImMJrQvNaV9BAA/98CrzG4Ss7gHaSc3ILOhjZkuRhdA9KBr/JEQZG9Ap5n1NWYJFWkw3JzPlN0aBnNFHubSmblXpfCcoL/cbpgHiCKAYQ",
+      "aws_waf_referrer": "{\"referrer\":\"\"}"
+    },
+    "sessionStorage": {}
+  },
+  "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+}

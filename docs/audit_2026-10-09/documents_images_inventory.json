@@ -1,0 +1,5780 @@
+{
+ "board": "/Users/cashhigh/foreclosure-scraper/docs/listings.json.gz",
+ "doc_ocr_field_landing": {
+  "aggregate_filled:street_address": 18,
+  "amount:extracted": 1,
+  "amount:landed": 1,
+  "case_number:extracted": 32,
+  "case_number:landed": 27,
+  "case_number:row_has_other_value": 5,
+  "owner_name:extracted": 33,
+  "owner_name:landed": 24,
+  "owner_name:row_has_other_value": 9,
+  "property_address:extracted": 18,
+  "property_address:landed": 4,
+  "property_address:not_on_row": 1,
+  "property_address:row_has_other_value": 13,
+  "sale_date:extracted": 27,
+  "sale_date:landed": 11,
+  "sale_date:not_on_row": 13,
+  "sale_date:row_has_other_value": 3
+ },
+ "documents": {
+  "assessor_card": {
+   "county": {
+    "NC:Alleghany": {
+     "processed": 3,
+     "rows": 3,
+     "urls": 3
+    },
+    "NC:Buncombe": {
+     "backlog_card_unparsed": 522,
+     "processed": 674,
+     "rows": 1196,
+     "urls": 1196
+    },
+    "NC:Catawba": {
+     "processed": 2,
+     "rows": 2,
+     "urls": 2
+    },
+    "NC:Cleveland": {
+     "processed": 10,
+     "rows": 10,
+     "urls": 10
+    },
+    "NC:Henderson": {
+     "processed": 10,
+     "rows": 10,
+     "urls": 10
+    },
+    "NC:Lincoln": {
+     "backlog_card_unparsed": 2,
+     "processed": 4,
+     "rows": 6,
+     "urls": 6
+    },
+    "NC:McDowell": {
+     "processed": 28,
+     "rows": 28,
+     "urls": 28
+    },
+    "NC:Pitt": {
+     "processed": 1,
+     "rows": 1,
+     "urls": 1
+    },
+    "NC:Polk": {
+     "backlog_card_unparsed": 53,
+     "processed": 1,
+     "rows": 54,
+     "urls": 55
+    },
+    "NC:Rutherford": {
+     "backlog_card_unparsed": 15,
+     "processed": 925,
+     "rows": 940,
+     "urls": 943
+    },
+    "NC:Scotland": {
+     "processed": 2,
+     "rows": 2,
+     "urls": 2
+    },
+    "NC:Swain": {
+     "processed": 6,
+     "rows": 6,
+     "urls": 6
+    },
+    "SC:Anderson": {
+     "processed": 69,
+     "rows": 69,
+     "urls": 69
+    },
+    "SC:Georgetown": {
+     "backlog_card_unparsed": 31,
+     "rows": 31,
+     "urls": 31
+    },
+    "SC:Greenville": {
+     "backlog_card_unparsed": 91,
+     "processed": 96,
+     "rows": 187,
+     "urls": 187
+    },
+    "SC:Laurens": {
+     "processed": 73,
+     "rows": 73,
+     "urls": 73
+    },
+    "SC:Oconee": {
+     "processed": 13,
+     "rows": 13,
+     "urls": 13
+    },
+    "SC:Pickens": {
+     "processed": 7,
+     "rows": 7,
+     "urls": 7
+    },
+    "SC:Spartanburg": {
+     "processed": 201,
+     "rows": 201,
+     "urls": 201
+    }
+   },
+   "county_count": 19,
+   "source": {
+    "counties.multi_year_delinquent_tax": {
+     "backlog_card_unparsed": 12,
+     "processed": 2,
+     "rows": 14,
+     "urls": 14
+    },
+    "counties_generic.arcgis_distress.buncombe_hmgp_buyout": {
+     "backlog_card_unparsed": 6,
+     "processed": 27,
+     "rows": 33,
+     "urls": 33
+    },
+    "counties_generic.arcgis_distress.buncombe_unpaid_bills": {
+     "backlog_card_unparsed": 31,
+     "processed": 19,
+     "rows": 50,
+     "urls": 50
+    },
+    "counties_generic.arcgis_distress.buncombe_unpaid_bills_2024": {
+     "backlog_card_unparsed": 6,
+     "processed": 1,
+     "rows": 7,
+     "urls": 7
+    },
+    "counties_generic.arcgis_distress.greenville_unpaid_tax_parcels": {
+     "backlog_card_unparsed": 81,
+     "processed": 83,
+     "rows": 164,
+     "urls": 164
+    },
+    "counties_generic.arcgis_distress.spartanburg_property_cleanup": {
+     "processed": 3,
+     "rows": 3,
+     "urls": 3
+    },
+    "counties_generic.liensnc": {
+     "backlog_card_unparsed": 5,
+     "processed": 11,
+     "rows": 16,
+     "urls": 16
+    },
+    "counties_generic.state_contamination.nc_dam_safety": {
+     "backlog_card_unparsed": 13,
+     "processed": 4,
+     "rows": 17,
+     "urls": 17
+    },
+    "counties_generic.state_contamination.nc_inactive_hazardous": {
+     "backlog_card_unparsed": 3,
+     "processed": 1,
+     "rows": 4,
+     "urls": 4
+    },
+    "counties_generic.state_contamination.nc_ust_incidents": {
+     "backlog_card_unparsed": 33,
+     "processed": 8,
+     "rows": 41,
+     "urls": 41
+    },
+    "counties_nc.asheville_helene": {
+     "backlog_card_unparsed": 18,
+     "processed": 21,
+     "rows": 39,
+     "urls": 39
+    },
+    "counties_nc.asheville_str_permits": {
+     "backlog_card_unparsed": 159,
+     "processed": 16,
+     "rows": 175,
+     "urls": 175
+    },
+    "counties_nc.buncombe_delinquent_tax": {
+     "backlog_card_unparsed": 74,
+     "processed": 101,
+     "rows": 175,
+     "urls": 175
+    },
+    "counties_nc.buncombe_elderly": {
+     "backlog_card_unparsed": 117,
+     "processed": 421,
+     "rows": 538,
+     "urls": 538
+    },
+    "counties_nc.nc_heir_estate_parcels": {
+     "backlog_card_unparsed": 16,
+     "processed": 55,
+     "rows": 71,
+     "urls": 72
+    },
+    "counties_nc.rutherford_tax": {
+     "backlog_card_unparsed": 1,
+     "processed": 585,
+     "rows": 586,
+     "urls": 586
+    },
+    "counties_nc.rutherford_wildfire_tax": {
+     "backlog_card_unparsed": 12,
+     "processed": 272,
+     "rows": 284,
+     "urls": 287
+    },
+    "counties_sc.georgetown_civicengage": {
+     "backlog_card_unparsed": 31,
+     "rows": 31,
+     "urls": 31
+    },
+    "counties_sc.greenville_delinquent_tax": {
+     "backlog_card_unparsed": 10,
+     "processed": 12,
+     "rows": 22,
+     "urls": 22
+    },
+    "counties_sc.oconee_forfeited_land": {
+     "processed": 4,
+     "rows": 4,
+     "urls": 4
+    },
+    "counties_sc.qpaybill_delinquent_roll": {
+     "processed": 10,
+     "rows": 10,
+     "urls": 10
+    },
+    "counties_sc.sc_public_index": {
+     "processed": 29,
+     "rows": 29,
+     "urls": 29
+    },
+    "counties_sc.sc_public_index_lis_pendens": {
+     "processed": 49,
+     "rows": 49,
+     "urls": 49
+    },
+    "counties_sc.sc_public_notices": {
+     "processed": 5,
+     "rows": 5,
+     "urls": 5
+    },
+    "counties_sc.sc_ust_registry": {
+     "processed": 6,
+     "rows": 6,
+     "urls": 6
+    },
+    "counties_sc.spartanburg_delinquent_tax": {
+     "processed": 141,
+     "rows": 141,
+     "urls": 141
+    },
+    "counties_sc.spartanburg_vacant": {
+     "processed": 15,
+     "rows": 15,
+     "urls": 15
+    },
+    "counties_sc.terry_howe_flc": {
+     "processed": 6,
+     "rows": 6,
+     "urls": 6
+    },
+    "law_firms.brock_scott": {
+     "processed": 5,
+     "rows": 5,
+     "urls": 5
+    },
+    "liensnc": {
+     "backlog_card_unparsed": 48,
+     "processed": 39,
+     "rows": 87,
+     "urls": 87
+    },
+    "national.courtlistener_bankruptcy": {
+     "backlog_card_unparsed": 4,
+     "processed": 3,
+     "rows": 7,
+     "urls": 7
+    },
+    "national.distressed": {
+     "backlog_card_unparsed": 3,
+     "processed": 3,
+     "rows": 6,
+     "urls": 6
+    },
+    "national.foreclosure_dot_com": {
+     "backlog_card_unparsed": 1,
+     "processed": 25,
+     "rows": 26,
+     "urls": 26
+    },
+    "national.homeharvest": {
+     "processed": 4,
+     "rows": 4,
+     "urls": 4
+    },
+    "national.hud_reac_inspection": {
+     "backlog_card_unparsed": 3,
+     "processed": 41,
+     "rows": 44,
+     "urls": 44
+    },
+    "national.hud_section8_contracts": {
+     "backlog_card_unparsed": 1,
+     "processed": 8,
+     "rows": 9,
+     "urls": 9
+    },
+    "national.landandfarm": {
+     "backlog_card_unparsed": 6,
+     "processed": 1,
+     "rows": 7,
+     "urls": 7
+    },
+    "national.landwatch": {
+     "backlog_card_unparsed": 3,
+     "processed": 1,
+     "rows": 4,
+     "urls": 4
+    },
+    "nc_ecourts_judgments": {
+     "processed": 30,
+     "rows": 30,
+     "urls": 30
+    },
+    "public_notices.nc_notices_counties": {
+     "backlog_card_unparsed": 5,
+     "processed": 5,
+     "rows": 10,
+     "urls": 10
+    }
+   },
+   "source_count": 76,
+   "total": {
+    "backlog_card_unparsed": 714,
+    "processed": 2125,
+    "rows": 2839,
+    "urls": 2843
+   }
+  },
+  "deed_image": {
+   "county": {
+    "NC:Buncombe": {
+     "backlog_no_reader": 1,
+     "rows": 1,
+     "urls": 2
+    },
+    "NC:Catawba": {
+     "backlog_no_reader": 1,
+     "rows": 1,
+     "urls": 2
+    },
+    "NC:Henderson": {
+     "backlog_no_reader": 1256,
+     "rows": 1256,
+     "urls": 2454
+    }
+   },
+   "county_count": 3,
+   "source": {
+    "counties_generic.arcgis_distress.hendersonville_flood_zone_structures": {
+     "backlog_no_reader": 2,
+     "rows": 2,
+     "urls": 4
+    },
+    "counties_generic.liensnc": {
+     "backlog_no_reader": 2,
+     "rows": 2,
+     "urls": 4
+    },
+    "counties_generic.state_contamination.nc_dam_safety": {
+     "backlog_no_reader": 12,
+     "rows": 12,
+     "urls": 24
+    },
+    "counties_generic.state_contamination.nc_inactive_hazardous": {
+     "backlog_no_reader": 2,
+     "rows": 2,
+     "urls": 4
+    },
+    "counties_generic.state_contamination.nc_ust_incidents": {
+     "backlog_no_reader": 9,
+     "rows": 9,
+     "urls": 18
+    },
+    "counties_nc.buncombe_delinquent_tax": {
+     "backlog_no_reader": 1,
+     "rows": 1,
+     "urls": 2
+    },
+    "counties_nc.henderson_code_violations": {
+     "backlog_no_reader": 29,
+     "rows": 29,
+     "urls": 57
+    },
+    "counties_nc.henderson_foreclosure_parcels": {
+     "backlog_no_reader": 9,
+     "rows": 9,
+     "urls": 17
+    },
+    "counties_nc.hendersonville_vacant_structures": {
+     "backlog_no_reader": 11,
+     "rows": 11,
+     "urls": 21
+    },
+    "counties_nc.nc_county_pdf_delinquent_tax": {
+     "backlog_no_reader": 1,
+     "rows": 1,
+     "urls": 2
+    },
+    "counties_nc.nc_ecourts_lis_pendens": {
+     "backlog_no_reader": 1,
+     "rows": 1,
+     "urls": 2
+    },
+    "counties_nc.nc_heir_estate_parcels": {
+     "backlog_no_reader": 4,
+     "rows": 4,
+     "urls": 6
+    },
+    "counties_nc.nc_ptscloud_delinquent_tax": {
+     "backlog_no_reader": 1117,
+     "rows": 1117,
+     "urls": 2182
+    },
+    "law_firms.hutchens": {
+     "backlog_no_reader": 1,
+     "rows": 1,
+     "urls": 2
+    },
+    "liensnc": {
+     "backlog_no_reader": 32,
+     "rows": 32,
+     "urls": 64
+    },
+    "national.courtlistener_bankruptcy": {
+     "backlog_no_reader": 4,
+     "rows": 4,
+     "urls": 8
+    },
+    "national.distressed": {
+     "backlog_no_reader": 3,
+     "rows": 3,
+     "urls": 5
+    },
+    "national.foreclosure_dot_com": {
+     "backlog_no_reader": 6,
+     "rows": 6,
+     "urls": 12
+    },
+    "national.landandfarm": {
+     "backlog_no_reader": 5,
+     "rows": 5,
+     "urls": 10
+    },
+    "national.landwatch": {
+     "backlog_no_reader": 2,
+     "rows": 2,
+     "urls": 4
+    },
+    "public_notices.nc_notices_counties": {
+     "backlog_no_reader": 5,
+     "rows": 5,
+     "urls": 10
+    }
+   },
+   "source_count": 21,
+   "total": {
+    "backlog_no_reader": 1258,
+    "rows": 1258,
+    "urls": 2458
+   }
+  },
+  "env_search": {
+   "county": {
+    "NC:Alamance": {
+     "backlog_not_a_document": 924,
+     "rows": 924,
+     "urls": 936
+    },
+    "NC:Beaufort": {
+     "backlog_not_a_document": 313,
+     "rows": 313,
+     "urls": 313
+    },
+    "NC:Buncombe": {
+     "backlog_not_a_document": 1249,
+     "rows": 1249,
+     "urls": 1264
+    },
+    "NC:Burke": {
+     "backlog_not_a_document": 352,
+     "rows": 352,
+     "urls": 354
+    },
+    "NC:Cabarrus": {
+     "backlog_not_a_document": 537,
+     "rows": 537,
+     "urls": 546
+    },
+    "NC:Caldwell": {
+     "backlog_not_a_document": 286,
+     "rows": 286,
+     "urls": 290
+    },
+    "NC:Carteret": {
+     "backlog_not_a_document": 297,
+     "rows": 297,
+     "urls": 297
+    },
+    "NC:Catawba": {
+     "backlog_not_a_document": 844,
+     "rows": 844,
+     "urls": 860
+    },
+    "NC:Cleveland": {
+     "backlog_not_a_document": 405,
+     "rows": 405,
+     "urls": 412
+    },
+    "NC:Columbus": {
+     "backlog_not_a_document": 280,
+     "rows": 280,
+     "urls": 281
+    },
+    "NC:Craven": {
+     "backlog_not_a_document": 572,
+     "rows": 572,
+     "urls": 574
+    },
+    "NC:Cumberland": {
+     "backlog_not_a_document": 1620,
+     "rows": 1620,
+     "urls": 1625
+    },
+    "NC:Davidson": {
+     "backlog_not_a_document": 684,
+     "rows": 684,
+     "urls": 690
+    },
+    "NC:Durham": {
+     "backlog_not_a_document": 1587,
+     "rows": 1587,
+     "urls": 1593
+    },
+    "NC:Forsyth": {
+     "backlog_not_a_document": 1979,
+     "rows": 1979,
+     "urls": 1999
+    },
+    "NC:Gaston": {
+     "backlog_not_a_document": 819,
+     "rows": 819,
+     "urls": 832
+    },
+    "NC:Guilford": {
+     "backlog_not_a_document": 3338,
+     "rows": 3338,
+     "urls": 3391
+    },
+    "NC:Haywood": {
+     "backlog_not_a_document": 309,
+     "rows": 309,
+     "urls": 309
+    },
+    "NC:Henderson": {
+     "backlog_not_a_document": 371,
+     "rows": 371,
+     "urls": 371
+    },
+    "NC:Iredell": {
+     "backlog_not_a_document": 639,
+     "rows": 639,
+     "urls": 650
+    },
+    "NC:Johnston": {
+     "backlog_not_a_document": 397,
+     "rows": 397,
+     "urls": 399
+    },
+    "NC:Lenoir": {
+     "backlog_not_a_document": 498,
+     "rows": 498,
+     "urls": 501
+    },
+    "NC:Martin": {
+     "backlog_not_a_document": 330,
+     "rows": 330,
+     "urls": 330
+    },
+    "NC:Mecklenburg": {
+     "backlog_not_a_document": 3493,
+     "rows": 3493,
+     "urls": 3578
+    },
+    "NC:Moore": {
+     "backlog_not_a_document": 316,
+     "rows": 316,
+     "urls": 318
+    },
+    "NC:Nash": {
+     "backlog_not_a_document": 545,
+     "rows": 545,
+     "urls": 545
+    },
+    "NC:Onslow": {
+     "backlog_not_a_document": 866,
+     "rows": 866,
+     "urls": 869
+    },
+    "NC:Orange": {
+     "backlog_not_a_document": 735,
+     "rows": 735,
+     "urls": 738
+    },
+    "NC:Pitt": {
+     "backlog_not_a_document": 1528,
+     "rows": 1528,
+     "urls": 1532
+    },
+    "NC:Randolph": {
+     "backlog_not_a_document": 493,
+     "rows": 493,
+     "urls": 498
+    },
+    "NC:Robeson": {
+     "backlog_not_a_document": 396,
+     "rows": 396,
+     "urls": 396
+    },
+    "NC:Rockingham": {
+     "backlog_not_a_document": 478,
+     "rows": 478,
+     "urls": 482
+    },
+    "NC:Rowan": {
+     "backlog_not_a_document": 606,
+     "rows": 606,
+     "urls": 612
+    },
+    "NC:Stanly": {
+     "backlog_not_a_document": 316,
+     "rows": 316,
+     "urls": 319
+    },
+    "NC:Surry": {
+     "backlog_not_a_document": 445,
+     "rows": 445,
+     "urls": 455
+    },
+    "NC:Union": {
+     "backlog_not_a_document": 468,
+     "rows": 468,
+     "urls": 477
+    },
+    "NC:Wake": {
+     "backlog_not_a_document": 2594,
+     "rows": 2594,
+     "urls": 2615
+    },
+    "NC:Wayne": {
+     "backlog_not_a_document": 540,
+     "rows": 540,
+     "urls": 544
+    },
+    "NC:Wilkes": {
+     "backlog_not_a_document": 322,
+     "rows": 322,
+     "urls": 323
+    },
+    "NC:Wilson": {
+     "backlog_not_a_document": 405,
+     "rows": 405,
+     "urls": 407
+    }
+   },
+   "county_count": 102,
+   "source": {
+    "counties_generic.arcgis_distress.buncombe_county_owned": {
+     "backlog_not_a_document": 6,
+     "rows": 6,
+     "urls": 6
+    },
+    "counties_generic.arcgis_distress.buncombe_hmgp_buyout": {
+     "backlog_not_a_document": 5,
+     "rows": 5,
+     "urls": 5
+    },
+    "counties_generic.arcgis_distress.buncombe_landslide_damage": {
+     "backlog_not_a_document": 1,
+     "rows": 1,
+     "urls": 1
+    },
+    "counties_generic.arcgis_distress.buncombe_unpaid_bills": {
+     "backlog_not_a_document": 4,
+     "rows": 4,
+     "urls": 4
+    },
+    "counties_generic.arcgis_distress.burke_storm_damage": {
+     "backlog_not_a_document": 3,
+     "rows": 3,
+     "urls": 3
+    },
+    "counties_generic.arcgis_distress.durham_open_code_violations": {
+     "backlog_not_a_document": 7,
+     "rows": 7,
+     "urls": 7
+    },
+    "counties_generic.arcgis_distress.greensboro_code_housing": {
+     "backlog_not_a_document": 7,
+     "rows": 7,
+     "urls": 7
+    },
+    "counties_generic.arcgis_distress.lincoln_code_violations": {
+     "backlog_not_a_document": 1,
+     "rows": 1,
+     "urls": 1
+    },
+    "counties_generic.arcgis_distress.lincoln_county_owned": {
+     "backlog_not_a_document": 1,
+     "rows": 1,
+     "urls": 1
+    },
+    "counties_generic.epa_frs.acres": {
+     "backlog_not_a_document": 145,
+     "rows": 145,
+     "urls": 160
+    },
+    "counties_generic.epa_frs.sems": {
+     "backlog_not_a_document": 180,
+     "rows": 180,
+     "urls": 207
+    },
+    "counties_generic.state_contamination.nc_inactive_hazardous": {
+     "backlog_not_a_document": 1516,
+     "rows": 1516,
+     "urls": 1516
+    },
+    "counties_generic.state_contamination.nc_ust_incidents": {
+     "backlog_not_a_document": 39592,
+     "rows": 39592,
+     "urls": 39943
+    },
+    "counties_nc.albemarle_observer_tax_lists": {
+     "backlog_not_a_document": 2,
+     "rows": 2,
+     "urls": 2
+    },
+    "counties_nc.asheville_str_permits": {
+     "backlog_not_a_document": 5,
+     "rows": 5,
+     "urls": 5
+    },
+    "counties_nc.buncombe_delinquent_tax": {
+     "backlog_not_a_document": 2,
+     "rows": 2,
+     "urls": 2
+    },
+    "counties_nc.buncombe_elderly": {
+     "backlog_not_a_document": 5,
+     "rows": 5,
+     "urls": 5
+    },
+    "counties_nc.nc_county_pdf_delinquent_tax": {
+     "backlog_not_a_document": 1,
+     "rows": 1,
+     "urls": 1
+    },
+    "counties_nc.transylvania_delinquent_tax": {
+     "backlog_not_a_document": 2,
+     "rows": 2,
+     "urls": 2
+    },
+    "counties_nc.transylvania_vacant": {
+     "backlog_not_a_document": 7,
+     "rows": 7,
+     "urls": 7
+    },
+    "counties_sc.sc_des_brownfields": {
+     "backlog_not_a_document": 64,
+     "rows": 64,
+     "urls": 64
+    },
+    "law_firms.kania": {
+     "backlog_not_a_document": 1,
+     "rows": 1,
+     "urls": 1
+    }
+   },
+   "source_count": 22,
+   "total": {
+    "backlog_not_a_document": 41557,
+    "rows": 41557,
+    "urls": 41950
+   }
+  },
+  "list": {
+   "county": {
+    "NC:Alamance": {
+     "read_by_scraper": 1,
+     "rows": 1,
+     "urls": 1
+    },
+    "NC:Buncombe": {
+     "read_by_scraper": 1183,
+     "rows": 1183,
+     "urls": 1183
+    },
+    "NC:Catawba": {
+     "read_by_scraper": 5227,
+     "rows": 5227,
+     "urls": 5227
+    },
+    "NC:Cleveland": {
+     "read_by_scraper": 4,
+     "rows": 4,
+     "urls": 4
+    },
+    "NC:Hyde": {
+     "read_by_scraper": 1,
+     "rows": 1,
+     "urls": 1
+    },
+    "NC:McDowell": {
+     "read_by_scraper": 2178,
+     "rows": 2178,
+     "urls": 2178
+    },
+    "NC:Onslow": {
+     "read_by_scraper": 2,
+     "rows": 2,
+     "urls": 2
+    },
+    "NC:Pitt": {
+     "read_by_scraper": 1,
+     "rows": 1,
+     "urls": 1
+    },
+    "NC:Rowan": {
+     "read_by_scraper": 1,
+     "rows": 1,
+     "urls": 1
+    },
+    "SC:Anderson": {
+     "read_by_scraper": 58,
+     "rows": 58,
+     "urls": 58
+    },
+    "SC:Calhoun": {
+     "read_by_scraper": 67,
+     "rows": 67,
+     "urls": 67
+    },
+    "SC:Charleston": {
+     "read_by_scraper": 1787,
+     "rows": 1787,
+     "urls": 1853
+    },
+    "SC:Cherokee": {
+     "read_by_scraper": 1,
+     "rows": 1,
+     "urls": 1
+    },
+    "SC:Fairfield": {
+     "read_by_scraper": 60,
+     "rows": 60,
+     "urls": 60
+    },
+    "SC:Florence": {
+     "read_by_scraper": 1836,
+     "rows": 1836,
+     "urls": 1837
+    },
+    "SC:Laurens": {
+     "read_by_scraper": 1,
+     "rows": 1,
+     "urls": 1
+    },
+    "SC:Oconee": {
+     "read_by_scraper": 1,
+     "rows": 1,
+     "urls": 1
+    },
+    "SC:Pickens": {
+     "read_by_scraper": 17,
+     "rows": 17,
+     "urls": 17
+    },
+    "SC:Spartanburg": {
+     "read_by_scraper": 7,
+     "rows": 7,
+     "urls": 7
+    }
+   },
+   "county_count": 19,
+   "source": {
+    "counties.column_legal_notices": {
+     "read_by_scraper": 7,
+     "rows": 7,
+     "urls": 7
+    },
+    "counties_generic.arcgis_distress.laurens_county_owned": {
+     "read_by_scraper": 1,
+     "rows": 1,
+     "urls": 1
+    },
+    "counties_nc.buncombe_delinquent_tax": {
+     "read_by_scraper": 1182,
+     "rows": 1182,
+     "urls": 1182
+    },
+    "counties_nc.nc_county_pdf_delinquent_tax": {
+     "read_by_scraper": 7409,
+     "rows": 7409,
+     "urls": 7409
+    },
+    "counties_sc.anderson_master_in_equity": {
+     "read_by_scraper": 12,
+     "rows": 12,
+     "urls": 12
+    },
+    "counties_sc.calhoun_overage_claims": {
+     "read_by_scraper": 67,
+     "rows": 67,
+     "urls": 67
+    },
+    "counties_sc.charleston_delinquent_tax": {
+     "read_by_scraper": 1760,
+     "rows": 1760,
+     "urls": 1826
+    },
+    "counties_sc.charleston_mie": {
+     "read_by_scraper": 27,
+     "rows": 27,
+     "urls": 27
+    },
+    "counties_sc.fairfield_overage_claims": {
+     "read_by_scraper": 60,
+     "rows": 60,
+     "urls": 60
+    },
+    "counties_sc.florence_delinquent_tax": {
+     "read_by_scraper": 1829,
+     "rows": 1829,
+     "urls": 1830
+    },
+    "counties_sc.pickens_master_in_equity": {
+     "read_by_scraper": 14,
+     "rows": 14,
+     "urls": 14
+    },
+    "counties_sc.sc_flc": {
+     "read_by_scraper": 44,
+     "rows": 44,
+     "urls": 44
+    },
+    "counties_sc.sc_ust_registry": {
+     "read_by_scraper": 7,
+     "rows": 7,
+     "urls": 7
+    },
+    "derived.probate_deed": {
+     "read_by_scraper": 2,
+     "rows": 2,
+     "urls": 2
+    },
+    "law_firms.rogers_townsend": {
+     "read_by_scraper": 12,
+     "rows": 12,
+     "urls": 12
+    }
+   },
+   "source_count": 15,
+   "total": {
+    "read_by_scraper": 12433,
+    "rows": 12433,
+    "urls": 12500
+   }
+  },
+  "notice": {
+   "county": {
+    "NC:Alamance": {
+     "rows": 4,
+     "urls": 4
+    },
+    "NC:Brunswick": {
+     "rows": 5,
+     "urls": 6
+    },
+    "NC:Buncombe": {
+     "rows": 6,
+     "urls": 6
+    },
+    "NC:Burke": {
+     "rows": 3,
+     "urls": 5
+    },
+    "NC:Caldwell": {
+     "rows": 1,
+     "urls": 1
+    },
+    "NC:Caswell": {
+     "rows": 1,
+     "urls": 1
+    },
+    "NC:Cleveland": {
+     "rows": 2,
+     "urls": 2
+    },
+    "NC:Craven": {
+     "rows": 4,
+     "urls": 4
+    },
+    "NC:Cumberland": {
+     "rows": 5,
+     "urls": 5
+    },
+    "NC:Dare": {
+     "rows": 1,
+     "urls": 1
+    },
+    "NC:Davidson": {
+     "rows": 1,
+     "urls": 1
+    },
+    "NC:Forsyth": {
+     "rows": 4,
+     "urls": 4
+    },
+    "NC:Franklin": {
+     "rows": 1,
+     "urls": 1
+    },
+    "NC:Gaston": {
+     "rows": 15,
+     "urls": 15
+    },
+    "NC:Guilford": {
+     "rows": 6,
+     "urls": 6
+    },
+    "NC:Halifax": {
+     "rows": 2,
+     "urls": 2
+    },
+    "NC:Haywood": {
+     "rows": 2,
+     "urls": 4
+    },
+    "NC:Henderson": {
+     "rows": 2,
+     "urls": 2
+    },
+    "NC:Hertford": {
+     "rows": 2,
+     "urls": 2
+    },
+    "NC:Lee": {
+     "rows": 2,
+     "urls": 2
+    },
+    "NC:Lenoir": {
+     "rows": 4,
+     "urls": 4
+    },
+    "NC:Mecklenburg": {
+     "rows": 11,
+     "urls": 11
+    },
+    "NC:Montgomery": {
+     "rows": 1,
+     "urls": 1
+    },
+    "NC:New Hanover": {
+     "rows": 2,
+     "urls": 2
+    },
+    "NC:Onslow": {
+     "rows": 13,
+     "urls": 13
+    },
+    "NC:Pitt": {
+     "rows": 1,
+     "urls": 1
+    },
+    "NC:Randolph": {
+     "rows": 3,
+     "urls": 3
+    },
+    "NC:Rowan": {
+     "rows": 2,
+     "urls": 2
+    },
+    "NC:Rutherford": {
+     "rows": 3,
+     "urls": 3
+    },
+    "NC:Swain": {
+     "rows": 1,
+     "urls": 2
+    },
+    "NC:Transylvania": {
+     "rows": 1,
+     "urls": 1
+    },
+    "NC:Watauga": {
+     "rows": 1,
+     "urls": 1
+    },
+    "NC:Wilkes": {
+     "rows": 1,
+     "urls": 1
+    },
+    "SC:?": {
+     "rows": 53,
+     "urls": 352
+    },
+    "SC:Anderson": {
+     "rows": 49,
+     "urls": 54
+    },
+    "SC:Dorchester": {
+     "backlog_js_viewer_needs_browser": 988,
+     "rows": 988,
+     "urls": 988
+    },
+    "SC:Horry": {
+     "rows": 3,
+     "urls": 3
+    },
+    "SC:Pickens": {
+     "rows": 50,
+     "urls": 50
+    },
+    "SC:Richland": {
+     "rows": 2,
+     "urls": 2
+    },
+    "SC:Spartanburg": {
+     "rows": 2,
+     "urls": 3
+    }
+   },
+   "county_count": 49,
+   "source": {
+    "counties.column_legal_notices": {
+     "rows": 104,
+     "urls": 104
+    },
+    "counties.multi_year_delinquent_tax": {
+     "rows": 26,
+     "urls": 26
+    },
+    "counties.sitemap_walker": {
+     "rows": 4,
+     "urls": 4
+    },
+    "counties_nc.brunswick_legal_notices": {
+     "rows": 5,
+     "urls": 6
+    },
+    "counties_nc.gastonia_code_enforcement": {
+     "rows": 2,
+     "urls": 2
+    },
+    "counties_nc.haywood_tax_foreclosures": {
+     "rows": 1,
+     "urls": 1
+    },
+    "counties_nc.swain_tax_foreclosures": {
+     "rows": 1,
+     "urls": 2
+    },
+    "counties_sc.anderson_master_in_equity": {
+     "rows": 16,
+     "urls": 21
+    },
+    "counties_sc.dorchester_billtrax_delinquent_tax": {
+     "backlog_js_viewer_needs_browser": 988,
+     "rows": 988,
+     "urls": 988
+    },
+    "counties_sc.pickens_delinquent_parcels": {
+     "rows": 13,
+     "urls": 13
+    },
+    "counties_sc.pickens_master_in_equity": {
+     "rows": 7,
+     "urls": 7
+    },
+    "counties_sc.sc_des_brownfields": {
+     "rows": 56,
+     "urls": 358
+    },
+    "counties_sc.sc_flc": {
+     "rows": 29,
+     "urls": 29
+    },
+    "counties_sc.sc_public_index": {
+     "rows": 1,
+     "urls": 1
+    },
+    "counties_sc.sc_public_index_lis_pendens": {
+     "rows": 1,
+     "urls": 1
+    },
+    "counties_sc.terry_howe_auctions": {
+     "rows": 3,
+     "urls": 4
+    },
+    "law_firms.shapiro_ingle_powerbi": {
+     "rows": 1,
+     "urls": 1
+    },
+    "manual.watchlist": {
+     "rows": 1,
+     "urls": 1
+    },
+    "national.distressed": {
+     "rows": 1,
+     "urls": 3
+    },
+    "national.hud_reac_inspection": {
+     "rows": 1,
+     "urls": 1
+    },
+    "national.servicelink_auction": {
+     "rows": 5,
+     "urls": 5
+    },
+    "national.xome": {
+     "rows": 1,
+     "urls": 3
+    },
+    "public_notices.nc_notices_counties": {
+     "rows": 2,
+     "urls": 2
+    }
+   },
+   "source_count": 23,
+   "total": {
+    "backlog_js_viewer_needs_browser": 988,
+    "rows": 1269,
+    "urls": 1583
+   }
+  },
+  "ocr_per_lead": {
+   "county": {
+    "NC:Alamance": {
+     "backlog_cut_or_failed_unrecorded": 4,
+     "ext_pdf": 4,
+     "rows": 4,
+     "rows_with_more_than_one_doc": 1
+    },
+    "NC:Brunswick": {
+     "backlog_cut_or_failed_unrecorded": 5,
+     "ext_none": 5,
+     "rows": 5,
+     "rows_warm": 2,
+     "rows_with_more_than_one_doc": 1
+    },
+    "NC:Buncombe": {
+     "backlog_cut_or_failed_unrecorded": 4,
+     "ext_pdf": 7,
+     "processed": 3,
+     "rows": 7,
+     "rows_warm": 3
+    },
+    "NC:Burke": {
+     "backlog_cut_or_failed_unrecorded": 2,
+     "backlog_field_not_read_by_doc_ocr": 1,
+     "ext_ashx": 1,
+     "ext_pdf": 2,
+     "rows": 3,
+     "rows_with_more_than_one_doc": 1
+    },
+    "NC:Caldwell": {
+     "backlog_cut_or_failed_unrecorded": 1,
+     "ext_pdf": 1,
+     "rows": 1
+    },
+    "NC:Caswell": {
+     "backlog_cut_or_failed_unrecorded": 1,
+     "ext_pdf": 1,
+     "rows": 1
+    },
+    "NC:Cleveland": {
+     "backlog_cut_or_failed_unrecorded": 1,
+     "ext_pdf": 2,
+     "processed": 1,
+     "rows": 2,
+     "rows_warm": 1
+    },
+    "NC:Craven": {
+     "backlog_cut_or_failed_unrecorded": 4,
+     "ext_pdf": 4,
+     "rows": 4
+    },
+    "NC:Cumberland": {
+     "backlog_cut_or_failed_unrecorded": 5,
+     "ext_pdf": 5,
+     "rows": 5
+    },
+    "NC:Dare": {
+     "backlog_cut_or_failed_unrecorded": 1,
+     "ext_pdf": 1,
+     "rows": 1
+    },
+    "NC:Davidson": {
+     "backlog_cut_or_failed_unrecorded": 1,
+     "ext_pdf": 1,
+     "rows": 1
+    },
+    "NC:Forsyth": {
+     "backlog_cut_or_failed_unrecorded": 4,
+     "ext_pdf": 4,
+     "rows": 4
+    },
+    "NC:Franklin": {
+     "backlog_cut_or_failed_unrecorded": 1,
+     "ext_pdf": 1,
+     "rows": 1
+    },
+    "NC:Gaston": {
+     "backlog_cut_or_failed_unrecorded": 9,
+     "ext_pdf": 15,
+     "processed": 6,
+     "rows": 15
+    },
+    "NC:Guilford": {
+     "backlog_cut_or_failed_unrecorded": 6,
+     "ext_pdf": 6,
+     "rows": 6
+    },
+    "NC:Halifax": {
+     "backlog_cut_or_failed_unrecorded": 2,
+     "ext_pdf": 2,
+     "rows": 2
+    },
+    "NC:Haywood": {
+     "backlog_cut_or_failed_unrecorded": 1,
+     "backlog_field_not_read_by_doc_ocr": 1,
+     "ext_ashx": 1,
+     "ext_none": 1,
+     "rows": 2,
+     "rows_with_more_than_one_doc": 1
+    },
+    "NC:Henderson": {
+     "backlog_cut_or_failed_unrecorded": 2,
+     "ext_pdf": 2,
+     "rows": 2
+    },
+    "NC:Hertford": {
+     "backlog_cut_or_failed_unrecorded": 1,
+     "ext_pdf": 2,
+     "processed": 1,
+     "rows": 2
+    },
+    "NC:Hyde": {
+     "ext_pdf": 1,
+     "processed": 1,
+     "rows": 1
+    },
+    "NC:Lee": {
+     "backlog_cut_or_failed_unrecorded": 2,
+     "ext_pdf": 2,
+     "rows": 2
+    },
+    "NC:Lenoir": {
+     "backlog_cut_or_failed_unrecorded": 4,
+     "ext_pdf": 4,
+     "rows": 4
+    },
+    "NC:Mecklenburg": {
+     "backlog_cut_or_failed_unrecorded": 11,
+     "ext_pdf": 11,
+     "rows": 11
+    },
+    "NC:Montgomery": {
+     "backlog_cut_or_failed_unrecorded": 1,
+     "ext_pdf": 1,
+     "rows": 1
+    },
+    "NC:New Hanover": {
+     "backlog_cut_or_failed_unrecorded": 1,
+     "ext_pdf": 2,
+     "processed": 1,
+     "rows": 2
+    },
+    "NC:Onslow": {
+     "backlog_cut_or_failed_unrecorded": 8,
+     "ext_pdf": 14,
+     "processed": 6,
+     "rows": 14,
+     "rows_warm": 2,
+     "rows_with_more_than_one_doc": 1
+    },
+    "NC:Pitt": {
+     "backlog_cut_or_failed_unrecorded": 1,
+     "ext_pdf": 1,
+     "rows": 1,
+     "rows_with_more_than_one_doc": 1
+    },
+    "NC:Randolph": {
+     "backlog_cut_or_failed_unrecorded": 3,
+     "ext_pdf": 3,
+     "rows": 3
+    },
+    "NC:Rowan": {
+     "backlog_cut_or_failed_unrecorded": 2,
+     "ext_pdf": 2,
+     "rows": 2,
+     "rows_with_more_than_one_doc": 1
+    },
+    "NC:Rutherford": {
+     "ext_pdf": 3,
+     "processed": 3,
+     "rows": 3
+    },
+    "NC:Swain": {
+     "backlog_cut_or_failed_unrecorded": 1,
+     "ext_none": 1,
+     "rows": 1,
+     "rows_with_more_than_one_doc": 1
+    },
+    "NC:Transylvania": {
+     "backlog_cut_or_failed_unrecorded": 1,
+     "ext_pdf": 1,
+     "rows": 1
+    },
+    "NC:Watauga": {
+     "backlog_cut_or_failed_unrecorded": 1,
+     "ext_pdf": 1,
+     "rows": 1
+    },
+    "NC:Wilkes": {
+     "backlog_cut_or_failed_unrecorded": 1,
+     "ext_pdf": 1,
+     "rows": 1
+    },
+    "SC:?": {
+     "backlog_cut_or_failed_unrecorded": 53,
+     "ext_aspx": 1,
+     "ext_none": 10,
+     "ext_pdf": 39,
+     "ext_png": 2,
+     "ext_xlsx": 1,
+     "rows": 53,
+     "rows_with_more_than_one_doc": 51
+    },
+    "SC:Anderson": {
+     "backlog_cut_or_failed_unrecorded": 9,
+     "ext_pdf": 9,
+     "rows": 9,
+     "rows_warm": 5,
+     "rows_with_more_than_one_doc": 4
+    },
+    "SC:Horry": {
+     "backlog_cut_or_failed_unrecorded": 2,
+     "ext_pdf": 3,
+     "processed": 1,
+     "rows": 3
+    },
+    "SC:Pickens": {
+     "backlog_cut_or_failed_unrecorded": 9,
+     "ext_pdf": 13,
+     "processed": 4,
+     "rows": 13,
+     "rows_hot": 2,
+     "rows_warm": 3
+    },
+    "SC:Richland": {
+     "backlog_cut_or_failed_unrecorded": 2,
+     "ext_jpg": 2,
+     "rows": 2
+    },
+    "SC:Spartanburg": {
+     "backlog_cut_or_failed_unrecorded": 2,
+     "ext_pdf": 2,
+     "rows": 2,
+     "rows_warm": 2,
+     "rows_with_more_than_one_doc": 1
+    }
+   },
+   "county_count": 49,
+   "source": {
+    "counties.column_legal_notices": {
+     "backlog_cut_or_failed_unrecorded": 86,
+     "ext_pdf": 107,
+     "processed": 21,
+     "rows": 107,
+     "rows_warm": 3,
+     "rows_with_more_than_one_doc": 4
+    },
+    "counties.sitemap_walker": {
+     "backlog_cut_or_failed_unrecorded": 3,
+     "ext_pdf": 3,
+     "rows": 3,
+     "rows_warm": 1
+    },
+    "counties_nc.brunswick_legal_notices": {
+     "backlog_cut_or_failed_unrecorded": 5,
+     "ext_none": 5,
+     "rows": 5,
+     "rows_warm": 2,
+     "rows_with_more_than_one_doc": 1
+    },
+    "counties_nc.gastonia_code_enforcement": {
+     "backlog_cut_or_failed_unrecorded": 2,
+     "ext_pdf": 2,
+     "rows": 2
+    },
+    "counties_nc.haywood_tax_foreclosures": {
+     "backlog_cut_or_failed_unrecorded": 1,
+     "ext_none": 1,
+     "rows": 1
+    },
+    "counties_nc.swain_tax_foreclosures": {
+     "backlog_cut_or_failed_unrecorded": 1,
+     "ext_none": 1,
+     "rows": 1,
+     "rows_with_more_than_one_doc": 1
+    },
+    "counties_sc.anderson_master_in_equity": {
+     "backlog_cut_or_failed_unrecorded": 4,
+     "ext_pdf": 4,
+     "rows": 4,
+     "rows_warm": 4,
+     "rows_with_more_than_one_doc": 4
+    },
+    "counties_sc.pickens_master_in_equity": {
+     "backlog_cut_or_failed_unrecorded": 8,
+     "ext_pdf": 10,
+     "processed": 2,
+     "rows": 10,
+     "rows_hot": 2,
+     "rows_warm": 3
+    },
+    "counties_sc.sc_des_brownfields": {
+     "backlog_cut_or_failed_unrecorded": 56,
+     "ext_aspx": 1,
+     "ext_jpg": 2,
+     "ext_none": 10,
+     "ext_pdf": 40,
+     "ext_png": 2,
+     "ext_xlsx": 1,
+     "rows": 56,
+     "rows_with_more_than_one_doc": 52
+    },
+    "counties_sc.sc_flc": {
+     "backlog_cut_or_failed_unrecorded": 2,
+     "ext_pdf": 2,
+     "rows": 2
+    },
+    "counties_sc.terry_howe_auctions": {
+     "backlog_cut_or_failed_unrecorded": 2,
+     "ext_pdf": 3,
+     "processed": 1,
+     "rows": 3,
+     "rows_warm": 2,
+     "rows_with_more_than_one_doc": 1
+    },
+    "derived.probate_deed": {
+     "backlog_cut_or_failed_unrecorded": 1,
+     "ext_pdf": 2,
+     "processed": 1,
+     "rows": 2
+    },
+    "law_firms.shapiro_ingle_powerbi": {
+     "backlog_cut_or_failed_unrecorded": 1,
+     "ext_pdf": 1,
+     "rows": 1
+    },
+    "manual.watchlist": {
+     "ext_pdf": 1,
+     "processed": 1,
+     "rows": 1
+    },
+    "national.distressed": {
+     "backlog_field_not_read_by_doc_ocr": 1,
+     "ext_ashx": 1,
+     "rows": 1,
+     "rows_with_more_than_one_doc": 1
+    },
+    "national.servicelink_auction": {
+     "backlog_cut_or_failed_unrecorded": 5,
+     "ext_pdf": 5,
+     "rows": 5,
+     "rows_warm": 1
+    },
+    "national.xome": {
+     "backlog_field_not_read_by_doc_ocr": 1,
+     "ext_ashx": 1,
+     "rows": 1,
+     "rows_with_more_than_one_doc": 1
+    },
+    "public_notices.nc_notices_counties": {
+     "backlog_cut_or_failed_unrecorded": 1,
+     "ext_pdf": 2,
+     "processed": 1,
+     "rows": 2,
+     "rows_warm": 2
+    }
+   },
+   "source_count": 18,
+   "total": {
+    "backlog_cut_or_failed_unrecorded": 178,
+    "backlog_field_not_read_by_doc_ocr": 2,
+    "ext_ashx": 2,
+    "ext_aspx": 1,
+    "ext_jpg": 2,
+    "ext_none": 17,
+    "ext_pdf": 182,
+    "ext_png": 2,
+    "ext_xlsx": 1,
+    "processed": 27,
+    "rows": 207,
+    "rows_hot": 2,
+    "rows_warm": 18,
+    "rows_with_more_than_one_doc": 65
+   }
+  },
+  "ocr_roster": {
+   "county": {
+    "NC:Buncombe": {
+     "backlog_aggregate_never_run": 150,
+     "ext_pdf": 1182,
+     "not_needed_address_present": 1031,
+     "processed": 1,
+     "rows": 1182,
+     "rows_warm": 692
+    },
+    "NC:Catawba": {
+     "backlog_aggregate_never_run": 4940,
+     "ext_pdf": 5227,
+     "not_needed_address_present": 287,
+     "rows": 5227,
+     "rows_warm": 214
+    },
+    "NC:Cleveland": {
+     "backlog_aggregate_never_run": 1,
+     "ext_pdf": 4,
+     "not_needed_address_present": 3,
+     "rows": 4,
+     "rows_warm": 2
+    },
+    "NC:McDowell": {
+     "backlog_aggregate_never_run": 805,
+     "ext_pdf": 2178,
+     "not_needed_address_present": 1371,
+     "processed": 2,
+     "rows": 2178,
+     "rows_warm": 1533
+    },
+    "SC:Anderson": {
+     "backlog_aggregate_never_run": 3,
+     "ext_pdf": 98,
+     "not_needed_address_present": 93,
+     "processed": 2,
+     "rows": 98,
+     "rows_warm": 6,
+     "rows_with_more_than_one_doc": 1
+    },
+    "SC:Calhoun": {
+     "backlog_aggregate_never_run": 45,
+     "ext_pdf": 67,
+     "not_needed_address_present": 22,
+     "rows": 67,
+     "rows_warm": 1
+    },
+    "SC:Charleston": {
+     "backlog_aggregate_never_run": 33,
+     "ext_pdf": 1787,
+     "not_needed_address_present": 1754,
+     "rows": 1787,
+     "rows_warm": 459
+    },
+    "SC:Cherokee": {
+     "ext_pdf": 1,
+     "not_needed_address_present": 1,
+     "rows": 1,
+     "rows_warm": 1
+    },
+    "SC:Fairfield": {
+     "backlog_aggregate_never_run": 59,
+     "ext_pdf": 60,
+     "not_needed_address_present": 1,
+     "rows": 60
+    },
+    "SC:Florence": {
+     "backlog_aggregate_never_run": 483,
+     "ext_pdf": 1829,
+     "not_needed_address_present": 1332,
+     "processed": 14,
+     "rows": 1829,
+     "rows_warm": 774
+    },
+    "SC:Oconee": {
+     "ext_pdf": 1,
+     "not_needed_address_present": 1,
+     "rows": 1
+    },
+    "SC:Pickens": {
+     "backlog_aggregate_never_run": 3,
+     "ext_pdf": 53,
+     "not_needed_address_present": 49,
+     "processed": 1,
+     "rows": 53,
+     "rows_hot": 1,
+     "rows_warm": 36,
+     "rows_with_more_than_one_doc": 1
+    },
+    "SC:Spartanburg": {
+     "ext_pdf": 7,
+     "not_needed_address_present": 7,
+     "rows": 7,
+     "rows_warm": 5
+    }
+   },
+   "county_count": 13,
+   "source": {
+    "counties.multi_year_delinquent_tax": {
+     "backlog_aggregate_never_run": 2,
+     "ext_pdf": 26,
+     "not_needed_address_present": 24,
+     "rows": 26,
+     "rows_warm": 19
+    },
+    "counties.sitemap_walker": {
+     "backlog_aggregate_never_run": 1,
+     "ext_pdf": 1,
+     "rows": 1
+    },
+    "counties_nc.buncombe_delinquent_tax": {
+     "backlog_aggregate_never_run": 150,
+     "ext_pdf": 1182,
+     "not_needed_address_present": 1031,
+     "processed": 1,
+     "rows": 1182,
+     "rows_warm": 692
+    },
+    "counties_nc.nc_county_pdf_delinquent_tax": {
+     "backlog_aggregate_never_run": 5746,
+     "ext_pdf": 7409,
+     "not_needed_address_present": 1661,
+     "processed": 2,
+     "rows": 7409,
+     "rows_warm": 1749
+    },
+    "counties_sc.anderson_master_in_equity": {
+     "backlog_aggregate_never_run": 2,
+     "ext_pdf": 24,
+     "not_needed_address_present": 20,
+     "processed": 2,
+     "rows": 24,
+     "rows_warm": 5,
+     "rows_with_more_than_one_doc": 1
+    },
+    "counties_sc.calhoun_overage_claims": {
+     "backlog_aggregate_never_run": 45,
+     "ext_pdf": 67,
+     "not_needed_address_present": 22,
+     "rows": 67,
+     "rows_warm": 1
+    },
+    "counties_sc.charleston_delinquent_tax": {
+     "backlog_aggregate_never_run": 10,
+     "ext_pdf": 1760,
+     "not_needed_address_present": 1750,
+     "rows": 1760,
+     "rows_warm": 458
+    },
+    "counties_sc.charleston_mie": {
+     "backlog_aggregate_never_run": 23,
+     "ext_pdf": 27,
+     "not_needed_address_present": 4,
+     "rows": 27,
+     "rows_warm": 1
+    },
+    "counties_sc.fairfield_overage_claims": {
+     "backlog_aggregate_never_run": 59,
+     "ext_pdf": 60,
+     "not_needed_address_present": 1,
+     "rows": 60
+    },
+    "counties_sc.florence_delinquent_tax": {
+     "backlog_aggregate_never_run": 483,
+     "ext_pdf": 1829,
+     "not_needed_address_present": 1332,
+     "processed": 14,
+     "rows": 1829,
+     "rows_warm": 774
+    },
+    "counties_sc.pickens_delinquent_parcels": {
+     "backlog_aggregate_never_run": 1,
+     "ext_pdf": 13,
+     "not_needed_address_present": 12,
+     "rows": 13,
+     "rows_warm": 8
+    },
+    "counties_sc.pickens_master_in_equity": {
+     "ext_pdf": 10,
+     "not_needed_address_present": 9,
+     "processed": 1,
+     "rows": 10,
+     "rows_warm": 6,
+     "rows_with_more_than_one_doc": 1
+    },
+    "counties_sc.sc_flc": {
+     "ext_pdf": 71,
+     "not_needed_address_present": 71,
+     "rows": 71
+    },
+    "counties_sc.sc_public_index": {
+     "ext_pdf": 1,
+     "not_needed_address_present": 1,
+     "rows": 1,
+     "rows_warm": 1
+    },
+    "counties_sc.sc_public_index_lis_pendens": {
+     "ext_pdf": 1,
+     "not_needed_address_present": 1,
+     "rows": 1,
+     "rows_warm": 1
+    },
+    "law_firms.rogers_townsend": {
+     "ext_pdf": 12,
+     "not_needed_address_present": 12,
+     "rows": 12,
+     "rows_hot": 1,
+     "rows_warm": 7
+    },
+    "national.hud_reac_inspection": {
+     "ext_pdf": 1,
+     "not_needed_address_present": 1,
+     "rows": 1,
+     "rows_warm": 1
+    }
+   },
+   "source_count": 17,
+   "total": {
+    "backlog_aggregate_never_run": 6522,
+    "ext_pdf": 12494,
+    "not_needed_address_present": 5952,
+    "processed": 20,
+    "rows": 12494,
+    "rows_hot": 1,
+    "rows_warm": 3723,
+    "rows_with_more_than_one_doc": 2
+   }
+  }
+ },
+ "dot_ocr_by_county": {
+  "NC:Burke": {
+   "eligible": 1355,
+   "loan_amount_on_row": 6,
+   "processed": 6
+  },
+  "NC:Cleveland": {
+   "eligible": 1043
+  },
+  "NC:Henderson": {
+   "eligible": 2748
+  },
+  "NC:Lincoln": {
+   "eligible": 18194
+  },
+  "NC:McDowell": {
+   "eligible": 3256
+  },
+  "NC:Mitchell": {
+   "eligible": 272
+  },
+  "NC:Transylvania": {
+   "eligible": 11929,
+   "loan_amount_on_row": 16,
+   "processed": 16
+  },
+  "SC:Laurens": {
+   "eligible": 2925
+  },
+  "SC:Oconee": {
+   "eligible": 3401
+  },
+  "SC:Spartanburg": {
+   "eligible": 18326
+  },
+  "SC:Union": {
+   "eligible": 1215
+  }
+ },
+ "images": {
+  "aerial": {
+   "county": {
+    "NC:Brunswick": {
+     "rows": 53,
+     "urls": 54
+    },
+    "NC:Buncombe": {
+     "rows": 4791,
+     "urls": 5304
+    },
+    "NC:Burke": {
+     "rows": 143,
+     "urls": 151
+    },
+    "NC:Carteret": {
+     "rows": 18,
+     "urls": 18
+    },
+    "NC:Catawba": {
+     "rows": 10,
+     "urls": 11
+    },
+    "NC:Cleveland": {
+     "rows": 123,
+     "urls": 128
+    },
+    "NC:Dare": {
+     "rows": 5,
+     "urls": 5
+    },
+    "NC:Forsyth": {
+     "rows": 1,
+     "urls": 1
+    },
+    "NC:Gaston": {
+     "rows": 215,
+     "urls": 235
+    },
+    "NC:Henderson": {
+     "rows": 1220,
+     "urls": 1347
+    },
+    "NC:Hyde": {
+     "rows": 32,
+     "urls": 34
+    },
+    "NC:Lincoln": {
+     "rows": 423,
+     "urls": 441
+    },
+    "NC:McDowell": {
+     "rows": 1150,
+     "urls": 1368
+    },
+    "NC:Mitchell": {
+     "rows": 97,
+     "urls": 106
+    },
+    "NC:New Hanover": {
+     "rows": 2142,
+     "urls": 2187
+    },
+    "NC:Onslow": {
+     "rows": 23,
+     "urls": 24
+    },
+    "NC:Pender": {
+     "rows": 11,
+     "urls": 11
+    },
+    "NC:Pitt": {
+     "rows": 3,
+     "urls": 3
+    },
+    "NC:Polk": {
+     "rows": 131,
+     "urls": 142
+    },
+    "NC:Rutherford": {
+     "rows": 4148,
+     "urls": 4562
+    },
+    "NC:Transylvania": {
+     "rows": 102,
+     "urls": 108
+    },
+    "NC:Vance": {
+     "rows": 1,
+     "urls": 1
+    },
+    "SC:Anderson": {
+     "rows": 244,
+     "urls": 276
+    },
+    "SC:Charleston": {
+     "rows": 616,
+     "urls": 617
+    },
+    "SC:Cherokee": {
+     "rows": 81,
+     "urls": 82
+    },
+    "SC:Dillon": {
+     "rows": 1,
+     "urls": 2
+    },
+    "SC:Georgetown": {
+     "rows": 354,
+     "urls": 355
+    },
+    "SC:Greenville": {
+     "rows": 2,
+     "urls": 3
+    },
+    "SC:Laurens": {
+     "rows": 165,
+     "urls": 199
+    },
+    "SC:Oconee": {
+     "rows": 727,
+     "urls": 846
+    },
+    "SC:Pickens": {
+     "rows": 1886,
+     "urls": 1950
+    },
+    "SC:Spartanburg": {
+     "rows": 2849,
+     "urls": 4098
+    },
+    "SC:Union": {
+     "rows": 46,
+     "urls": 48
+    }
+   },
+   "county_count": 33,
+   "source": {
+    "counties.multi_year_delinquent_tax": {
+     "rows": 782,
+     "urls": 828
+    },
+    "counties_generic.arcgis_distress.buncombe_unpaid_bills": {
+     "rows": 255,
+     "urls": 269
+    },
+    "counties_generic.arcgis_distress.new_hanover_demolition_permits": {
+     "rows": 973,
+     "urls": 983
+    },
+    "counties_nc.asheville_helene": {
+     "rows": 83,
+     "urls": 90
+    },
+    "counties_nc.asheville_str_permits": {
+     "rows": 534,
+     "urls": 670
+    },
+    "counties_nc.buncombe_delinquent_tax": {
+     "rows": 866,
+     "urls": 1062
+    },
+    "counties_nc.buncombe_elderly": {
+     "rows": 2719,
+     "urls": 2861
+    },
+    "counties_nc.gaston_vacant": {
+     "rows": 104,
+     "urls": 116
+    },
+    "counties_nc.henderson_code_violations": {
+     "rows": 157,
+     "urls": 184
+    },
+    "counties_nc.lincoln_vacant": {
+     "rows": 187,
+     "urls": 197
+    },
+    "counties_nc.mcdowell_probate": {
+     "rows": 95,
+     "urls": 132
+    },
+    "counties_nc.nc_county_csv_delinquent_tax": {
+     "rows": 1168,
+     "urls": 1203
+    },
+    "counties_nc.nc_county_pdf_delinquent_tax": {
+     "rows": 1140,
+     "urls": 1317
+    },
+    "counties_nc.nc_ecourts_lis_pendens": {
+     "rows": 84,
+     "urls": 86
+    },
+    "counties_nc.nc_heir_estate_parcels": {
+     "rows": 373,
+     "urls": 421
+    },
+    "counties_nc.nc_ptscloud_delinquent_tax": {
+     "rows": 890,
+     "urls": 972
+    },
+    "counties_nc.rutherford_tax": {
+     "rows": 2797,
+     "urls": 3080
+    },
+    "counties_nc.rutherford_wildfire_tax": {
+     "rows": 1241,
+     "urls": 1348
+    },
+    "counties_nc.transylvania_vacant": {
+     "rows": 54,
+     "urls": 58
+    },
+    "counties_sc.charleston_delinquent_tax": {
+     "rows": 521,
+     "urls": 521
+    },
+    "counties_sc.georgetown_civicengage": {
+     "rows": 352,
+     "urls": 353
+    },
+    "counties_sc.oconee_flc_assignment": {
+     "rows": 412,
+     "urls": 469
+    },
+    "counties_sc.oconee_forfeited_land": {
+     "rows": 128,
+     "urls": 164
+    },
+    "counties_sc.pickens_delinquent_parcels": {
+     "rows": 1141,
+     "urls": 1172
+    },
+    "counties_sc.sc_flc": {
+     "rows": 71,
+     "urls": 74
+    },
+    "counties_sc.sc_probate_net": {
+     "rows": 87,
+     "urls": 87
+    },
+    "counties_sc.sc_public_index": {
+     "rows": 161,
+     "urls": 163
+    },
+    "counties_sc.sc_public_index_lis_pendens": {
+     "rows": 127,
+     "urls": 180
+    },
+    "counties_sc.spartanburg_city_condemned": {
+     "rows": 76,
+     "urls": 80
+    },
+    "counties_sc.spartanburg_condemned": {
+     "rows": 1034,
+     "urls": 1149
+    },
+    "counties_sc.spartanburg_delinquent_tax": {
+     "rows": 246,
+     "urls": 256
+    },
+    "counties_sc.spartanburg_vacant": {
+     "rows": 1112,
+     "urls": 2109
+    },
+    "law_firms.shapiro_ingle_powerbi": {
+     "rows": 50,
+     "urls": 50
+    },
+    "national.courtlistener_bankruptcy": {
+     "rows": 163,
+     "urls": 167
+    },
+    "national.distressed": {
+     "rows": 166,
+     "urls": 170
+    },
+    "national.foreclosure_dot_com": {
+     "rows": 106,
+     "urls": 121
+    },
+    "national.hud_reac_inspection": {
+     "rows": 126,
+     "urls": 136
+    },
+    "national.landandfarm": {
+     "rows": 195,
+     "urls": 203
+    },
+    "national.landwatch": {
+     "rows": 95,
+     "urls": 95
+    },
+    "public_notices.nc_notices_counties": {
+     "rows": 83,
+     "urls": 88
+    }
+   },
+   "source_count": 119,
+   "total": {
+    "rows": 21813,
+    "urls": 24717
+   }
+  },
+  "any_gradable": {
+   "county": {
+    "NC:Alamance": {
+     "backlog_count_cap": 36,
+     "rows": 36
+    },
+    "NC:Brunswick": {
+     "backlog_breaker_or_budget_inside_cap": 2,
+     "backlog_count_cap": 62,
+     "backlog_warm": 2,
+     "condition_tier_landed": 11,
+     "rows": 119,
+     "vision_read": 55
+    },
+    "NC:Buncombe": {
+     "backlog_breaker_or_budget_inside_cap": 282,
+     "backlog_count_cap": 924,
+     "backlog_fetch_failed": 32,
+     "backlog_warm": 312,
+     "condition_tier_landed": 3115,
+     "rows": 5804,
+     "vision_read": 4566
+    },
+    "NC:Burke": {
+     "backlog_breaker_or_budget_inside_cap": 32,
+     "backlog_count_cap": 239,
+     "backlog_fetch_failed": 7,
+     "backlog_warm": 38,
+     "condition_tier_landed": 70,
+     "rows": 412,
+     "vision_read": 134
+    },
+    "NC:Cabarrus": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "backlog_count_cap": 40,
+     "backlog_warm": 1,
+     "rows": 41
+    },
+    "NC:Carteret": {
+     "backlog_breaker_or_budget_inside_cap": 3,
+     "backlog_count_cap": 40,
+     "backlog_warm": 3,
+     "condition_tier_landed": 9,
+     "rows": 62,
+     "vision_read": 19
+    },
+    "NC:Catawba": {
+     "backlog_breaker_or_budget_inside_cap": 79,
+     "backlog_count_cap": 28,
+     "backlog_fetch_failed": 1,
+     "backlog_warm": 80,
+     "condition_tier_landed": 6,
+     "rows": 121,
+     "vision_read": 13
+    },
+    "NC:Cleveland": {
+     "backlog_breaker_or_budget_inside_cap": 6,
+     "backlog_count_cap": 53,
+     "backlog_fetch_failed": 3,
+     "backlog_warm": 9,
+     "condition_tier_landed": 86,
+     "rows": 188,
+     "vision_read": 126
+    },
+    "NC:Craven": {
+     "backlog_count_cap": 25,
+     "condition_tier_landed": 7,
+     "rows": 34,
+     "vision_read": 9
+    },
+    "NC:Cumberland": {
+     "backlog_breaker_or_budget_inside_cap": 6,
+     "backlog_count_cap": 99,
+     "backlog_warm": 6,
+     "condition_tier_landed": 1,
+     "rows": 109,
+     "vision_read": 4
+    },
+    "NC:Dare": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "backlog_count_cap": 30,
+     "backlog_warm": 1,
+     "condition_tier_landed": 3,
+     "rows": 37,
+     "vision_read": 6
+    },
+    "NC:Forsyth": {
+     "backlog_breaker_or_budget_inside_cap": 2,
+     "backlog_count_cap": 78,
+     "backlog_warm": 2,
+     "condition_tier_landed": 7,
+     "rows": 101,
+     "vision_read": 21
+    },
+    "NC:Gaston": {
+     "backlog_breaker_or_budget_inside_cap": 123,
+     "backlog_count_cap": 5970,
+     "backlog_fetch_failed": 5,
+     "backlog_warm": 126,
+     "condition_tier_landed": 148,
+     "rows": 6313,
+     "vision_read": 215
+    },
+    "NC:Guilford": {
+     "backlog_breaker_or_budget_inside_cap": 6,
+     "backlog_count_cap": 111,
+     "backlog_warm": 6,
+     "rows": 118,
+     "vision_read": 1
+    },
+    "NC:Harnett": {
+     "backlog_count_cap": 40,
+     "rows": 41,
+     "vision_read": 1
+    },
+    "NC:Henderson": {
+     "backlog_breaker_or_budget_inside_cap": 253,
+     "backlog_count_cap": 338,
+     "backlog_fetch_failed": 3,
+     "backlog_warm": 256,
+     "condition_tier_landed": 236,
+     "rows": 1369,
+     "vision_read": 775
+    },
+    "NC:Iredell": {
+     "backlog_breaker_or_budget_inside_cap": 2,
+     "backlog_count_cap": 37,
+     "backlog_warm": 2,
+     "rows": 40,
+     "vision_read": 1
+    },
+    "NC:Johnston": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "backlog_count_cap": 46,
+     "backlog_warm": 1,
+     "rows": 48,
+     "vision_read": 1
+    },
+    "NC:Lincoln": {
+     "backlog_breaker_or_budget_inside_cap": 98,
+     "backlog_count_cap": 110,
+     "backlog_fetch_failed": 13,
+     "backlog_warm": 111,
+     "condition_tier_landed": 259,
+     "rows": 616,
+     "vision_read": 395
+    },
+    "NC:McDowell": {
+     "backlog_breaker_or_budget_inside_cap": 35,
+     "backlog_count_cap": 62,
+     "backlog_fetch_failed": 2,
+     "backlog_warm": 37,
+     "condition_tier_landed": 499,
+     "rows": 1216,
+     "vision_read": 1117
+    },
+    "NC:Mecklenburg": {
+     "backlog_breaker_or_budget_inside_cap": 19,
+     "backlog_count_cap": 62,
+     "backlog_warm": 19,
+     "condition_tier_landed": 7,
+     "rows": 113,
+     "vision_read": 32
+    },
+    "NC:Mitchell": {
+     "backlog_breaker_or_budget_inside_cap": 8,
+     "backlog_count_cap": 35,
+     "backlog_warm": 8,
+     "condition_tier_landed": 37,
+     "rows": 130,
+     "vision_read": 87
+    },
+    "NC:New Hanover": {
+     "backlog_breaker_or_budget_inside_cap": 53,
+     "backlog_count_cap": 102,
+     "backlog_warm": 53,
+     "condition_tier_landed": 355,
+     "rows": 2153,
+     "vision_read": 1998
+    },
+    "NC:Onslow": {
+     "backlog_count_cap": 32,
+     "condition_tier_landed": 17,
+     "rows": 67,
+     "vision_read": 35
+    },
+    "NC:Pender": {
+     "backlog_count_cap": 28,
+     "condition_tier_landed": 5,
+     "rows": 40,
+     "vision_read": 12
+    },
+    "NC:Polk": {
+     "backlog_breaker_or_budget_inside_cap": 10,
+     "backlog_count_cap": 69,
+     "backlog_fetch_failed": 2,
+     "backlog_warm": 11,
+     "condition_tier_landed": 48,
+     "rows": 168,
+     "vision_read": 87
+    },
+    "NC:Rutherford": {
+     "backlog_breaker_or_budget_inside_cap": 178,
+     "backlog_count_cap": 315,
+     "backlog_fetch_failed": 9,
+     "backlog_hot": 1,
+     "backlog_warm": 186,
+     "condition_tier_landed": 853,
+     "rows": 4415,
+     "vision_read": 3913
+    },
+    "NC:Transylvania": {
+     "backlog_breaker_or_budget_inside_cap": 13,
+     "backlog_count_cap": 178,
+     "backlog_warm": 13,
+     "condition_tier_landed": 54,
+     "rows": 282,
+     "vision_read": 91
+    },
+    "SC:Anderson": {
+     "backlog_breaker_or_budget_inside_cap": 21,
+     "backlog_count_cap": 113,
+     "backlog_fetch_failed": 3,
+     "backlog_warm": 22,
+     "condition_tier_landed": 238,
+     "rows": 458,
+     "vision_read": 321
+    },
+    "SC:Berkeley": {
+     "backlog_breaker_or_budget_inside_cap": 143,
+     "backlog_warm": 143,
+     "rows": 143
+    },
+    "SC:Charleston": {
+     "backlog_breaker_or_budget_inside_cap": 4,
+     "backlog_count_cap": 63,
+     "backlog_fetch_failed": 8,
+     "backlog_warm": 12,
+     "condition_tier_landed": 60,
+     "rows": 670,
+     "vision_read": 595
+    },
+    "SC:Cherokee": {
+     "backlog_breaker_or_budget_inside_cap": 5,
+     "backlog_count_cap": 85,
+     "backlog_warm": 5,
+     "condition_tier_landed": 90,
+     "rows": 231,
+     "vision_read": 141
+    },
+    "SC:Georgetown": {
+     "backlog_count_cap": 33,
+     "condition_tier_landed": 72,
+     "rows": 388,
+     "vision_read": 355
+    },
+    "SC:Greenville": {
+     "backlog_breaker_or_budget_inside_cap": 31,
+     "backlog_count_cap": 10,
+     "backlog_fetch_failed": 93,
+     "backlog_warm": 122,
+     "condition_tier_landed": 3,
+     "rows": 143,
+     "vision_read": 9
+    },
+    "SC:Horry": {
+     "backlog_breaker_or_budget_inside_cap": 220,
+     "backlog_count_cap": 49,
+     "backlog_fetch_failed": 1,
+     "backlog_warm": 221,
+     "condition_tier_landed": 9,
+     "rows": 280,
+     "vision_read": 10
+    },
+    "SC:Laurens": {
+     "backlog_breaker_or_budget_inside_cap": 80,
+     "backlog_count_cap": 104,
+     "backlog_fetch_failed": 3,
+     "backlog_hot": 1,
+     "backlog_warm": 81,
+     "condition_tier_landed": 111,
+     "rows": 372,
+     "vision_read": 185
+    },
+    "SC:Oconee": {
+     "backlog_breaker_or_budget_inside_cap": 60,
+     "backlog_count_cap": 154,
+     "backlog_fetch_failed": 37,
+     "backlog_warm": 97,
+     "condition_tier_landed": 289,
+     "rows": 882,
+     "vision_read": 631
+    },
+    "SC:Pickens": {
+     "backlog_breaker_or_budget_inside_cap": 67,
+     "backlog_count_cap": 136,
+     "backlog_fetch_failed": 4,
+     "backlog_hot": 1,
+     "backlog_warm": 70,
+     "condition_tier_landed": 893,
+     "rows": 2072,
+     "vision_read": 1865
+    },
+    "SC:Spartanburg": {
+     "backlog_breaker_or_budget_inside_cap": 392,
+     "backlog_count_cap": 897,
+     "backlog_fetch_failed": 10,
+     "backlog_hot": 2,
+     "backlog_warm": 670,
+     "condition_tier_landed": 2524,
+     "rows": 4211,
+     "vision_read": 2912
+    },
+    "SC:Union": {
+     "backlog_breaker_or_budget_inside_cap": 7,
+     "backlog_count_cap": 75,
+     "backlog_warm": 7,
+     "condition_tier_landed": 55,
+     "rows": 158,
+     "vision_read": 76
+    }
+   },
+   "county_count": 103,
+   "source": {
+    "counties.multi_year_delinquent_tax": {
+     "backlog_breaker_or_budget_inside_cap": 34,
+     "backlog_count_cap": 56,
+     "backlog_warm": 34,
+     "condition_tier_landed": 351,
+     "rows": 783,
+     "vision_read": 693
+    },
+    "counties_generic.arcgis_distress.buncombe_unpaid_bills": {
+     "backlog_breaker_or_budget_inside_cap": 96,
+     "backlog_count_cap": 83,
+     "backlog_fetch_failed": 22,
+     "backlog_warm": 117,
+     "condition_tier_landed": 32,
+     "rows": 350,
+     "vision_read": 149
+    },
+    "counties_generic.arcgis_distress.burke_storm_damage": {
+     "backlog_breaker_or_budget_inside_cap": 17,
+     "backlog_count_cap": 170,
+     "backlog_fetch_failed": 5,
+     "backlog_warm": 22,
+     "rows": 193,
+     "vision_read": 1
+    },
+    "counties_generic.arcgis_distress.greenville_unpaid_tax_parcels": {
+     "backlog_breaker_or_budget_inside_cap": 27,
+     "backlog_count_cap": 7,
+     "backlog_fetch_failed": 92,
+     "backlog_warm": 118,
+     "condition_tier_landed": 1,
+     "rows": 133,
+     "vision_read": 7
+    },
+    "counties_generic.arcgis_distress.new_hanover_demolition_permits": {
+     "backlog_breaker_or_budget_inside_cap": 51,
+     "backlog_count_cap": 99,
+     "backlog_warm": 51,
+     "condition_tier_landed": 112,
+     "rows": 976,
+     "vision_read": 826
+    },
+    "counties_generic.liensnc": {
+     "backlog_count_cap": 55,
+     "backlog_fetch_failed": 1,
+     "backlog_warm": 1,
+     "condition_tier_landed": 15,
+     "rows": 148,
+     "vision_read": 92
+    },
+    "counties_nc.asheville_helene": {
+     "backlog_breaker_or_budget_inside_cap": 12,
+     "backlog_count_cap": 661,
+     "backlog_warm": 12,
+     "condition_tier_landed": 36,
+     "rows": 734,
+     "vision_read": 61
+    },
+    "counties_nc.asheville_str_permits": {
+     "condition_tier_landed": 483,
+     "rows": 534,
+     "vision_read": 534
+    },
+    "counties_nc.buncombe_delinquent_tax": {
+     "backlog_breaker_or_budget_inside_cap": 71,
+     "backlog_count_cap": 24,
+     "backlog_fetch_failed": 2,
+     "backlog_warm": 73,
+     "condition_tier_landed": 615,
+     "rows": 959,
+     "vision_read": 862
+    },
+    "counties_nc.buncombe_elderly": {
+     "backlog_breaker_or_budget_inside_cap": 8,
+     "backlog_count_cap": 12,
+     "backlog_fetch_failed": 1,
+     "backlog_warm": 8,
+     "condition_tier_landed": 1788,
+     "rows": 2732,
+     "vision_read": 2711
+    },
+    "counties_nc.gaston_vacant": {
+     "backlog_breaker_or_budget_inside_cap": 92,
+     "backlog_count_cap": 5845,
+     "backlog_warm": 92,
+     "condition_tier_landed": 58,
+     "rows": 6039,
+     "vision_read": 102
+    },
+    "counties_nc.henderson_code_violations": {
+     "backlog_breaker_or_budget_inside_cap": 5,
+     "backlog_count_cap": 4,
+     "backlog_warm": 5,
+     "condition_tier_landed": 91,
+     "rows": 161,
+     "vision_read": 152
+    },
+    "counties_nc.lincoln_vacant": {
+     "backlog_breaker_or_budget_inside_cap": 7,
+     "backlog_count_cap": 11,
+     "backlog_fetch_failed": 7,
+     "backlog_warm": 14,
+     "condition_tier_landed": 123,
+     "rows": 207,
+     "vision_read": 182
+    },
+    "counties_nc.nc_county_csv_delinquent_tax": {
+     "backlog_breaker_or_budget_inside_cap": 2,
+     "backlog_warm": 2,
+     "condition_tier_landed": 242,
+     "rows": 1168,
+     "vision_read": 1166
+    },
+    "counties_nc.nc_county_pdf_delinquent_tax": {
+     "backlog_breaker_or_budget_inside_cap": 151,
+     "backlog_count_cap": 55,
+     "backlog_fetch_failed": 4,
+     "backlog_warm": 155,
+     "condition_tier_landed": 484,
+     "rows": 1296,
+     "vision_read": 1086
+    },
+    "counties_nc.nc_heir_estate_parcels": {
+     "backlog_breaker_or_budget_inside_cap": 123,
+     "backlog_count_cap": 59,
+     "backlog_fetch_failed": 3,
+     "backlog_hot": 1,
+     "backlog_warm": 125,
+     "condition_tier_landed": 107,
+     "rows": 512,
+     "vision_read": 327
+    },
+    "counties_nc.nc_ptscloud_delinquent_tax": {
+     "backlog_breaker_or_budget_inside_cap": 235,
+     "backlog_count_cap": 257,
+     "backlog_warm": 235,
+     "condition_tier_landed": 35,
+     "rows": 929,
+     "vision_read": 437
+    },
+    "counties_nc.rutherford_tax": {
+     "backlog_breaker_or_budget_inside_cap": 85,
+     "backlog_count_cap": 112,
+     "backlog_fetch_failed": 2,
+     "backlog_warm": 87,
+     "condition_tier_landed": 538,
+     "rows": 2842,
+     "vision_read": 2643
+    },
+    "counties_nc.rutherford_wildfire_tax": {
+     "backlog_breaker_or_budget_inside_cap": 46,
+     "backlog_count_cap": 58,
+     "backlog_warm": 46,
+     "condition_tier_landed": 266,
+     "rows": 1278,
+     "vision_read": 1174
+    },
+    "counties_nc.transylvania_delinquent_tax": {
+     "backlog_breaker_or_budget_inside_cap": 8,
+     "backlog_count_cap": 125,
+     "backlog_warm": 8,
+     "condition_tier_landed": 2,
+     "rows": 141,
+     "vision_read": 8
+    },
+    "counties_sc.berkeley_paystar_tax": {
+     "backlog_breaker_or_budget_inside_cap": 143,
+     "backlog_warm": 143,
+     "rows": 143
+    },
+    "counties_sc.charleston_delinquent_tax": {
+     "backlog_count_cap": 4,
+     "backlog_fetch_failed": 8,
+     "backlog_warm": 8,
+     "condition_tier_landed": 9,
+     "rows": 521,
+     "vision_read": 509
+    },
+    "counties_sc.georgetown_civicengage": {
+     "backlog_count_cap": 2,
+     "condition_tier_landed": 67,
+     "rows": 352,
+     "vision_read": 350
+    },
+    "counties_sc.horry_delinquent_xlsx": {
+     "backlog_breaker_or_budget_inside_cap": 220,
+     "backlog_warm": 220,
+     "rows": 220
+    },
+    "counties_sc.oconee_flc_assignment": {
+     "backlog_breaker_or_budget_inside_cap": 32,
+     "backlog_count_cap": 4,
+     "backlog_fetch_failed": 35,
+     "backlog_warm": 67,
+     "condition_tier_landed": 99,
+     "rows": 413,
+     "vision_read": 342
+    },
+    "counties_sc.oconee_forfeited_land": {
+     "backlog_breaker_or_budget_inside_cap": 7,
+     "backlog_count_cap": 1,
+     "backlog_warm": 7,
+     "condition_tier_landed": 71,
+     "rows": 128,
+     "vision_read": 120
+    },
+    "counties_sc.pickens_delinquent_parcels": {
+     "backlog_breaker_or_budget_inside_cap": 15,
+     "backlog_count_cap": 11,
+     "backlog_warm": 15,
+     "condition_tier_landed": 509,
+     "rows": 1141,
+     "vision_read": 1115
+    },
+    "counties_sc.sc_public_index": {
+     "backlog_breaker_or_budget_inside_cap": 51,
+     "backlog_count_cap": 49,
+     "backlog_warm": 51,
+     "condition_tier_landed": 9,
+     "rows": 166,
+     "vision_read": 66
+    },
+    "counties_sc.sc_public_index_lis_pendens": {
+     "backlog_breaker_or_budget_inside_cap": 3,
+     "backlog_warm": 3,
+     "condition_tier_landed": 55,
+     "rows": 128,
+     "vision_read": 125
+    },
+    "counties_sc.spartanburg_condemned": {
+     "backlog_breaker_or_budget_inside_cap": 10,
+     "backlog_count_cap": 162,
+     "backlog_warm": 10,
+     "condition_tier_landed": 894,
+     "rows": 1206,
+     "vision_read": 1034
+    },
+    "counties_sc.spartanburg_delinquent_tax": {
+     "backlog_breaker_or_budget_inside_cap": 243,
+     "backlog_count_cap": 553,
+     "backlog_hot": 1,
+     "backlog_warm": 512,
+     "condition_tier_landed": 199,
+     "rows": 1031,
+     "vision_read": 235
+    },
+    "counties_sc.spartanburg_vacant": {
+     "backlog_count_cap": 2,
+     "condition_tier_landed": 1031,
+     "rows": 1114,
+     "vision_read": 1112
+    },
+    "national.courtlistener_bankruptcy": {
+     "backlog_breaker_or_budget_inside_cap": 18,
+     "backlog_count_cap": 38,
+     "backlog_warm": 18,
+     "condition_tier_landed": 90,
+     "rows": 171,
+     "vision_read": 115
+    },
+    "national.distressed": {
+     "backlog_breaker_or_budget_inside_cap": 40,
+     "backlog_count_cap": 1151,
+     "backlog_fetch_failed": 2,
+     "backlog_warm": 41,
+     "condition_tier_landed": 236,
+     "rows": 1438,
+     "vision_read": 245
+    },
+    "national.foreclosure_dot_com": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "backlog_count_cap": 5,
+     "backlog_warm": 1,
+     "condition_tier_landed": 80,
+     "rows": 139,
+     "vision_read": 133
+    },
+    "national.hud_reac_inspection": {
+     "backlog_breaker_or_budget_inside_cap": 2,
+     "backlog_count_cap": 1,
+     "backlog_warm": 2,
+     "condition_tier_landed": 74,
+     "rows": 129,
+     "vision_read": 126
+    },
+    "national.landandfarm": {
+     "backlog_breaker_or_budget_inside_cap": 3,
+     "backlog_count_cap": 235,
+     "backlog_fetch_failed": 10,
+     "backlog_warm": 12,
+     "condition_tier_landed": 123,
+     "rows": 426,
+     "vision_read": 178
+    },
+    "national.landwatch": {
+     "backlog_count_cap": 464,
+     "backlog_fetch_failed": 2,
+     "backlog_warm": 2,
+     "condition_tier_landed": 55,
+     "rows": 551,
+     "vision_read": 85
+    },
+    "national.usda_properties": {
+     "backlog_breaker_or_budget_inside_cap": 24,
+     "backlog_count_cap": 354,
+     "backlog_fetch_failed": 4,
+     "backlog_hot": 1,
+     "backlog_warm": 27,
+     "condition_tier_landed": 339,
+     "rows": 731,
+     "vision_read": 349
+    },
+    "nc_ecourts_judgments": {
+     "backlog_breaker_or_budget_inside_cap": 53,
+     "backlog_count_cap": 70,
+     "backlog_warm": 53,
+     "condition_tier_landed": 1,
+     "rows": 125,
+     "vision_read": 2
+    }
+   },
+   "source_count": 135,
+   "total": {
+    "backlog_breaker_or_budget_inside_cap": 2273,
+    "backlog_count_cap": 11379,
+    "backlog_fetch_failed": 238,
+    "backlog_hot": 5,
+    "backlog_warm": 2765,
+    "condition_tier_landed": 10186,
+    "rows": 34760,
+    "vision_read": 20870
+   }
+  },
+  "assessor_photo": {
+   "county": {
+    "NC:Buncombe": {
+     "rows": 1358,
+     "urls": 2235
+    },
+    "NC:Burke": {
+     "rows": 291,
+     "urls": 291
+    },
+    "NC:Gaston": {
+     "rows": 6078,
+     "urls": 6078
+    },
+    "NC:Henderson": {
+     "rows": 359,
+     "urls": 359
+    },
+    "NC:Lincoln": {
+     "rows": 183,
+     "urls": 183
+    },
+    "NC:Madison": {
+     "rows": 2,
+     "urls": 2
+    },
+    "NC:Pitt": {
+     "rows": 1,
+     "urls": 1
+    },
+    "NC:Rutherford": {
+     "rows": 279,
+     "urls": 279
+    }
+   },
+   "county_count": 8,
+   "source": {
+    "counties.column_legal_notices": {
+     "rows": 11,
+     "urls": 11
+    },
+    "counties_generic.arcgis_distress.buncombe_hmgp_buyout": {
+     "rows": 24,
+     "urls": 24
+    },
+    "counties_generic.arcgis_distress.buncombe_landslide_damage": {
+     "rows": 6,
+     "urls": 6
+    },
+    "counties_generic.arcgis_distress.buncombe_unpaid_bills": {
+     "rows": 27,
+     "urls": 27
+    },
+    "counties_generic.arcgis_distress.buncombe_unpaid_bills_2024": {
+     "rows": 3,
+     "urls": 3
+    },
+    "counties_generic.arcgis_distress.burke_storm_damage": {
+     "rows": 192,
+     "urls": 192
+    },
+    "counties_generic.arcgis_distress.lincoln_code_violations": {
+     "rows": 9,
+     "urls": 9
+    },
+    "counties_generic.arcgis_distress.lincoln_county_owned": {
+     "rows": 5,
+     "urls": 5
+    },
+    "counties_generic.epa_frs.acres": {
+     "rows": 7,
+     "urls": 7
+    },
+    "counties_generic.epa_frs.sems": {
+     "rows": 4,
+     "urls": 4
+    },
+    "counties_generic.liensnc": {
+     "rows": 13,
+     "urls": 13
+    },
+    "counties_generic.state_contamination.nc_dam_safety": {
+     "rows": 22,
+     "urls": 22
+    },
+    "counties_generic.state_contamination.nc_ust_incidents": {
+     "rows": 39,
+     "urls": 39
+    },
+    "counties_nc.asheville_helene": {
+     "rows": 705,
+     "urls": 1582
+    },
+    "counties_nc.asheville_str_permits": {
+     "rows": 36,
+     "urls": 36
+    },
+    "counties_nc.buncombe_delinquent_tax": {
+     "rows": 256,
+     "urls": 256
+    },
+    "counties_nc.buncombe_elderly": {
+     "rows": 250,
+     "urls": 250
+    },
+    "counties_nc.buncombe_tax": {
+     "rows": 4,
+     "urls": 4
+    },
+    "counties_nc.gaston_vacant": {
+     "rows": 5956,
+     "urls": 5956
+    },
+    "counties_nc.gastonia_code_enforcement": {
+     "rows": 10,
+     "urls": 10
+    },
+    "counties_nc.henderson_code_violations": {
+     "rows": 18,
+     "urls": 18
+    },
+    "counties_nc.lincoln_vacant": {
+     "rows": 51,
+     "urls": 51
+    },
+    "counties_nc.nc_county_pdf_delinquent_tax": {
+     "rows": 66,
+     "urls": 66
+    },
+    "counties_nc.nc_ecourts_divorce": {
+     "rows": 2,
+     "urls": 2
+    },
+    "counties_nc.nc_ecourts_lis_pendens": {
+     "rows": 10,
+     "urls": 10
+    },
+    "counties_nc.nc_heir_estate_parcels": {
+     "rows": 108,
+     "urls": 108
+    },
+    "counties_nc.nc_ptscloud_delinquent_tax": {
+     "rows": 263,
+     "urls": 263
+    },
+    "counties_nc.rutherford_tax": {
+     "rows": 80,
+     "urls": 80
+    },
+    "counties_nc.rutherford_wildfire_tax": {
+     "rows": 64,
+     "urls": 64
+    },
+    "law_firms.hutchens": {
+     "rows": 4,
+     "urls": 4
+    },
+    "law_firms.shapiro_ingle_powerbi": {
+     "rows": 27,
+     "urls": 27
+    },
+    "liensnc": {
+     "rows": 54,
+     "urls": 54
+    },
+    "national.courtlistener_bankruptcy": {
+     "rows": 38,
+     "urls": 38
+    },
+    "national.distressed": {
+     "rows": 24,
+     "urls": 24
+    },
+    "national.foreclosure_dot_com": {
+     "rows": 3,
+     "urls": 3
+    },
+    "national.nc_upset_bids": {
+     "rows": 4,
+     "urls": 4
+    },
+    "nc_ecourts_judgments": {
+     "rows": 123,
+     "urls": 123
+    },
+    "public_notices.gannett_obituaries": {
+     "rows": 6,
+     "urls": 6
+    },
+    "public_notices.nc_notices_counties": {
+     "rows": 11,
+     "urls": 11
+    },
+    "public_notices.ncnotices": {
+     "rows": 2,
+     "urls": 2
+    }
+   },
+   "source_count": 51,
+   "total": {
+    "rows": 8551,
+    "urls": 9428
+   }
+  },
+  "best_aerial": {
+   "county": {
+    "NC:Brunswick": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "backlog_count_cap": 1,
+     "condition_tier_landed": 7,
+     "rows": 53,
+     "vision_read": 51
+    },
+    "NC:Buncombe": {
+     "backlog_breaker_or_budget_inside_cap": 80,
+     "backlog_count_cap": 127,
+     "condition_tier_landed": 2492,
+     "rows": 3891,
+     "vision_read": 3684
+    },
+    "NC:Burke": {
+     "backlog_count_cap": 4,
+     "condition_tier_landed": 19,
+     "rows": 53,
+     "vision_read": 49
+    },
+    "NC:Carteret": {
+     "condition_tier_landed": 5,
+     "rows": 11,
+     "vision_read": 11
+    },
+    "NC:Catawba": {
+     "rows": 5,
+     "vision_read": 5
+    },
+    "NC:Cleveland": {
+     "backlog_breaker_or_budget_inside_cap": 3,
+     "backlog_count_cap": 8,
+     "condition_tier_landed": 48,
+     "rows": 82,
+     "vision_read": 71
+    },
+    "NC:Dare": {
+     "rows": 1,
+     "vision_read": 1
+    },
+    "NC:Forsyth": {
+     "condition_tier_landed": 1,
+     "rows": 1,
+     "vision_read": 1
+    },
+    "NC:Gaston": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "backlog_count_cap": 1,
+     "condition_tier_landed": 35,
+     "rows": 62,
+     "vision_read": 60
+    },
+    "NC:Henderson": {
+     "backlog_breaker_or_budget_inside_cap": 176,
+     "backlog_count_cap": 134,
+     "condition_tier_landed": 161,
+     "rows": 903,
+     "vision_read": 593
+    },
+    "NC:Hyde": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "backlog_count_cap": 16,
+     "condition_tier_landed": 1,
+     "rows": 24,
+     "vision_read": 7
+    },
+    "NC:Lincoln": {
+     "backlog_breaker_or_budget_inside_cap": 7,
+     "backlog_count_cap": 13,
+     "condition_tier_landed": 111,
+     "rows": 179,
+     "vision_read": 159
+    },
+    "NC:McDowell": {
+     "backlog_breaker_or_budget_inside_cap": 18,
+     "backlog_count_cap": 16,
+     "backlog_fetch_failed": 1,
+     "condition_tier_landed": 393,
+     "rows": 969,
+     "vision_read": 934
+    },
+    "NC:Mitchell": {
+     "backlog_breaker_or_budget_inside_cap": 8,
+     "backlog_count_cap": 2,
+     "condition_tier_landed": 23,
+     "rows": 80,
+     "vision_read": 70
+    },
+    "NC:New Hanover": {
+     "backlog_breaker_or_budget_inside_cap": 52,
+     "backlog_count_cap": 97,
+     "condition_tier_landed": 330,
+     "rows": 2055,
+     "vision_read": 1906
+    },
+    "NC:Onslow": {
+     "condition_tier_landed": 6,
+     "rows": 23,
+     "vision_read": 23
+    },
+    "NC:Pender": {
+     "condition_tier_landed": 4,
+     "rows": 10,
+     "vision_read": 10
+    },
+    "NC:Pitt": {
+     "rows": 1,
+     "vision_read": 1
+    },
+    "NC:Polk": {
+     "backlog_breaker_or_budget_inside_cap": 7,
+     "backlog_count_cap": 35,
+     "condition_tier_landed": 39,
+     "rows": 116,
+     "vision_read": 74
+    },
+    "NC:Rutherford": {
+     "backlog_breaker_or_budget_inside_cap": 89,
+     "backlog_count_cap": 137,
+     "backlog_fetch_failed": 1,
+     "condition_tier_landed": 786,
+     "rows": 4003,
+     "vision_read": 3776
+    },
+    "NC:Transylvania": {
+     "backlog_breaker_or_budget_inside_cap": 5,
+     "backlog_count_cap": 12,
+     "condition_tier_landed": 25,
+     "rows": 76,
+     "vision_read": 59
+    },
+    "NC:Vance": {
+     "rows": 1,
+     "vision_read": 1
+    },
+    "SC:Anderson": {
+     "backlog_count_cap": 1,
+     "condition_tier_landed": 67,
+     "rows": 98,
+     "vision_read": 97
+    },
+    "SC:Charleston": {
+     "backlog_breaker_or_budget_inside_cap": 4,
+     "backlog_count_cap": 10,
+     "backlog_fetch_failed": 8,
+     "condition_tier_landed": 32,
+     "rows": 581,
+     "vision_read": 559
+    },
+    "SC:Cherokee": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "condition_tier_landed": 13,
+     "rows": 57,
+     "vision_read": 56
+    },
+    "SC:Georgetown": {
+     "backlog_count_cap": 2,
+     "condition_tier_landed": 67,
+     "rows": 352,
+     "vision_read": 350
+    },
+    "SC:Laurens": {
+     "backlog_breaker_or_budget_inside_cap": 24,
+     "backlog_count_cap": 19,
+     "condition_tier_landed": 15,
+     "rows": 97,
+     "vision_read": 54
+    },
+    "SC:Oconee": {
+     "backlog_breaker_or_budget_inside_cap": 58,
+     "backlog_count_cap": 48,
+     "backlog_fetch_failed": 34,
+     "condition_tier_landed": 222,
+     "rows": 700,
+     "vision_read": 560
+    },
+    "SC:Pickens": {
+     "backlog_breaker_or_budget_inside_cap": 39,
+     "backlog_count_cap": 36,
+     "condition_tier_landed": 791,
+     "rows": 1798,
+     "vision_read": 1723
+    },
+    "SC:Spartanburg": {
+     "backlog_breaker_or_budget_inside_cap": 7,
+     "backlog_count_cap": 17,
+     "condition_tier_landed": 1610,
+     "rows": 1929,
+     "vision_read": 1905
+    },
+    "SC:Union": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "backlog_count_cap": 10,
+     "condition_tier_landed": 2,
+     "rows": 29,
+     "vision_read": 18
+    }
+   },
+   "county_count": 31,
+   "source": {
+    "counties.multi_year_delinquent_tax": {
+     "backlog_breaker_or_budget_inside_cap": 33,
+     "backlog_count_cap": 55,
+     "condition_tier_landed": 328,
+     "rows": 744,
+     "vision_read": 656
+    },
+    "counties_generic.arcgis_distress.buncombe_unpaid_bills": {
+     "backlog_breaker_or_budget_inside_cap": 33,
+     "backlog_count_cap": 68,
+     "condition_tier_landed": 24,
+     "rows": 230,
+     "vision_read": 129
+    },
+    "counties_generic.arcgis_distress.new_hanover_demolition_permits": {
+     "backlog_breaker_or_budget_inside_cap": 50,
+     "backlog_count_cap": 97,
+     "condition_tier_landed": 104,
+     "rows": 938,
+     "vision_read": 791
+    },
+    "counties_generic.arcgis_distress.spartanburg_infill_eligible": {
+     "condition_tier_landed": 38,
+     "rows": 43,
+     "vision_read": 43
+    },
+    "counties_nc.asheville_helene": {
+     "backlog_breaker_or_budget_inside_cap": 5,
+     "condition_tier_landed": 16,
+     "rows": 25,
+     "vision_read": 20
+    },
+    "counties_nc.asheville_str_permits": {
+     "condition_tier_landed": 422,
+     "rows": 470,
+     "vision_read": 470
+    },
+    "counties_nc.buncombe_delinquent_tax": {
+     "backlog_breaker_or_budget_inside_cap": 3,
+     "backlog_count_cap": 3,
+     "condition_tier_landed": 367,
+     "rows": 527,
+     "vision_read": 521
+    },
+    "counties_nc.buncombe_elderly": {
+     "backlog_count_cap": 4,
+     "condition_tier_landed": 1570,
+     "rows": 2395,
+     "vision_read": 2391
+    },
+    "counties_nc.gaston_vacant": {
+     "backlog_count_cap": 1,
+     "condition_tier_landed": 15,
+     "rows": 32,
+     "vision_read": 31
+    },
+    "counties_nc.henderson_code_violations": {
+     "backlog_breaker_or_budget_inside_cap": 2,
+     "backlog_count_cap": 3,
+     "condition_tier_landed": 78,
+     "rows": 137,
+     "vision_read": 132
+    },
+    "counties_nc.hendersonville_vacant_structures": {
+     "condition_tier_landed": 17,
+     "rows": 41,
+     "vision_read": 41
+    },
+    "counties_nc.lincoln_vacant": {
+     "backlog_count_cap": 6,
+     "condition_tier_landed": 52,
+     "rows": 85,
+     "vision_read": 79
+    },
+    "counties_nc.mcdowell_probate": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "condition_tier_landed": 33,
+     "rows": 68,
+     "vision_read": 67
+    },
+    "counties_nc.nc_county_csv_delinquent_tax": {
+     "backlog_breaker_or_budget_inside_cap": 2,
+     "condition_tier_landed": 226,
+     "rows": 1116,
+     "vision_read": 1114
+    },
+    "counties_nc.nc_county_pdf_delinquent_tax": {
+     "backlog_breaker_or_budget_inside_cap": 16,
+     "backlog_count_cap": 21,
+     "condition_tier_landed": 372,
+     "rows": 908,
+     "vision_read": 871
+    },
+    "counties_nc.nc_ecourts_lis_pendens": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "condition_tier_landed": 15,
+     "rows": 82,
+     "vision_read": 81
+    },
+    "counties_nc.nc_heir_estate_parcels": {
+     "backlog_breaker_or_budget_inside_cap": 15,
+     "backlog_count_cap": 30,
+     "condition_tier_landed": 71,
+     "rows": 288,
+     "vision_read": 243
+    },
+    "counties_nc.nc_ptscloud_delinquent_tax": {
+     "backlog_breaker_or_budget_inside_cap": 173,
+     "backlog_count_cap": 142,
+     "condition_tier_landed": 25,
+     "rows": 652,
+     "vision_read": 337
+    },
+    "counties_nc.rutherford_tax": {
+     "backlog_breaker_or_budget_inside_cap": 56,
+     "backlog_count_cap": 92,
+     "backlog_fetch_failed": 1,
+     "condition_tier_landed": 515,
+     "rows": 2735,
+     "vision_read": 2586
+    },
+    "counties_nc.rutherford_wildfire_tax": {
+     "backlog_breaker_or_budget_inside_cap": 25,
+     "backlog_count_cap": 37,
+     "condition_tier_landed": 253,
+     "rows": 1201,
+     "vision_read": 1139
+    },
+    "counties_nc.transylvania_vacant": {
+     "backlog_breaker_or_budget_inside_cap": 2,
+     "backlog_count_cap": 10,
+     "condition_tier_landed": 10,
+     "rows": 38,
+     "vision_read": 26
+    },
+    "counties_sc.charleston_delinquent_tax": {
+     "backlog_count_cap": 4,
+     "backlog_fetch_failed": 8,
+     "condition_tier_landed": 8,
+     "rows": 514,
+     "vision_read": 502
+    },
+    "counties_sc.georgetown_civicengage": {
+     "backlog_count_cap": 2,
+     "condition_tier_landed": 66,
+     "rows": 351,
+     "vision_read": 349
+    },
+    "counties_sc.oconee_flc_assignment": {
+     "backlog_breaker_or_budget_inside_cap": 32,
+     "backlog_count_cap": 4,
+     "backlog_fetch_failed": 34,
+     "condition_tier_landed": 97,
+     "rows": 409,
+     "vision_read": 339
+    },
+    "counties_sc.oconee_forfeited_land": {
+     "backlog_breaker_or_budget_inside_cap": 7,
+     "backlog_count_cap": 1,
+     "condition_tier_landed": 67,
+     "rows": 124,
+     "vision_read": 116
+    },
+    "counties_sc.pickens_delinquent_parcels": {
+     "backlog_breaker_or_budget_inside_cap": 15,
+     "backlog_count_cap": 11,
+     "condition_tier_landed": 497,
+     "rows": 1125,
+     "vision_read": 1099
+    },
+    "counties_sc.sc_flc": {
+     "condition_tier_landed": 54,
+     "rows": 70,
+     "vision_read": 70
+    },
+    "counties_sc.sc_probate_net": {
+     "backlog_breaker_or_budget_inside_cap": 4,
+     "backlog_count_cap": 6,
+     "condition_tier_landed": 23,
+     "rows": 62,
+     "vision_read": 52
+    },
+    "counties_sc.sc_public_index": {
+     "backlog_breaker_or_budget_inside_cap": 48,
+     "backlog_count_cap": 48,
+     "condition_tier_landed": 7,
+     "rows": 155,
+     "vision_read": 59
+    },
+    "counties_sc.sc_public_index_lis_pendens": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "condition_tier_landed": 20,
+     "rows": 66,
+     "vision_read": 65
+    },
+    "counties_sc.sc_public_notices": {
+     "backlog_breaker_or_budget_inside_cap": 7,
+     "backlog_count_cap": 12,
+     "condition_tier_landed": 3,
+     "rows": 27,
+     "vision_read": 8
+    },
+    "counties_sc.spartanburg_city_condemned": {
+     "condition_tier_landed": 25,
+     "rows": 61,
+     "vision_read": 61
+    },
+    "counties_sc.spartanburg_condemned": {
+     "backlog_count_cap": 1,
+     "condition_tier_landed": 455,
+     "rows": 551,
+     "vision_read": 550
+    },
+    "counties_sc.spartanburg_delinquent_tax": {
+     "backlog_breaker_or_budget_inside_cap": 5,
+     "backlog_count_cap": 8,
+     "condition_tier_landed": 141,
+     "rows": 185,
+     "vision_read": 172
+    },
+    "counties_sc.spartanburg_vacant": {
+     "condition_tier_landed": 860,
+     "rows": 938,
+     "vision_read": 938
+    },
+    "national.courtlistener_bankruptcy": {
+     "backlog_breaker_or_budget_inside_cap": 13,
+     "backlog_count_cap": 26,
+     "condition_tier_landed": 70,
+     "rows": 129,
+     "vision_read": 90
+    },
+    "national.hud_reac_inspection": {
+     "condition_tier_landed": 20,
+     "rows": 51,
+     "vision_read": 51
+    },
+    "national.landandfarm": {
+     "backlog_breaker_or_budget_inside_cap": 2,
+     "backlog_count_cap": 7,
+     "condition_tier_landed": 51,
+     "rows": 73,
+     "vision_read": 64
+    },
+    "national.landwatch": {
+     "backlog_count_cap": 8,
+     "condition_tier_landed": 38,
+     "rows": 64,
+     "vision_read": 56
+    },
+    "public_notices.nc_notices_counties": {
+     "backlog_breaker_or_budget_inside_cap": 8,
+     "backlog_count_cap": 25,
+     "condition_tier_landed": 21,
+     "rows": 71,
+     "vision_read": 38
+    }
+   },
+   "source_count": 105,
+   "total": {
+    "backlog_breaker_or_budget_inside_cap": 582,
+    "backlog_count_cap": 746,
+    "backlog_fetch_failed": 44,
+    "condition_tier_landed": 7305,
+    "rows": 18240,
+    "vision_read": 16868
+   }
+  },
+  "best_assessor_photo": {
+   "county": {
+    "NC:Buncombe": {
+     "backlog_breaker_or_budget_inside_cap": 105,
+     "backlog_count_cap": 685,
+     "backlog_fetch_failed": 17,
+     "condition_tier_landed": 349,
+     "rows": 1340,
+     "vision_read": 533
+    },
+    "NC:Burke": {
+     "backlog_breaker_or_budget_inside_cap": 32,
+     "backlog_count_cap": 199,
+     "backlog_fetch_failed": 7,
+     "condition_tier_landed": 25,
+     "rows": 283,
+     "vision_read": 45
+    },
+    "NC:Gaston": {
+     "backlog_breaker_or_budget_inside_cap": 118,
+     "backlog_count_cap": 5886,
+     "backlog_fetch_failed": 2,
+     "condition_tier_landed": 23,
+     "rows": 6059,
+     "vision_read": 53
+    },
+    "NC:Henderson": {
+     "backlog_breaker_or_budget_inside_cap": 73,
+     "backlog_count_cap": 161,
+     "backlog_fetch_failed": 3,
+     "condition_tier_landed": 23,
+     "rows": 351,
+     "vision_read": 114
+    },
+    "NC:Lincoln": {
+     "backlog_breaker_or_budget_inside_cap": 51,
+     "backlog_count_cap": 20,
+     "backlog_fetch_failed": 8,
+     "condition_tier_landed": 42,
+     "rows": 179,
+     "vision_read": 100
+    },
+    "NC:Madison": {
+     "backlog_breaker_or_budget_inside_cap": 2,
+     "rows": 2
+    },
+    "NC:Pitt": {
+     "rows": 1,
+     "vision_read": 1
+    },
+    "NC:Rutherford": {
+     "backlog_breaker_or_budget_inside_cap": 68,
+     "backlog_count_cap": 133,
+     "backlog_fetch_failed": 2,
+     "condition_tier_landed": 18,
+     "rows": 272,
+     "vision_read": 69
+    }
+   },
+   "county_count": 8,
+   "source": {
+    "counties.column_legal_notices": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "backlog_count_cap": 5,
+     "backlog_fetch_failed": 1,
+     "condition_tier_landed": 2,
+     "rows": 11,
+     "vision_read": 4
+    },
+    "counties.multi_year_delinquent_tax": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "condition_tier_landed": 1,
+     "rows": 2,
+     "vision_read": 1
+    },
+    "counties_generic.arcgis_distress.buncombe_hmgp_buyout": {
+     "backlog_breaker_or_budget_inside_cap": 22,
+     "condition_tier_landed": 1,
+     "rows": 23,
+     "vision_read": 1
+    },
+    "counties_generic.arcgis_distress.buncombe_landslide_damage": {
+     "backlog_breaker_or_budget_inside_cap": 5,
+     "condition_tier_landed": 1,
+     "rows": 6,
+     "vision_read": 1
+    },
+    "counties_generic.arcgis_distress.buncombe_unpaid_bills": {
+     "backlog_breaker_or_budget_inside_cap": 12,
+     "backlog_count_cap": 1,
+     "backlog_fetch_failed": 11,
+     "condition_tier_landed": 1,
+     "rows": 26,
+     "vision_read": 2
+    },
+    "counties_generic.arcgis_distress.buncombe_unpaid_bills_2024": {
+     "backlog_fetch_failed": 3,
+     "rows": 3
+    },
+    "counties_generic.arcgis_distress.burke_storm_damage": {
+     "backlog_breaker_or_budget_inside_cap": 17,
+     "backlog_count_cap": 170,
+     "backlog_fetch_failed": 5,
+     "rows": 192
+    },
+    "counties_generic.arcgis_distress.lincoln_code_violations": {
+     "backlog_breaker_or_budget_inside_cap": 7,
+     "backlog_fetch_failed": 1,
+     "rows": 9,
+     "vision_read": 1
+    },
+    "counties_generic.arcgis_distress.lincoln_county_owned": {
+     "backlog_breaker_or_budget_inside_cap": 3,
+     "condition_tier_landed": 2,
+     "rows": 5,
+     "vision_read": 2
+    },
+    "counties_generic.epa_frs.acres": {
+     "backlog_breaker_or_budget_inside_cap": 2,
+     "backlog_count_cap": 5,
+     "rows": 7
+    },
+    "counties_generic.epa_frs.sems": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "backlog_count_cap": 3,
+     "rows": 4
+    },
+    "counties_generic.liensnc": {
+     "backlog_count_cap": 12,
+     "backlog_fetch_failed": 1,
+     "rows": 13
+    },
+    "counties_generic.state_contamination.nc_dam_safety": {
+     "backlog_breaker_or_budget_inside_cap": 2,
+     "backlog_count_cap": 16,
+     "condition_tier_landed": 4,
+     "rows": 22,
+     "vision_read": 4
+    },
+    "counties_generic.state_contamination.nc_ust_incidents": {
+     "backlog_breaker_or_budget_inside_cap": 3,
+     "backlog_count_cap": 32,
+     "condition_tier_landed": 1,
+     "rows": 37,
+     "vision_read": 2
+    },
+    "counties_nc.asheville_helene": {
+     "backlog_breaker_or_budget_inside_cap": 7,
+     "backlog_count_cap": 661,
+     "condition_tier_landed": 17,
+     "rows": 705,
+     "vision_read": 37
+    },
+    "counties_nc.asheville_str_permits": {
+     "condition_tier_landed": 33,
+     "rows": 36,
+     "vision_read": 36
+    },
+    "counties_nc.buncombe_delinquent_tax": {
+     "backlog_breaker_or_budget_inside_cap": 43,
+     "backlog_count_cap": 9,
+     "condition_tier_landed": 131,
+     "rows": 246,
+     "vision_read": 194
+    },
+    "counties_nc.buncombe_elderly": {
+     "backlog_breaker_or_budget_inside_cap": 4,
+     "backlog_count_cap": 5,
+     "backlog_fetch_failed": 1,
+     "condition_tier_landed": 152,
+     "rows": 247,
+     "vision_read": 237
+    },
+    "counties_nc.buncombe_tax": {
+     "backlog_fetch_failed": 2,
+     "rows": 4,
+     "vision_read": 2
+    },
+    "counties_nc.gaston_vacant": {
+     "backlog_breaker_or_budget_inside_cap": 92,
+     "backlog_count_cap": 5831,
+     "condition_tier_landed": 5,
+     "rows": 5948,
+     "vision_read": 25
+    },
+    "counties_nc.gastonia_code_enforcement": {
+     "backlog_breaker_or_budget_inside_cap": 5,
+     "backlog_count_cap": 3,
+     "rows": 10,
+     "vision_read": 2
+    },
+    "counties_nc.henderson_code_violations": {
+     "backlog_breaker_or_budget_inside_cap": 3,
+     "backlog_count_cap": 1,
+     "condition_tier_landed": 9,
+     "rows": 18,
+     "vision_read": 14
+    },
+    "counties_nc.lincoln_vacant": {
+     "backlog_breaker_or_budget_inside_cap": 3,
+     "backlog_count_cap": 3,
+     "backlog_fetch_failed": 4,
+     "condition_tier_landed": 20,
+     "rows": 50,
+     "vision_read": 40
+    },
+    "counties_nc.nc_county_pdf_delinquent_tax": {
+     "backlog_breaker_or_budget_inside_cap": 11,
+     "backlog_count_cap": 8,
+     "backlog_fetch_failed": 3,
+     "condition_tier_landed": 15,
+     "rows": 65,
+     "vision_read": 43
+    },
+    "counties_nc.nc_ecourts_divorce": {
+     "backlog_count_cap": 2,
+     "rows": 2
+    },
+    "counties_nc.nc_ecourts_lis_pendens": {
+     "backlog_breaker_or_budget_inside_cap": 7,
+     "backlog_count_cap": 2,
+     "condition_tier_landed": 1,
+     "rows": 10,
+     "vision_read": 1
+    },
+    "counties_nc.nc_heir_estate_parcels": {
+     "backlog_breaker_or_budget_inside_cap": 31,
+     "backlog_count_cap": 20,
+     "backlog_fetch_failed": 2,
+     "condition_tier_landed": 15,
+     "rows": 106,
+     "vision_read": 53
+    },
+    "counties_nc.nc_ptscloud_delinquent_tax": {
+     "backlog_breaker_or_budget_inside_cap": 59,
+     "backlog_count_cap": 114,
+     "condition_tier_landed": 8,
+     "rows": 262,
+     "vision_read": 89
+    },
+    "counties_nc.rutherford_tax": {
+     "backlog_breaker_or_budget_inside_cap": 25,
+     "backlog_count_cap": 20,
+     "condition_tier_landed": 5,
+     "rows": 77,
+     "vision_read": 32
+    },
+    "counties_nc.rutherford_wildfire_tax": {
+     "backlog_breaker_or_budget_inside_cap": 16,
+     "backlog_count_cap": 21,
+     "condition_tier_landed": 6,
+     "rows": 63,
+     "vision_read": 26
+    },
+    "law_firms.hutchens": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "backlog_fetch_failed": 1,
+     "condition_tier_landed": 1,
+     "rows": 4,
+     "vision_read": 2
+    },
+    "law_firms.shapiro_ingle_powerbi": {
+     "condition_tier_landed": 23,
+     "rows": 27,
+     "vision_read": 27
+    },
+    "liensnc": {
+     "backlog_breaker_or_budget_inside_cap": 2,
+     "backlog_count_cap": 51,
+     "backlog_fetch_failed": 1,
+     "rows": 54
+    },
+    "national.courtlistener_bankruptcy": {
+     "backlog_breaker_or_budget_inside_cap": 5,
+     "backlog_count_cap": 10,
+     "condition_tier_landed": 16,
+     "rows": 35,
+     "vision_read": 20
+    },
+    "national.homepath_json": {
+     "backlog_fetch_failed": 2,
+     "rows": 2
+    },
+    "national.nc_upset_bids": {
+     "backlog_fetch_failed": 1,
+     "condition_tier_landed": 2,
+     "rows": 4,
+     "vision_read": 3
+    },
+    "nc_ecourts_judgments": {
+     "backlog_breaker_or_budget_inside_cap": 53,
+     "backlog_count_cap": 70,
+     "rows": 123
+    },
+    "public_notices.gannett_obituaries": {
+     "backlog_count_cap": 3,
+     "condition_tier_landed": 3,
+     "rows": 6,
+     "vision_read": 3
+    },
+    "public_notices.nc_notices_counties": {
+     "backlog_breaker_or_budget_inside_cap": 3,
+     "backlog_count_cap": 6,
+     "condition_tier_landed": 1,
+     "rows": 11,
+     "vision_read": 2
+    },
+    "public_notices.ncnotices": {
+     "backlog_breaker_or_budget_inside_cap": 2,
+     "rows": 2
+    }
+   },
+   "source_count": 50,
+   "total": {
+    "backlog_breaker_or_budget_inside_cap": 449,
+    "backlog_count_cap": 7084,
+    "backlog_fetch_failed": 39,
+    "condition_tier_landed": 480,
+    "rows": 8487,
+    "vision_read": 915
+   }
+  },
+  "best_listing_photo": {
+   "county": {
+    "NC:Alamance": {
+     "backlog_count_cap": 36,
+     "rows": 36
+    },
+    "NC:Brunswick": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "backlog_count_cap": 61,
+     "condition_tier_landed": 4,
+     "rows": 66,
+     "vision_read": 4
+    },
+    "NC:Buncombe": {
+     "backlog_breaker_or_budget_inside_cap": 3,
+     "backlog_count_cap": 91,
+     "backlog_fetch_failed": 1,
+     "condition_tier_landed": 179,
+     "rows": 315,
+     "vision_read": 220
+    },
+    "NC:Burke": {
+     "backlog_count_cap": 36,
+     "condition_tier_landed": 26,
+     "rows": 76,
+     "vision_read": 40
+    },
+    "NC:Cabarrus": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "backlog_count_cap": 40,
+     "rows": 41
+    },
+    "NC:Carteret": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "backlog_count_cap": 40,
+     "condition_tier_landed": 4,
+     "rows": 49,
+     "vision_read": 8
+    },
+    "NC:Catawba": {
+     "backlog_breaker_or_budget_inside_cap": 2,
+     "backlog_count_cap": 28,
+     "condition_tier_landed": 5,
+     "rows": 37,
+     "vision_read": 7
+    },
+    "NC:Cleveland": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "backlog_count_cap": 44,
+     "backlog_fetch_failed": 1,
+     "condition_tier_landed": 37,
+     "rows": 99,
+     "vision_read": 53
+    },
+    "NC:Craven": {
+     "backlog_count_cap": 25,
+     "condition_tier_landed": 7,
+     "rows": 34,
+     "vision_read": 9
+    },
+    "NC:Cumberland": {
+     "backlog_breaker_or_budget_inside_cap": 6,
+     "backlog_count_cap": 99,
+     "condition_tier_landed": 1,
+     "rows": 109,
+     "vision_read": 4
+    },
+    "NC:Dare": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "backlog_count_cap": 30,
+     "condition_tier_landed": 3,
+     "rows": 36,
+     "vision_read": 5
+    },
+    "NC:Durham": {
+     "backlog_count_cap": 31,
+     "rows": 31
+    },
+    "NC:Forsyth": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "backlog_count_cap": 78,
+     "condition_tier_landed": 6,
+     "rows": 99,
+     "vision_read": 20
+    },
+    "NC:Gaston": {
+     "backlog_breaker_or_budget_inside_cap": 4,
+     "backlog_count_cap": 82,
+     "backlog_fetch_failed": 3,
+     "condition_tier_landed": 89,
+     "rows": 189,
+     "vision_read": 100
+    },
+    "NC:Guilford": {
+     "backlog_breaker_or_budget_inside_cap": 6,
+     "backlog_count_cap": 111,
+     "rows": 118,
+     "vision_read": 1
+    },
+    "NC:Harnett": {
+     "backlog_count_cap": 40,
+     "rows": 41,
+     "vision_read": 1
+    },
+    "NC:Henderson": {
+     "backlog_breaker_or_budget_inside_cap": 3,
+     "backlog_count_cap": 43,
+     "condition_tier_landed": 52,
+     "rows": 113,
+     "vision_read": 67
+    },
+    "NC:Iredell": {
+     "backlog_breaker_or_budget_inside_cap": 2,
+     "backlog_count_cap": 37,
+     "rows": 40,
+     "vision_read": 1
+    },
+    "NC:Johnston": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "backlog_count_cap": 46,
+     "rows": 48,
+     "vision_read": 1
+    },
+    "NC:Lincoln": {
+     "backlog_breaker_or_budget_inside_cap": 4,
+     "backlog_count_cap": 53,
+     "backlog_fetch_failed": 5,
+     "condition_tier_landed": 45,
+     "rows": 118,
+     "vision_read": 56
+    },
+    "NC:McDowell": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "backlog_count_cap": 45,
+     "backlog_fetch_failed": 1,
+     "condition_tier_landed": 27,
+     "rows": 87,
+     "vision_read": 40
+    },
+    "NC:Mecklenburg": {
+     "backlog_breaker_or_budget_inside_cap": 19,
+     "backlog_count_cap": 62,
+     "condition_tier_landed": 7,
+     "rows": 113,
+     "vision_read": 32
+    },
+    "NC:Mitchell": {
+     "backlog_count_cap": 32,
+     "condition_tier_landed": 13,
+     "rows": 48,
+     "vision_read": 16
+    },
+    "NC:New Hanover": {
+     "backlog_count_cap": 5,
+     "condition_tier_landed": 24,
+     "rows": 85,
+     "vision_read": 80
+    },
+    "NC:Onslow": {
+     "backlog_count_cap": 32,
+     "condition_tier_landed": 11,
+     "rows": 44,
+     "vision_read": 12
+    },
+    "NC:Pender": {
+     "backlog_count_cap": 28,
+     "condition_tier_landed": 1,
+     "rows": 30,
+     "vision_read": 2
+    },
+    "NC:Polk": {
+     "backlog_count_cap": 33,
+     "backlog_fetch_failed": 2,
+     "condition_tier_landed": 8,
+     "rows": 47,
+     "vision_read": 12
+    },
+    "NC:Rutherford": {
+     "backlog_breaker_or_budget_inside_cap": 9,
+     "backlog_count_cap": 44,
+     "backlog_fetch_failed": 3,
+     "condition_tier_landed": 47,
+     "rows": 118,
+     "vision_read": 62
+    },
+    "NC:Transylvania": {
+     "backlog_count_cap": 41,
+     "condition_tier_landed": 29,
+     "rows": 73,
+     "vision_read": 32
+    },
+    "SC:Anderson": {
+     "backlog_breaker_or_budget_inside_cap": 14,
+     "backlog_count_cap": 110,
+     "condition_tier_landed": 170,
+     "rows": 345,
+     "vision_read": 221
+    },
+    "SC:Berkeley": {
+     "backlog_breaker_or_budget_inside_cap": 46,
+     "rows": 46
+    },
+    "SC:Charleston": {
+     "backlog_count_cap": 53,
+     "condition_tier_landed": 28,
+     "rows": 86,
+     "vision_read": 33
+    },
+    "SC:Cherokee": {
+     "backlog_count_cap": 84,
+     "condition_tier_landed": 77,
+     "rows": 169,
+     "vision_read": 85
+    },
+    "SC:Georgetown": {
+     "backlog_count_cap": 31,
+     "condition_tier_landed": 5,
+     "rows": 36,
+     "vision_read": 5
+    },
+    "SC:Horry": {
+     "backlog_count_cap": 47,
+     "backlog_fetch_failed": 1,
+     "condition_tier_landed": 9,
+     "rows": 58,
+     "vision_read": 10
+    },
+    "SC:Laurens": {
+     "backlog_breaker_or_budget_inside_cap": 11,
+     "backlog_count_cap": 84,
+     "backlog_fetch_failed": 2,
+     "condition_tier_landed": 95,
+     "rows": 223,
+     "vision_read": 126
+    },
+    "SC:Oconee": {
+     "backlog_breaker_or_budget_inside_cap": 2,
+     "backlog_count_cap": 104,
+     "backlog_fetch_failed": 1,
+     "condition_tier_landed": 67,
+     "rows": 178,
+     "vision_read": 71
+    },
+    "SC:Pickens": {
+     "backlog_breaker_or_budget_inside_cap": 4,
+     "backlog_count_cap": 82,
+     "backlog_fetch_failed": 3,
+     "condition_tier_landed": 100,
+     "rows": 227,
+     "vision_read": 138
+    },
+    "SC:Spartanburg": {
+     "backlog_breaker_or_budget_inside_cap": 14,
+     "backlog_count_cap": 129,
+     "backlog_fetch_failed": 1,
+     "condition_tier_landed": 283,
+     "rows": 465,
+     "vision_read": 321
+    },
+    "SC:Union": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "backlog_count_cap": 64,
+     "condition_tier_landed": 53,
+     "rows": 123,
+     "vision_read": 58
+    }
+   },
+   "county_count": 101,
+   "source": {
+    "city_websites.charlotte_open_data": {
+     "backlog_breaker_or_budget_inside_cap": 19,
+     "backlog_count_cap": 52,
+     "condition_tier_landed": 3,
+     "rows": 76,
+     "vision_read": 5
+    },
+    "counties.multi_year_delinquent_tax": {
+     "backlog_count_cap": 1,
+     "condition_tier_landed": 21,
+     "rows": 36,
+     "vision_read": 35
+    },
+    "counties_generic.arcgis_distress.buncombe_unpaid_bills": {
+     "backlog_breaker_or_budget_inside_cap": 2,
+     "backlog_count_cap": 6,
+     "condition_tier_landed": 5,
+     "rows": 18,
+     "vision_read": 10
+    },
+    "counties_generic.arcgis_distress.new_hanover_demolition_permits": {
+     "backlog_count_cap": 2,
+     "condition_tier_landed": 7,
+     "rows": 25,
+     "vision_read": 23
+    },
+    "counties_generic.arcgis_distress.spartanburg_property_cleanup": {
+     "backlog_count_cap": 15,
+     "condition_tier_landed": 6,
+     "rows": 22,
+     "vision_read": 7
+    },
+    "counties_generic.liensnc": {
+     "backlog_count_cap": 43,
+     "condition_tier_landed": 15,
+     "rows": 135,
+     "vision_read": 92
+    },
+    "counties_generic.state_contamination.nc_ust_incidents": {
+     "backlog_count_cap": 15,
+     "condition_tier_landed": 7,
+     "rows": 27,
+     "vision_read": 12
+    },
+    "counties_nc.asheville_str_permits": {
+     "condition_tier_landed": 22,
+     "rows": 22,
+     "vision_read": 22
+    },
+    "counties_nc.buncombe_delinquent_tax": {
+     "backlog_count_cap": 4,
+     "condition_tier_landed": 34,
+     "rows": 44,
+     "vision_read": 40
+    },
+    "counties_nc.buncombe_elderly": {
+     "backlog_count_cap": 1,
+     "condition_tier_landed": 64,
+     "rows": 82,
+     "vision_read": 81
+    },
+    "counties_nc.gaston_vacant": {
+     "backlog_count_cap": 13,
+     "condition_tier_landed": 37,
+     "rows": 57,
+     "vision_read": 44
+    },
+    "counties_nc.lincoln_vacant": {
+     "backlog_count_cap": 1,
+     "backlog_fetch_failed": 3,
+     "condition_tier_landed": 19,
+     "rows": 26,
+     "vision_read": 22
+    },
+    "counties_nc.nc_county_csv_delinquent_tax": {
+     "condition_tier_landed": 16,
+     "rows": 52,
+     "vision_read": 52
+    },
+    "counties_nc.nc_county_pdf_delinquent_tax": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "backlog_count_cap": 2,
+     "condition_tier_landed": 8,
+     "rows": 19,
+     "vision_read": 16
+    },
+    "counties_nc.nc_heir_estate_parcels": {
+     "backlog_breaker_or_budget_inside_cap": 3,
+     "backlog_count_cap": 1,
+     "condition_tier_landed": 12,
+     "rows": 24,
+     "vision_read": 20
+    },
+    "counties_nc.rutherford_tax": {
+     "backlog_breaker_or_budget_inside_cap": 3,
+     "condition_tier_landed": 18,
+     "rows": 25,
+     "vision_read": 22
+    },
+    "counties_nc.transylvania_vacant": {
+     "backlog_count_cap": 11,
+     "condition_tier_landed": 15,
+     "rows": 26,
+     "vision_read": 15
+    },
+    "counties_sc.berkeley_paystar_tax": {
+     "backlog_breaker_or_budget_inside_cap": 46,
+     "rows": 46
+    },
+    "counties_sc.pickens_delinquent_parcels": {
+     "condition_tier_landed": 11,
+     "rows": 15,
+     "vision_read": 15
+    },
+    "counties_sc.qpaybill_delinquent_roll": {
+     "backlog_count_cap": 5,
+     "condition_tier_landed": 10,
+     "rows": 22,
+     "vision_read": 17
+    },
+    "counties_sc.sc_dew_lien_registry": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "backlog_count_cap": 33,
+     "condition_tier_landed": 3,
+     "rows": 37,
+     "vision_read": 3
+    },
+    "counties_sc.sc_probate_net": {
+     "condition_tier_landed": 24,
+     "rows": 25,
+     "vision_read": 25
+    },
+    "counties_sc.sc_public_index_lis_pendens": {
+     "condition_tier_landed": 35,
+     "rows": 58,
+     "vision_read": 58
+    },
+    "counties_sc.sc_ust_registry": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "backlog_count_cap": 11,
+     "condition_tier_landed": 13,
+     "rows": 31,
+     "vision_read": 19
+    },
+    "counties_sc.spartanburg_condemned": {
+     "backlog_count_cap": 2,
+     "condition_tier_landed": 36,
+     "rows": 41,
+     "vision_read": 39
+    },
+    "counties_sc.spartanburg_vacant": {
+     "backlog_count_cap": 1,
+     "condition_tier_landed": 54,
+     "rows": 56,
+     "vision_read": 55
+    },
+    "counties_sc.terry_howe_flc": {
+     "backlog_count_cap": 1,
+     "condition_tier_landed": 7,
+     "rows": 14,
+     "vision_read": 13
+    },
+    "national.bid4assets": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "backlog_count_cap": 18,
+     "rows": 19
+    },
+    "national.distressed": {
+     "backlog_breaker_or_budget_inside_cap": 40,
+     "backlog_count_cap": 1151,
+     "backlog_fetch_failed": 2,
+     "condition_tier_landed": 236,
+     "rows": 1438,
+     "vision_read": 245
+    },
+    "national.foreclosure_dot_com": {
+     "backlog_count_cap": 5,
+     "condition_tier_landed": 76,
+     "rows": 131,
+     "vision_read": 126
+    },
+    "national.homeharvest": {
+     "backlog_breaker_or_budget_inside_cap": 7,
+     "backlog_count_cap": 12,
+     "condition_tier_landed": 19,
+     "rows": 41,
+     "vision_read": 22
+    },
+    "national.homepath_json": {
+     "backlog_breaker_or_budget_inside_cap": 5,
+     "backlog_count_cap": 24,
+     "condition_tier_landed": 14,
+     "rows": 45,
+     "vision_read": 16
+    },
+    "national.hud_reac_inspection": {
+     "condition_tier_landed": 53,
+     "rows": 73,
+     "vision_read": 73
+    },
+    "national.hud_section8_contracts": {
+     "condition_tier_landed": 9,
+     "rows": 18,
+     "vision_read": 18
+    },
+    "national.landandfarm": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "backlog_count_cap": 228,
+     "backlog_fetch_failed": 10,
+     "condition_tier_landed": 72,
+     "rows": 353,
+     "vision_read": 114
+    },
+    "national.landwatch": {
+     "backlog_count_cap": 456,
+     "backlog_fetch_failed": 2,
+     "condition_tier_landed": 16,
+     "rows": 486,
+     "vision_read": 28
+    },
+    "national.usda_properties": {
+     "backlog_breaker_or_budget_inside_cap": 24,
+     "backlog_count_cap": 354,
+     "backlog_fetch_failed": 4,
+     "condition_tier_landed": 339,
+     "rows": 731,
+     "vision_read": 349
+    },
+    "national.zillow_foreclosures": {
+     "backlog_breaker_or_budget_inside_cap": 2,
+     "backlog_count_cap": 34,
+     "condition_tier_landed": 46,
+     "rows": 86,
+     "vision_read": 50
+    },
+    "public_notices.gannett_obituaries": {
+     "backlog_count_cap": 18,
+     "rows": 18
+    },
+    "reo.vrm_va_reo": {
+     "backlog_count_cap": 4,
+     "condition_tier_landed": 9,
+     "rows": 13,
+     "vision_read": 9
+    }
+   },
+   "source_count": 107,
+   "total": {
+    "backlog_breaker_or_budget_inside_cap": 173,
+    "backlog_count_cap": 2588,
+    "backlog_fetch_failed": 25,
+    "condition_tier_landed": 1523,
+    "rows": 4787,
+    "vision_read": 2001
+   }
+  },
+  "best_street": {
+   "county": {
+    "NC:Buncombe": {
+     "backlog_breaker_or_budget_inside_cap": 94,
+     "backlog_count_cap": 21,
+     "backlog_fetch_failed": 14,
+     "condition_tier_landed": 95,
+     "rows": 258,
+     "vision_read": 129
+    },
+    "NC:Carteret": {
+     "backlog_breaker_or_budget_inside_cap": 2,
+     "rows": 2
+    },
+    "NC:Catawba": {
+     "backlog_breaker_or_budget_inside_cap": 77,
+     "backlog_fetch_failed": 1,
+     "condition_tier_landed": 1,
+     "rows": 79,
+     "vision_read": 1
+    },
+    "NC:Chatham": {
+     "backlog_fetch_failed": 1,
+     "rows": 1
+    },
+    "NC:Cleveland": {
+     "backlog_breaker_or_budget_inside_cap": 2,
+     "backlog_count_cap": 1,
+     "backlog_fetch_failed": 2,
+     "condition_tier_landed": 1,
+     "rows": 7,
+     "vision_read": 2
+    },
+    "NC:Edgecombe": {
+     "backlog_breaker_or_budget_inside_cap": 8,
+     "backlog_fetch_failed": 1,
+     "rows": 9
+    },
+    "NC:Forsyth": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "rows": 1
+    },
+    "NC:Gaston": {
+     "backlog_count_cap": 1,
+     "condition_tier_landed": 1,
+     "rows": 3,
+     "vision_read": 2
+    },
+    "NC:Gates": {
+     "backlog_breaker_or_budget_inside_cap": 2,
+     "rows": 2
+    },
+    "NC:Henderson": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "rows": 2,
+     "vision_read": 1
+    },
+    "NC:Hyde": {
+     "backlog_count_cap": 1,
+     "rows": 8,
+     "vision_read": 7
+    },
+    "NC:Lincoln": {
+     "backlog_breaker_or_budget_inside_cap": 36,
+     "backlog_count_cap": 24,
+     "condition_tier_landed": 61,
+     "rows": 140,
+     "vision_read": 80
+    },
+    "NC:McDowell": {
+     "backlog_breaker_or_budget_inside_cap": 16,
+     "backlog_count_cap": 1,
+     "condition_tier_landed": 79,
+     "rows": 160,
+     "vision_read": 143
+    },
+    "NC:Mitchell": {
+     "backlog_count_cap": 1,
+     "condition_tier_landed": 1,
+     "rows": 2,
+     "vision_read": 1
+    },
+    "NC:New Hanover": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "condition_tier_landed": 1,
+     "rows": 13,
+     "vision_read": 12
+    },
+    "NC:Polk": {
+     "backlog_breaker_or_budget_inside_cap": 3,
+     "backlog_count_cap": 1,
+     "condition_tier_landed": 1,
+     "rows": 5,
+     "vision_read": 1
+    },
+    "NC:Rutherford": {
+     "backlog_breaker_or_budget_inside_cap": 12,
+     "backlog_count_cap": 1,
+     "backlog_fetch_failed": 3,
+     "condition_tier_landed": 2,
+     "rows": 22,
+     "vision_read": 6
+    },
+    "NC:Transylvania": {
+     "backlog_breaker_or_budget_inside_cap": 8,
+     "backlog_count_cap": 125,
+     "rows": 133
+    },
+    "SC:Anderson": {
+     "backlog_breaker_or_budget_inside_cap": 7,
+     "backlog_count_cap": 2,
+     "backlog_fetch_failed": 3,
+     "condition_tier_landed": 1,
+     "rows": 15,
+     "vision_read": 3
+    },
+    "SC:Berkeley": {
+     "backlog_breaker_or_budget_inside_cap": 97,
+     "rows": 97
+    },
+    "SC:Charleston": {
+     "rows": 3,
+     "vision_read": 3
+    },
+    "SC:Cherokee": {
+     "backlog_breaker_or_budget_inside_cap": 4,
+     "backlog_count_cap": 1,
+     "rows": 5
+    },
+    "SC:Greenville": {
+     "backlog_breaker_or_budget_inside_cap": 31,
+     "backlog_count_cap": 6,
+     "backlog_fetch_failed": 92,
+     "rows": 129
+    },
+    "SC:Horry": {
+     "backlog_breaker_or_budget_inside_cap": 220,
+     "backlog_count_cap": 2,
+     "rows": 222
+    },
+    "SC:Laurens": {
+     "backlog_breaker_or_budget_inside_cap": 45,
+     "backlog_count_cap": 1,
+     "backlog_fetch_failed": 1,
+     "condition_tier_landed": 1,
+     "rows": 52,
+     "vision_read": 5
+    },
+    "SC:Lexington": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "rows": 1
+    },
+    "SC:Oconee": {
+     "backlog_count_cap": 2,
+     "backlog_fetch_failed": 2,
+     "rows": 4
+    },
+    "SC:Pickens": {
+     "backlog_breaker_or_budget_inside_cap": 24,
+     "backlog_count_cap": 18,
+     "backlog_fetch_failed": 1,
+     "condition_tier_landed": 2,
+     "rows": 47,
+     "vision_read": 4
+    },
+    "SC:Spartanburg": {
+     "backlog_breaker_or_budget_inside_cap": 371,
+     "backlog_count_cap": 751,
+     "backlog_fetch_failed": 9,
+     "condition_tier_landed": 631,
+     "rows": 1817,
+     "vision_read": 686
+    },
+    "SC:Sumter": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "rows": 1
+    },
+    "SC:Union": {
+     "backlog_breaker_or_budget_inside_cap": 5,
+     "backlog_count_cap": 1,
+     "rows": 6
+    }
+   },
+   "county_count": 31,
+   "source": {
+    "counties.column_legal_notices": {
+     "backlog_count_cap": 2,
+     "condition_tier_landed": 2,
+     "rows": 4,
+     "vision_read": 2
+    },
+    "counties_generic.arcgis_distress.buncombe_hmgp_buyout": {
+     "backlog_breaker_or_budget_inside_cap": 9,
+     "rows": 9
+    },
+    "counties_generic.arcgis_distress.buncombe_unpaid_bills": {
+     "backlog_breaker_or_budget_inside_cap": 49,
+     "backlog_count_cap": 8,
+     "backlog_fetch_failed": 11,
+     "condition_tier_landed": 2,
+     "rows": 76,
+     "vision_read": 8
+    },
+    "counties_generic.arcgis_distress.buncombe_unpaid_bills_2024": {
+     "backlog_breaker_or_budget_inside_cap": 6,
+     "rows": 9,
+     "vision_read": 3
+    },
+    "counties_generic.arcgis_distress.greenville_unpaid_tax_parcels": {
+     "backlog_breaker_or_budget_inside_cap": 27,
+     "backlog_count_cap": 6,
+     "backlog_fetch_failed": 92,
+     "rows": 125
+    },
+    "counties_generic.arcgis_distress.new_hanover_demolition_permits": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "condition_tier_landed": 1,
+     "rows": 13,
+     "vision_read": 12
+    },
+    "counties_generic.arcgis_distress.spartanburg_city_tax_sale": {
+     "backlog_breaker_or_budget_inside_cap": 65,
+     "backlog_count_cap": 3,
+     "condition_tier_landed": 10,
+     "rows": 78,
+     "vision_read": 10
+    },
+    "counties_generic.arcgis_distress.spartanburg_infill_eligible": {
+     "backlog_count_cap": 1,
+     "condition_tier_landed": 4,
+     "rows": 5,
+     "vision_read": 4
+    },
+    "counties_generic.arcgis_distress.spartanburg_property_cleanup": {
+     "backlog_breaker_or_budget_inside_cap": 3,
+     "backlog_count_cap": 22,
+     "backlog_fetch_failed": 1,
+     "condition_tier_landed": 11,
+     "rows": 37,
+     "vision_read": 11
+    },
+    "counties_generic.epa_frs.acres": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "condition_tier_landed": 3,
+     "rows": 4,
+     "vision_read": 3
+    },
+    "counties_nc.asheville_str_permits": {
+     "condition_tier_landed": 6,
+     "rows": 6,
+     "vision_read": 6
+    },
+    "counties_nc.buncombe_delinquent_tax": {
+     "backlog_breaker_or_budget_inside_cap": 25,
+     "backlog_count_cap": 8,
+     "backlog_fetch_failed": 2,
+     "condition_tier_landed": 83,
+     "rows": 142,
+     "vision_read": 107
+    },
+    "counties_nc.buncombe_elderly": {
+     "backlog_breaker_or_budget_inside_cap": 4,
+     "backlog_count_cap": 2,
+     "condition_tier_landed": 2,
+     "rows": 8,
+     "vision_read": 2
+    },
+    "counties_nc.edgecombe_tax_foreclosure": {
+     "backlog_breaker_or_budget_inside_cap": 8,
+     "backlog_fetch_failed": 1,
+     "rows": 9
+    },
+    "counties_nc.lincoln_vacant": {
+     "backlog_breaker_or_budget_inside_cap": 4,
+     "backlog_count_cap": 1,
+     "condition_tier_landed": 32,
+     "rows": 46,
+     "vision_read": 41
+    },
+    "counties_nc.mcdowell_probate": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "condition_tier_landed": 14,
+     "rows": 22,
+     "vision_read": 21
+    },
+    "counties_nc.nc_county_pdf_delinquent_tax": {
+     "backlog_breaker_or_budget_inside_cap": 123,
+     "backlog_count_cap": 24,
+     "backlog_fetch_failed": 1,
+     "condition_tier_landed": 89,
+     "rows": 304,
+     "vision_read": 156
+    },
+    "counties_nc.nc_heir_estate_parcels": {
+     "backlog_breaker_or_budget_inside_cap": 74,
+     "backlog_count_cap": 8,
+     "backlog_fetch_failed": 1,
+     "condition_tier_landed": 9,
+     "rows": 94,
+     "vision_read": 11
+    },
+    "counties_nc.nc_ptscloud_delinquent_tax": {
+     "backlog_breaker_or_budget_inside_cap": 2,
+     "backlog_count_cap": 1,
+     "rows": 10,
+     "vision_read": 7
+    },
+    "counties_nc.rutherford_tax": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "backlog_fetch_failed": 1,
+     "rows": 5,
+     "vision_read": 3
+    },
+    "counties_nc.transylvania_delinquent_tax": {
+     "backlog_breaker_or_budget_inside_cap": 8,
+     "backlog_count_cap": 125,
+     "rows": 133
+    },
+    "counties_sc.berkeley_paystar_tax": {
+     "backlog_breaker_or_budget_inside_cap": 97,
+     "rows": 97
+    },
+    "counties_sc.greenville_delinquent_tax": {
+     "backlog_breaker_or_budget_inside_cap": 4,
+     "rows": 4
+    },
+    "counties_sc.horry_delinquent_xlsx": {
+     "backlog_breaker_or_budget_inside_cap": 220,
+     "rows": 220
+    },
+    "counties_sc.qpaybill_delinquent_roll": {
+     "backlog_breaker_or_budget_inside_cap": 16,
+     "backlog_fetch_failed": 2,
+     "rows": 18
+    },
+    "counties_sc.sc_dew_lien_registry": {
+     "backlog_breaker_or_budget_inside_cap": 13,
+     "backlog_fetch_failed": 4,
+     "rows": 17
+    },
+    "counties_sc.sc_public_index": {
+     "backlog_breaker_or_budget_inside_cap": 3,
+     "backlog_count_cap": 1,
+     "rows": 7,
+     "vision_read": 3
+    },
+    "counties_sc.sc_public_index_lis_pendens": {
+     "backlog_breaker_or_budget_inside_cap": 2,
+     "rows": 4,
+     "vision_read": 2
+    },
+    "counties_sc.sc_public_notices": {
+     "backlog_breaker_or_budget_inside_cap": 22,
+     "backlog_count_cap": 11,
+     "rows": 33
+    },
+    "counties_sc.sc_rod_acclaim": {
+     "backlog_breaker_or_budget_inside_cap": 7,
+     "backlog_count_cap": 7,
+     "rows": 14
+    },
+    "counties_sc.sc_ust_registry": {
+     "backlog_breaker_or_budget_inside_cap": 6,
+     "backlog_count_cap": 9,
+     "condition_tier_landed": 8,
+     "rows": 23,
+     "vision_read": 8
+    },
+    "counties_sc.spartan_weekly_legals": {
+     "backlog_breaker_or_budget_inside_cap": 3,
+     "backlog_count_cap": 1,
+     "backlog_fetch_failed": 1,
+     "condition_tier_landed": 2,
+     "rows": 7,
+     "vision_read": 2
+    },
+    "counties_sc.spartanburg_city_condemned": {
+     "backlog_breaker_or_budget_inside_cap": 1,
+     "condition_tier_landed": 11,
+     "rows": 12,
+     "vision_read": 11
+    },
+    "counties_sc.spartanburg_condemned": {
+     "backlog_breaker_or_budget_inside_cap": 10,
+     "backlog_count_cap": 159,
+     "condition_tier_landed": 403,
+     "rows": 614,
+     "vision_read": 445
+    },
+    "counties_sc.spartanburg_delinquent_tax": {
+     "backlog_breaker_or_budget_inside_cap": 237,
+     "backlog_count_cap": 545,
+     "condition_tier_landed": 49,
+     "rows": 835,
+     "vision_read": 53
+    },
+    "counties_sc.spartanburg_vacant": {
+     "backlog_count_cap": 1,
+     "condition_tier_landed": 117,
+     "rows": 120,
+     "vision_read": 119
+    },
+    "counties_sc.terry_howe_auctions": {
+     "backlog_breaker_or_budget_inside_cap": 4,
+     "backlog_count_cap": 2,
+     "condition_tier_landed": 2,
+     "rows": 8,
+     "vision_read": 2
+    },
+    "law_firms.brock_scott": {
+     "backlog_count_cap": 2,
+     "backlog_fetch_failed": 1,
+     "condition_tier_landed": 3,
+     "rows": 8,
+     "vision_read": 5
+    },
+    "national.homepath_json": {
+     "backlog_count_cap": 1,
+     "backlog_fetch_failed": 1,
+     "condition_tier_landed": 1,
+     "rows": 6,
+     "vision_read": 4
+    },
+    "national.hud_reac_inspection": {
+     "backlog_breaker_or_budget_inside_cap": 2,
+     "backlog_count_cap": 1,
+     "condition_tier_landed": 1,
+     "rows": 4,
+     "vision_read": 1
+    }
+   },
+   "source_count": 73,
+   "total": {
+    "backlog_breaker_or_budget_inside_cap": 1069,
+    "backlog_count_cap": 961,
+    "backlog_fetch_failed": 130,
+    "condition_tier_landed": 878,
+    "rows": 3246,
+    "vision_read": 1086
+   }
+  },
+  "listing_photo": {
+   "county": {
+    "NC:Alamance": {
+     "rows": 36,
+     "urls": 158
+    },
+    "NC:Brunswick": {
+     "rows": 66,
+     "urls": 198
+    },
+    "NC:Buncombe": {
+     "rows": 315,
+     "urls": 899
+    },
+    "NC:Burke": {
+     "rows": 76,
+     "urls": 165
+    },
+    "NC:Cabarrus": {
+     "rows": 41,
+     "urls": 186
+    },
+    "NC:Carteret": {
+     "rows": 49,
+     "urls": 145
+    },
+    "NC:Catawba": {
+     "rows": 37,
+     "urls": 153
+    },
+    "NC:Cleveland": {
+     "rows": 99,
+     "urls": 429
+    },
+    "NC:Craven": {
+     "rows": 34,
+     "urls": 143
+    },
+    "NC:Cumberland": {
+     "rows": 109,
+     "urls": 486
+    },
+    "NC:Dare": {
+     "rows": 36,
+     "urls": 63
+    },
+    "NC:Durham": {
+     "rows": 31,
+     "urls": 137
+    },
+    "NC:Forsyth": {
+     "rows": 99,
+     "urls": 392
+    },
+    "NC:Gaston": {
+     "rows": 189,
+     "urls": 745
+    },
+    "NC:Guilford": {
+     "rows": 118,
+     "urls": 535
+    },
+    "NC:Harnett": {
+     "rows": 41,
+     "urls": 184
+    },
+    "NC:Henderson": {
+     "rows": 113,
+     "urls": 353
+    },
+    "NC:Iredell": {
+     "rows": 40,
+     "urls": 179
+    },
+    "NC:Johnston": {
+     "rows": 48,
+     "urls": 217
+    },
+    "NC:Lincoln": {
+     "rows": 118,
+     "urls": 518
+    },
+    "NC:McDowell": {
+     "rows": 87,
+     "urls": 211
+    },
+    "NC:Mecklenburg": {
+     "rows": 113,
+     "urls": 113
+    },
+    "NC:Mitchell": {
+     "rows": 48,
+     "urls": 92
+    },
+    "NC:New Hanover": {
+     "rows": 85,
+     "urls": 89
+    },
+    "NC:Onslow": {
+     "rows": 44,
+     "urls": 44
+    },
+    "NC:Pender": {
+     "rows": 30,
+     "urls": 34
+    },
+    "NC:Polk": {
+     "rows": 47,
+     "urls": 79
+    },
+    "NC:Rutherford": {
+     "rows": 118,
+     "urls": 352
+    },
+    "NC:Transylvania": {
+     "rows": 73,
+     "urls": 163
+    },
+    "SC:Anderson": {
+     "rows": 345,
+     "urls": 1033
+    },
+    "SC:Berkeley": {
+     "rows": 46,
+     "urls": 46
+    },
+    "SC:Charleston": {
+     "rows": 86,
+     "urls": 201
+    },
+    "SC:Cherokee": {
+     "rows": 169,
+     "urls": 296
+    },
+    "SC:Georgetown": {
+     "rows": 36,
+     "urls": 44
+    },
+    "SC:Horry": {
+     "rows": 58,
+     "urls": 79
+    },
+    "SC:Laurens": {
+     "rows": 223,
+     "urls": 442
+    },
+    "SC:Oconee": {
+     "rows": 178,
+     "urls": 298
+    },
+    "SC:Pickens": {
+     "rows": 227,
+     "urls": 581
+    },
+    "SC:Spartanburg": {
+     "rows": 465,
+     "urls": 1294
+    },
+    "SC:Union": {
+     "rows": 123,
+     "urls": 218
+    }
+   },
+   "county_count": 101,
+   "source": {
+    "city_websites.charlotte_open_data": {
+     "rows": 76,
+     "urls": 76
+    },
+    "counties.multi_year_delinquent_tax": {
+     "rows": 36,
+     "urls": 139
+    },
+    "counties_generic.arcgis_distress.buncombe_unpaid_bills": {
+     "rows": 18,
+     "urls": 22
+    },
+    "counties_generic.arcgis_distress.new_hanover_demolition_permits": {
+     "rows": 25,
+     "urls": 25
+    },
+    "counties_generic.arcgis_distress.spartanburg_property_cleanup": {
+     "rows": 22,
+     "urls": 41
+    },
+    "counties_generic.liensnc": {
+     "rows": 135,
+     "urls": 135
+    },
+    "counties_generic.state_contamination.nc_ust_incidents": {
+     "rows": 27,
+     "urls": 52
+    },
+    "counties_nc.asheville_str_permits": {
+     "rows": 22,
+     "urls": 78
+    },
+    "counties_nc.buncombe_delinquent_tax": {
+     "rows": 44,
+     "urls": 98
+    },
+    "counties_nc.buncombe_elderly": {
+     "rows": 82,
+     "urls": 243
+    },
+    "counties_nc.gaston_vacant": {
+     "rows": 57,
+     "urls": 178
+    },
+    "counties_nc.lincoln_vacant": {
+     "rows": 26,
+     "urls": 94
+    },
+    "counties_nc.nc_county_csv_delinquent_tax": {
+     "rows": 52,
+     "urls": 52
+    },
+    "counties_nc.nc_county_pdf_delinquent_tax": {
+     "rows": 19,
+     "urls": 59
+    },
+    "counties_nc.nc_heir_estate_parcels": {
+     "rows": 24,
+     "urls": 97
+    },
+    "counties_nc.rutherford_tax": {
+     "rows": 25,
+     "urls": 105
+    },
+    "counties_nc.transylvania_vacant": {
+     "rows": 26,
+     "urls": 71
+    },
+    "counties_sc.berkeley_paystar_tax": {
+     "rows": 46,
+     "urls": 46
+    },
+    "counties_sc.pickens_delinquent_parcels": {
+     "rows": 15,
+     "urls": 59
+    },
+    "counties_sc.qpaybill_delinquent_roll": {
+     "rows": 22,
+     "urls": 43
+    },
+    "counties_sc.sc_dew_lien_registry": {
+     "rows": 37,
+     "urls": 47
+    },
+    "counties_sc.sc_probate_net": {
+     "rows": 25,
+     "urls": 123
+    },
+    "counties_sc.sc_public_index_lis_pendens": {
+     "rows": 58,
+     "urls": 269
+    },
+    "counties_sc.sc_ust_registry": {
+     "rows": 31,
+     "urls": 59
+    },
+    "counties_sc.spartanburg_condemned": {
+     "rows": 41,
+     "urls": 98
+    },
+    "counties_sc.spartanburg_vacant": {
+     "rows": 56,
+     "urls": 186
+    },
+    "counties_sc.terry_howe_flc": {
+     "rows": 14,
+     "urls": 39
+    },
+    "national.bid4assets": {
+     "rows": 19,
+     "urls": 19
+    },
+    "national.distressed": {
+     "rows": 1438,
+     "urls": 6270
+    },
+    "national.foreclosure_dot_com": {
+     "rows": 131,
+     "urls": 395
+    },
+    "national.homeharvest": {
+     "rows": 41,
+     "urls": 426
+    },
+    "national.homepath_json": {
+     "rows": 45,
+     "urls": 104
+    },
+    "national.hud_reac_inspection": {
+     "rows": 73,
+     "urls": 346
+    },
+    "national.hud_section8_contracts": {
+     "rows": 18,
+     "urls": 82
+    },
+    "national.landandfarm": {
+     "rows": 353,
+     "urls": 426
+    },
+    "national.landwatch": {
+     "rows": 486,
+     "urls": 486
+    },
+    "national.usda_properties": {
+     "rows": 731,
+     "urls": 956
+    },
+    "national.zillow_foreclosures": {
+     "rows": 86,
+     "urls": 596
+    },
+    "public_notices.gannett_obituaries": {
+     "rows": 18,
+     "urls": 18
+    },
+    "reo.vrm_va_reo": {
+     "rows": 13,
+     "urls": 84
+    }
+   },
+   "source_count": 107,
+   "total": {
+    "rows": 4787,
+    "urls": 13988
+   }
+  },
+  "map": {
+   "county": {
+    "NC:Brunswick": {
+     "rows": 53,
+     "urls": 53
+    },
+    "NC:Buncombe": {
+     "rows": 4791,
+     "urls": 4791
+    },
+    "NC:Burke": {
+     "rows": 143,
+     "urls": 143
+    },
+    "NC:Carteret": {
+     "rows": 18,
+     "urls": 18
+    },
+    "NC:Catawba": {
+     "rows": 10,
+     "urls": 10
+    },
+    "NC:Cleveland": {
+     "rows": 123,
+     "urls": 123
+    },
+    "NC:Dare": {
+     "rows": 5,
+     "urls": 5
+    },
+    "NC:Forsyth": {
+     "rows": 1,
+     "urls": 1
+    },
+    "NC:Gaston": {
+     "rows": 215,
+     "urls": 215
+    },
+    "NC:Henderson": {
+     "rows": 1220,
+     "urls": 1220
+    },
+    "NC:Hyde": {
+     "rows": 32,
+     "urls": 32
+    },
+    "NC:Lincoln": {
+     "rows": 423,
+     "urls": 423
+    },
+    "NC:McDowell": {
+     "rows": 1150,
+     "urls": 1150
+    },
+    "NC:Mitchell": {
+     "rows": 97,
+     "urls": 97
+    },
+    "NC:New Hanover": {
+     "rows": 2142,
+     "urls": 2142
+    },
+    "NC:Onslow": {
+     "rows": 23,
+     "urls": 23
+    },
+    "NC:Pender": {
+     "rows": 11,
+     "urls": 11
+    },
+    "NC:Pitt": {
+     "rows": 3,
+     "urls": 3
+    },
+    "NC:Polk": {
+     "rows": 131,
+     "urls": 131
+    },
+    "NC:Rutherford": {
+     "rows": 4148,
+     "urls": 4148
+    },
+    "NC:Transylvania": {
+     "rows": 102,
+     "urls": 102
+    },
+    "NC:Vance": {
+     "rows": 1,
+     "urls": 1
+    },
+    "SC:Anderson": {
+     "rows": 244,
+     "urls": 244
+    },
+    "SC:Charleston": {
+     "rows": 616,
+     "urls": 616
+    },
+    "SC:Cherokee": {
+     "rows": 81,
+     "urls": 81
+    },
+    "SC:Dillon": {
+     "rows": 1,
+     "urls": 1
+    },
+    "SC:Georgetown": {
+     "rows": 354,
+     "urls": 354
+    },
+    "SC:Greenville": {
+     "rows": 2,
+     "urls": 2
+    },
+    "SC:Laurens": {
+     "rows": 165,
+     "urls": 165
+    },
+    "SC:Oconee": {
+     "rows": 727,
+     "urls": 727
+    },
+    "SC:Pickens": {
+     "rows": 1886,
+     "urls": 1886
+    },
+    "SC:Spartanburg": {
+     "rows": 2849,
+     "urls": 2849
+    },
+    "SC:Union": {
+     "rows": 46,
+     "urls": 46
+    }
+   },
+   "county_count": 33,
+   "source": {
+    "counties.multi_year_delinquent_tax": {
+     "rows": 782,
+     "urls": 782
+    },
+    "counties_generic.arcgis_distress.buncombe_unpaid_bills": {
+     "rows": 255,
+     "urls": 255
+    },
+    "counties_generic.arcgis_distress.new_hanover_demolition_permits": {
+     "rows": 973,
+     "urls": 973
+    },
+    "counties_nc.asheville_helene": {
+     "rows": 83,
+     "urls": 83
+    },
+    "counties_nc.asheville_str_permits": {
+     "rows": 534,
+     "urls": 534
+    },
+    "counties_nc.buncombe_delinquent_tax": {
+     "rows": 866,
+     "urls": 866
+    },
+    "counties_nc.buncombe_elderly": {
+     "rows": 2719,
+     "urls": 2719
+    },
+    "counties_nc.gaston_vacant": {
+     "rows": 104,
+     "urls": 104
+    },
+    "counties_nc.henderson_code_violations": {
+     "rows": 157,
+     "urls": 157
+    },
+    "counties_nc.lincoln_vacant": {
+     "rows": 187,
+     "urls": 187
+    },
+    "counties_nc.mcdowell_probate": {
+     "rows": 95,
+     "urls": 95
+    },
+    "counties_nc.nc_county_csv_delinquent_tax": {
+     "rows": 1168,
+     "urls": 1168
+    },
+    "counties_nc.nc_county_pdf_delinquent_tax": {
+     "rows": 1140,
+     "urls": 1140
+    },
+    "counties_nc.nc_ecourts_lis_pendens": {
+     "rows": 84,
+     "urls": 84
+    },
+    "counties_nc.nc_heir_estate_parcels": {
+     "rows": 373,
+     "urls": 373
+    },
+    "counties_nc.nc_ptscloud_delinquent_tax": {
+     "rows": 890,
+     "urls": 890
+    },
+    "counties_nc.rutherford_tax": {
+     "rows": 2797,
+     "urls": 2797
+    },
+    "counties_nc.rutherford_wildfire_tax": {
+     "rows": 1241,
+     "urls": 1241
+    },
+    "counties_nc.transylvania_vacant": {
+     "rows": 54,
+     "urls": 54
+    },
+    "counties_sc.charleston_delinquent_tax": {
+     "rows": 521,
+     "urls": 521
+    },
+    "counties_sc.georgetown_civicengage": {
+     "rows": 352,
+     "urls": 352
+    },
+    "counties_sc.oconee_flc_assignment": {
+     "rows": 412,
+     "urls": 412
+    },
+    "counties_sc.oconee_forfeited_land": {
+     "rows": 128,
+     "urls": 128
+    },
+    "counties_sc.pickens_delinquent_parcels": {
+     "rows": 1141,
+     "urls": 1141
+    },
+    "counties_sc.sc_flc": {
+     "rows": 71,
+     "urls": 71
+    },
+    "counties_sc.sc_probate_net": {
+     "rows": 87,
+     "urls": 87
+    },
+    "counties_sc.sc_public_index": {
+     "rows": 161,
+     "urls": 161
+    },
+    "counties_sc.sc_public_index_lis_pendens": {
+     "rows": 127,
+     "urls": 127
+    },
+    "counties_sc.spartanburg_city_condemned": {
+     "rows": 76,
+     "urls": 76
+    },
+    "counties_sc.spartanburg_condemned": {
+     "rows": 1034,
+     "urls": 1034
+    },
+    "counties_sc.spartanburg_delinquent_tax": {
+     "rows": 246,
+     "urls": 246
+    },
+    "counties_sc.spartanburg_vacant": {
+     "rows": 1112,
+     "urls": 1112
+    },
+    "law_firms.shapiro_ingle_powerbi": {
+     "rows": 50,
+     "urls": 50
+    },
+    "national.courtlistener_bankruptcy": {
+     "rows": 163,
+     "urls": 163
+    },
+    "national.distressed": {
+     "rows": 166,
+     "urls": 166
+    },
+    "national.foreclosure_dot_com": {
+     "rows": 106,
+     "urls": 106
+    },
+    "national.hud_reac_inspection": {
+     "rows": 126,
+     "urls": 126
+    },
+    "national.landandfarm": {
+     "rows": 195,
+     "urls": 195
+    },
+    "national.landwatch": {
+     "rows": 95,
+     "urls": 95
+    },
+    "public_notices.nc_notices_counties": {
+     "rows": 83,
+     "urls": 83
+    }
+   },
+   "source_count": 119,
+   "total": {
+    "rows": 21813,
+    "urls": 21813
+   }
+  },
+  "street": {
+   "county": {
+    "NC:Buncombe": {
+     "rows": 283,
+     "urls": 284
+    },
+    "NC:Carteret": {
+     "rows": 2,
+     "urls": 2
+    },
+    "NC:Catawba": {
+     "rows": 80,
+     "urls": 80
+    },
+    "NC:Chatham": {
+     "rows": 1,
+     "urls": 1
+    },
+    "NC:Cleveland": {
+     "rows": 8,
+     "urls": 8
+    },
+    "NC:Edgecombe": {
+     "rows": 9,
+     "urls": 9
+    },
+    "NC:Forsyth": {
+     "rows": 1,
+     "urls": 1
+    },
+    "NC:Gaston": {
+     "rows": 4,
+     "urls": 4
+    },
+    "NC:Gates": {
+     "rows": 2,
+     "urls": 2
+    },
+    "NC:Henderson": {
+     "rows": 2,
+     "urls": 2
+    },
+    "NC:Hyde": {
+     "rows": 8,
+     "urls": 8
+    },
+    "NC:Lincoln": {
+     "rows": 150,
+     "urls": 150
+    },
+    "NC:McDowell": {
+     "rows": 162,
+     "urls": 162
+    },
+    "NC:Mitchell": {
+     "rows": 2,
+     "urls": 2
+    },
+    "NC:New Hanover": {
+     "rows": 13,
+     "urls": 13
+    },
+    "NC:Polk": {
+     "rows": 5,
+     "urls": 5
+    },
+    "NC:Rutherford": {
+     "rows": 22,
+     "urls": 22
+    },
+    "NC:Transylvania": {
+     "rows": 133,
+     "urls": 133
+    },
+    "SC:Anderson": {
+     "rows": 18,
+     "urls": 18
+    },
+    "SC:Berkeley": {
+     "rows": 97,
+     "urls": 97
+    },
+    "SC:Charleston": {
+     "rows": 3,
+     "urls": 3
+    },
+    "SC:Cherokee": {
+     "rows": 5,
+     "urls": 5
+    },
+    "SC:Greenville": {
+     "rows": 129,
+     "urls": 129
+    },
+    "SC:Horry": {
+     "rows": 222,
+     "urls": 222
+    },
+    "SC:Laurens": {
+     "rows": 53,
+     "urls": 53
+    },
+    "SC:Lexington": {
+     "rows": 1,
+     "urls": 1
+    },
+    "SC:Oconee": {
+     "rows": 4,
+     "urls": 4
+    },
+    "SC:Pickens": {
+     "rows": 48,
+     "urls": 48
+    },
+    "SC:Spartanburg": {
+     "rows": 1881,
+     "urls": 1881
+    },
+    "SC:Sumter": {
+     "rows": 1,
+     "urls": 1
+    },
+    "SC:Union": {
+     "rows": 6,
+     "urls": 6
+    }
+   },
+   "county_count": 31,
+   "source": {
+    "counties.column_legal_notices": {
+     "rows": 4,
+     "urls": 4
+    },
+    "counties_generic.arcgis_distress.buncombe_hmgp_buyout": {
+     "rows": 10,
+     "urls": 10
+    },
+    "counties_generic.arcgis_distress.buncombe_unpaid_bills": {
+     "rows": 78,
+     "urls": 78
+    },
+    "counties_generic.arcgis_distress.buncombe_unpaid_bills_2024": {
+     "rows": 9,
+     "urls": 9
+    },
+    "counties_generic.arcgis_distress.greenville_unpaid_tax_parcels": {
+     "rows": 125,
+     "urls": 125
+    },
+    "counties_generic.arcgis_distress.new_hanover_demolition_permits": {
+     "rows": 13,
+     "urls": 13
+    },
+    "counties_generic.arcgis_distress.spartanburg_city_tax_sale": {
+     "rows": 81,
+     "urls": 81
+    },
+    "counties_generic.arcgis_distress.spartanburg_infill_eligible": {
+     "rows": 5,
+     "urls": 5
+    },
+    "counties_generic.arcgis_distress.spartanburg_property_cleanup": {
+     "rows": 38,
+     "urls": 38
+    },
+    "counties_nc.asheville_helene": {
+     "rows": 7,
+     "urls": 7
+    },
+    "counties_nc.asheville_str_permits": {
+     "rows": 6,
+     "urls": 6
+    },
+    "counties_nc.buncombe_delinquent_tax": {
+     "rows": 158,
+     "urls": 159
+    },
+    "counties_nc.buncombe_elderly": {
+     "rows": 8,
+     "urls": 8
+    },
+    "counties_nc.edgecombe_tax_foreclosure": {
+     "rows": 9,
+     "urls": 9
+    },
+    "counties_nc.lincoln_vacant": {
+     "rows": 52,
+     "urls": 52
+    },
+    "counties_nc.mcdowell_probate": {
+     "rows": 23,
+     "urls": 23
+    },
+    "counties_nc.nc_county_pdf_delinquent_tax": {
+     "rows": 308,
+     "urls": 308
+    },
+    "counties_nc.nc_heir_estate_parcels": {
+     "rows": 96,
+     "urls": 96
+    },
+    "counties_nc.nc_ptscloud_delinquent_tax": {
+     "rows": 10,
+     "urls": 10
+    },
+    "counties_nc.rutherford_tax": {
+     "rows": 5,
+     "urls": 5
+    },
+    "counties_nc.transylvania_delinquent_tax": {
+     "rows": 133,
+     "urls": 133
+    },
+    "counties_sc.berkeley_paystar_tax": {
+     "rows": 97,
+     "urls": 97
+    },
+    "counties_sc.horry_delinquent_xlsx": {
+     "rows": 220,
+     "urls": 220
+    },
+    "counties_sc.qpaybill_delinquent_roll": {
+     "rows": 18,
+     "urls": 18
+    },
+    "counties_sc.sc_dew_lien_registry": {
+     "rows": 18,
+     "urls": 18
+    },
+    "counties_sc.sc_public_index": {
+     "rows": 8,
+     "urls": 8
+    },
+    "counties_sc.sc_public_notices": {
+     "rows": 33,
+     "urls": 33
+    },
+    "counties_sc.sc_rod_acclaim": {
+     "rows": 14,
+     "urls": 14
+    },
+    "counties_sc.sc_ust_registry": {
+     "rows": 24,
+     "urls": 24
+    },
+    "counties_sc.spartan_weekly_legals": {
+     "rows": 7,
+     "urls": 7
+    },
+    "counties_sc.spartanburg_city_condemned": {
+     "rows": 13,
+     "urls": 13
+    },
+    "counties_sc.spartanburg_condemned": {
+     "rows": 633,
+     "urls": 633
+    },
+    "counties_sc.spartanburg_delinquent_tax": {
+     "rows": 836,
+     "urls": 836
+    },
+    "counties_sc.spartanburg_vacant": {
+     "rows": 144,
+     "urls": 144
+    },
+    "counties_sc.terry_howe_auctions": {
+     "rows": 8,
+     "urls": 8
+    },
+    "law_firms.brock_scott": {
+     "rows": 8,
+     "urls": 8
+    },
+    "national.distressed": {
+     "rows": 6,
+     "urls": 6
+    },
+    "national.foreclosure_dot_com": {
+     "rows": 6,
+     "urls": 6
+    },
+    "national.homepath_json": {
+     "rows": 6,
+     "urls": 6
+    },
+    "national.xome": {
+     "rows": 5,
+     "urls": 5
+    }
+   },
+   "source_count": 79,
+   "total": {
+    "rows": 3355,
+    "urls": 3356
+   }
+  }
+ },
+ "ledgers_loaded": [],
+ "ocr_primary_urls": {
+  "distinct": 211,
+  "rows_on_shared": 12494,
+  "shared_over_3": 20
+ },
+ "peak_rss_mb": 270,
+ "rows": 350013,
+ "seconds": 48
+}

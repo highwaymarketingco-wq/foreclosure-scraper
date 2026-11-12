@@ -1,0 +1,380 @@
+#!/usr/bin/env bash
+# Local weekly run — the free, stealth-browser pipeline on this Mac.
+#
+# Loads secrets from .secrets/, runs the full foreclosure pipeline (which
+# writes the Google Sheet + emails Greg & Cash), and logs to logs/.
+#
+# Run manually:           bash scripts/run_local.sh
+# Run via launchd:        installed by scripts/install_local_schedule.sh
+#
+# 100% free: no Apify, no proxies. Anti-bot sites (Zillow/Tyler/law firms)
+# are handled by the local Scrapling stealth browser — which is exactly why
+# this runs on your Mac and not on headless CI.
+set -uo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+
+# A Finder-launched applet (the Desktop "Run Foreclosure Engine" button) and launchd
+# both start with a minimal PATH that lacks ~/.local/bin. dailycourt failed 31 days
+# running with "uv: command not found" (audit O10/O12); fail loud instead of silently.
+export PATH="$HOME/.local/bin:/opt/homebrew/bin:$PATH"
+command -v uv >/dev/null 2>&1 || { echo "FATAL: uv not found on PATH ($PATH)" >&2; exit 127; }
+
+SECRETS="$ROOT/.secrets"
+mkdir -p "$ROOT/logs"
+STAMP="$(date +%Y%m%dT%H%M%S)"
+LOG="$ROOT/logs/local-run-$STAMP.log"
+
+# ONE BOARD WRITER AT A TIME, for the whole multi-hour run + publish.
+#
+# This is the longest board-holder there is, so it is also the one most often on
+# the losing side of a silent revert: every guard elsewhere was a pgrep taken
+# BEFORE the other job's critical section opened, which cannot see a writer that
+# starts later. The lock is held from here through `git push`, is reentrant via
+# FORECLOSURE_BOARD_LOCK_HELD (so the pipeline's own board writers proceed
+# inside it), and a lock left by a killed run is broken automatically. See
+# scripts/board_lock.sh.
+. "$ROOT/scripts/job_event.sh"
+. "$ROOT/scripts/board_lock.sh"
+. "$ROOT/scripts/board_payload.sh"
+. "$ROOT/scripts/publish_helper.sh"
+JOB_EVENT_ROOT="$ROOT"
+job_event_begin full_run
+# One trap: an unreported exit is recorded as failed, then the lock is released.
+trap 'job_event_finalize; board_lock_release' EXIT INT TERM
+# The full run legitimately holds the lock 15 to 57 hours (audit B2), so it declares
+# a 72 hour max runtime; a hung holder past that (+30 min) is treated as stale.
+if ! board_lock_acquire "$ROOT" "run_local.sh" 0 "${FULLRUN_LOCK_MAX_RUNTIME:-259200}"; then
+  echo "==> $(board_lock_refusal_message 'the full run'); refusing to start." | tee -a "$LOG"
+  if [ "$BOARD_LOCK_REFUSAL" = "memory" ]; then job_event_end skipped_memory "" "$BOARD_MEM_REASON"
+  else job_event_end skipped_lock "" "$(board_lock_holder)"; fi
+  # 75 (EX_TEMPFAIL), not 0: gui_run.sh used to announce "Run finished" for a run that
+  # never started (audit O10).
+  exit 75
+fi
+
+# ---- load secrets from .secrets/ -------------------------------------------
+load() {  # load <ENV_NAME> <file> [required]
+  local name="$1" file="$2" required="${3:-}"
+  if [[ -f "$file" ]]; then
+    export "$name"="$(cat "$file")"
+  elif [[ "$required" == "required" ]]; then
+    echo "FATAL: required secret $name missing ($file)" | tee -a "$LOG"
+    exit 1
+  fi
+}
+
+load GOOGLE_SERVICE_ACCOUNT_JSON "$SECRETS/service_account.json" required
+load SHEET_ID                    "$SECRETS/sheet_id.txt"         required
+load GMAIL_APP_PASSWORD          "$SECRETS/gmail_app_password.txt" required
+load ANTHROPIC_API_KEY           "$SECRETS/anthropic_api_key.txt"
+load COURTLISTENER_TOKEN         "$SECRETS/courtlistener_token.txt"
+load NC_ECOURTS_USERNAME         "$SECRETS/nc_ecourts_username.txt"
+load NC_ECOURTS_PASSWORD         "$SECRETS/nc_ecourts_password.txt"
+
+# Gemini Vision keys — one per Google account (free tier 1500 req/day each).
+# The vision code auto-rotates to the next key when one hits its daily limit,
+# so 4 keys = ~6000 free calls/day. Drop each account's key in its own file:
+#   .secrets/gemini_api_key_1.txt  (account 1)  ... gemini_api_key_4.txt
+load GEMINI_API_KEY              "$SECRETS/gemini_api_key.txt"
+# One free key per Gemini project; auto-load every gemini_api_key_N.txt.
+for i in $(seq 1 60); do load "GEMINI_API_KEY_$i" "$SECRETS/gemini_api_key_$i.txt"; done
+# GitHub Models (free, separate pool) — saved token or gh CLI fallback.
+load GITHUB_MODELS_TOKEN         "$SECRETS/github_models_token.txt"
+[[ -z "${GITHUB_MODELS_TOKEN:-}" ]] && export GITHUB_MODELS_TOKEN="$(gh auth token 2>/dev/null || true)"
+# Groq (free, separate pool) — optional.
+load GROQ_API_KEY                "$SECRETS/groq_api_key.txt"
+# Local Ollama removed (redundant vs cloud pools; slow/weak on 8GB).
+export VISION_USE_OLLAMA=0
+# More free API pools — each activates only if its key file exists.
+load OPENROUTER_API_KEY          "$SECRETS/openrouter_api_key.txt"
+load MISTRAL_API_KEY             "$SECRETS/mistral_api_key.txt"
+load CLOUDFLARE_API_TOKEN        "$SECRETS/cloudflare_api_token.txt"
+load CLOUDFLARE_ACCOUNT_ID       "$SECRETS/cloudflare_account_id.txt"
+# NVIDIA NIM (free) — one key, many vision models (each its own ~40 RPM lane).
+load NVIDIA_API_KEY             "$SECRETS/nvidia_api_key.txt"
+
+# ---- defaults (config.py also defaults these, set here for clarity) --------
+export GMAIL_SENDER="${GMAIL_SENDER:-highwaymarketingco@gmail.com}"
+export EMAIL_RECIPIENTS="${EMAIL_RECIPIENTS:-greghhigh@gmail.com,cashrandolphhigh@gmail.com}"
+# Vision provider: prefer FREE Gemini when any Gemini key is present
+# (4 accounts auto-rotate); fall back to Anthropic only if no Gemini key.
+if [[ -n "${GEMINI_API_KEY:-}${GEMINI_API_KEY_1:-}${GEMINI_API_KEY_2:-}" ]]; then
+  export VISION_PROVIDER="${VISION_PROVIDER:-gemini}"
+else
+  export VISION_PROVIDER="${VISION_PROVIDER:-anthropic}"
+fi
+# 8GB Mac: 24 concurrent scrapers drove 4.3GB of swap on the 2026-09-08 run and
+# starved simple sources (epa_superfund/fdic/fema logged ZERO activity before
+# their soft timeout fired) - 39 "timeouts" that were memory pressure, not
+# broken sources. Override with PARALLEL_SCRAPERS=N.
+export PARALLEL_SCRAPERS="${PARALLEL_SCRAPERS:-8}"
+export LOG_LEVEL="${LOG_LEVEL:-INFO}"
+export PYTHONUNBUFFERED=1
+
+# Free skip tracing: reliable tax-records owner + mailing address, plus
+# best-effort people-search phone for the most imminent sales. Zero cost.
+export SKIP_TRACE_PROVIDER="${SKIP_TRACE_PROVIDER:-free}"
+export FREE_SKIPTRACE_PHONE_MAX="${FREE_SKIPTRACE_PHONE_MAX:-40}"
+
+# Photo supply (operator-enabled 2026-07-29): free assessor drive-by photos +
+# Street View at 300/run (= the Google-side daily quota; monthly ledger clamped
+# under the 10k free tier — STREETVIEW_ALLOW_PAID stays unset, so \$0.00).
+export FORECLOSURE_ASSESSOR_PHOTO="${FORECLOSURE_ASSESSOR_PHOTO:-1}"
+export FORECLOSURE_STREETVIEW="${FORECLOSURE_STREETVIEW:-1}"
+export STREETVIEW_MAX="${STREETVIEW_MAX:-300}"
+load GOOGLE_MAPS_API_KEY "$SECRETS/google_maps_api_key.txt"
+
+# Assessor property-card enricher — ON for the weekly run. Fills REAL heated
+# sqft + beds + baths from the county card, which clears the ESTIMATE flag and
+# lets ARV grade at HIGH confidence (calc caps to MEDIUM without true sqft). The
+# board un-freeze left a ~12k backlog of built homes in card-covered counties
+# still missing sqft (Rutherford 4.7k, Buncombe 3.1k, ...), so the per-run cap
+# is raised 400 -> 900 to chew that down faster. For a hard catch-up, run
+# scripts/sqft_backfill.py in daylight (bounded, resumable, ~1500/pass).
+export ASSESSOR_CARD_ON="${ASSESSOR_CARD_ON:-1}"
+export ASSESSOR_CARD_MAX="${ASSESSOR_CARD_MAX:-400}"
+
+# Mecklenburg's own NCGS 105-369 statutory tax-lien advertisement (operator-enabled
+# 2026-10-23): 43,355 rows / $35.5M due, free, no login/CAPTCHA, the earliest county-wide
+# tax-distress list there is for NC's largest county. Off by default because the ~29k
+# parcel-resolved rows it emits carry no coordinates and compete for the shared, already
+# budget-capped (GEOCODE_BUDGET_S, 600s/run) geocode step -- that cap is the safety valve,
+# so turning this on is a resource-sharing decision, not an unbounded-cost one. A one-time
+# catch-up already landed 21,059 genuinely-new rows (scripts/land_mecklenburg_delinquent_tax.py);
+# this keeps future advertisement updates (new tax year, newly-added parcels) landing too.
+export FORECLOSURE_MECKLENBURG_DELINQUENT="${FORECLOSURE_MECKLENBURG_DELINQUENT:-1}"
+
+# Mecklenburg's taxbill.co.mecklenburg.nc.us live "Bill Search" portal (enrichment_mecklenburg_
+# tax.py, built+wired into main.py's enrichment chain 2026-11-05, operator-enabled 2026-11-10):
+# per-parcel multi-year bill history, closing the single biggest sourced-not-built cell in the
+# whole gap matrix (~39,861 Mecklenburg rows for multi_year_delinquent_tax/two_year_delinquent).
+# It shipped gated off (FORECLOSURE_MECKLENBURG_MYDT) only because main.py hadn't called it yet
+# -- that reason is gone now that it's wired (confirmed in main.py's enrichment_stats block), and
+# every structurally-identical sibling (qpaybill/its_public/ptscloud/iredell/cabarrus/catawba
+# _multiyear_tax) already runs unconditionally with the same MAX_ROWS=300/BUDGET_S=600s/
+# CONCURRENCY=4/circuit-breaker-at-8 bounds as this module, which is itself the safety valve
+# (same "existing cap is the safety net, enabling is a normal judgment call" reasoning as
+# FORECLOSURE_MECKLENBURG_DELINQUENT just above). Re-verified live 2026-11-10 against 6 real,
+# already-known-distressed parcels (sourced from this file's own prior advertisement rows): all
+# 6 answered HTTP 200, no WAF/CAPTCHA, 5 of 6 showed genuine matured multi-year delinquency
+# through the real, unmodified parser -- see tests/test_enrichment_mecklenburg_tax.py (new,
+# 2026-11-10; this module had zero test coverage before).
+export FORECLOSURE_MECKLENBURG_MYDT="${FORECLOSURE_MECKLENBURG_MYDT:-1}"
+
+# Mecklenburg/Carteret's Harris "ROD Web Access" real-estate + marriage name-index search
+# (operator-enabled 2026-10-23): a Playwright headless-browser lookup, live-verified working
+# (no login/CAPTCHA, just a one-time disclaimer click-through), held off since 2026-10-07
+# (HANDOFF item 82) pending a real yield measurement -- each lookup costs ~15-30s and a
+# transient ~250-540MB browser-process footprint (one browser at a time, by design, see
+# rod/nc_render.py). Measured live 2026-10-23: 3/3 Mecklenburg lookups in a 90s bounded test
+# came back with real ROD instruments (2 carrying a mortgage), no walls, no errors, memory
+# flat after the browser closed. Already runs inside enrich_nc_rod_render()'s own
+# FORECLOSURE_NC_ROD_RENDER_BUDGET_S budget (default 3600s/run, ~120 lookups/day at this
+# pace) -- that budget is the safety valve, so turning this on is the same resource-sharing
+# decision as the Mecklenburg delinquent-tax flag above, not an unbounded-cost one. Mecklenburg
+# has 39,861 rows; at ~120/day this chips away at the backlog over many days by design, same
+# as bop_federal/incarceration's own daily-capped rate.
+export FORECLOSURE_NC_HARRIS_ROD="${FORECLOSURE_NC_HARRIS_ROD:-1}"
+# Same Harris session's Marriage index (enrich_marriage_render, called from
+# enrich_nc_rod_render right after the ROD loop) -- shares the SAME budget_s above, not an
+# additional resource; live-reconfirmed 2026-10-20 (108 real 1881-2026 Mecklenburg licence
+# rows, no login/CAPTCHA). gap_matrix.py's own comment flags this column as misclassified
+# while both flags default off (see docs comment at RENDER_ROD_CONFIG usage).
+export FORECLOSURE_NC_HARRIS_MARRIAGE="${FORECLOSURE_NC_HARRIS_MARRIAGE:-1}"
+
+# NC Cott/Lookup/ORS/CCHS-classic/Tyler ROD name-index search (operator-enabled 2026-11-03,
+# after a 5-agent investigation confirmed these are proven working code, not walls, not
+# stubs): all 5 platforms were built 2026-10-07 and live-proven with real hits on at least
+# some of their counties -- Cott 17/20 via guest-button click-through (commits a237f78b,
+# 8cb3325b), Lookup Avery+Columbus of 11 (commit dbd53293), ORS/CCHS-classic/Tyler
+# platform-proven per enrichment_generic_rod.py's own docstring. Shipped OFF by default
+# purely because board-lead yield was never measured, same as Harris above before its
+# 2026-10-23 flip -- NOT the same as the older ROD_ENRICH_ON path further down this file,
+# which gates a separate, superseded legacy system (rod/enrich.py's aumentum/cchs/cott/
+# kofile modules, broken as of a 2026-06-16 measurement) using different vendor code; leave
+# that one alone. Already declared "1" in deploy/oracle/run_profile.json for the VM;
+# enabling here too since the VM has been down since 2026-10-31 and this is the only lane
+# currently alive. Pure-HTTP (not the Playwright-rendered kind), wall-clock-budget-capped
+# via _await_capped (main.py), same safety pattern as the Harris flag above. Lookup's other
+# 9 counties beyond Avery/Columbus haven't been individually search-tested yet (only
+# platform-level, via Avery/Columbus) -- watch its first run's logs.
+export FORECLOSURE_NC_COTT_ROD="${FORECLOSURE_NC_COTT_ROD:-1}"
+export FORECLOSURE_NC_LOOKUP_ROD="${FORECLOSURE_NC_LOOKUP_ROD:-1}"
+export FORECLOSURE_NC_ORS_ROD="${FORECLOSURE_NC_ORS_ROD:-1}"
+export FORECLOSURE_NC_CCHS_CLASSIC_ROD="${FORECLOSURE_NC_CCHS_CLASSIC_ROD:-1}"
+export FORECLOSURE_NC_TYLER_ROD="${FORECLOSURE_NC_TYLER_ROD:-1}"
+
+# Enrichment budget — keep the run finishing in a sane window. The cloud
+# run died at 4h partly on a Gemini-quota Vision spiral; locally we use
+# Anthropic (set above) and cap Vision so the run completes. ROD deed
+# enrichment stays OFF (broken vendor portals = 27 min for 0 matches).
+#
+# Vision budget — the pool is FREE and 26 backends wide (9 Gemini keys +
+# GitHub Models + Groq + Mistral + Cloudflare + 13 NVIDIA NIM lanes), one
+# worker per backend off a shared queue. Measured drain: ~90 listings/min
+# (logs/daily-vision-*.log). 800 was a paid-Anthropic-era number and left
+# most of the free capacity unused — the board carries ~5.9k photo-bearing
+# leads, so 800/run could never cover it.
+#
+# 2500 (prioritized: soonest sale date, then never-scored) ≈ 28 min at the
+# measured rate. TRADEOFF: ~15 min more wall clock than the 800 cap for
+# ~3x the condition coverage. Unscored fall back to the regex/age tier.
+export VISION_MAX_LISTINGS="${VISION_MAX_LISTINGS:-2500}"
+export VISION_INTER_CALL_DELAY="${VISION_INTER_CALL_DELAY:-4}"
+# Wall-clock cap — THE stop. The count above only sets how much we try; this
+# is what guarantees the phase ends. 45 min covers 2500 at the measured rate
+# with headroom for a degraded pool, and can never hang the run.
+export VISION_MAX_SECONDS="${VISION_MAX_SECONDS:-2700}"
+# Sold-comp pool gets its own (smaller) cap + budget so it can't eat the
+# active-listing pass; ~89-400 comps ≈ a few minutes.
+export SOLD_POOL_VISION_MAX_LISTINGS="${SOLD_POOL_VISION_MAX_LISTINGS:-400}"
+export SOLD_POOL_VISION_MAX_SECONDS="${SOLD_POOL_VISION_MAX_SECONDS:-600}"
+# Catch-up pass for leads the name-resolver just gave an address to.
+export VISION_CATCHUP_MAX_LISTINGS="${VISION_CATCHUP_MAX_LISTINGS:-1500}"
+export VISION_CATCHUP_MAX_SECONDS="${VISION_CATCHUP_MAX_SECONDS:-900}"
+
+# Photo gallery budget — the UPSTREAM unlock for Vision (no photo = no
+# condition grade, whatever the Vision cap is). ~10.1k board leads have an
+# address but <3 photos and the old 500 cap reached 5% of them per run.
+# HomeHarvest is slow (~19 leads/min on 4 threads), so the honest limiter is
+# the 40-min wall clock, not the count: expect ~750-800 leads/run.
+# TRADEOFF: ~14 min more wall clock than the old count-capped ~26 min.
+export FORECLOSURE_PHOTO_MAX_TARGETS="${FORECLOSURE_PHOTO_MAX_TARGETS:-2500}"
+export FORECLOSURE_PHOTO_MAX_SECONDS="${FORECLOSURE_PHOTO_MAX_SECONDS:-2400}"
+# Keep rate-limited vision backends alive (cooldown+retry) instead of retiring
+# them after 2 strikes — a too-low threshold killed the whole Gemini fleet in
+# ~2 min. See run_daily_vision.sh for the rationale.
+export VISION_BACKEND_STRIKES="${VISION_BACKEND_STRIKES:-10}"
+export VISION_BACKEND_COOLDOWN="${VISION_BACKEND_COOLDOWN:-70}"
+# ROD_ENRICH_ON unset = skipped (default).
+
+# If no NC eCourts creds are present, fall back to anonymous access.
+if [[ -z "${NC_ECOURTS_USERNAME:-}" ]]; then
+  export NC_ECOURTS_USE_ANONYMOUS=1
+fi
+
+# Stealth-browser tuning (real browsers are heavy; keep concurrency modest).
+export RENDER_HEADLESS="${RENDER_HEADLESS:-1}"
+export RENDER_CONCURRENCY="${RENDER_CONCURRENCY:-2}"
+
+echo "==> foreclosure-scraper local run $STAMP" | tee -a "$LOG"
+echo "==> sheet=${SHEET_ID:0:8}…  vision=$VISION_PROVIDER  log=$LOG" | tee -a "$LOG"
+
+# Ensure deps + the stealth browser are present (idempotent, fast if cached).
+# --inexact: NEVER remove a package the lockfile does not name. Plain `uv sync` is
+# exact, and the 2026-09-08 run opened with "Uninstalled 25 packages" (easyocr, scipy,
+# shapely, opencv-python-headless, openpyxl, pytesseract, networkx, scikit-image,
+# nodriver ...) because they were installed by hand and never declared (audit O12).
+# See docs/ops_fixes_2026-09-21.md for the pyproject patch that declares them.
+uv sync --frozen --inexact >>"$LOG" 2>&1 || uv sync --inexact >>"$LOG" 2>&1
+uv run python -m playwright install chromium >>"$LOG" 2>&1 || true
+uv run scrapling install >>"$LOG" 2>&1 || true
+
+# ---- run the pipeline ------------------------------------------------------
+# caffeinate -is: hold OFF idle sleep (-i) and system sleep (-s) for the whole
+# multi-hour run. The board froze for ~3 weeks because the laptop slept mid-run
+# and the pipeline never reached the artifact write. This is the single biggest
+# reliability fix short of an always-on host. caffeinate propagates the child's
+# exit code, so RC=$? below stays correct. (A closed lid on battery can still
+# sleep — a plugged-in machine with the lid open is the reliable setup.)
+# caffeinate is macOS-only (not on Linux PATH at all -- exit 127, confirmed live
+# 2026-10-14 trying to run this script on the Oracle VM). A cloud VM has no lid
+# to close and doesn't idle-sleep the way a laptop does, so the guard it provides
+# is a Mac-specific concern in the first place -- on Linux we just run the
+# pipeline directly, unwrapped.
+START=$(date +%s)
+# job_run adds a wall-clock backstop (FULLRUN_MAX_SECONDS, default 72 h) and records peak
+# RSS + swap-out delta in logs/job_events.jsonl (audit O9). caffeinate still propagates
+# the pipeline's exit code (on macOS; the Linux branch has no caffeinate to propagate
+# through, job_run's own RC capture covers it the same way either branch).
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  job_run "${FULLRUN_MAX_SECONDS:-259200}" caffeinate -is uv run python -m foreclosure_scraper >>"$LOG" 2>&1
+else
+  job_run "${FULLRUN_MAX_SECONDS:-259200}" uv run python -m foreclosure_scraper >>"$LOG" 2>&1
+fi
+RC=$JOB_RUN_RC
+END=$(date +%s)
+
+echo "==> exit=$RC  elapsed=$(( (END-START)/60 ))m  $(date)" | tee -a "$LOG"
+
+# Surface the fail-loud signals from the run so they're visible at the
+# tail of the log (and to anything tailing it / parsing exit status).
+if grep -q "count_drop_alert" "$LOG"; then
+  echo "==> ⚠️  COUNT-DROP ALERT fired this run — a source may be broken. See log above." | tee -a "$LOG"
+  RC=2
+fi
+# A failed board write (count guard, lock refusal, changed-since-load, integrity error)
+# is logged as web_artifact.failed and main.py now exits 3 for it. The wrapper used to
+# swallow that: on 8/30 and 9/9 it printed a total of 94,384 for runs that wrote
+# NOTHING because it fell back to run_meta.json (audit O4). Abort instead.
+if grep -qE 'web_artifact\.failed' "$LOG"; then
+  echo "==> !! the board write FAILED this run (web_artifact.failed). Aborting: no publish, no total." | tee -a "$LOG"
+  [ "$RC" -eq 0 ] && RC=3
+fi
+# Read the REAL listing count from the artifact-write event (not a stray
+# "total": from some sub-summary — that false-positived a 47 once and blocked
+# a healthy 5073-listing publish). NO fallback to run_meta.json: a run that never
+# reached web_artifact.written has no total, and run_meta.json describes an OLDER run.
+TOTAL=$(grep -E 'web_artifact\.written' "$LOG" | grep -oE '("listings": |listings=)[0-9]+' | tail -1 | grep -oE '[0-9]+' || echo "")
+if [ -z "$TOTAL" ] && [ "$RC" -eq 0 ]; then
+  echo "==> !! exit 0 but no web_artifact.written event: the board was NOT written this run." | tee -a "$LOG"
+  RC=4
+fi
+if [ -n "$TOTAL" ]; then
+  echo "==> total listings this run: $TOTAL" | tee -a "$LOG"
+  if [ "$TOTAL" -lt 200 ]; then
+    echo "==> ⚠️  LOW TOTAL ($TOTAL < 200) — likely a broad failure. Investigate." | tee -a "$LOG"
+    RC=2
+  fi
+fi
+
+# ---- publish dashboard data to GitHub Pages --------------------------------
+# The pipeline wrote docs/listings.json (with images, Vision condition,
+# A-F grade, ARV/max-bid, comps, amount_owed) + run_health.json locally.
+# The retired cloud workflow used to push these so GitHub Pages served the
+# live dashboard; now the local run must do it. Only publish on a healthy
+# run so we never overwrite a good dashboard with a broken/empty one.
+PUB=skipped
+if [[ "$RC" -eq 0 && -f "$ROOT/docs/listings.json" ]]; then
+  # The payload list — and every "exists OR is already tracked" rule behind it —
+  # lives in ONE place now: scripts/board_payload.sh. Five publishers were each
+  # maintaining their own copy of that list and they had already drifted apart.
+  if command -v git >/dev/null 2>&1; then
+    cd "$ROOT"
+    # publish_commit runs board_payload_check (Jekyll's exclude/include are PREFIX
+    # matches, so `exclude: listings.json` also drops listings.json.gz; that trap has
+    # 404'd this site's data three times), stages the payload, and commits INSIDE the
+    # lock. The push happens after the lock is released (audit O7).
+    publish_commit "$ROOT" "local run: refresh dashboard data ($(date +%Y-%m-%d))" any >>"$LOG" 2>&1
+    PC=$?
+    board_lock_release
+    case $PC in
+      0) if publish_push "$ROOT" >>"$LOG" 2>&1; then
+           echo "==> ✓ dashboard published to GitHub (Pages will update in ~1 min)" | tee -a "$LOG"; PUB=pushed
+         else
+           echo "==> ⚠️  dashboard commit made locally but push failed — see log: $PUBLISH_PUSH_OUT" | tee -a "$LOG"; PUB=push_failed
+         fi ;;
+      1) echo "==> dashboard data unchanged — nothing to publish" | tee -a "$LOG"; PUB=unchanged ;;
+      *) echo "==> ⚠️  commit refused (size gate or hook) — see logs/publish_blocked.log" | tee -a "$LOG"; PUB=commit_failed; RC=5 ;;
+    esac
+  fi
+else
+  echo "==> skipping dashboard publish (run unhealthy: RC=$RC)" | tee -a "$LOG"
+fi
+
+if [[ "$RC" -ne 0 ]]; then
+  job_event_end failed "" "rc=$RC"
+elif [[ "$PUB" == "push_failed" ]]; then
+  job_event_end push_failed "" "total=${TOTAL:-?}"
+elif [[ "$PUB" == "unchanged" ]]; then
+  job_event_end no_change "" "total=${TOTAL:-?}"
+else
+  job_event_end ok "" "total=${TOTAL:-?}"
+fi
+
+# Keep the 12 most recent run logs; prune older.
+ls -1t "$ROOT"/logs/local-run-*.log 2>/dev/null | tail -n +13 | xargs rm -f 2>/dev/null || true
+
+exit $RC

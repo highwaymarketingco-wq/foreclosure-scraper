@@ -1,0 +1,1330 @@
+"""Comp finder + property-data backfill via HomeHarvest sold listings.
+
+Like-for-like comp matching for accurate ARV and cash-flow analysis. The matcher
+filters by:
+  1. Property kind (single-family / condo / townhouse / multi-family / land /
+     manufactured) — never compares across kinds
+  2. Style/quality bucket (manufactured-vs-stick-built; new-build vs vintage)
+  3. Year built within ±15 years (era proxy for build quality / systems age)
+  4. Living sqft within ±20% (size band)
+  5. Bed count exact (±0; bedrooms drive resale and rent dollars)
+  6. Same ZIP first; relax to same city only if zip-pool is too thin
+
+Plus rent comps via the same matcher, and condition-tier inference from
+description text (move-in / cosmetic / major / gut). The condition tier feeds
+the calculator's rehab estimate so a "needs full reno" listing isn't priced
+the same as a "move-in ready" one.
+
+Cost: $0. HomeHarvest hits Realtor.com's public API directly.
+"""
+from __future__ import annotations
+
+import asyncio
+import re
+from concurrent.futures import ThreadPoolExecutor
+from datetime import date
+from typing import Iterable, Optional
+
+import structlog
+
+from . import enrichment_gis_sale_crosscheck as gis_crosscheck
+from .config import in_scope_distressed
+from .http_client import client
+from .models import Listing, PropertyKind
+from .validation import normalize_county
+
+log = structlog.get_logger()
+
+
+# ---- Pools (sold + rent) ---------------------------------------------------
+
+def _comp_location(county: str, state: str) -> str:
+    """Location string for HomeHarvest's (Realtor.com) geo-suggest search.
+
+    '<County> County, <ST>' resolves the WHOLE county, not just its seat town
+    -- verified live 2026-10-03 against counties at every size, from Catawba
+    NC (1,858 sold/180d) and Greenville SC (5,763) down to rural Allendale SC
+    (20). It also beats a seat-town search for the ORIGINAL hardcoded
+    counties: Spartanburg SC returns 5,935 sold/180d by county vs 1,747 by
+    seat-town alone, Rutherford NC 778 vs 227 -- a county search is a strict
+    superset of a seat-town search, not a different population. This removes
+    the need for a per-county seat-town gazetteer (which doesn't exist for
+    all 146 real NC+SC counties; only the original 18-county footprint had
+    one, in config.py's `County.seat`).
+    """
+    return f"{county} County, {state}"
+
+
+def _sold_pool_for_seat(county: str, state: str) -> list[dict]:
+    try:
+        from homeharvest import scrape_property
+    except ImportError:
+        return []
+    try:
+        df = scrape_property(
+            location=_comp_location(county, state),
+            listing_type="sold",
+            past_days=180,
+        )
+        if df is None or len(df) == 0:
+            return []
+        records = df.to_dict("records")
+        # Dedupe — HomeHarvest can return the same sale twice (re-list, MLS dupes);
+        # an un-deduped pool double-counts a sale in the median.
+        seen: set = set()
+        deduped = []
+        for r in records:
+            key = r.get("property_url") or (
+                str(r.get("street") or ""), r.get("sold_price"), str(r.get("last_sold_date") or ""))
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(r)
+        return deduped
+    except Exception as exc:
+        log.debug("comps.sold_pool.error", county=county, state=state, error=str(exc)[:100])
+        return []
+
+
+def _rent_pool_for_seat(county: str, state: str) -> list[dict]:
+    try:
+        from homeharvest import scrape_property
+    except ImportError:
+        return []
+    try:
+        df = scrape_property(
+            location=_comp_location(county, state),
+            listing_type="for_rent",
+            past_days=90,
+        )
+        if df is None or len(df) == 0:
+            return []
+        return df.to_dict("records")
+    except Exception as exc:
+        log.debug("comps.rent_pool.error", county=county, state=state, error=str(exc)[:100])
+        return []
+
+
+# --- Market velocity: months-of-inventory -> per-listing holding period -----
+SOLD_WINDOW_MONTHS = 6.0   # the sold pool's past_days=180 == 6 months
+
+
+def _active_count_for_seat(county: str, state: str) -> Optional[int]:
+    """Count current for-sale listings. Returns None on FETCH FAILURE (distinct
+    from a genuine 0) so a failed pull can't masquerade as a red-hot market."""
+    try:
+        from homeharvest import scrape_property
+    except ImportError:
+        return None
+    try:
+        df = scrape_property(location=_comp_location(county, state), listing_type="for_sale")
+        return 0 if df is None else int(len(df))
+    except Exception as exc:
+        log.debug("comps.active_pool.error", county=county, state=state, error=str(exc)[:100])
+        return None
+
+
+def _months_of_inventory(active: Optional[int], sold: int) -> float | None:
+    """MOI = active listings / monthly sold rate. None when either signal is
+    missing (active None=fetch failed, or active 0 ~ almost always a failed pull
+    for a county seat) so the holding period falls back to the neutral default."""
+    if not active or sold <= 0:
+        return None
+    monthly_sold = sold / SOLD_WINDOW_MONTHS
+    if monthly_sold <= 0:
+        return None
+    return round(active / monthly_sold, 1)
+
+
+def _holding_months_from_moi(moi: float | None) -> int:
+    """Map absorption to an exit-time estimate (carrying cost driver).
+    <2mo seller's market -> fast flip; 2-6 balanced; >6 buyer's market -> slow."""
+    if moi is None:
+        return 6
+    if moi < 2:
+        return 4
+    if moi <= 6:
+        return 6
+    return 9
+
+
+def _num(v):
+    try:
+        if v is None or (isinstance(v, float) and (v != v)):
+            return None
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+# ---- Property-kind classification ------------------------------------------
+
+# County-published property-class tokens that mean manufactured housing. These
+# live in `Listing.land_use` (the county's own class string) and in
+# `raw.cama.building_type` (the assessor record). NOTHING in the comp matcher or
+# the valuation path read either field, which is why the board carries 791
+# identifiably-manufactured leads of which only 7 had property_kind == MOBILE:
+# the rest fell through _classify_kind as "unknown", and _filter_by_kind coerces
+# unknown to "sfr". Net effect measured on the live board: 430 manufactured homes
+# valued against site-built comps (230 pure SFR, 171 land, 24 SFR+townhouse) and
+# only 12 manufactured comps used board-wide.
+_MANUFACTURED_CLASS_TOKENS = (
+    "mobile home", "manufactured", "mfg home", "doublewide", "double wide",
+    "singlewide", "single wide", "modular home",
+)
+# land_use / building_type only RE-classify a subject whose own property_kind is
+# unset or already consistent with a manufactured dwelling. A lead explicitly
+# typed multi_family or commercial keeps its kind — one HUD multi-family
+# inspection lead on the board carries a "Mobile Home Lot" land_use it picked up
+# from a bad parcel join, and must not start comping against single-wides.
+_MANUFACTURED_OVERRIDABLE = (
+    PropertyKind.UNKNOWN, PropertyKind.LAND,
+    PropertyKind.SINGLE_FAMILY, PropertyKind.MOBILE,
+)
+
+
+def _county_class_is_manufactured(li: Listing) -> bool:
+    """True when the COUNTY says this parcel is manufactured housing."""
+    if li.property_kind not in _MANUFACTURED_OVERRIDABLE:
+        return False
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    cama = raw.get("cama") if isinstance(raw.get("cama"), dict) else {}
+    blob = " ".join([
+        str(getattr(li, "land_use", "") or ""),
+        str(cama.get("building_type") or ""),
+    ]).lower()
+    return any(t in blob for t in _MANUFACTURED_CLASS_TOKENS)
+
+
+def _classify_kind(row: dict | Listing) -> str:
+    """Bucket a HomeHarvest row OR a Listing into one of:
+       sfr | condo | townhouse | multi | land | manufactured | unknown"""
+    if isinstance(row, Listing):
+        # The county's own property class beats every other signal on the
+        # subject side — it is the assessor describing this exact parcel, not a
+        # scraper's guess. Checked FIRST so a manufactured home tagged
+        # single_family (256 of them on the board) still comps like-for-like.
+        if _county_class_is_manufactured(row):
+            return "manufactured"
+        # Use Listing's own classification
+        pk = row.property_kind
+        if pk == PropertyKind.SINGLE_FAMILY:
+            return "sfr"
+        if pk == PropertyKind.CONDO:
+            return "condo"
+        if pk == PropertyKind.TOWNHOUSE:
+            return "townhouse"
+        if pk == PropertyKind.MULTI_FAMILY:
+            return "multi"
+        if pk == PropertyKind.LAND:
+            return "land"
+        if pk == PropertyKind.MOBILE:
+            return "manufactured"
+        # Fall through to text heuristic when UNKNOWN
+        text_blob = " ".join(filter(None, [
+            row.description or "",
+            (row.raw or {}).get("style", ""),
+            str(getattr(row, "land_use", "") or ""),
+        ])).lower()
+    else:
+        # HomeHarvest dict row
+        style = str(row.get("style") or "").lower()
+        if "manufactured" in style or "mobile" in style:
+            return "manufactured"
+        if "single" in style:
+            return "sfr"
+        if "condo" in style:
+            return "condo"
+        if "town" in style:
+            return "townhouse"
+        if "multi" in style or "duplex" in style or "triplex" in style or "fourplex" in style:
+            return "multi"
+        if "land" in style or "lot" in style or "vacant" in style:
+            return "land"
+        text_blob = " ".join(str(row.get(k) or "") for k in ("text", "description", "style")).lower()
+
+    # Text heuristics
+    if any(k in text_blob for k in ("manufactured home", "mobile home", "double wide", "single wide", "doublewide", "singlewide")):
+        return "manufactured"
+    if any(k in text_blob for k in ("vacant land", "raw land", "buildable lot", "build site")):
+        return "land"
+    if any(k in text_blob for k in ("condominium", "condo unit")):
+        return "condo"
+    if "townhouse" in text_blob or "townhome" in text_blob:
+        return "townhouse"
+    if any(k in text_blob for k in ("duplex", "triplex", "fourplex", "multi-family", "multifamily", "5+ units")):
+        return "multi"
+    return "unknown"
+
+
+# ---- Spec backfill (best-effort match by exact street) ---------------------
+
+def _backfill_property_data(li: Listing, sold_pool: list[dict]) -> None:
+    if not (li.street_address and (li.zip_code or li.city)):
+        return
+    target_street = li.street_address.strip().lower()
+    for s in sold_pool:
+        s_street = str(s.get("street") or "").strip().lower()
+        if not s_street:
+            continue
+        if s_street == target_street or s_street in target_street or target_street in s_street:
+            if li.living_sqft is None and s.get("sqft"):
+                li.living_sqft = _num(s.get("sqft"))
+                li.raw.setdefault("sqft_source", "comp_backfill")
+                li.raw["living_sqft_estimated"] = True
+            if li.bedrooms is None and s.get("beds"):
+                li.bedrooms = _num(s.get("beds"))
+            if li.bathrooms is None and s.get("full_baths"):
+                li.bathrooms = _num(s.get("full_baths"))
+            if li.year_built is None and s.get("year_built") and str(s["year_built"]).replace(".0", "").isdigit():
+                li.year_built = int(s["year_built"])
+            if li.lot_size_sqft is None and s.get("lot_sqft"):
+                li.lot_size_sqft = _num(s.get("lot_sqft"))
+            return
+
+
+# ---- Strict comp matcher ---------------------------------------------------
+
+SQFT_BAND_PCT = 0.20    # ±20% of subject sqft
+YEAR_BAND = 15          # ±15 years
+BED_BAND_EXACT = True   # bedrooms must match exactly
+LAND_LOT_BAND_PCT = 0.50  # for land, ±50% acreage tolerance
+# Widened land-lot tiers, as MULTIPLICATIVE ratios (subject/r .. subject*r).
+# They are ratios, not ±percentages, because a ±percentage band wider than 100%
+# has a negative lower bound and therefore no lower bound at all — see
+# _within_band below for the bug this replaced. Chosen to match
+# valuation.calc.LAND_COMP_BANDS ("wide" 3.0, "loose" 5.0) exactly, so a comp
+# that survives to the DISPLAYED table is one the ARV path would also accept.
+# Before this alignment the two disagreed: calc rejected the mismatched comps
+# for its ARV while the comp table still showed them as the evidence.
+LAND_LOT_WIDEN_RATIOS = ((3.0, "lot~3x"), (5.0, "lot~5x"))
+# Geographic accuracy: when the subject has coordinates, comps must be
+# within this radius. Prevents a rural subject from being valued against
+# county-seat sales 20+ miles away (the "inaccurate comps" complaint).
+COMP_RADIUS_MILES = 10.0
+
+
+def _within_band(value: float, target: float, pct: float) -> bool:
+    """True when `value` is within ±`pct` of `target`.
+
+    GUARD: at pct >= 1.0 the naive lower bound `target * (1 - pct)` is zero or
+    NEGATIVE, i.e. the "band" accepts every positive value and only caps the top
+    — which is not a band. That is not hypothetical: stage 3 below called this
+    with pct=2.0 and pct=4.0, so an 86.7-acre subject accepted a 0.63-acre
+    building lot as a comparable, and $/acre decays hard with size (board
+    medians $153,523/ac at 0-1ac vs $22,744/ac at 20-50ac). Measured on the live
+    board: of 4,932 land leads carrying comps and a usable lot size, 4,022 hold
+    at least one comp outside a 3x ratio of the subject and 3,097 outside 5x —
+    the worst is a 2,500-acre tract comped against a 0.34-acre lot, 7,353x.
+    At pct >= 1 the band collapses to its symmetric ratio form
+    [target/(1+pct), target*(1+pct)], which is what every call site meant.
+    Sub-1.0 callers (the ±20% sqft bands, the ±50% lot band) are untouched.
+    """
+    if not value or not target:
+        return False
+    lo = target * (1 - pct) if pct < 1.0 else target / (1.0 + pct)
+    return lo <= value <= target * (1 + pct)
+
+
+def _within_ratio_band(value: float, target: float, ratio: float) -> bool:
+    """True when `value` is within a multiplicative `ratio` of `target` in BOTH
+    directions: target/ratio <= value <= target*ratio.
+
+    The honest way to express a wide size band. Mirrors the acreage band in
+    valuation.calc._land_arv, so the comps shown as evidence and the comps used
+    for the ARV are drawn from the same population.
+    """
+    if not value or not target or ratio <= 1.0:
+        return False
+    return target / ratio <= value <= target * ratio
+
+
+def _haversine_miles(lat1, lon1, lat2, lon2) -> float | None:
+    """Great-circle distance in miles, or None if any coord is missing."""
+    try:
+        from math import asin, cos, radians, sin, sqrt
+        lat1, lon1, lat2, lon2 = float(lat1), float(lon1), float(lat2), float(lon2)
+    except (TypeError, ValueError):
+        return None
+    dlat = radians(lat2 - lat1)
+    dlon = radians(lon2 - lon1)
+    a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2) ** 2
+    return 3958.8 * 2 * asin(min(1.0, sqrt(a)))
+
+
+# ---- Multi-dwelling "investment property" exclusion -----------------------
+# A parcel styled/zoned single-family that actually carries TWO OR MORE
+# separate structures (a site-built house plus a second mobile home, a
+# detached guest house, an in-law suite/ADU) reports AGGREGATE beds/baths/
+# sqft across every structure combined -- not either individual dwelling's
+# own specs. Confirmed live example (2026-10-04): 140 Old Leicester Rd,
+# Asheville NC -- HomeHarvest's `style` field says SINGLE_FAMILY and combined
+# sqft=1529, but the listing `text` says "two separate dwellings: a 1940s
+# bungalow and a single-wide mobile home" -- neither dwelling alone is
+# anywhere near 1529 sqft. Using this as a same-kind SFR comp compares the
+# subject's ONE house against the combined footprint/bed count of TWO
+# dwellings, which is not like-for-like no matter how well sqft/beds/zip/era
+# happen to land in-band.
+#
+# No STRUCTURED HomeHarvest/Realtor.com field exposes this: `style` stays
+# SINGLE_FAMILY (the parcel isn't platted/zoned as a duplex) and the
+# flattened sold-pool row carries no "structure_count"/"units" column
+# (verified against homeharvest's own `ordered_properties` DataFrame schema,
+# `.venv/lib/python3.12/site-packages/homeharvest/utils.py`, and the live
+# 140 Old Leicester Rd row itself -- `style` was SINGLE_FAMILY). The ONLY
+# available signal is the free-text `text` field, and only when the listing
+# happens to mention it, so recall here is necessarily partial -- a multi-
+# structure parcel whose listing text is silent on it is invisible to this
+# check. That makes this a PRECISION-first filter: match only unambiguous
+# multi-dwelling phrasing (never a loose single word like "guest" or
+# "cottage" alone) to keep false positives near zero, and when the match
+# would leave fewer than 3 comps, keep the pool as-is rather than starve it
+# on an unconfirmed guess -- the same discipline the condition-tier filter
+# just below already uses.
+_MULTI_DWELLING_RE = re.compile(
+    r"\b("
+    r"two\s+separate\s+(?:dwellings|homes|houses|residences)|"
+    r"(?:a\s+)?second\s+(?:dwelling|home|house|residence)\s+on\s+"
+    r"(?:the\s+|this\s+)?(?:property|lot|parcel|land)|"
+    r"(?:detached\s+)?(?:guest\s+house|in-?law\s+suite|accessory\s+dwelling\s+unit|\bADU\b)|"
+    r"(?:main\s+(?:house|dwelling)|primary\s+(?:dwelling|residence))\s+"
+    r"(?:plus|and|\+)\s+(?:a\s+)?(?:second|additional)?\s*"
+    r"(?:mobile\s+home|cottage|cabin|bungalow)|"
+    r"(?:house|home|bungalow|cottage)\s+and\s+(?:a\s+)?"
+    r"(?:single|double)[\s\-]?wide\s+mobile\s+home|"
+    r"multiple\s+(?:dwellings|structures|residences|homes)\s+on\s+"
+    r"(?:the\s+|this\s+)?(?:property|lot|parcel|site)"
+    r")\b", re.I,
+)
+
+
+def _is_multi_dwelling_listing(row: dict) -> bool:
+    """True when a HomeHarvest pool row's own listing text unambiguously
+    describes 2+ separate dwellings on one parcel. See the module note above
+    `_MULTI_DWELLING_RE` for why this is text-only and precision-first."""
+    text = str(row.get("text") or "")
+    return bool(text) and bool(_MULTI_DWELLING_RE.search(text))
+
+
+def _filter_by_kind(pool: list[dict], target_kind: str) -> list[dict]:
+    """Keep only same-kind properties from the pool."""
+    if target_kind == "unknown":
+        # No kind info on subject — return SFR pool (most common, safest default)
+        target_kind = "sfr"
+    out: list[dict] = []
+    for p in pool:
+        pk = _classify_kind(p)
+        if pk == target_kind:
+            out.append(p)
+        # SFR ↔ townhouse interchangeable when one is unknown
+        elif target_kind == "sfr" and pk == "townhouse":
+            out.append(p)
+    return out
+
+
+def _pick_3_comps(target: Listing, sold_pool: list[dict],
+                  kind_cache: dict | None = None) -> list[dict]:
+    """Strict like-for-like comp matcher. Refuses to mix kinds.
+
+    Returns up to 3 dicts. If pool can't produce a like-for-like match, returns
+    fewer (or zero) — better to show "not enough comps" than misleading comps.
+
+    `kind_cache` (enrich_with_comps passes one per run) keeps each county pool's
+    same-kind subset, so the text classifier runs once per pool row instead of once
+    per pool row PER LISTING (a 6,000-sale pool times 19,000 county leads).
+    """
+    target_kind = _classify_kind(target)
+    target_zip = (target.zip_code or "").strip()
+    target_city = (target.city or "").strip().lower()
+    target_state = (target.state or "").strip().upper()
+    target_sqft = target.living_sqft
+    target_beds = target.bedrooms
+    target_year = target.year_built
+    # `acreage` is the field the board actually carries for land: 12,917 of the
+    # 14,737 land rows have acreage set and lot_size_sqft null. Reading only
+    # lot_size_sqft meant the acreage band below never even had a target to
+    # compare against on 87.6% of land leads, so it silently never ran.
+    target_lot = target.lot_size_sqft or (
+        float(target.acreage) * 43560.0 if target.acreage and target.acreage > 0 else None
+    )
+
+    # Stage 1: same kind only
+    if kind_cache is not None:
+        ck = (id(sold_pool), target_kind)
+        kind_pool = kind_cache.get(ck)
+        if kind_pool is None:
+            kind_pool = kind_cache[ck] = _filter_by_kind(sold_pool, target_kind)
+    else:
+        kind_pool = _filter_by_kind(sold_pool, target_kind)
+    if not kind_pool:
+        return []
+    match_quality = "kind"
+
+    # Stage 1.5: geographic gate. If the subject has coordinates, attach a
+    # distance to every comp that has coordinates and keep only those within
+    # COMP_RADIUS_MILES. This is the most accurate anchor — it stops a rural
+    # subject from being compared against county-seat sales 20+ miles away.
+    has_geo = target.latitude is not None and target.longitude is not None
+    if has_geo:
+        near = []
+        for s in kind_pool:
+            d = _haversine_miles(target.latitude, target.longitude,
+                                 s.get("latitude"), s.get("longitude"))
+            if d is not None and d <= COMP_RADIUS_MILES:
+                s = {**s, "_distance_mi": round(d, 1)}
+                near.append(s)
+        if near:
+            kind_pool = near
+            match_quality = "kind+geo"
+
+    # Stage 2: zip-match within same kind
+    zip_pool = [s for s in kind_pool if str(s.get("zip_code") or "").strip() == target_zip] if target_zip else []
+    pool = zip_pool if zip_pool else kind_pool
+    if zip_pool:
+        match_quality = "zip+kind" + ("+geo" if has_geo else "")
+    elif target_city:
+        city_pool = [s for s in kind_pool
+                     if str(s.get("city") or "").strip().lower() == target_city
+                     and str(s.get("state") or "").strip().upper() == target_state]
+        if city_pool:
+            pool = city_pool
+            match_quality = "city+kind" + ("+geo" if has_geo else "")
+
+    # Stage 2.5: PRICE-BAND filter — reject comps whose sale price is wildly
+    # different from the subject's value. A $2M lakefront luxury home is not
+    # a comp for a $440K property no matter how close the sqft/beds match.
+    # Uses the subject's assessed/market value as anchor; ratio band of 3×
+    # keeps comps in the same value tier while allowing reasonable spread.
+    _anchor_val = None
+    try:
+        _anchor_val = float(target.market_value) if target.market_value else None
+    except (TypeError, ValueError):
+        pass
+    if not _anchor_val:
+        try:
+            _anchor_val = float(target.tax_value) if target.tax_value else None
+        except (TypeError, ValueError):
+            pass
+    if _anchor_val and _anchor_val > 10000 and len(pool) > 3:
+        price_filt = []
+        for s in pool:
+            sp = _num(s.get("sold_price"))
+            if sp and _anchor_val / 3.0 <= sp <= _anchor_val * 3.0:
+                price_filt.append(s)
+        if len(price_filt) >= 3:
+            pool = price_filt
+            match_quality += "+price"
+
+    # Stage 3 (LAND ONLY): match by lot acreage band — sqft is meaningless for raw land.
+    #
+    # This used to read `if lot_filt: pool = lot_filt`, i.e. when NOTHING fell in
+    # the band it silently kept the unfiltered pool and priced the subject off
+    # whatever was left. That is how 0.63-acre building lots came to value an
+    # 86.7-acre tract at $2,769,500: $/acre decays hard with size (board medians
+    # $153,523/ac at 0-1ac vs $22,744/ac at 20-50ac), so a 100x size gap makes
+    # the comp meaningless. Widen the band in steps instead of abandoning it,
+    # and when even the widest band is empty emit NO comps — "not enough comps"
+    # is a true statement; a 100x-mismatched lot comp is not.
+    #
+    # THE WIDENING WAS ITSELF UNBOUNDED BELOW. The two wide steps were written
+    # as ±percentages (2.0 and 4.0) through _within_band, whose lower bound
+    # `target * (1 - pct)` is NEGATIVE past pct=1.0 — so "lot~3x" and "lot~5x"
+    # had a ceiling and no floor, and the 0.63-acre comp walked straight through
+    # the widened step that was supposed to catch it. valuation/calc.py
+    # re-filters before computing an ARV, so the published NUMBER was protected;
+    # these comps are the evidence table the operator reads, and evidence that
+    # does not match the subject is worse than no evidence. The wide steps are
+    # now genuine ratio bands (LAND_LOT_WIDEN_RATIOS), aligned to calc's own.
+    if target_kind == "land" and target_lot:
+        for band, label in ((LAND_LOT_BAND_PCT, "lot"),) + LAND_LOT_WIDEN_RATIOS:
+            test = _within_band if label == "lot" else _within_ratio_band
+            lot_filt = [s for s in pool
+                        if s.get("lot_sqft") and test(float(s["lot_sqft"]), target_lot, band)]
+            if lot_filt:
+                pool = lot_filt
+                match_quality += f"+{label}"
+                break
+        else:
+            return []
+
+    # Stage 4 (NON-LAND): sqft band
+    if target_kind != "land" and target_sqft:
+        sqft_filt = [s for s in pool
+                     if s.get("sqft") and _within_band(float(s["sqft"]), target_sqft, SQFT_BAND_PCT)]
+        if len(sqft_filt) >= 3:
+            pool = sqft_filt
+            match_quality += "+sqft"
+
+    # Stage 5 (NON-LAND): beds exact
+    if target_kind not in ("land", "multi") and target_beds:
+        bed_filt = [s for s in pool
+                    if s.get("beds") is not None and float(s["beds"]) == target_beds]
+        if len(bed_filt) >= 3:
+            pool = bed_filt
+            match_quality += "+beds"
+
+    # Stage 6: year ±15
+    if target_year:
+        yr_filt = [s for s in pool
+                   if s.get("year_built") and abs(float(s["year_built"]) - target_year) <= YEAR_BAND]
+        if len(yr_filt) >= 3:
+            pool = yr_filt
+            match_quality += "+era"
+
+    # Condition parity: a gut/major-condition sale closed BELOW renovated retail,
+    # so it understates ARV for a fixed-up subject. Drop those when 3+ retail-
+    # grade comps remain. Non-land only.
+    if target_kind != "land":
+        retail = [s for s in pool
+                  if _comp_condition_tier(str(s.get("text") or s.get("description") or "")) not in ("gut", "major")]
+        if len(retail) >= 3:
+            pool = retail
+            match_quality += "+cond"
+
+    # Multi-dwelling exclusion: an aggregate-spec investment-property comp
+    # (two+ structures on one parcel) is not like-for-like even when its
+    # combined sqft/beds happen to land in-band — see `_is_multi_dwelling_
+    # listing` above. Drop when 3+ single-dwelling comps remain; never drop
+    # below 3 on a text guess alone, same discipline as condition parity.
+    if target_kind != "land":
+        single_dwelling = [s for s in pool if not _is_multi_dwelling_listing(s)]
+        if len(single_dwelling) >= 3:
+            pool = single_dwelling
+            match_quality += "+single_dwelling"
+
+    # Sort: closest-first when we have distances, else most-recent-first.
+    try:
+        if has_geo and any(s.get("_distance_mi") is not None for s in pool):
+            pool.sort(key=lambda s: (s.get("_distance_mi") if s.get("_distance_mi") is not None else 9e9))
+        else:
+            pool.sort(key=lambda s: str(s.get("last_sold_date") or "0000"), reverse=True)
+    except Exception:
+        pass
+
+    # Honesty flag: when the only anchor was "kind" — no zip, no city, and no
+    # geographic coordinates — the comps are county-wide, NOT local. Mark them
+    # so ARV downstream treats them as low-confidence instead of presenting
+    # far-away sales as comparable.
+    geographically_anchored = ("geo" in match_quality) or ("zip" in match_quality) or ("city" in match_quality)
+
+    out: list[dict] = []
+    for s in pool[:3]:
+        sold_price = _num(s.get("sold_price")) or _num(s.get("list_price"))
+        sqft = _num(s.get("sqft"))
+        out.append({
+            "address": str(s.get("street") or s.get("formatted_address") or "").strip(),
+            "city": s.get("city"),
+            "zip": s.get("zip_code"),
+            "sold_price": sold_price,
+            "sold_date": str(s.get("last_sold_date") or "") or None,
+            "sqft": sqft,
+            "lot_sqft": _num(s.get("lot_sqft")),
+            "beds": _num(s.get("beds")),
+            "baths": _num(s.get("full_baths")),
+            "year_built": int(s["year_built"]) if s.get("year_built") and str(s["year_built"]).replace(".0", "").isdigit() else None,
+            "kind": _classify_kind(s),
+            "distance_mi": s.get("_distance_mi"),
+            "geo_anchored": geographically_anchored,
+            "price_per_sqft": round(sold_price / sqft, 2) if sold_price and sqft else None,
+            "url": s.get("property_url"),
+            "match_quality": match_quality,
+            "multi_dwelling_suspected": _is_multi_dwelling_listing(s),
+        })
+
+    # Line-item adjustment grid (improved property only): adjust each comp toward
+    # the subject and re-express on the SUBJECT's sqft. ARV uses the median
+    # ADJUSTED $/sqft (see enrich loop) instead of raw $/sqft.
+    if target_kind != "land" and target.living_sqft:
+        raw_ppsfs = sorted(c["price_per_sqft"] for c in out if c.get("price_per_sqft"))
+        base_ppsf = raw_ppsfs[len(raw_ppsfs) // 2] if raw_ppsfs else None
+        if base_ppsf:
+            for c, s in zip(out, pool[:3]):
+                eff, adj = _adjust_comp(target, s, base_ppsf)
+                if eff:
+                    c["adjusted_ppsf"] = eff
+                    c["adjustments"] = adj
+    return out
+
+
+def _pick_3_rent_comps(target: Listing, rent_pool: list[dict]) -> list[dict]:
+    """Strict rent-comp matcher: same kind + zip + sqft band + beds."""
+    target_kind = _classify_kind(target)
+    if target_kind == "land":
+        return []  # land doesn't rent
+
+    kind_pool = _filter_by_kind(rent_pool, target_kind)
+    if not kind_pool:
+        return []
+
+    target_zip = (target.zip_code or "").strip()
+    target_city = (target.city or "").strip().lower()
+    target_state = (target.state or "").strip().upper()
+    target_sqft = target.living_sqft
+    target_beds = target.bedrooms
+
+    pool = ([s for s in kind_pool if str(s.get("zip_code") or "").strip() == target_zip]
+            if target_zip else [])
+    if not pool and target_city:
+        pool = [s for s in kind_pool
+                if str(s.get("city") or "").strip().lower() == target_city
+                and str(s.get("state") or "").strip().upper() == target_state]
+    if not pool:
+        return []  # don't fall back — rent varies too much across counties
+
+    if target_beds:
+        bed_filt = [s for s in pool
+                    if s.get("beds") is not None and float(s["beds"]) == target_beds]
+        if len(bed_filt) >= 3:
+            pool = bed_filt
+    if target_sqft:
+        sqft_filt = [s for s in pool
+                     if s.get("sqft") and _within_band(float(s["sqft"]), target_sqft, SQFT_BAND_PCT)]
+        if len(sqft_filt) >= 3:
+            pool = sqft_filt
+
+    # Multi-dwelling exclusion (see `_is_multi_dwelling_listing` above): an
+    # aggregate rent across two+ structures on one parcel isn't the rent for
+    # either dwelling alone. Same "never drop below 3" discipline.
+    single_dwelling = [s for s in pool if not _is_multi_dwelling_listing(s)]
+    if len(single_dwelling) >= 3:
+        pool = single_dwelling
+
+    out: list[dict] = []
+    for s in pool[:3]:
+        rent = _num(s.get("list_price"))
+        sqft = _num(s.get("sqft"))
+        out.append({
+            "address": str(s.get("street") or "").strip(),
+            "city": s.get("city"),
+            "zip": s.get("zip_code"),
+            "rent_per_month": rent,
+            "sqft": sqft,
+            "beds": _num(s.get("beds")),
+            "baths": _num(s.get("full_baths")),
+            "rent_per_sqft": round(rent / sqft, 2) if rent and sqft else None,
+            "url": s.get("property_url"),
+            "multi_dwelling_suspected": _is_multi_dwelling_listing(s),
+        })
+    return out
+
+
+# ---- Condition tier inference ---------------------------------------------
+
+CONDITION_PATTERNS = {
+    "move_in_ready": re.compile(
+        r"\b(move[\s\-]?in\s+ready|recently\s+(?:renovated|updated|remodeled)|"
+        r"new\s+(?:roof|hvac|kitchen|bath)|fully\s+(?:renovated|updated)|"
+        r"pristine|turn[\s\-]?key|like\s+new)\b", re.I),
+    "cosmetic": re.compile(
+        r"\b(needs\s+(?:cosmetic|minor)\s+(?:work|updates|TLC)|"
+        r"some\s+(?:cosmetic|minor)\s+(?:work|TLC)|paint|carpet)\b", re.I),
+    "major": re.compile(
+        r"\b(needs\s+(?:major|substantial|significant)\s+(?:work|repairs)|"
+        r"fixer[\s\-]?upper|handyman\s+special|investor\s+special|"
+        r"as[\s\-]?is(?:\s+condition)?|cash\s+only|"
+        r"needs\s+TLC|requires\s+(?:work|repair))\b", re.I),
+    "gut": re.compile(
+        r"\b(complete\s+(?:gut|renovation)|tear[\s\-]?down|knockdown|"
+        r"shell\s+only|down\s+to\s+studs|fire[\s\-]?damaged|"
+        r"condemned|uninhabitable)\b", re.I),
+}
+
+# --- Appraisal-style line-item adjustment grid (free, pure-Python) ---------
+# A raw $/sqft median treats a 1,000-sqft and a 2,500-sqft comp as identical
+# value-per-foot; a pro adjusts each comp toward the subject. GLA is adjusted at
+# a MARGINAL rate (a bigger house isn't worth proportionally more per foot), the
+# rest at conventional paired-sale dollar amounts. Gross adjustment is capped at
+# 25% of the comp price — beyond that the comp is too dissimilar to trust.
+MARGINAL_GLA_FRAC = 0.40   # marginal $/sqft = 40% of the local whole-value ppsf
+BATH_ADJ = 5000.0          # per full-bath difference
+LOT_ADJ_PER_SQFT = 1.0     # per sqft of lot delta (conservative)
+LOT_ADJ_CAP_FRAC = 0.10    # lot adjustment capped at 10% of comp price
+YEAR_ADJ = 400.0           # per year of effective-age difference (newer worth more)
+MAX_GROSS_ADJ_FRAC = 0.25  # appraisal rule: total adjustment <= 25% of comp price
+
+
+def _comp_condition_tier(text: str) -> str | None:
+    """Worst condition tier signalled by a comp's listing text (or None)."""
+    if not text:
+        return None
+    for tier in ("gut", "major", "cosmetic", "move_in_ready"):
+        if CONDITION_PATTERNS[tier].search(text):
+            return tier
+    return None
+
+
+def _adjust_comp(target: Listing, s: dict, base_ppsf: float) -> tuple[float | None, dict | None]:
+    """Adjust a comp's sold price toward the subject; return (effective $/sqft
+    expressed on the SUBJECT's sqft, adjustments breakdown). None if unusable."""
+    price = _num(s.get("sold_price")) or _num(s.get("list_price"))
+    comp_sqft = _num(s.get("sqft"))
+    tgt_sqft = target.living_sqft
+    if not price or not comp_sqft or not tgt_sqft or comp_sqft <= 0 or tgt_sqft <= 0:
+        return None, None
+    adj: dict = {}
+    if base_ppsf:
+        adj["gla"] = round((tgt_sqft - comp_sqft) * (MARGINAL_GLA_FRAC * base_ppsf), -2)
+    cb, tb = _num(s.get("full_baths")), target.bathrooms
+    if cb is not None and tb is not None:
+        adj["baths"] = round((tb - cb) * BATH_ADJ, -2)
+    cl, tl = _num(s.get("lot_sqft")), target.lot_size_sqft
+    if cl and tl:
+        lot_cap = LOT_ADJ_CAP_FRAC * price
+        adj["lot"] = round(max(-lot_cap, min(lot_cap, (tl - cl) * LOT_ADJ_PER_SQFT)), -2)
+    cy, ty = _num(s.get("year_built")), target.year_built
+    if cy and ty:
+        adj["age"] = round((ty - cy) * YEAR_ADJ, -2)
+    net = sum(adj.values())
+    gross = sum(abs(v) for v in adj.values())   # appraisal rule is on GROSS
+    cap = MAX_GROSS_ADJ_FRAC * price
+    capped_net = max(-cap, min(cap, net))
+    adj["net"] = round(capped_net, -2)
+    adj["gross"] = round(gross, -2)
+    # Flag when GROSS adjustment exceeds the limit — the comp is too dissimilar
+    # to fully trust (per the 25% appraisal guideline), even if NET is small.
+    adj["capped"] = gross > cap
+    effective_ppsf = round((price + capped_net) / tgt_sqft, 2)
+    return effective_ppsf, adj
+
+
+# Default condition by year-built bucket when no description signals
+DEFAULT_CONDITION_BY_AGE = {
+    # newer than 5 years → move-in ready unless told otherwise
+    "new":     "move_in_ready",     # built within 5 years
+    "modern":  "move_in_ready",     # 5-25 years
+    "vintage": "cosmetic",          # 25-50 years
+    "older":   "major",             # 50-80 years
+    "ancient": "gut",               # 80+ years
+}
+
+
+def _condition_tier(li: Listing) -> str:
+    """Return one of: move_in_ready, cosmetic, major, gut.
+
+    Strongest signal first: explicit description keywords. Falls back to
+    age-based default when description is silent. Distressed-source listings
+    default at least to 'cosmetic' (motivated seller is a tell).
+    """
+    parts: list[str] = []
+    if li.description:
+        parts.append(str(li.description))
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    distressed = raw.get("distressed") or {}
+    kw = distressed.get("matched_keywords") if isinstance(distressed, dict) else None
+    if isinstance(kw, list):
+        parts.append(" ".join(str(k) for k in kw))
+    elif isinstance(kw, str):
+        parts.append(kw)
+    text = " ".join(parts)
+
+    # Most-severe-first match
+    for tier in ("gut", "major", "cosmetic", "move_in_ready"):
+        if CONDITION_PATTERNS[tier].search(text):
+            return tier
+
+    # Default by age — DO NOT auto-tag "gut" purely on age. Gut requires
+    # explicit signals (fire damage, condemned, complete-gut text). Old
+    # homes default to "major" rehab; only the description triggers gut.
+    yb = li.year_built
+    if yb:
+        from datetime import datetime as _dt
+        age = _dt.utcnow().year - yb
+        if age < 10:
+            return "move_in_ready"
+        if age < 30:
+            return "cosmetic"
+        if age < 60:
+            return "cosmetic"  # 30-60y still mostly cosmetic absent text signals
+        return "major"           # 60+y default major (was overzealous gut)
+
+    # Distressed source → at least cosmetic
+    if li.source in ("national.distressed", "national.propwire"):
+        return "cosmetic"
+
+    return "cosmetic"  # safe middle
+
+
+# ---- County-recorded sale-price cross-check --------------------------------
+
+async def _apply_gis_crosscheck(http, comps: list[dict], pool_key: tuple[str, str],
+                                 cache: dict[tuple[str, str], dict | None]) -> None:
+    """For each sold comp in a `gis_crosscheck.SUPPORTED` county, look up the
+    county's own recorded SalePrice/DeedDate for that address and, when they
+    disagree with HomeHarvest's claimed sold_price by more than
+    `gis_crosscheck.PRICE_DISAGREEMENT_TOLERANCE`, prefer the county's number
+    (see enrichment_gis_sale_crosscheck.py for the confirmed bug this closes).
+    Mutates each comp dict in place. `cache` is keyed by (address, city) so
+    the same comp address reused across many listings in this run's batch
+    costs one live query, not one per listing."""
+    state, county = pool_key
+    for c in comps:
+        addr = c.get("address")
+        if not addr:
+            continue
+        key = (str(addr).strip().lower(), str(c.get("city") or "").strip().lower())
+        if key not in cache:
+            try:
+                cache[key] = await gis_crosscheck.crosscheck_sold_price(
+                    http, state=state, county=county, address=addr, city=c.get("city"),
+                    claimed_sold_price=c.get("sold_price"), claimed_sold_date=c.get("sold_date"),
+                )
+            except Exception as exc:  # noqa: BLE001
+                log.debug("comps.gis_crosscheck.error", error=str(exc)[:120])
+                cache[key] = None
+        result = cache[key]
+        if not result:
+            continue
+        c["gis_crosscheck"] = result
+        if not result["preferred"]:
+            continue
+        old_price = c.get("sold_price")
+        new_price = result["county_sale_price"]
+        c["sold_price_homeharvest"] = old_price
+        c["sold_price"] = new_price
+        if c.get("sqft"):
+            c["price_per_sqft"] = round(new_price / c["sqft"], 2)
+        # The appraisal-style adjustment grid (_adjust_comp) baked the OLD
+        # price into `adjusted_ppsf`; re-express it on the corrected price by
+        # the same ratio rather than re-running the whole grid -- cheap and
+        # directionally correct, not a full re-derivation.
+        if c.get("adjusted_ppsf") and old_price:
+            c["adjusted_ppsf"] = round(c["adjusted_ppsf"] * (new_price / old_price), 2)
+            if isinstance(c.get("adjustments"), dict):
+                c["adjustments"]["gis_price_corrected"] = True
+
+
+# ---- Main enrichment -------------------------------------------------------
+
+async def enrich_with_comps(listings: list[Listing]) -> None:
+    """Pull sold + rent pools for every real NC/SC county this batch actually
+    touches, and attach:
+       - 3 sold comps (kind+zip+sqft+beds+era matched)
+       - 3 rent comps (kind+zip+beds+sqft matched)
+       - Spec backfill (sqft, beds, baths, year)
+       - Condition tier (move_in / cosmetic / major / gut)
+
+    County universe: the distinct (state, county) pairs present in `listings`,
+    validated against the full 146-county NC+SC register (`in_scope_distressed`)
+    -- NOT `config.ALL_COUNTIES`' 18-county FLIP-only corridor. That narrower
+    list is a deliberate scope for flip-specific code (law-firm footprints,
+    court scrapers, the geocode seat-centroid fallback); it undercounted here
+    by construction, since 2026-09-15's "if it's a flip, it's the 18 counties;
+    if it's a distressed lead, it's anywhere in NC/SC" direction means every
+    one of the 146 counties can carry leads that still need an ARV. A county
+    with zero listings in this batch costs nothing (no pool is fetched for
+    it), so this keeps the original design's "cost bounded by county count,
+    not row count" property -- just measured against the counties actually
+    present, not a frozen 18-county list.
+    """
+    if not listings:
+        return
+    log.info("comps.start", count=len(listings))
+
+    county_list: list[tuple[str, str]] = sorted({
+        (li.state.strip().upper(), normalize_county(li.county))
+        for li in listings
+        if li.state and li.county and in_scope_distressed(li.county, li.state)
+    })
+    if not county_list:
+        log.info("comps.no_valid_counties", count=len(listings))
+        return
+
+    loop = asyncio.get_event_loop()
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        sold_futs = [loop.run_in_executor(pool, _sold_pool_for_seat, name, state) for state, name in county_list]
+        rent_futs = [loop.run_in_executor(pool, _rent_pool_for_seat, name, state) for state, name in county_list]
+        active_futs = [loop.run_in_executor(pool, _active_count_for_seat, name, state) for state, name in county_list]
+        sold_results, rent_results, active_results = await asyncio.gather(
+            asyncio.gather(*sold_futs, return_exceptions=True),
+            asyncio.gather(*rent_futs, return_exceptions=True),
+            asyncio.gather(*active_futs, return_exceptions=True),
+        )
+
+    sold_pools: dict[tuple[str, str], list[dict]] = {}
+    rent_pools: dict[tuple[str, str], list[dict]] = {}
+    velocity: dict[tuple[str, str], dict] = {}
+    for (state, name), sr, rr, ar in zip(county_list, sold_results, rent_results, active_results):
+        if isinstance(sr, list):
+            sold_pools[(state, name)] = sr
+        if isinstance(rr, list):
+            rent_pools[(state, name)] = rr
+        active = ar if isinstance(ar, int) else None   # None = fetch failed
+        moi = _months_of_inventory(active, len(sr) if isinstance(sr, list) else 0)
+        velocity[(state, name)] = {
+            "moi": moi, "holding_months_est": _holding_months_from_moi(moi),
+            "active": active, "sold_180d": len(sr) if isinstance(sr, list) else 0,
+        }
+    total_sold = sum(len(p) for p in sold_pools.values())
+    total_rent = sum(len(p) for p in rent_pools.values())
+    log.info("comps.pools_built", counties=len(sold_pools),
+             total_sold=total_sold, total_rent=total_rent)
+
+    matched_sold = matched_rent = backfilled = 0
+    cond_counts = {"move_in_ready": 0, "cosmetic": 0, "major": 0, "gut": 0}
+
+    # County-recorded sale-price cross-check (see enrichment_gis_sale_
+    # crosscheck.py): only open the extra httpx client when this batch
+    # actually touches a county that module covers, and cache by comp
+    # address so the same handful of addresses -- reused as comps across
+    # many nearby listings -- cost one live query each, not one per listing.
+    gis_needed = any(k in gis_crosscheck.SUPPORTED for k in county_list)
+    gis_cache: dict[tuple[str, str], dict | None] = {}
+    gis_ctx = client(timeout=20.0) if gis_needed else None
+    gis_http = await gis_ctx.__aenter__() if gis_ctx is not None else None
+
+    # The phase runs under a wall-clock cap (main.py, COMPS_PHASE_MAX_SECONDS) that the
+    # 2026-10-08 gated run hit after 24 minutes of this loop. Rows nobody reached kept only
+    # what they already had, so the order decides who goes without: rows with no comps first,
+    # then HOT/WARM, then the rows whose comps are oldest (age_comps() prunes those later).
+    today = date.today().isoformat()
+    kind_cache: dict = {}
+    for _i, li in enumerate(sorted(listings, key=_comps_priority)):
+        if _i % 200 == 0:
+            # Most rows never hit an await point in this loop (the gis crosscheck path is
+            # rare), so without this, asyncio.wait_for's COMPS_PHASE_MAX_SECONDS cap cannot
+            # preempt until the loop naturally finishes -- live logs show 100-700s of
+            # overshoot past the stated budget from exactly this (2026-10-16 gap-sweep).
+            await asyncio.sleep(0)
+        pool_key = ((li.state or "").strip().upper(), normalize_county(li.county)) if (li.county and li.state) else None
+        sold_pool = sold_pools.get(pool_key) if pool_key else None
+        rent_pool = rent_pools.get(pool_key) if pool_key else None
+
+        # Spec backfill from same-county sold pool
+        before = (li.living_sqft, li.bedrooms, li.bathrooms)
+        if sold_pool:
+            _backfill_property_data(li, sold_pool)
+        after = (li.living_sqft, li.bedrooms, li.bathrooms)
+        if before != after:
+            backfilled += 1
+
+        # Condition tier
+        if not isinstance(li.raw, dict):
+            li.raw = {}
+
+        # Market velocity -> per-listing holding-period estimate (calc reads it).
+        vel = velocity.get(pool_key) if pool_key else None
+        if vel:
+            li.raw["market_velocity"] = vel
+        tier = _condition_tier(li)
+        li.raw["condition_tier"] = tier
+        cond_counts[tier] = cond_counts.get(tier, 0) + 1
+
+        # Sold comps (strict like-for-like; may return fewer than 3 or zero)
+        if sold_pool:
+            comps = _pick_3_comps(li, sold_pool, kind_cache)
+            if comps and gis_http is not None and pool_key in gis_crosscheck.SUPPORTED:
+                await _apply_gis_crosscheck(gis_http, comps, pool_key, gis_cache)
+            if comps:
+                li.raw["comps"] = comps
+                # Honesty gate: only derive ARV $/sqft from comps that are
+                # geographically anchored (same zip / city / within radius).
+                # County-wide "kind only" comps are kept in raw for
+                # transparency but must NOT drive ARV — that was the
+                # "inaccurate comps" failure mode.
+                anchored = bool(comps and comps[0].get("geo_anchored"))
+                if not anchored:
+                    li.raw["comps_geo_warning"] = (
+                        "comps are county-wide (no same-zip/city/nearby match) — "
+                        "ARV from these is low confidence"
+                    )
+                # The median $/sqft comes only from anchored comps (_median_ppsf);
+                # a median left by LAST run's comps must not sit beside unanchored
+                # new ones (calc would price off it).
+                med = _median_ppsf(comps)
+                if med is not None:
+                    li.raw["comp_median_ppsf"] = med
+                else:
+                    li.raw.pop("comp_median_ppsf", None)
+                for c in comps:
+                    c["picked_on"] = today
+                matched_sold += 1
+            else:
+                li.raw["comps_note"] = (
+                    f"no like-for-like comps in same kind ({_classify_kind(li)}) "
+                    f"+ same zip/city pool"
+                )
+
+        # Rent comps (strict; same kind + zip)
+        if rent_pool:
+            rents = _pick_3_rent_comps(li, rent_pool)
+            if rents:
+                li.raw["rent_comps"] = rents
+                rpsf = [r["rent_per_sqft"] for r in rents if r.get("rent_per_sqft")]
+                if rpsf:
+                    rpsf.sort()
+                    median_rpsf = rpsf[len(rpsf) // 2]
+                    li.raw["rent_median_ppsf"] = median_rpsf
+                    # Sanity-bound the per-sqft estimate
+                    median_rpsf = max(0.50, min(3.50, median_rpsf))
+                    if li.living_sqft:
+                        # Estimate rent from per-sqft (more reliable than absolute median)
+                        li.raw["estimated_monthly_rent"] = round(median_rpsf * li.living_sqft, -1)
+                matched_rent += 1
+
+    if gis_ctx is not None:
+        await gis_ctx.__aexit__(None, None, None)
+
+    log.info("comps.done", listings=len(listings),
+             sold_matched=matched_sold, rent_matched=matched_rent,
+             backfilled=backfilled, conditions=cond_counts)
+
+
+# ---- Comp age and carry-forward (audit 2026-10-09) --------------------------------------
+#
+# WHY. The 2026-10-08 gated run lost the comps of 1,599 rows the 10/7 board had priced
+# (2.3% of the 69,706 rows in both that carried comps). 410 of them were right to go: the
+# subject is now land (or the comps were sfr on a lot) and validation._validate_comps drops a
+# comp of another kind. 1,160 were not: their identity changed between runs (Lincoln's
+# 10-digit PIN on a row that had none, a PTS Cloud roll row re-keyed), so merge_prior_board
+# never folded last run's row onto them and nothing carried its comps, and this phase hit its
+# wall-clock cap (main.py COMPS_PHASE_MAX_SECONDS) before the loop reached them. Comps that a
+# row already carried had no age either: nothing said how old a kept comp was or dropped it.
+#
+# THE RULES. A comp is evidence for COMPS_CARRY_MAX_AGE_DAYS after its sale (appraisal
+# practice: comparable sales within 12 months; the sold pool itself is 180 days). Every comp
+# the matcher picks is stamped `picked_on`. After the phase (whether or not it was capped),
+# age_comps() keeps a row's not-refreshed comps only while they are inside the window, marks
+# each `carried` with its `age_days`, and drops the rest. carry_forward_from_prior() gives a
+# row that still has none the comps the previous board held for the same property (same
+# parcel, numbered address or as-scraped fingerprint, same county), when they fit the
+# subject's kind and are inside the window, marked `carried_from` with that board's date.
+
+COMPS_CARRY_MAX_AGE_DAYS = 365
+
+
+def _median_ppsf(comps: list[dict]) -> float | None:
+    """The comp median $/sqft calc prices from: geographically anchored comps only (county-wide
+    'kind only' comps stay visible but never drive the ARV), adjusted $/sqft where a grid was
+    computed, and at 3+ comps the as-is/distressed sales under 0.70x the median dropped."""
+    if not comps or not comps[0].get("geo_anchored"):
+        return None
+    ppsf = sorted(p for p in ((c.get("adjusted_ppsf") or c.get("price_per_sqft")) for c in comps
+                              if isinstance(c, dict)) if p)
+    if not ppsf:
+        return None
+    if len(ppsf) >= 3:
+        median = ppsf[len(ppsf) // 2]
+        clean = [p for p in ppsf if p >= median * 0.70]
+        if len(clean) >= 3:
+            ppsf = clean
+    return ppsf[len(ppsf) // 2]
+
+
+def _comp_sale_date(c: dict) -> date | None:
+    s = str(c.get("sold_date") or c.get("sale_date") or "").strip()
+    if len(s) >= 8 and s[:8].isdigit():          # 20260518
+        s = f"{s[:4]}-{s[4:6]}-{s[6:8]}"
+    try:
+        return date.fromisoformat(s[:10])
+    except ValueError:
+        return None
+
+
+def comp_age_days(c: dict, today: date | None = None) -> int | None:
+    d = _comp_sale_date(c) if isinstance(c, dict) else None
+    return ((today or date.today()) - d).days if d else None
+
+
+_TIER_RANK = {"HOT": 0, "WARM": 1}
+
+
+def _comps_priority(li: Listing) -> tuple:
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    comps = raw.get("comps") if isinstance(raw.get("comps"), list) else []
+    ds = raw.get("distress_stack") if isinstance(raw.get("distress_stack"), dict) else {}
+    picked = min((str(c.get("picked_on") or "") for c in comps if isinstance(c, dict)), default="")
+    return (1 if comps else 0, _TIER_RANK.get(str(ds.get("tier") or ""), 2), picked)
+
+
+def _kind_fits(subject: Listing, comp_kind) -> bool:
+    """validation._validate_comps' rule: a comp of a different known kind does not fit
+    (townhouse and single-family trade in one pool)."""
+    from .validation import _canonical_kind
+    pk = subject.property_kind
+    subj = _canonical_kind(pk.value if hasattr(pk, "value") else str(pk or ""))
+    ck = _canonical_kind(comp_kind)
+    if not ck or not subj or subj in ("unknown",) or ck == subj:
+        return True
+    return (subj, ck) in {("single_family", "townhouse"), ("townhouse", "single_family")}
+
+
+def _set_median(li: Listing) -> None:
+    med = _median_ppsf(li.raw.get("comps") or [])
+    if med is not None:
+        li.raw["comp_median_ppsf"] = med
+    else:
+        li.raw.pop("comp_median_ppsf", None)
+
+
+def age_comps(listings: list[Listing], today: date | None = None) -> dict:
+    """Run after the comps phase, capped or not. Fresh comps (picked today) get their age;
+    every other comp list is a carry: kept while each comp is inside COMPS_CARRY_MAX_AGE_DAYS
+    of its sale (an undated comp cannot show that and is dropped), marked carried with its
+    age, and the median recomputed from what is left."""
+    today = today or date.today()
+    iso = today.isoformat()
+    stats = {"fresh": 0, "carried": 0, "aged_out_rows": 0, "aged_out_comps": 0}
+    for li in listings:
+        raw = li.raw if isinstance(li.raw, dict) else None
+        comps = raw.get("comps") if raw else None
+        if not isinstance(comps, list) or not comps:
+            continue
+        if all(isinstance(c, dict) and c.get("picked_on") == iso for c in comps):
+            for c in comps:
+                c["age_days"] = comp_age_days(c, today)
+            stats["fresh"] += 1
+            continue
+        keep = []
+        for c in comps:
+            if not isinstance(c, dict):
+                continue
+            age = comp_age_days(c, today)
+            if age is None or age > COMPS_CARRY_MAX_AGE_DAYS:
+                stats["aged_out_comps"] += 1
+                continue
+            c["age_days"] = age
+            c["carried"] = True
+            keep.append(c)
+        if len(keep) != len(comps):
+            raw["comps"] = keep
+            _set_median(li)
+        if keep:
+            stats["carried"] += 1
+        else:
+            stats["aged_out_rows"] += 1
+            raw["comps_note"] = (f"no comps this run; the last ones sold over "
+                                 f"{COMPS_CARRY_MAX_AGE_DAYS} days ago and were dropped")
+    return stats
+
+
+def _identity_keys(row) -> list[str]:
+    """parcel / numbered-address keys (verification.core.row_keys, state+county qualified),
+    then the as-scraped fingerprint: the keys compare_boards joins two boards on."""
+    from .verification.core import _IDENTITY_FIELDS, _fingerprint, row_keys
+    keys = [k for k in row_keys(row) if k.startswith(("parcel:", "addr:"))]
+    if isinstance(row, Listing):
+        row = row.model_dump(mode="json", include=set(_IDENTITY_FIELDS))
+    keys.append("fp:" + _fingerprint(row))
+    return keys
+
+
+def carry_forward_from_prior(listings: list[Listing], prior_rows: Iterable[dict],
+                             prior_as_of: str | None = None,
+                             today: date | None = None) -> dict:
+    """Rows that end the comps phase with no comps (or no recorded-sales basket) get the
+    previous board's for the same property (see the block comment above). `prior_rows` is one
+    streaming pass over the previous board with its 'comps' detail merged
+    (board_stream.iter_board_rows_with_detail); only prior rows carrying comps or a basket are
+    looked at, so memory is bounded by the rows needing them. A carried basket is
+    raw['recorded_comps'] (enrichment_recorded_comps: county recorded sales around the same
+    parcel, no per-sale dates) with its median, stamped `carried_from`."""
+    today = today or date.today()
+    stats = {"needing": 0, "carried": 0, "carried_recorded": 0, "ambiguous_keys": 0,
+             "kind_mismatch": 0, "aged_out": 0}
+    need: dict[str, int] = {}
+    dup: set[str] = set()
+    for i, li in enumerate(listings):
+        raw = li.raw if isinstance(li.raw, dict) else {}
+        if raw.get("comps") and raw.get("recorded_comps"):
+            continue
+        stats["needing"] += 1
+        for k in _identity_keys(li):
+            if k in need and need[k] != i:
+                dup.add(k)
+            need[k] = i
+    for k in dup:
+        need.pop(k, None)
+    stats["ambiguous_keys"] = len(dup)
+    if not need:
+        return stats
+
+    # best[i] = [key rank, prior street address, comps, basket, conflicted]: two prior rows of
+    # different addresses reaching the row on equally strong keys leave it without a carry.
+    best: dict[int, list] = {}
+    for row in prior_rows:
+        raw = row.get("raw") if isinstance(row.get("raw"), dict) else {}
+        comps = raw.get("comps") if isinstance(raw.get("comps"), list) else None
+        basket = raw.get("recorded_comps") if isinstance(raw.get("recorded_comps"), dict) else None
+        if not comps and not (basket and raw.get("comp_median_ppsf_recorded")):
+            continue
+        try:
+            keys = _identity_keys(row)
+        except Exception:  # noqa: BLE001 - an odd prior row is skipped
+            continue
+        addr = str(row.get("street_address") or "").strip().lower()
+        for rank, k in enumerate(keys):
+            i = need.get(k)
+            if i is None:
+                continue
+            prev = best.get(i)
+            if prev is None or rank < prev[0]:
+                best[i] = [rank, addr, comps,
+                           (basket, raw.get("comp_median_ppsf_recorded")) if basket else None, False]
+            elif rank == prev[0] and addr != prev[1]:
+                prev[4] = True
+            break
+    for i, (_rank, _addr, comps, basket, conflicted) in best.items():
+        if conflicted:
+            stats["ambiguous_keys"] += 1
+            continue
+        li = listings[i]
+        if not isinstance(li.raw, dict):
+            li.raw = {}
+        if basket and not li.raw.get("recorded_comps") and basket[1]:
+            li.raw["recorded_comps"] = {**basket[0], "carried_from": prior_as_of or "previous board"}
+            li.raw["comp_median_ppsf_recorded"] = basket[1]
+            stats["carried_recorded"] += 1
+        if li.raw.get("comps") or not comps:
+            continue
+        keep = []
+        for c in comps:
+            if not isinstance(c, dict):
+                continue
+            if not _kind_fits(li, c.get("kind")):
+                stats["kind_mismatch"] += 1
+                continue
+            age = comp_age_days(c, today)
+            if age is None or age > COMPS_CARRY_MAX_AGE_DAYS:
+                stats["aged_out"] += 1
+                continue
+            keep.append({**c, "carried": True, "age_days": age,
+                         "carried_from": prior_as_of or "previous board"})
+        if not keep:
+            continue
+        li.raw["comps"] = keep
+        _set_median(li)
+        ages = [c["age_days"] for c in keep]
+        li.raw["comps_note"] = (
+            f"no fresh comps this run; showing {len(keep)} carried from the "
+            f"{prior_as_of or 'previous'} board (sold {min(ages)}-{max(ages)} days ago)")
+        stats["carried"] += 1
+    return stats
+
+
+def carry_forward_from_board(listings: list[Listing], docs_dir=None) -> dict:
+    """carry_forward_from_prior() over the published board in `docs_dir` (default the repo's
+    docs/, the board this run will replace), streamed once with its 'comps' detail merged."""
+    import json
+    from pathlib import Path
+
+    from .board_stream import iter_board_rows_with_detail
+    docs = Path(docs_dir) if docs_dir else Path(__file__).resolve().parents[2] / "docs"
+    board = docs / "listings.json.gz"
+    if not board.exists():
+        return {"needing": 0, "carried": 0, "note": "no previous board"}
+    try:
+        as_of = str(json.loads((docs / "run_meta.json").read_text()).get("run_time") or "")[:10]
+    except (OSError, ValueError):
+        as_of = ""
+    try:
+        from .board_stream import detail_source
+        detail_source(docs)
+    except Exception:  # noqa: BLE001 - no or unreadable detail payload: comps live there
+        log.warning("comps_carry.skipped", reason="no detail payload", docs=str(docs))
+        return {"needing": 0, "carried": 0, "skipped": "no detail payload"}
+    try:
+        return carry_forward_from_prior(
+            listings, iter_board_rows_with_detail(board, keys=("comps",)), prior_as_of=as_of or None)
+    except Exception as exc:  # noqa: BLE001 - never fail the run over a carry
+        log.warning("comps_carry.skipped", reason=f"{type(exc).__name__}: {exc}"[:200])
+        return {"needing": 0, "carried": 0, "skipped": f"unreadable prior board: {type(exc).__name__}"}

@@ -1,0 +1,724 @@
+[
+ {
+  "options": {
+   "classes": "ninja_table_row_0 nt_row_id_37821"
+  },
+  "value": {
+   "county": "Alexander",
+   "address": "(0000041) NC 90 HWY E, Stony Point<br />7384 NC HWY 90 E, Stony Point",
+   "parcel": "0000041<br />0000396",
+   "saledatetime": "<span class='red'>Sale date not yet set</span>",
+   "openingbid": "",
+   "currentbid": "",
+   "closedate": "",
+   "propertytype": "Residential Home",
+   "courtfile": "25CV001557-010",
+   "ourfile": "24097",
+   "salestatus": "",
+   "___id___": 37821
+  }
+ },
+ {
+  "options": {
+   "classes": "ninja_table_row_1 nt_row_id_37822"
+  },
+  "value": {
+   "county": "Alexander",
+   "address": "742 Oxford School Rd,",
+   "parcel": "0006307",
+   "saledatetime": "<span class='red'>Sale date not yet set</span>",
+   "openingbid": "",
+   "currentbid": "",
+   "closedate": "",
+   "propertytype": "Residential Home",
+   "courtfile": "26CV000271-010",
+   "ourfile": "24405",
+   "salestatus": "",
+   "___id___": 37822
+  }
+ },
+ {
+  "options": {
+   "classes": "ninja_table_row_2 nt_row_id_37823"
+  },
+  "value": {
+   "county": "Alleghany",
+   "address": "1051 Delp Road, Laurel Springs",
+   "parcel": "3040204782",
+   "saledatetime": "7/30/2026 11:00:00 AM",
+   "openingbid": "$6,800.00",
+   "currentbid": "",
+   "closedate": "8/10/2026",
+   "propertytype": "Residential Vacant Lot",
+   "courtfile": "25CV001189-020",
+   "ourfile": "24232",
+   "salestatus": "",
+   "___id___": 37823
+  }
+ },
+ {
+  "options": {
+   "classes": "ninja_table_row_3 nt_row_id_37824"
+  },
+  "value": {
+   "county": "Alleghany",
+   "address": "125 Folger Road, Sparta",
+   "parcel": "3989 62 3029",
+   "saledatetime": "7/30/2026 11:00:00 AM",
+   "openingbid": "$10,600.00",
+   "currentbid": "",
+   "closedate": "8/10/2026",
+   "propertytype": "Residential Home",
+   "courtfile": "25CV001162-020",
+   "ourfile": "24274",
+   "salestatus": "",
+   "___id___": 37824
+  }
+ },
+ {
+  "options": {
+   "classes": "ninja_table_row_4 nt_row_id_37825"
+  },
+  "value": {
+   "county": "Anson",
+   "address": "321 Robinson Bridge Road, Morven",
+   "parcel": "649012870193",
+   "saledatetime": "8/27/2026 2:00:00 PM",
+   "openingbid": "",
+   "currentbid": "",
+   "closedate": "9/8/2026",
+   "propertytype": "Residential Home",
+   "courtfile": "25CV000769-030",
+   "ourfile": "23826",
+   "salestatus": "",
+   "___id___": 37825
+  }
+ },
+ {
+  "options": {
+   "classes": "ninja_table_row_5 nt_row_id_37826"
+  },
+  "value": {
+   "county": "Anson",
+   "address": "3192 Bethel Rd, Wadesboro",
+   "parcel": "645200921832",
+   "saledatetime": "8/27/2026 2:00:00 PM",
+   "openingbid": "",
+   "currentbid": "",
+   "closedate": "9/8/2026",
+   "propertytype": "Residential Vacant Lot",
+   "courtfile": "26CV000091-030",
+   "ourfile": "24392",
+   "salestatus": "",
+   "___id___": 37826
+  }
+ },
+ {
+  "options": {
+   "classes": "ninja_table_row_22 nt_row_id_37843"
+  },
+  "value": {
+   "county": "Burke",
+   "address": "578 E. Settings Blvd. NW, Valdese",
+   "parcel": "32724",
+   "saledatetime": "5/5/2026 11:00:00 AM",
+   "openingbid": "$12,500.00",
+   "currentbid": "$34,728.75",
+   "closedate": "8/3/2026",
+   "propertytype": "Residential Vacant Lot",
+   "courtfile": "25CVD001289-110",
+   "ourfile": "23567",
+   "salestatus": "",
+   "___id___": 37843
+  }
+ },
+ {
+  "options": {
+   "classes": "ninja_table_row_23 nt_row_id_37844"
+  },
+  "value": {
+   "county": "Burke",
+   "address": "243 Pleasant View Loop, Morganton",
+   "parcel": "8746",
+   "saledatetime": "7/16/2026 11:00:00 AM",
+   "openingbid": "$14,700.00",
+   "currentbid": "$16,500.00",
+   "closedate": "8/6/2026",
+   "propertytype": "Residential Home",
+   "courtfile": "24CVD001428-110",
+   "ourfile": "22932",
+   "salestatus": "",
+   "___id___": 37844
+  }
+ },
+ {
+  "options": {
+   "classes": "ninja_table_row_24 nt_row_id_37845"
+  },
+  "value": {
+   "county": "Burke",
+   "address": "227 Table Rock Terrace NW, Valdese",
+   "parcel": "53171",
+   "saledatetime": "7/16/2026 11:00:00 AM",
+   "openingbid": "$13,100.00",
+   "currentbid": "$13,851.00",
+   "closedate": "8/3/2026",
+   "propertytype": "Residential Vacant Lot",
+   "courtfile": "25CVD000540-110",
+   "ourfile": "23558",
+   "salestatus": "",
+   "___id___": 37845
+  }
+ },
+ {
+  "options": {
+   "classes": "ninja_table_row_25 nt_row_id_37846"
+  },
+  "value": {
+   "county": "Burke",
+   "address": "7087 Silver Creek Lane, Morganton<br />7091 Silver Creek Lane, Morganton",
+   "parcel": "40313<br />39225",
+   "saledatetime": "<span class='red'>Sale date not yet set</span>",
+   "openingbid": "",
+   "currentbid": "",
+   "closedate": "",
+   "propertytype": "Residential Vacant Lot",
+   "courtfile": "25CV002743-110",
+   "ourfile": "19102",
+   "salestatus": "",
+   "___id___": 37846
+  }
+ },
+ {
+  "options": {
+   "classes": "ninja_table_row_26 nt_row_id_37847"
+  },
+  "value": {
+   "county": "Burke",
+   "address": "Multiple Parcels",
+   "parcel": "Multiple",
+   "saledatetime": "<span class='red'>Sale date not yet set</span>",
+   "openingbid": "",
+   "currentbid": "",
+   "closedate": "",
+   "propertytype": "Residential Vacant Lot",
+   "courtfile": "25CV002596-110",
+   "ourfile": "20146",
+   "salestatus": "",
+   "___id___": 37847
+  }
+ },
+ {
+  "options": {
+   "classes": "ninja_table_row_27 nt_row_id_37848"
+  },
+  "value": {
+   "county": "Burke",
+   "address": "0 Jack London Street,",
+   "parcel": "40896",
+   "saledatetime": "<span class='red'>Sale date not yet set</span>",
+   "openingbid": "",
+   "currentbid": "",
+   "closedate": "",
+   "propertytype": "Residential Vacant Lot",
+   "courtfile": "26CV000399-110",
+   "ourfile": "23520",
+   "salestatus": "",
+   "___id___": 37848
+  }
+ },
+ {
+  "options": {
+   "classes": "ninja_table_row_28 nt_row_id_37849"
+  },
+  "value": {
+   "county": "Burke",
+   "address": "2092 Brent Street,",
+   "parcel": "44518",
+   "saledatetime": "<span class='red'>Sale date not yet set</span>",
+   "openingbid": "",
+   "currentbid": "",
+   "closedate": "",
+   "propertytype": "Residential Home",
+   "courtfile": "26CV001001-110",
+   "ourfile": "24414",
+   "salestatus": "",
+   "___id___": 37849
+  }
+ },
+ {
+  "options": {
+   "classes": "ninja_table_row_29 nt_row_id_37850"
+  },
+  "value": {
+   "county": "Burke",
+   "address": "1713 Butler Hill Road, Morganton",
+   "parcel": "3996",
+   "saledatetime": "<span class='red'>Sale date not yet set</span>",
+   "openingbid": "",
+   "currentbid": "",
+   "closedate": "",
+   "propertytype": "Residential Home",
+   "courtfile": "26CV000457-110",
+   "ourfile": "24536",
+   "salestatus": "",
+   "___id___": 37850
+  }
+ },
+ {
+  "options": {
+   "classes": "ninja_table_row_30 nt_row_id_37851"
+  },
+  "value": {
+   "county": "Burke",
+   "address": "7878 Houston Avenue, Hickory",
+   "parcel": "37682",
+   "saledatetime": "<span class='red'>Sale date not yet set</span>",
+   "openingbid": "",
+   "currentbid": "",
+   "closedate": "",
+   "propertytype": "Residential Home",
+   "courtfile": "26CV000899-110",
+   "ourfile": "24545",
+   "salestatus": "",
+   "___id___": 37851
+  }
+ },
+ {
+  "options": {
+   "classes": "ninja_table_row_31 nt_row_id_37852"
+  },
+  "value": {
+   "county": "Burke",
+   "address": "0 NC 18 S, Connelly Springs<br />0 NC 18 S, Connelly Springs",
+   "parcel": "16367<br />21752",
+   "saledatetime": "<span class='red'>Sale date not yet set</span>",
+   "openingbid": "",
+   "currentbid": "",
+   "closedate": "",
+   "propertytype": "Residential Vacant Lot",
+   "courtfile": "26CV000435-110",
+   "ourfile": "24601",
+   "salestatus": "",
+   "___id___": 37852
+  }
+ },
+ {
+  "options": {
+   "classes": "ninja_table_row_32 nt_row_id_37853"
+  },
+  "value": {
+   "county": "Burke",
+   "address": "1300 E Union St, Morganton<br />1302 E Union St, Morganton<br />0 Southview St, Morganton<br />0 Southview St, Morganton",
+   "parcel": "32342<br />32276<br />9140<br />9139",
+   "saledatetime": "<span class='red'>Sale date not yet set</span>",
+   "openingbid": "",
+   "currentbid": "",
+   "closedate": "",
+   "propertytype": "Mixed",
+   "courtfile": "26CV000454-110",
+   "ourfile": "24749",
+   "salestatus": "",
+   "___id___": 37853
+  }
+ },
+ {
+  "options": {
+   "classes": "ninja_table_row_33 nt_row_id_37854"
+  },
+  "value": {
+   "county": "Burke",
+   "address": "140 Southview St, Morganton",
+   "parcel": "9141",
+   "saledatetime": "<span class='red'>Sale date not yet set</span>",
+   "openingbid": "",
+   "currentbid": "",
+   "closedate": "",
+   "propertytype": "Residential Home",
+   "courtfile": "26CV000448-110",
+   "ourfile": "24751",
+   "salestatus": "",
+   "___id___": 37854
+  }
+ },
+ {
+  "options": {
+   "classes": "ninja_table_row_62 nt_row_id_37883"
+  },
+  "value": {
+   "county": "Cleveland",
+   "address": "(51411) Afton Dr, Kings Mountain<br />124 Afton Dr, Kings Mountain",
+   "parcel": "51411<br />12005",
+   "saledatetime": "6/25/2026 11:00:00 AM",
+   "openingbid": "$11,300.00",
+   "currentbid": "$25,000.00",
+   "closedate": "8/6/2026",
+   "propertytype": "Mixed",
+   "courtfile": "25CV003091-220",
+   "ourfile": "24481",
+   "salestatus": "",
+   "___id___": 37883
+  }
+ },
+ {
+  "options": {
+   "classes": "ninja_table_row_63 nt_row_id_37884"
+  },
+  "value": {
+   "county": "Cleveland",
+   "address": "126 Brunet Dr, Casar",
+   "parcel": "47004",
+   "saledatetime": "6/25/2026 11:00:00 AM",
+   "openingbid": "$6,200.00",
+   "currentbid": "$13,000.00",
+   "closedate": "8/7/2026",
+   "propertytype": "Residential Vacant Lot",
+   "courtfile": "25CV003791-220",
+   "ourfile": "24486",
+   "salestatus": "",
+   "___id___": 37884
+  }
+ },
+ {
+  "options": {
+   "classes": "ninja_table_row_64 nt_row_id_37885"
+  },
+  "value": {
+   "county": "Cleveland",
+   "address": "124 Galilee Church Rd, Kings Mountain",
+   "parcel": "12811",
+   "saledatetime": "6/25/2026 11:00:00 AM",
+   "openingbid": "$20,100.00",
+   "currentbid": "$84,000.00",
+   "closedate": "8/3/2026",
+   "propertytype": "Residential Home",
+   "courtfile": "25CV003450-220",
+   "ourfile": "24491",
+   "salestatus": "",
+   "___id___": 37885
+  }
+ },
+ {
+  "options": {
+   "classes": "ninja_table_row_96 nt_row_id_37917"
+  },
+  "value": {
+   "county": "Lincoln",
+   "address": "(16855) S Aspen St, Lincolnton",
+   "parcel": "16855",
+   "saledatetime": "8/20/2026 11:00:00 AM",
+   "openingbid": "",
+   "currentbid": "",
+   "closedate": "8/31/2026",
+   "propertytype": "Residential Home",
+   "courtfile": "26CV000155-540",
+   "ourfile": "24112",
+   "salestatus": "",
+   "___id___": 37917
+  }
+ },
+ {
+  "options": {
+   "classes": "ninja_table_row_97 nt_row_id_37918"
+  },
+  "value": {
+   "county": "Lincoln",
+   "address": "1586 S Aspen St, Lincolnton",
+   "parcel": "21332",
+   "saledatetime": "8/20/2026 11:00:00 AM",
+   "openingbid": "",
+   "currentbid": "",
+   "closedate": "8/31/2026",
+   "propertytype": "Residential Home",
+   "courtfile": "25CV003147-540",
+   "ourfile": "24578",
+   "salestatus": "",
+   "___id___": 37918
+  }
+ },
+ {
+  "options": {
+   "classes": "ninja_table_row_153 nt_row_id_37974"
+  },
+  "value": {
+   "county": "Rutherford",
+   "address": "207 McArthur Street, Forest City",
+   "parcel": "429249",
+   "saledatetime": "4/28/2026 11:00:00 AM",
+   "openingbid": "$10,700.00",
+   "currentbid": "$28,000.00",
+   "closedate": "8/6/2026",
+   "propertytype": "Residential Home",
+   "courtfile": "24CVD001321-800",
+   "ourfile": "23448",
+   "salestatus": "",
+   "___id___": 37974
+  }
+ },
+ {
+  "options": {
+   "classes": "ninja_table_row_154 nt_row_id_37975"
+  },
+  "value": {
+   "county": "Rutherford",
+   "address": "185 Jamerson Rd., Cliffside",
+   "parcel": "915854",
+   "saledatetime": "6/9/2026 11:00:00 AM",
+   "openingbid": "$15,200.00",
+   "currentbid": "$143,325.00",
+   "closedate": "8/3/2026",
+   "propertytype": "Residential Home",
+   "courtfile": "25CVD000938-800",
+   "ourfile": "23537",
+   "salestatus": "",
+   "___id___": 37975
+  }
+ },
+ {
+  "options": {
+   "classes": "ninja_table_row_155 nt_row_id_37976"
+  },
+  "value": {
+   "county": "Rutherford",
+   "address": "141 Duncan Street, Spindale",
+   "parcel": "1206540",
+   "saledatetime": "7/7/2026 11:00:00 AM",
+   "openingbid": "$12,000.00",
+   "currentbid": "$46,305.00",
+   "closedate": "8/6/2026",
+   "propertytype": "Residential Home",
+   "courtfile": "25CVD000199-800",
+   "ourfile": "23516",
+   "salestatus": "",
+   "___id___": 37976
+  }
+ },
+ {
+  "options": {
+   "classes": "ninja_table_row_156 nt_row_id_37977"
+  },
+  "value": {
+   "county": "Rutherford",
+   "address": "152 Old US 221N Hwy, Rutherfordton",
+   "parcel": "1204619",
+   "saledatetime": "7/7/2026 11:00:00 AM",
+   "openingbid": "$12,400.00",
+   "currentbid": "$22,050.00",
+   "closedate": "8/6/2026",
+   "propertytype": "Residential Home",
+   "courtfile": "25CVD000695-800",
+   "ourfile": "23764",
+   "salestatus": "",
+   "___id___": 37977
+  }
+ },
+ {
+  "options": {
+   "classes": "ninja_table_row_157 nt_row_id_37978"
+  },
+  "value": {
+   "county": "Rutherford",
+   "address": "118 Hillcrest Avenue, Forest City",
+   "parcel": "421175",
+   "saledatetime": "7/7/2026 11:00:00 AM",
+   "openingbid": "$13,000.00",
+   "currentbid": "$63,000.00",
+   "closedate": "8/6/2026",
+   "propertytype": "Residential Home",
+   "courtfile": "25CVD001262-800",
+   "ourfile": "23990",
+   "salestatus": "",
+   "___id___": 37978
+  }
+ },
+ {
+  "options": {
+   "classes": "ninja_table_row_158 nt_row_id_37979"
+  },
+  "value": {
+   "county": "Rutherford",
+   "address": "287 N Meridian Street, Rutherfordton",
+   "parcel": "1201941",
+   "saledatetime": "8/6/2026 11:00:00 AM",
+   "openingbid": "$12,100.00",
+   "currentbid": "",
+   "closedate": "8/17/2026",
+   "propertytype": "Residential Home",
+   "courtfile": "25CVD001051-800",
+   "ourfile": "23347",
+   "salestatus": "",
+   "___id___": 37979
+  }
+ },
+ {
+  "options": {
+   "classes": "ninja_table_row_159 nt_row_id_37980"
+  },
+  "value": {
+   "county": "Rutherford",
+   "address": "(908440) Harris Henrietta, Mooresboro",
+   "parcel": "908440",
+   "saledatetime": "8/6/2026 11:00:00 AM",
+   "openingbid": "$6,070.00",
+   "currentbid": "",
+   "closedate": "8/17/2026",
+   "propertytype": "Residential Vacant Lot",
+   "courtfile": "26CV000526-800",
+   "ourfile": "24743",
+   "salestatus": "",
+   "___id___": 37980
+  }
+ },
+ {
+  "options": {
+   "classes": "ninja_table_row_160 nt_row_id_37981"
+  },
+  "value": {
+   "county": "Rutherford",
+   "address": "186 Mountaintop Pkwy, Lake Lure",
+   "parcel": "1641050",
+   "saledatetime": "<span class='red'>Sale date not yet set</span>",
+   "openingbid": "",
+   "currentbid": "",
+   "closedate": "",
+   "propertytype": "Residential Vacant Lot",
+   "courtfile": "24CVD001334-800",
+   "ourfile": "23106",
+   "salestatus": "",
+   "___id___": 37981
+  }
+ },
+ {
+  "options": {
+   "classes": "ninja_table_row_161 nt_row_id_37982"
+  },
+  "value": {
+   "county": "Rutherford",
+   "address": "5970 US 221A Hwy, Mooresboro",
+   "parcel": "912224",
+   "saledatetime": "<span class='red'>Sale date not yet set</span>",
+   "openingbid": "",
+   "currentbid": "",
+   "closedate": "",
+   "propertytype": "Residential Home",
+   "courtfile": "26CV000506-800",
+   "ourfile": "24565",
+   "salestatus": "",
+   "___id___": 37982
+  }
+ },
+ {
+  "options": {
+   "classes": "ninja_table_row_162 nt_row_id_37983"
+  },
+  "value": {
+   "county": "Rutherford",
+   "address": "239 Florida Avenue, Spindale",
+   "parcel": "1207941",
+   "saledatetime": "<span class='red'>Sale date not yet set</span>",
+   "openingbid": "",
+   "currentbid": "",
+   "closedate": "",
+   "propertytype": "Residential Home",
+   "courtfile": "26CV000609-800",
+   "ourfile": "24741",
+   "salestatus": "",
+   "___id___": 37983
+  }
+ },
+ {
+  "options": {
+   "classes": "ninja_table_row_163 nt_row_id_37984"
+  },
+  "value": {
+   "county": "Rutherford",
+   "address": "550 Womack Lake Rd, Forest City",
+   "parcel": "1607140",
+   "saledatetime": "<span class='red'>Sale date not yet set</span>",
+   "openingbid": "",
+   "currentbid": "",
+   "closedate": "",
+   "propertytype": "Residential Home",
+   "courtfile": "26CV000674-800",
+   "ourfile": "24745",
+   "salestatus": "",
+   "___id___": 37984
+  }
+ },
+ {
+  "options": {
+   "classes": "ninja_table_row_164 nt_row_id_37985"
+  },
+  "value": {
+   "county": "Rutherford",
+   "address": "335 Bugger Hollow Rd, Ellenboro",
+   "parcel": "1605987",
+   "saledatetime": "<span class='red'>Sale date not yet set</span>",
+   "openingbid": "",
+   "currentbid": "",
+   "closedate": "",
+   "propertytype": "Residential Home",
+   "courtfile": "26CV000482-800",
+   "ourfile": "24752",
+   "salestatus": "",
+   "___id___": 37985
+  }
+ },
+ {
+  "options": {
+   "classes": "ninja_table_row_165 nt_row_id_37986"
+  },
+  "value": {
+   "county": "Rutherford",
+   "address": "5201 Whitesides Rd, Bostic",
+   "parcel": "1012203",
+   "saledatetime": "<span class='red'>Sale date not yet set</span>",
+   "openingbid": "",
+   "currentbid": "",
+   "closedate": "",
+   "propertytype": "Residential Home",
+   "courtfile": "26CV000355-800",
+   "ourfile": "24786",
+   "salestatus": "",
+   "___id___": 37986
+  }
+ },
+ {
+  "options": {
+   "classes": "ninja_table_row_166 nt_row_id_37987"
+  },
+  "value": {
+   "county": "Rutherford",
+   "address": "130 Mayflower Street, Forest City",
+   "parcel": "417270",
+   "saledatetime": "<span class='red'>Sale date not yet set</span>",
+   "openingbid": "",
+   "currentbid": "",
+   "closedate": "",
+   "propertytype": "Residential Home",
+   "courtfile": "26CV000320-800",
+   "ourfile": "24804",
+   "salestatus": "",
+   "___id___": 37987
+  }
+ },
+ {
+  "options": {
+   "classes": "ninja_table_row_167 nt_row_id_37988"
+  },
+  "value": {
+   "county": "Rutherford",
+   "address": "130 Lennie Court, Forest City",
+   "parcel": "1653046",
+   "saledatetime": "<span class='red'>Sale date not yet set</span>",
+   "openingbid": "",
+   "currentbid": "",
+   "closedate": "",
+   "propertytype": "Residential Home",
+   "courtfile": "26CV000686-800",
+   "ourfile": "24834",
+   "salestatus": "",
+   "___id___": 37988
+  }
+ }
+]

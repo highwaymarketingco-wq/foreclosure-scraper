@@ -1,0 +1,3086 @@
+{
+"cases": [
+{
+"key": "parcel:NC:henderson:0600439872",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:38:59.116821",
+"parcel_id": "0600439872",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Solid Waste"
+],
+"violations": [
+{
+"case_id": "2937",
+"date": "2022-03-28",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "Solid Waste"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "331 LAMB MOUNTAIN RD"
+},
+"signal": "code_enforcement",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:0600600739",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-09-22T15:36:28.147840",
+"parcel_id": "0600600739",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Nuisance",
+"Solid Waste"
+],
+"violations": [
+{
+"case_id": "3350",
+"date": "2026-09-03",
+"status": "Notice of Violation Issued",
+"violation": "Solid Waste"
+},
+{
+"case_id": "3015",
+"date": "2023-03-15",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "Nuisance"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "100 orchard ridge road"
+},
+"signal": "code_enforcement",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:0601165124",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-07-31T15:09:36.191962",
+"parcel_id": "0601165124",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Nuisance"
+],
+"violations": [
+{
+"case_id": "2959",
+"date": "2022-07-13",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "Nuisance"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "440 HIDDEN VIEW RD"
+},
+"signal": "code_enforcement",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:0601441013",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-07-01T03:46:13.825004",
+"parcel_id": "0601441013",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Nuisance"
+],
+"violations": [
+{
+"case_id": "1844",
+"date": "2026-04-14",
+"status": "Notice of Violation Issued",
+"violation": "Nuisance"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "2069 PILOT MOUNTAIN RD"
+},
+"signal": "code_enforcement",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:0611949460",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-07-01T03:46:13.825004",
+"parcel_id": "0611949460",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Solid Waste"
+],
+"violations": [
+{
+"case_id": "3260",
+"date": "2026-03-13",
+"status": "Notice of Violation Issued",
+"violation": "Solid Waste"
+}
+]
+}
+},
+"source": "counties_generic.state_contamination.nc_ust_incidents",
+"state": "NC",
+"street_address": "1718 SUGARLOAF MOUNTAIN RD"
+},
+"signal": "code_enforcement",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9527214365",
+"reason": "category_not_distress",
+"row": {
+"county": "Henderson",
+"first_seen": "2026-07-01T03:46:13.825004",
+"parcel_id": "9527214365",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Zoning"
+],
+"violations": [
+{
+"case_id": "3013",
+"date": "2023-03-06",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "Zoning"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "2968 Pleasant Grove Church Rd"
+},
+"signal": "code_enforcement",
+"verdict": "refuted"
+},
+{
+"key": "parcel:NC:henderson:9536341879",
+"reason": "category_not_distress",
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:38:59.116821",
+"parcel_id": "9536341879",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Zoning"
+],
+"violations": [
+{
+"case_id": "2938",
+"date": "2022-03-30",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "Zoning"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "54 ADAMS VIEW DR"
+},
+"signal": "code_enforcement",
+"verdict": "refuted"
+},
+{
+"key": "parcel:NC:henderson:9538629450",
+"reason": "category_not_distress",
+"row": {
+"county": "Henderson",
+"first_seen": "2026-07-01T03:46:13.825004",
+"parcel_id": "9538629450",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Zoning"
+],
+"violations": [
+{
+"case_id": "2991",
+"date": "2022-12-15",
+"status": "Notice of Violation Issued",
+"violation": "Zoning"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "29 H S DALTON RD"
+},
+"signal": "code_enforcement",
+"verdict": "refuted"
+},
+{
+"key": "parcel:NC:henderson:9548060064",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-07-22T20:45:25.608467",
+"parcel_id": "9548060064",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Nuisance"
+],
+"violations": [
+{
+"case_id": "3117",
+"date": "2024-06-19",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "Nuisance"
+},
+{
+"case_id": "2170",
+"date": "2018-07-30",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "Nuisance"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "111 E FOX RIDGE DR"
+},
+"signal": "code_enforcement",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9549142166",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:38:59.116821",
+"parcel_id": "9549142166",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Nuisance"
+],
+"violations": [
+{
+"case_id": "970",
+"date": "2024-04-12",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "Nuisance"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "4 LAUREL FOREST DR"
+},
+"signal": "code_enforcement",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9557867375",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:38:59.116821",
+"parcel_id": "9557867375",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Nuisance"
+],
+"violations": [
+{
+"case_id": "3032",
+"date": "2023-06-27",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "Nuisance"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "625 NELSON VALLEY LN"
+},
+"signal": "code_enforcement",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9568900439",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-09-22T15:36:28.147840",
+"parcel_id": "9568900439",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Nuisance"
+],
+"violations": [
+{
+"case_id": "1561",
+"date": "2026-09-10",
+"status": "Notice of Violation Issued",
+"violation": "Nuisance"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "817 MAYBANK DR"
+},
+"signal": "code_enforcement",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9568943079",
+"reason": "case_on_other_parcel",
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-27T06:18:34.033166",
+"parcel_id": "9568943079",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Nuisance"
+],
+"violations": [
+{
+"case_id": "3356",
+"date": "2026-09-10",
+"status": "Notice of Violation Issued",
+"violation": "Nuisance"
+}
+]
+}
+},
+"source": "counties_generic.arcgis_distress.hendersonville_flood_zone_structures",
+"state": "NC",
+"street_address": "637 SPARTANBURG HWY"
+},
+"signal": "code_enforcement",
+"verdict": "refuted"
+},
+{
+"key": "parcel:NC:henderson:9569371656",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-06-09T11:57:17.299851",
+"parcel_id": "9569371656",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Nuisance"
+],
+"violations": [
+{
+"case_id": "3037",
+"date": "2023-07-28",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "Nuisance"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "134 HAYNES ST"
+},
+"signal": "code_enforcement",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9569386719",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:38:59.116821",
+"parcel_id": "9569386719",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Nuisance"
+],
+"violations": [
+{
+"case_id": "3204",
+"date": "2025-08-06",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "Nuisance"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "2215 N EDENBURG ST"
+},
+"signal": "code_enforcement",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9569862880",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-07-01T03:46:13.825004",
+"parcel_id": "9569862880",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Nuisance"
+],
+"violations": [
+{
+"case_id": "3050",
+"date": "2023-09-15",
+"status": "15 Day Notice Issued",
+"violation": "Nuisance"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "108 APPALACHIAN AVE"
+},
+"signal": "code_enforcement",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9575740972",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:38:59.116821",
+"parcel_id": "9575740972",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Solid Waste"
+],
+"violations": [
+{
+"case_id": "2864",
+"date": "2021-02-14",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "Solid Waste"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "59 LOWER CREST ST"
+},
+"signal": "code_enforcement",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9577672583",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:38:59.116821",
+"parcel_id": "9577672583",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Solid Waste"
+],
+"violations": [
+{
+"case_id": "2461",
+"date": "2025-04-30",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "Solid Waste"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "330 JAMES ST"
+},
+"signal": "code_enforcement",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9577679137",
+"reason": "category_not_distress",
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:38:59.116821",
+"parcel_id": "9577679137",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Zoning"
+],
+"violations": [
+{
+"case_id": "3001",
+"date": "2023-01-18",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "Zoning"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "307 JAMES ST"
+},
+"signal": "code_enforcement",
+"verdict": "refuted"
+},
+{
+"key": "parcel:NC:henderson:9577984987",
+"reason": "category_not_distress",
+"row": {
+"county": "Henderson",
+"first_seen": "2026-05-12T20:49:36.735748",
+"parcel_id": "9577984987",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"General"
+],
+"violations": [
+{
+"case_id": "272",
+"date": "2005-10-19",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "General"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "204 Gull Ave"
+},
+"signal": "code_enforcement",
+"verdict": "refuted"
+},
+{
+"key": "parcel:NC:henderson:9578527777",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-07-01T03:46:13.825004",
+"parcel_id": "9578527777",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Nuisance"
+],
+"violations": [
+{
+"case_id": "1756",
+"date": "2011-12-12",
+"status": "Notice of Violation Issued",
+"violation": "Nuisance"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "202 FAIRFIELD DR"
+},
+"signal": "code_enforcement",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9578862491",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:38:59.116821",
+"parcel_id": "9578862491",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Nuisance"
+],
+"violations": [
+{
+"case_id": "1515",
+"date": "2024-07-08",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "Nuisance"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "785 NEW HOPE RD"
+},
+"signal": "code_enforcement",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9579420384",
+"reason": "case_closed",
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:38:59.116821",
+"parcel_id": "9579420384",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Nuisance"
+],
+"violations": [
+{
+"case_id": "2564",
+"date": "2018-05-24",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "Nuisance"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "313 DANA RD"
+},
+"signal": "code_enforcement",
+"verdict": "stale"
+},
+{
+"key": "parcel:NC:henderson:9579960770",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:38:59.116821",
+"parcel_id": "9579960770",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Junkyard"
+],
+"violations": [
+{
+"case_id": "798",
+"date": "2020-02-17",
+"status": "Notice of Violation Issued",
+"violation": "Junkyard"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "3967 HOWARD GAP RD"
+},
+"signal": "code_enforcement",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9585971963",
+"reason": "category_not_distress",
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:38:59.116821",
+"parcel_id": "9585971963",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Zoning"
+],
+"violations": [
+{
+"case_id": "2745",
+"date": "2020-01-10",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "Zoning"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "150 WOODED BLUFF LN"
+},
+"signal": "code_enforcement",
+"verdict": "refuted"
+},
+{
+"key": "parcel:NC:henderson:9587235371",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-07-01T03:46:13.825004",
+"parcel_id": "9587235371",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Nuisance"
+],
+"violations": [
+{
+"case_id": "2902",
+"date": "2021-10-11",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "Nuisance"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "160 MAPLEWOOD KNOLL DR"
+},
+"signal": "code_enforcement",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9587775455",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:38:59.116821",
+"parcel_id": "9587775455",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Nuisance"
+],
+"violations": [
+{
+"case_id": "2941",
+"date": "2022-04-08",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "Nuisance"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "80 BIRCHVIEW LN"
+},
+"signal": "code_enforcement",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9589798954",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:38:59.116821",
+"parcel_id": "9589798954",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Solid Waste"
+],
+"violations": [
+{
+"case_id": "2967",
+"date": "2022-08-15",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "Solid Waste"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "686 TAYLOR RD"
+},
+"signal": "code_enforcement",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9594483548",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-07-01T03:46:13.825004",
+"parcel_id": "9594483548",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Nuisance"
+],
+"violations": [
+{
+"case_id": "2091",
+"date": "2025-03-27",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "Nuisance"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "50 ACORN MOUNTAIN LN"
+},
+"signal": "code_enforcement",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9595089314",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:38:59.116821",
+"parcel_id": "9595089314",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Junkyard"
+],
+"violations": [
+{
+"case_id": "242",
+"date": "2026-03-05",
+"status": "15 Day Notice Issued",
+"violation": "Junkyard"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "38 Macedonia Rd"
+},
+"signal": "code_enforcement",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9595642133",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:38:59.116821",
+"parcel_id": "9595642133",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Nuisance"
+],
+"violations": [
+{
+"case_id": "687",
+"date": "2025-03-27",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "Nuisance"
+}
+]
+}
+},
+"source": "counties_generic.state_contamination.nc_ust_incidents",
+"state": "NC",
+"street_address": "20 L M MORGAN RD"
+},
+"signal": "code_enforcement",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9599697478",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-07-01T03:46:13.825004",
+"parcel_id": "9599697478",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Nuisance",
+"Solid Waste"
+],
+"violations": [
+{
+"case_id": "2663",
+"date": "2019-03-29",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "Solid Waste"
+},
+{
+"case_id": "1395",
+"date": "2009-08-21",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "Nuisance"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "4646 SUGARLOAF RD"
+},
+"signal": "code_enforcement",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9610584373",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:38:59.116821",
+"parcel_id": "9610584373",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Nuisance"
+],
+"violations": [
+{
+"case_id": "2936",
+"date": "2022-03-25",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "Nuisance"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "259 E Joe Rd"
+},
+"signal": "code_enforcement",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9610587690",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:38:59.116821",
+"parcel_id": "9610587690",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Nuisance"
+],
+"violations": [
+{
+"case_id": "2935",
+"date": "2022-03-25",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "Nuisance"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "131 JOE RD"
+},
+"signal": "code_enforcement",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9622876032",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-07-01T03:46:13.825004",
+"parcel_id": "9622876032",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Solid Waste"
+],
+"violations": [
+{
+"case_id": "2681",
+"date": "2021-02-18",
+"status": "Notice of Violation Issued",
+"violation": "Solid Waste"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "305 PENNSYLVANIA RD"
+},
+"signal": "code_enforcement",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9640631334",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:38:59.116821",
+"parcel_id": "9640631334",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Nuisance"
+],
+"violations": [
+{
+"case_id": "2951",
+"date": "2022-06-10",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "Nuisance"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "110 Arthur LN"
+},
+"signal": "code_enforcement",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9640730143",
+"reason": "category_not_distress",
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:38:59.116821",
+"parcel_id": "9640730143",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Zoning"
+],
+"violations": [
+{
+"case_id": "2469",
+"date": "2017-09-20",
+"status": "Notice of Violation Issued",
+"violation": "Zoning"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "33 JUBILATION DR"
+},
+"signal": "code_enforcement",
+"verdict": "refuted"
+},
+{
+"key": "parcel:NC:henderson:9650875466",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-07-01T03:46:13.825004",
+"parcel_id": "9650875466",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Solid Waste"
+],
+"violations": [
+{
+"case_id": "2012",
+"date": "2014-05-07",
+"status": "Notice of Violation Issued",
+"violation": "Solid Waste"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "58 MOUNTAIN HOME ST"
+},
+"signal": "code_enforcement",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9651136954",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:38:59.116821",
+"parcel_id": "9651136954",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Nuisance"
+],
+"violations": [
+{
+"case_id": "1161",
+"date": "2015-11-03",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "Nuisance"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "89 RUGBY DR"
+},
+"signal": "code_enforcement",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9652109964",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:38:59.116821",
+"parcel_id": "9652109964",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Nuisance"
+],
+"violations": [
+{
+"case_id": "2710",
+"date": "2019-09-09",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "Nuisance"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "38 DRY HOLLOW LN"
+},
+"signal": "code_enforcement",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9652327300",
+"reason": "category_not_distress",
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-16T19:51:25.896630",
+"parcel_id": "9652327300",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"General"
+],
+"violations": [
+{
+"case_id": "1211",
+"date": "2008-08-14",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "General"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "5360 HENDERSONVILLE RD"
+},
+"signal": "code_enforcement",
+"verdict": "refuted"
+},
+{
+"key": "parcel:NC:henderson:9660060338",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:38:59.116821",
+"parcel_id": "9660060338",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Nuisance"
+],
+"violations": [
+{
+"case_id": "943",
+"date": "2018-06-12",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "Nuisance"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "170 RIANNON LN"
+},
+"signal": "code_enforcement",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9661403931",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:38:59.116821",
+"parcel_id": "96614039310",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Solid Waste"
+],
+"violations": [
+{
+"case_id": "1371",
+"date": "2009-07-16",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "Solid Waste"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "119 DELICIOUS LN"
+},
+"signal": "code_enforcement",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9661405931",
+"reason": "category_not_distress",
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:38:59.116821",
+"parcel_id": "9661405931",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Zoning"
+],
+"violations": [
+{
+"case_id": "844",
+"date": "2007-07-31",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "Zoning"
+}
+]
+}
+},
+"source": "counties_generic.state_contamination.nc_ust_incidents",
+"state": "NC",
+"street_address": "1772 HOWARD GAP ROAD"
+},
+"signal": "code_enforcement",
+"verdict": "refuted"
+},
+{
+"key": "parcel:NC:henderson:9661649228",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:38:59.116821",
+"parcel_id": "9661649228",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Nuisance"
+],
+"violations": [
+{
+"case_id": "2554",
+"date": "2018-07-30",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "Nuisance"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "302 BENNING CT"
+},
+"signal": "code_enforcement",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9670345792",
+"reason": "category_not_distress",
+"row": {
+"county": "Henderson",
+"first_seen": "2026-07-31T15:21:04.373931",
+"parcel_id": "9670345792",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Zoning"
+],
+"violations": [
+{
+"case_id": "2894",
+"date": "2021-09-24",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "Zoning"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "2929 HOWARD GAP RD"
+},
+"signal": "code_enforcement",
+"verdict": "refuted"
+},
+{
+"key": "parcel:NC:henderson:9671716405",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:38:59.116821",
+"parcel_id": "9671716405",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Nuisance"
+],
+"violations": [
+{
+"case_id": "1237",
+"date": "2022-04-28",
+"status": "Notice of Violation Issued",
+"violation": "Nuisance"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "591 MCMINN RD"
+},
+"signal": "code_enforcement",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9681558872",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-07-01T03:46:13.825004",
+"parcel_id": "9681558872",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Solid Waste"
+],
+"violations": [
+{
+"case_id": "2528",
+"date": "2018-03-15",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "Solid Waste"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "422 FRUITLAND CEMETERY RD"
+},
+"signal": "code_enforcement",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9691642254",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:38:59.116821",
+"parcel_id": "9691642254",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Nuisance"
+],
+"violations": [
+{
+"case_id": "1268",
+"date": "2014-04-01",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "Nuisance"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "1400 S MILLS GAP RD"
+},
+"signal": "code_enforcement",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9692828055",
+"reason": "category_not_distress",
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:38:59.116821",
+"parcel_id": "9692828055",
+"raw": {
+"code_enforcement": {
+"has_open": true,
+"source": "henderson_ordinance_violations_tracking",
+"violation_types": [
+"Zoning"
+],
+"violations": [
+{
+"case_id": "2966",
+"date": "2022-08-10",
+"status": "In Progress - Case Assigned and Staff Reviewing",
+"violation": "Zoning"
+}
+]
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "212 WHITEHEAD RD"
+},
+"signal": "code_enforcement",
+"verdict": "refuted"
+},
+{
+"key": "parcel:NC:henderson:9568019646",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:39:01.711475",
+"parcel_id": "9568019646",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": false,
+"source": "hendersonville_vacant_structures_register",
+"vacant": true
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "1900 WILLOW RD"
+},
+"signal": "vacant_structure",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9568099076",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:39:01.711475",
+"parcel_id": "9568099076",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": null,
+"source": "hendersonville_vacant_structures_register",
+"vacant": true
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "1612 DIXIE LN"
+},
+"signal": "vacant_structure",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9568168457",
+"reason": "occupancy_not_recorded",
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:39:01.711475",
+"parcel_id": "9568168457",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": null,
+"source": "hendersonville_vacant_structures_register",
+"vacant": null
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "122 OVERLOOK VIEW DR"
+},
+"signal": "vacant_structure",
+"verdict": "unconfirmed"
+},
+{
+"key": "parcel:NC:henderson:9568210946",
+"reason": "occupancy_not_recorded",
+"row": {
+"county": "Henderson",
+"first_seen": "2026-07-01T03:46:13.825004",
+"parcel_id": "9568210946",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": null,
+"source": "hendersonville_vacant_structures_register",
+"vacant": null
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "122 SOUTH CAROLINA AVE"
+},
+"signal": "vacant_structure",
+"verdict": "unconfirmed"
+},
+{
+"key": "parcel:NC:henderson:9568212055",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-07-01T03:46:13.825004",
+"parcel_id": "9568212055",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": false,
+"source": "hendersonville_vacant_structures_register",
+"vacant": true
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "1605 GEORGIA AVE"
+},
+"signal": "vacant_structure",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9568272348",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:39:01.711475",
+"parcel_id": "9568272348",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": false,
+"source": "hendersonville_vacant_structures_register",
+"vacant": true
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "410 MIDWAY ST"
+},
+"signal": "vacant_structure",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9568281880",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-09-22T15:36:31.001479",
+"parcel_id": "9568281880",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": null,
+"source": "hendersonville_vacant_structures_register",
+"vacant": true
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "1314 PINECREST DR"
+},
+"signal": "vacant_structure",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9568281998",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:39:01.711475",
+"parcel_id": "9568281998",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": null,
+"source": "hendersonville_vacant_structures_register",
+"vacant": true
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "1413 PINECREST DR"
+},
+"signal": "vacant_structure",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9568282798",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:39:01.711475",
+"parcel_id": "9568282798",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": null,
+"source": "hendersonville_vacant_structures_register",
+"vacant": true
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "1312 PINECREST DR"
+},
+"signal": "vacant_structure",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9568291177",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-09-22T15:36:31.001479",
+"parcel_id": "9568291177",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": null,
+"source": "hendersonville_vacant_structures_register",
+"vacant": true
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "1415 PINECREST DR"
+},
+"signal": "vacant_structure",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9568471221",
+"reason": "occupancy_not_recorded",
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:39:01.711475",
+"parcel_id": "9568471221",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": false,
+"source": "hendersonville_vacant_structures_register",
+"vacant": null
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "1003 3RD AVE W"
+},
+"signal": "vacant_structure",
+"verdict": "unconfirmed"
+},
+{
+"key": "parcel:NC:henderson:9568483618",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:39:01.711475",
+"parcel_id": "9568483618",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": false,
+"source": "hendersonville_vacant_structures_register",
+"vacant": true
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "906 HOLMES ST"
+},
+"signal": "vacant_structure",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9568493680",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-09-22T15:36:31.001479",
+"parcel_id": "9568493680",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": null,
+"source": "hendersonville_vacant_structures_register",
+"vacant": true
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "701 N WHITTED"
+},
+"signal": "vacant_structure",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9568494492",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-09-22T15:36:31.001479",
+"parcel_id": "9568494492",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": true,
+"source": "hendersonville_vacant_structures_register",
+"vacant": true
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "826 7TH AVE W"
+},
+"signal": "vacant_structure",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9568494585",
+"reason": "occupancy_not_recorded",
+"row": {
+"county": "Henderson",
+"first_seen": "2026-07-01T03:46:13.825004",
+"parcel_id": "9568494585",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": null,
+"source": "hendersonville_vacant_structures_register",
+"vacant": null
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "700 N WHITTED"
+},
+"signal": "vacant_structure",
+"verdict": "unconfirmed"
+},
+{
+"key": "parcel:NC:henderson:9568495431",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:39:01.711475",
+"parcel_id": "9568495431",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": true,
+"source": "hendersonville_vacant_structures_register",
+"vacant": null
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "822 7TH AVE W"
+},
+"signal": "vacant_structure",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9568568741",
+"reason": "not_on_register",
+"row": {
+"county": "Henderson",
+"first_seen": "2026-07-01T03:46:13.825004",
+"parcel_id": "9568568741",
+"raw": {
+"code_enforcement": {
+"demolished": true,
+"has_open": false,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": false,
+"source": "hendersonville_vacant_structures_register",
+"vacant": null
+}
+},
+"source": "counties_generic.state_contamination.nc_ust_incidents",
+"state": "NC",
+"street_address": "113 S JUSTICE ST"
+},
+"signal": "vacant_structure",
+"verdict": "refuted"
+},
+{
+"key": "parcel:NC:henderson:9568624948",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:39:01.711475",
+"parcel_id": "9568624948",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": null,
+"source": "hendersonville_vacant_structures_register",
+"vacant": true
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "1001 TEMON ST"
+},
+"signal": "vacant_structure",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9568663862",
+"reason": "occupancy_not_recorded",
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:39:01.711475",
+"parcel_id": "9568663862",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": false,
+"source": "hendersonville_vacant_structures_register",
+"vacant": null
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "522 1ST AVE W"
+},
+"signal": "vacant_structure",
+"verdict": "unconfirmed"
+},
+{
+"key": "parcel:NC:henderson:9568677227",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:39:01.711475",
+"parcel_id": "9568677227",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure",
+"Condemnation"
+]
+},
+"vacancy": {
+"boarded_up": false,
+"source": "hendersonville_vacant_structures_register",
+"vacant": true
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "115 RHODES ST"
+},
+"signal": "vacant_structure",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9568774191",
+"reason": "occupancy_not_recorded",
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:39:01.711475",
+"parcel_id": "9568774191",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": false,
+"source": "hendersonville_vacant_structures_register",
+"vacant": null
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "230 1ST AVE W"
+},
+"signal": "vacant_structure",
+"verdict": "unconfirmed"
+},
+{
+"key": "parcel:NC:henderson:9568897788",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:39:01.711475",
+"parcel_id": "9568897788",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": true,
+"source": "hendersonville_vacant_structures_register",
+"vacant": null
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "407 7TH AVE E"
+},
+"signal": "vacant_structure",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9568994914",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:39:01.711475",
+"parcel_id": "9568994914",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": true,
+"source": "hendersonville_vacant_structures_register",
+"vacant": null
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "601 E PACE ST"
+},
+"signal": "vacant_structure",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9569249141",
+"reason": "occupancy_not_recorded",
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:39:01.711475",
+"parcel_id": "9569249141",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": false,
+"source": "hendersonville_vacant_structures_register",
+"vacant": null
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "200 EWBANK"
+},
+"signal": "vacant_structure",
+"verdict": "unconfirmed"
+},
+{
+"key": "parcel:NC:henderson:9569282226",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:38:59.116821",
+"parcel_id": "9569282226",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+],
+"violations": [
+{
+"case_id": "3266",
+"date": "2026-03-23",
+"status": "Notice of Violation Issued",
+"violation": "Manufactured Home Graveyard"
+}
+]
+},
+"vacancy": {
+"boarded_up": false,
+"source": "hendersonville_vacant_structures_register",
+"vacant": true
+}
+},
+"source": "counties_nc.henderson_code_violations",
+"state": "NC",
+"street_address": "203 Lyndhurst Drive"
+},
+"signal": "vacant_structure",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9569329759",
+"reason": "occupancy_not_recorded",
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:39:01.711475",
+"parcel_id": "9569329759",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": false,
+"source": "hendersonville_vacant_structures_register",
+"vacant": null
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "1733 HAYWOOD RD"
+},
+"signal": "vacant_structure",
+"verdict": "unconfirmed"
+},
+{
+"key": "parcel:NC:henderson:9569344337",
+"reason": "structure_demolished",
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:39:01.711475",
+"parcel_id": "9569344337",
+"raw": {
+"code_enforcement": {
+"demolished": true,
+"has_open": false,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure",
+"Condemnation"
+]
+},
+"vacancy": {
+"boarded_up": true,
+"source": "hendersonville_vacant_structures_register",
+"vacant": null
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "618 FERNCLIFF"
+},
+"signal": "vacant_structure",
+"verdict": "stale"
+},
+{
+"key": "parcel:NC:henderson:9569347380",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:39:01.711475",
+"parcel_id": "9569347380",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": false,
+"source": "hendersonville_vacant_structures_register",
+"vacant": true
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "602 FERNCLIFF"
+},
+"signal": "vacant_structure",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9569402580",
+"reason": "occupancy_not_recorded",
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:39:01.711475",
+"parcel_id": "9569402580",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": false,
+"source": "hendersonville_vacant_structures_register",
+"vacant": null
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "917 9TH AVE W"
+},
+"signal": "vacant_structure",
+"verdict": "unconfirmed"
+},
+{
+"key": "parcel:NC:henderson:9569419828",
+"reason": "marked_occupied",
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:39:01.711475",
+"parcel_id": "9569419828",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": null,
+"source": "hendersonville_vacant_structures_register",
+"vacant": null
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "902 SYLVAN BLVD"
+},
+"signal": "vacant_structure",
+"verdict": "stale"
+},
+{
+"key": "parcel:NC:henderson:9569428702",
+"reason": "occupancy_not_recorded",
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:39:01.711475",
+"parcel_id": "9569428702",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": null,
+"source": "hendersonville_vacant_structures_register",
+"vacant": null
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "223 ASHWOOD"
+},
+"signal": "vacant_structure",
+"verdict": "unconfirmed"
+},
+{
+"key": "parcel:NC:henderson:9569442095",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:39:01.711475",
+"parcel_id": "9569442095",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": null,
+"source": "hendersonville_vacant_structures_register",
+"vacant": true
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "421 HIGATE RD"
+},
+"signal": "vacant_structure",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9569447296",
+"reason": "occupancy_not_recorded",
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:39:01.711475",
+"parcel_id": "9569447296",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": null,
+"source": "hendersonville_vacant_structures_register",
+"vacant": null
+}
+},
+"source": "counties_generic.arcgis_distress.hendersonville_flood_zone_structures",
+"state": "NC",
+"street_address": "1744 MEADOWBROOK TER"
+},
+"signal": "vacant_structure",
+"verdict": "unconfirmed"
+},
+{
+"key": "parcel:NC:henderson:9569463261",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:39:01.711475",
+"parcel_id": "9569463261",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": null,
+"source": "hendersonville_vacant_structures_register",
+"vacant": true
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "2025 S STONEY VIEW CT"
+},
+"signal": "vacant_structure",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9569543180",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:39:01.711475",
+"parcel_id": "9569543180",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": true,
+"source": "hendersonville_vacant_structures_register",
+"vacant": null
+}
+},
+"source": "counties_generic.arcgis_distress.hendersonville_flood_zone_structures",
+"state": "NC",
+"street_address": "1730 ASHEVILLE HWY"
+},
+"signal": "vacant_structure",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9569722889",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:39:01.711475",
+"parcel_id": "9569722889",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": false,
+"source": "hendersonville_vacant_structures_register",
+"vacant": true
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "1302 N MAIN ST"
+},
+"signal": "vacant_structure",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9569816848",
+"reason": "occupancy_not_recorded",
+"row": {
+"county": "Henderson",
+"first_seen": "2026-07-01T03:46:13.825004",
+"parcel_id": "9569816848",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": false,
+"source": "hendersonville_vacant_structures_register",
+"vacant": null
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "706 WHITE SPARROW DR"
+},
+"signal": "vacant_structure",
+"verdict": "unconfirmed"
+},
+{
+"key": "parcel:NC:henderson:9569868366",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-07-01T03:46:13.825004",
+"parcel_id": "9569868366",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": false,
+"source": "hendersonville_vacant_structures_register",
+"vacant": true
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "8 CLEAR CREEK RD"
+},
+"signal": "vacant_structure",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9569903834",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:39:01.711475",
+"parcel_id": "9569903834",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure",
+"Condemnation"
+]
+},
+"vacancy": {
+"boarded_up": false,
+"source": "hendersonville_vacant_structures_register",
+"vacant": true
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "721 WOODCOCK ST"
+},
+"signal": "vacant_structure",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9569908005",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:31:27.632615",
+"parcel_id": "9569908005",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": true,
+"source": "hendersonville_vacant_structures_register",
+"vacant": null
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "704 E PACE ST"
+},
+"signal": "vacant_structure",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9569909242",
+"reason": "occupancy_not_recorded",
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:39:01.711475",
+"parcel_id": "9569909242",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": false,
+"source": "hendersonville_vacant_structures_register",
+"vacant": null
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "722 E PACE ST"
+},
+"signal": "vacant_structure",
+"verdict": "unconfirmed"
+},
+{
+"key": "parcel:NC:henderson:9569910422",
+"reason": "occupancy_not_recorded",
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:39:01.711475",
+"parcel_id": "9569910422",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": false,
+"source": "hendersonville_vacant_structures_register",
+"vacant": null
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "722 PARKVIEW DR"
+},
+"signal": "vacant_structure",
+"verdict": "unconfirmed"
+},
+{
+"key": "parcel:NC:henderson:9578022312",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-07-01T03:46:13.825004",
+"parcel_id": "9578022312",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": false,
+"source": "hendersonville_vacant_structures_register",
+"vacant": true
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "1136 GARDEN LN"
+},
+"signal": "vacant_structure",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9578090970",
+"reason": "occupancy_not_recorded",
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:39:01.711475",
+"parcel_id": "9578090970",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": false,
+"source": "hendersonville_vacant_structures_register",
+"vacant": null
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "710 JONAS ST"
+},
+"signal": "vacant_structure",
+"verdict": "unconfirmed"
+},
+{
+"key": "parcel:NC:henderson:9578124065",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:39:01.711475",
+"parcel_id": "9578124065",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": false,
+"source": "hendersonville_vacant_structures_register",
+"vacant": true
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "715 SHADYWOOD LN"
+},
+"signal": "vacant_structure",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9578219499",
+"reason": null,
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:39:01.711475",
+"parcel_id": "9578219499",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": false,
+"source": "hendersonville_vacant_structures_register",
+"vacant": true
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "611 BROOKLYN"
+},
+"signal": "vacant_structure",
+"verdict": "confirmed"
+},
+{
+"key": "parcel:NC:henderson:9578257546",
+"reason": "occupancy_not_recorded",
+"row": {
+"county": "Henderson",
+"first_seen": "2026-07-01T03:46:13.825004",
+"parcel_id": "9578257546",
+"raw": {
+"code_enforcement": {
+"demolished": false,
+"has_open": true,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": null,
+"source": "hendersonville_vacant_structures_register",
+"vacant": null
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "401 GLOVER"
+},
+"signal": "vacant_structure",
+"verdict": "unconfirmed"
+},
+{
+"key": "parcel:NC:henderson:9578352617",
+"reason": "structure_demolished",
+"row": {
+"county": "Henderson",
+"first_seen": "2026-07-01T03:46:13.825004",
+"parcel_id": "9578352617",
+"raw": {
+"code_enforcement": {
+"demolished": true,
+"has_open": false,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": true,
+"source": "hendersonville_vacant_structures_register",
+"vacant": null
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "201 BLUE RIDGE ST"
+},
+"signal": "vacant_structure",
+"verdict": "stale"
+},
+{
+"key": "parcel:NC:henderson:9579230754",
+"reason": "structure_demolished",
+"row": {
+"county": "Henderson",
+"first_seen": "2026-08-06T13:39:01.711475",
+"parcel_id": "9579230754",
+"raw": {
+"code_enforcement": {
+"demolished": true,
+"has_open": false,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": null,
+"source": "hendersonville_vacant_structures_register",
+"vacant": null
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "112 N BLUE RIDGE AVE"
+},
+"signal": "vacant_structure",
+"verdict": "stale"
+},
+{
+"key": "parcel:NC:henderson:9579232596",
+"reason": "structure_demolished",
+"row": {
+"county": "Henderson",
+"first_seen": "2026-09-22T15:36:31.001479",
+"parcel_id": "9579232596",
+"raw": {
+"code_enforcement": {
+"demolished": true,
+"has_open": false,
+"kind": "vacant_structure_register",
+"source": "hendersonville_vacant_structures_register",
+"violation_types": [
+"Vacant Structure"
+]
+},
+"vacancy": {
+"boarded_up": false,
+"source": "hendersonville_vacant_structures_register",
+"vacant": true
+}
+},
+"source": "counties_nc.hendersonville_vacant_structures",
+"state": "NC",
+"street_address": "120 N BLUE RIDGE AVE"
+},
+"signal": "vacant_structure",
+"verdict": "stale"
+}
+],
+"note": "the rows the 2026-10-06 live sweep checked (minimal fields: no owner, no notes) and the verdicts it pushed (43119aaa)"
+}

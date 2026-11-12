@@ -1,0 +1,62 @@
+[
+  {
+    "name": "hot_lead_priority",
+    "enabled": true,
+    "trigger": {
+      "grade": [
+        "A"
+      ],
+      "has_phone": true
+    },
+    "actions": [
+      {
+        "type": "tag",
+        "value": "priority_sms"
+      },
+      {
+        "type": "set_status",
+        "value": "contact_pending"
+      }
+    ]
+  },
+  {
+    "name": "warm_lead_mail",
+    "enabled": true,
+    "trigger": {
+      "grade": [
+        "B"
+      ],
+      "has_mailing_address": true
+    },
+    "actions": [
+      {
+        "type": "tag",
+        "value": "direct_mail"
+      },
+      {
+        "type": "queue_campaign",
+        "value": "mail"
+      }
+    ]
+  },
+  {
+    "name": "tax_lien_equity",
+    "enabled": true,
+    "trigger": {
+      "listing_type": [
+        "tax_lien"
+      ],
+      "min_equity": 50000
+    },
+    "actions": [
+      {
+        "type": "tag",
+        "value": "high_equity"
+      },
+      {
+        "type": "set_status",
+        "value": "researching"
+      }
+    ]
+  }
+]

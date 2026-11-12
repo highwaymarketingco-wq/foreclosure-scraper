@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Foreclosure Board">
+  <!-- Source artwork for icon-maskable-512.png. Same brand tile as icon.svg, with
+       the glyph scaled down so the whole mark sits inside the inner 80% safe zone
+       (radius 204.8px from centre) that an adaptive mask is allowed to crop to.
+       The gradient still bleeds to all four edges, which is what "maskable"
+       requires — only the glyph has to respect the safe zone. -->
+  <defs>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3b82f6"/>
+      <stop offset="1" stop-color="#22d3ee"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#brand)"/>
+  <g transform="translate(256 256) scale(11.7) translate(-12 -12)"
+     fill="none" stroke="#ffffff" stroke-width="2"
+     stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 10.5 12 4l9 6.5"/>
+    <path d="M5 9.5V20h14V9.5"/>
+    <path d="M9.5 20v-5h5v5"/>
+  </g>
+</svg>

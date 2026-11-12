@@ -1,0 +1,91 @@
+# Scratch / generated one-off outputs (not build artifacts, not checked in)
+/scratch/
+scripts/_*.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+wheels/
+
+# uv
+# (.python-version is committed so CI knows the version)
+
+# Secrets / credentials (NEVER commit these)
+.env
+.env.local
+*.env.local
+service_account.json
+google_credentials.json
+gmail_app_password.txt
+apify_token.txt
+secrets/
+
+# Local artifacts
+data/
+output/
+*.sqlite
+*.db
+*.csv
+*.xlsx
+!tests/fixtures/*.csv
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Logs
+*.log
+logs/
+.secrets/
+
+# Outreach generated state (local operator data)
+docs/crm.json
+docs/outreach_maillist.csv
+data/ncvoter/
+docs/skiptrace_worksheet.csv
+.cache/
+
+# scraper WAF/debug dumps (noise, regenerated per run)
+debug/
+
+# local sidecar backups (not for commit)
+backups/
+
+# The uncompressed board JSONs exceed GitHub 100MB/file and are NOT served by
+# Pages (docs/_config.yml excludes them; dashboard loads the .gz). Kept LOCAL only;
+# load_board falls back to the committed .gz on a fresh clone. See web_artifact.read_board_json.
+docs/listings.json
+docs/listings_detail.json
+# Same rule for the mobile slim payload: the .gz twin (docs/listings_slim.json.gz)
+# is committed and served; the uncompressed twin stays local only.
+docs/listings_slim.json
+
+# 356MB of regenerable, dashboard-served parcel/streetview photos: kept on disk, out of git
+docs/parcel_photos/
+
+# Responsible-disclosure drafts name exposed endpoints; the repo is PUBLIC. Keep local (2026-09-20).
+docs/pii_disclosure_drafts_*.md

@@ -1,0 +1,118 @@
+"""Strategy-fit tagger — label each lead with the exit strategies it actually
+fits, so the operator can filter the board by how they'd work it (LOCAL, no network).
+
+Reads the signals the pipeline already computed (equity, tenure, condition,
+listing type, property kind, tax status, distress stack) and sets
+raw['strategy_fit'] = {"tags": [...], "reasons": {...}}. Tags:
+
+  FIX_FLIP        residential in rough condition (major/gut) with equity to renovate.
+  BUY_HOLD        residential, livable, not severely distressed — rental hold.
+  LAND            vacant land parcel — buyable land (not a wholesale assignment play).
+
+Heuristic + transparent; every tag carries a one-line reason. Gate STRATEGY_FIT=0.
+
+AUDIT 2026-09-21 (F1/F13). "Distressed" here used to mean ANY signal on the distress stack, so a
+vacant parcel with nothing but an assessed-value placeholder read as `LAND_WHOLESALE: vacant land
++ distress signal`. It now means the lead reached WARM or HOT, which the scorer only grants on
+evidence. And a lead counts as probate only on a probate listing type, a probate flag, or an
+owner name that says HEIRS / ESTATE OF: `raw['life_events']` also carries `trust`,
+`multiple_heirs` and a bare `estate` (an LLC named "... REAL ESTATE ..."), none of which is a
+death.
+"""
+from __future__ import annotations
+
+import os
+from typing import Iterable
+
+from .models import Listing
+from .signal_freshness import has_real_probate, owner_names_a_death
+
+_ENABLED = os.environ.get("STRATEGY_FIT") != "0"
+
+_LAND_KINDS = {"land", "vacant_land", "vacant", "lot", "acreage"}
+_ROUGH_CONDITION = {"major", "gut"}
+
+
+def _is_probate(li: Listing, lt: str, raw: dict) -> bool:
+    # has_real_probate (audit 2026-10-01): raw['probate'] is an always-written "notice seen"
+    # wrapper on several scrapers; a bare presence check counted a notice naming no decedent.
+    if ("probate" in lt or lt in ("estate_lead",)
+            or has_real_probate(raw.get("probate")) or has_real_probate(raw.get("estate"))):
+        return True
+    tags = raw.get("life_events")
+    # only the estate_probate tag, and only when the owner name really names a death
+    return (isinstance(tags, (list, tuple, set)) and "estate_probate" in tags
+            and owner_names_a_death(li.owner_name))
+
+
+def _f(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _is_land(li: Listing) -> bool:
+    pk = (li.property_kind.value if hasattr(li.property_kind, "value") else str(li.property_kind or "")).lower()
+    if any(k in pk for k in _LAND_KINDS):
+        return True
+    desc = (li.description or "").lower()
+    return "vacant lot" in desc or "vacant land" in desc or "vacant parcel" in desc
+
+
+def _equity_pct(raw: dict):
+    eq = raw.get("equity") or {}
+    p = _f(eq.get("pct"))
+    if p is not None and p > 1:   # stored as 0-100 in some paths
+        p = p / 100.0
+    return p
+
+
+def enrich_strategy_fit(listings: Iterable[Listing]) -> dict:
+    stats = {"tagged": 0}
+    if not _ENABLED:
+        return stats
+    counts: dict[str, int] = {}
+    for li in listings:
+        raw = li.raw if isinstance(li.raw, dict) else {}
+        lt = (li.listing_type.value if hasattr(li.listing_type, "value") else str(li.listing_type or "")).lower()
+        ds = raw.get("distress_stack") or {}
+        has_distress = ds.get("tier") in ("HOT", "WARM")
+        tax_owed = bool((raw.get("tax_owed") or {}).get("balance"))
+        tenure = raw.get("tenure") or {}
+        long_tenure = bool(tenure.get("long_tenure"))
+        probate = _is_probate(li, lt, raw)
+        eq = _equity_pct(raw)
+        cond = (raw.get("condition_tier") or "").lower()
+        is_land = _is_land(li)
+        is_foreclosure = lt in ("foreclosure_sale", "lis_pendens", "notice_of_sale", "sheriff_sale")
+
+        tags: list[str] = []
+        reasons: dict[str, str] = {}
+
+        # High equity is the wholesale/flip prerequisite. We only have a computed
+        # equity % on some leads; when it's unknown, LONG TENURE (held 7+ yrs) is a
+        # solid proxy for real equity, so we accept that in its place — but never
+        # tag on a blank (that's what made the first pass fire on everything).
+        high_equity = (eq is not None and eq >= 0.40) or (eq is None and long_tenure)
+        some_equity = (eq is not None and eq >= 0.25) or (eq is None and long_tenure)
+        low_equity = eq is not None and eq < 0.20
+
+        if is_land and (tax_owed or long_tenure or probate or has_distress):
+            tags.append("LAND_WHOLESALE")
+            reasons["LAND_WHOLESALE"] = "vacant land + " + (
+                "delinquent tax" if tax_owed else "long-held (equity)" if long_tenure else
+                "probate/estate" if probate else "distress signal")
+
+        if (not is_land) and cond in _ROUGH_CONDITION and some_equity:
+            tags.append("FIX_FLIP")
+            reasons["FIX_FLIP"] = f"rough condition ({cond}) + equity to renovate"
+
+        if tags:
+            raw["strategy_fit"] = {"tags": tags, "reasons": reasons}
+            li.raw = raw
+            stats["tagged"] += 1
+            for t in tags:
+                counts[t] = counts.get(t, 0) + 1
+    stats["by_tag"] = counts
+    return stats

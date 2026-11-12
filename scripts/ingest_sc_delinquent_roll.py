@@ -1,0 +1,304 @@
+#!/usr/bin/env python3
+"""Land the harvested SC delinquent-tax roll on the board.
+
+WHAT THIS INGESTS
+    The qPayBill sweep of 19 SC county treasurer portals, harvested 2026-09-10/11 into
+    logs/qpaybill_roll_all.json and logs/qpaybill_roll_top5.json. Five counties hit their
+    per-county request budget on the first pass and REPORTED THEMSELVES INCOMPLETE rather
+    than claiming success; the re-run at a higher budget recovered 3,843 more parcels, so
+    the re-run file SUPERSEDES those five counties in the first file.
+
+    Every row carries owner name, TMS, balance owed, the years unpaid and a two-year-plus
+    flag; about two thirds carry a situs address.
+
+WHY A SCRIPT INSTEAD OF A PIPELINE RUN
+    The scraper is wired and will run in the normal cycle, but a full run is a 6-10 hour
+    job on this machine and the harvest already exists on disk. This lands it now, through
+    the SAME dedupe the pipeline uses, so the rows merge with their existing twins instead
+    of doubling them.
+
+SAFETY
+  * dedupe() is the project's own, so a parcel already on the board from another source
+    merges rather than duplicating.
+  * Rows with no parcel are dropped -- a delinquent-tax lead with no TMS cannot be
+    underwritten, joined to the assessor, or routed to a county.
+  * The county is taken from the harvest, never inferred.
+  * This ADDS rows, so the count guard is not at risk; the row count is asserted to have
+    grown, and the before/after is printed.
+
+    python scripts/ingest_sc_delinquent_roll.py --dry-run
+    python scripts/ingest_sc_delinquent_roll.py
+"""
+from __future__ import annotations
+
+import argparse
+import contextlib
+import json
+import sys
+from collections import Counter
+from datetime import datetime
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO / "src"))
+
+FILES = [
+    ("base", REPO / "logs" / "qpaybill_roll_all.json"),
+    ("rerun", REPO / "logs" / "qpaybill_roll_top5.json"),   # supersedes its counties
+    ("catalis", REPO / "logs" / "catalis_pickens_full.json"),
+    # Greenville Master-in-Equity foreclosure adverts: TMS + the ACTUAL total judgment
+    # debt per case. Different county from all the rolls above, so nothing is superseded.
+    ("greenville_mie", REPO / "logs" / "greenville_mie_full.json"),
+    # SC DEW lien registry: statewide employer tax/benefit liens. No parcel, but every
+    # row carries a street address, a county and the lien amount, so it is routable. A
+    # named SC entity with an unpaid state lien is a real distress signal, and the
+    # address is a reachable mailing address -- the constraint SC has been short of.
+    ("sc_dew", REPO / "logs" / "sc_dew_full.json"),
+    # Column legal notices: NC + SC foreclosure sales and probate/estate notices.
+    # Additive — a different source from the tax rolls, covering different counties.
+    ("column", REPO / "logs" / "column_full.json"),
+    # qPayBill DETAIL pass for the four lowest-value counties (Oconee/Cherokee/Union at
+    # 1% value, Laurens at 9%). ADDITIVE on purpose, not part of the superseding family:
+    # it covers the same counties as the base roll but read 1,397 Cherokee parcels where
+    # the base read 1,421, so superseding would DROP 24. Additive plus the merge path
+    # enriches the existing rows with Total Appraisal instead of replacing them.
+    ("qpaybill_detail", REPO / "logs" / "qpaybill_detail4.json"),
+    # 2026-09-13 detail re-run at DETAIL_MAX=6000 (detail4 was capped, so it left the
+    # tail of Oconee/Cherokee without Total Appraisal). This pass filled 8,541 of 8,543
+    # rows with skipped_over_cap=0 -- 3,105 of 3,108 parcels now carry a value.
+    # ADDITIVE for the same reason detail4 is: it reads FEWER parcels than the base roll
+    # (1,397 Cherokee vs 1,421), so superseding would drop the difference.
+    ("qpaybill_detail5", REPO / "logs" / "qpaybill_detail5.json"),
+    # 2026-09-13: the EIGHT counties found when the qPayBill roster turned out to be
+    # 27 wide, not 19 — Horry, Lexington, Kershaw, Sumter, Marion, Bamberg, Saluda,
+    # Colleton. Five of them (Lexington, Kershaw, Bamberg, Saluda, plus Horry) had
+    # ZERO rows on the board, so these are NET-NEW leads, not merges.
+    #
+    # ADDITIVE, and it must stay additive: it shares no county with the base roll, so
+    # superseding would be a no-op at best and, if a county name ever overlapped,
+    # would silently replace a fuller read with a thinner one.
+    #
+    # NOTE Horry carries NO situs address (its portal omits the column — verified
+    # 2026-09-13). Those rows have a parcel, so the "no parcel AND no address" drop
+    # keeps them; they need address resolution from Horry GIS afterwards.
+    ("qpaybill_new8", REPO / "logs" / "qpaybill_new8.json"),
+    # 2026-09-13 DETAIL pass for the new counties. This is what makes them rankable:
+    # 11,690 of 13,674 rows carry an appraised value, where the plain roll carried
+    # none. Horry 0 -> 2,230, Kershaw 0 -> 1,722, Sumter 3,844, Lexington 2,829.
+    #
+    # ADDITIVE, same precedent as detail4/detail5: it covers the same counties as
+    # new8 and superseding would drop any parcel this pass happened to miss.
+    #
+    # Colleton only got 23 values — it exhausted its request budget and SAID SO
+    # (qpaybill_roll.budget_exhausted). Its roll here is incomplete; re-run Colleton
+    # alone at a higher budget rather than treating 23 as its real coverage.
+    ("qpaybill_new_detail", REPO / "logs" / "qpaybill_new_detail.json"),
+]
+
+
+#: Only these labels supersede each other, and only within this set: the qPayBill re-run
+#: is a MORE COMPLETE read of the same counties from the same portal, so it replaces the
+#: truncated base. Every other file is a DIFFERENT SOURCE and must be ADDITIVE.
+#:
+#: The first version superseded on county alone. Adding sc_dew -- which covers 12 counties
+#: the qPayBill roll also covers -- silently wiped those counties' tax rolls: 31,786 + 770
+#: + 10,500 should be 43,056 and it reported 32,923. About 10,000 rows lost, with nothing
+#: in the output saying so. Caught by checking the arithmetic rather than the log.
+SUPERSEDING_FAMILY = {"base", "rerun"}
+
+
+def load_rows() -> tuple[list[dict], dict]:
+    """Within the qPayBill family a later file wins per county; other sources are additive."""
+    by_county: dict[str, list[dict]] = {}
+    extra: list[dict] = []
+    prov: dict[str, str] = {}
+    for label, path in FILES:
+        if not path.exists():
+            continue
+        try:
+            rows = json.loads(path.read_text())
+        except Exception as exc:  # noqa: BLE001
+            print(f"  ! {path.name}: unreadable ({exc})")
+            continue
+        if not isinstance(rows, list) or not rows:
+            print(f"  - {path.name}: 0 rows, skipped")
+            continue
+        counties = {r.get("county") for r in rows if r.get("county")}
+        if label in SUPERSEDING_FAMILY:
+            for c in counties:
+                by_county[c] = [r for r in rows if r.get("county") == c]
+                prov[c] = label
+        else:
+            extra.extend(rows)
+            for c in counties:
+                prov.setdefault(c, label)
+        print(f"  + {path.name}: {len(rows):,} rows over {len(counties)} counties "
+              f"({label}{'' if label in SUPERSEDING_FAMILY else ', additive'})")
+    flat = [r for rows in by_county.values() for r in rows] + extra
+    return flat, prov
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--dry-run", action="store_true")
+    args = ap.parse_args()
+
+    from foreclosure_scraper.dedupe import _strong_sigs, dedupe
+    from foreclosure_scraper.models import Listing
+    from foreclosure_scraper.web_artifact import board_lock, load_board, write_artifact
+
+    print("loading harvest files:")
+    raw_rows, prov = load_rows()
+    print(f"\nharvested rows after supersede: {len(raw_rows):,}")
+
+    fresh: list[Listing] = []
+    dropped = Counter()
+    _addr_only: list = []
+    for r in raw_rows:
+        # A lead needs SOMETHING to be routed and underwritten by: a parcel, or failing
+        # that a street address. Requiring a parcel alone silently discarded every
+        # Orangeburg row -- 6,669 of them -- because that county's portal publishes an
+        # ACCOUNT id rather than a TMS, so the scraper deliberately sets parcel_id=None
+        # rather than feed dedupe a non-parcel. They still carry owner, balance and (for
+        # some) a situs address, so the honest filter is "parcel OR address".
+        if not (r.get("parcel_id") or "").strip():
+            if not (r.get("street_address") or "").strip():
+                dropped["no parcel AND no address"] += 1
+                continue
+            dropped["kept on address alone (no parcel)"] += 0  # counted below
+            _addr_only.append(1)
+        try:
+            fresh.append(Listing(**r))
+        except Exception:  # noqa: BLE001
+            # models change; fall back to the fields we know the harvest carries
+            try:
+                fresh.append(Listing(
+                    source=r.get("source") or "counties_sc.qpaybill_delinquent_roll",
+                    source_url=r.get("source_url") or "",
+                    listing_type=r.get("listing_type") or "tax_sale",
+                    property_kind=r.get("property_kind") or "unknown",
+                    state=r.get("state") or "SC", county=r.get("county"),
+                    parcel_id=r.get("parcel_id"), defendant=r.get("defendant"),
+                    owner_name=r.get("owner_name"), street_address=r.get("street_address"),
+                    tax_value=r.get("tax_value"), acreage=r.get("acreage"),
+                    legal_description=r.get("legal_description"),
+                    description=r.get("description"),
+                    first_seen=datetime.utcnow(), last_seen=datetime.utcnow(),
+                    raw=r.get("raw") or {}))
+            except Exception as exc:  # noqa: BLE001
+                dropped[f"unbuildable: {type(exc).__name__}"] += 1
+
+    print(f"buildable listings          : {len(fresh):,}")
+    if _addr_only:
+        print(f"  of which no parcel, address only: {len(_addr_only):,} "
+              f"(Orangeburg publishes an account id, not a TMS)")
+    for k, n in dropped.most_common():
+        print(f"  dropped {n:>6,}  {k}")
+
+    by_county = Counter(li.county for li in fresh)
+    two_yr = sum(1 for li in fresh
+                 if (li.raw.get("qpaybill_roll") or li.raw.get("catalis_roll") or {}).get("is_two_year_plus"))
+    with_addr = sum(1 for li in fresh if (li.street_address or "").strip())
+    print(f"\n  with a situs address      : {with_addr:,}")
+    print(f"  two-year-plus delinquent  : {two_yr:,}")
+    print(f"  counties                  : {len(by_county)}")
+
+    lock = contextlib.nullcontext() if args.dry_run else board_lock(REPO, owner="ingest_sc_roll")
+    with lock:
+        existing = load_board(REPO / "docs")
+        before = len(existing)
+        print(f"\nboard before: {before:,}")
+
+        # ADDITIVE MERGE, NOT A WHOLE-BOARD RE-DEDUPE.
+        #
+        # Measured 2026-09-11: dedupe(board) with NO new data at all collapses
+        # 94,384 -> 70,878, eliminating 23,506 rows. The published board is simply not
+        # in dedupe-normal-form -- it carries genuine cross-source duplicates that have
+        # never been merged (the same Buncombe house arriving from liensnc,
+        # buncombe_elderly and buncombe_delinquent_tax). An audit of the union-find pass
+        # found 6,841 of 7,336 merge groups share one address, i.e. most of that
+        # collapse is legitimate.
+        #
+        # But it is a 25% change to the operator's board and it is NOT this script's
+        # decision to make. dedupe(existing + fresh) would have reported "net -5,185"
+        # and quietly swallowed both effects at once: +18k new leads hidden behind -23k
+        # of collapse. So the fresh rows are deduped among THEMSELVES and matched
+        # against the existing keys; existing rows are never re-merged with each other.
+        # Index existing rows BY signature so a match can be MERGED, not just counted.
+        #
+        # The first version did `if sigs & existing_keys: continue` -- it dropped every
+        # matched row on the floor. That looked harmless because the count was reported,
+        # but a matched row is not a duplicate to discard: it is the SAME property seen
+        # by a different source, carrying fields the existing row may not have. A Column
+        # foreclosure notice matching a tax-roll row brings a case number, a sale date and
+        # the attorney's contact; the tax row has none of those. 31,607 rows matched on
+        # this ingest and every one of their fields was being thrown away.
+        by_sig: dict = {}
+        for li in existing:
+            for sig in {li.dedupe_key()} | _strong_sigs(li):
+                by_sig.setdefault(sig, li)
+
+        fresh_deduped = dedupe(fresh)          # within the harvest only
+        add, matched, enriched = [], 0, 0
+        field_gains = Counter()
+        for li in fresh_deduped:
+            sigs = {li.dedupe_key()} | _strong_sigs(li)
+            twin = next((by_sig[s] for s in sigs if s in by_sig), None)
+            if twin is not None:
+                matched += 1
+                # Count FIELD changes, not new raw keys. The first version compared
+                # len(raw) before and after, which reported 0 enriched on a run that was
+                # in fact filling tax_value on thousands of rows -- the detail rows carry
+                # the same raw KEY (qpaybill_roll) as their twin, so the key count never
+                # moved. A counter that reads 0 while real work is happening is worse
+                # than no counter: it nearly got a working merge reverted.
+                watch = ("tax_value", "market_value", "living_sqft", "acreage",
+                         "street_address", "owner_name", "case_number", "sale_date",
+                         "zip_code", "city", "judgment_amount", "legal_description")
+                before_vals = {f: getattr(twin, f, None) for f in watch}
+                merged_row = twin.merge(li)     # keeps first-non-null per field
+                if merged_row is not twin:
+                    twin.__dict__.update(merged_row.__dict__)
+                gained = [f for f in watch
+                          if before_vals[f] in (None, "") and getattr(twin, f, None) not in (None, "")]
+                if gained:
+                    enriched += 1
+                    for f in gained:
+                        field_gains[f] += 1
+                continue
+            add.append(li)
+            for s in sigs:
+                by_sig.setdefault(s, li)
+        merged = existing + add
+        after = len(merged)
+        net_new = len(add)
+        print(f"harvest deduped internally  : {len(fresh):,} -> {len(fresh_deduped):,}")
+        print(f"  already on the board      : {matched:,}")
+        print(f"    of those, MERGED new fields into the existing row: {enriched:,}")
+        for f, n in field_gains.most_common(8):
+            print(f"        +{n:>6,}  {f}")
+        print(f"  NET NEW leads             : {net_new:,}")
+        print(f"board after : {after:,}  (existing {before:,} untouched)")
+
+        print("\n--- per county (harvested) ---")
+        for c, n in by_county.most_common():
+            print(f"   {c:<15}{n:>7,}   [{prov.get(c, '?')}]")
+
+        if args.dry_run:
+            print("\nDRY RUN — nothing written.")
+            return 0
+
+        assert after >= before, "an ingest must never shrink the board"
+        write_artifact(merged, {
+            "total": after,
+            "notes": (f"SC delinquent roll ingest: {len(fresh):,} harvested, "
+                      f"{len(fresh_deduped):,} after internal dedupe, {matched:,} already "
+                      f"on the board, {net_new:,} net-new. Existing rows untouched."),
+            "off_footprint_removed": 0,
+        }, docs_dir=REPO / "docs")
+        print(f"\nwrote board: {before:,} -> {after:,}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

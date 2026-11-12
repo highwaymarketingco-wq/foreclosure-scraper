@@ -1,0 +1,675 @@
+"""Courthouse Computer Systems (CCHS) — Burke + Cleveland NC Register of Deeds.
+
+The legacy flat `searchonline.asp` endpoint is dead (404 sitewide). The live
+app is a classic-ASP search service:
+  1. session bootstrap: GET /{root}/  -> /{App}/application.asp -> /{App}/realestatesearch.asp
+  2. GET /{App}/SearchService.asp?cmd=search&...instrumenttypes=FCL,LIS/P...  -> <recordcount>
+  3. GET /{App}/SearchService.asp?cmd=getall&start=0&offset=N  -> <r>..</r> XML rows
+
+Each <r> carries: da (recorded date), ki (instrument type), bk/pg (book/page),
+dn (doc#), or+or1 (grantor=owner), ee+ee1 (grantee=lender), mo (money/excise),
+pk (parcel). Free, plain httpx, no render. (Lincoln is a different ASP.NET-MVC
+CCHS install — not handled here; returns [] gracefully.)
+
+DEED-INDEX SWEEP (sweep_loss_instruments). A date-window search restricted to the
+loss-class kinds (trustee's, commissioner's, sheriff's deeds) returns one <r> per
+PARTY, so a single deed arrives as several rows. collapse_documents() folds them
+into one DeedInstrument per document. The search reply carries <recordcount>
+(party rows) and <doccount> (documents); the sweep asserts both against what
+getall returns instead of trusting either, and bisects any window that reaches
+the row cap. It STOPS the host at the first 403, challenge, CAPTCHA or login
+page and never retries it (CchsWall). 2026-09-20: us4 and us5 both answered the
+search with a Cloudflare "Just a moment..." 403 after three normal 200
+bootstrap pages, so the sweep had not been run live at that point.
+
+2026-09-28 RE-VERIFIED LIVE, all 5 counties (Burke/Cleveland/Lincoln/Madison/
+Henderson): the three bootstrap pages (root, application.asp,
+realestatesearch.asp) were never the problem — those always 200'd with plain
+httpx. Only SearchService.asp itself sits behind Cloudflare and answers plain
+httpx's TLS fingerprint with the "Just a moment..." 403; a real Chrome JA3/TLS
+fingerprint (http_client.get_text_impersonate — curl-cffi impersonation, NOT a
+CAPTCHA/WAF solve, no cookies/session needed) clears it and returns the real
+<SearchResponse> / <r> XML every time. _cchs_fetch() and search_by_name() now
+use that tier for the two SearchService.asp calls. sweep_loss_instruments()'s
+own bootstrap-page fetches stay on plain httpx (those always 200), but its
+recursive _sweep_window helper now goes through the same get_text_impersonate
+tier for search/getall via the _get_search_text() wrapper, which translates
+get_text_impersonate's RuntimeError-on-bad-status into the sweep's CchsWall so
+the existing wall-stops-the-host contract is unchanged.
+
+2026-10-02 RE-PROBED LIVE, FLIPPED (still not a wall, confirmed intermittent):
+the paragraph above has it backwards TODAY. Plain httpx now clears
+SearchService.asp on the first try (Burke/Lincoln/Cleveland all answered 200
+with a real <SearchResponse>), while curl-cffi's "chrome" impersonation now
+gets the 403 ("Just a moment...") on the exact same request/URL. Cloudflare's
+fingerprint rule here flips which tier it blocks between runs — the only thing
+that has stayed true across both probes is that ONE of the two tiers clears it
+with no login/cookies/CAPTCHA-solve. Locking onto either tier alone is
+therefore itself the bug: SearchService.asp calls now go through
+`get_text(..., impersonate=True)` (plain first, auto-escalate to the curl-cffi
+tier only on a block status code) — the same plain-then-escalate behavior
+`get_text` already offers every other caller — instead of a tier hard-coded
+from whichever side of the flip happened to be true on the day it was last
+probed.
+
+2026-11-06 — A DIFFERENT host-side change, not the Cloudflare flip above:
+us4.courthousecomputersystems.com started answering GET on SearchService.asp
+with a plain HTTP 405 ("HTTP verb used to access this page is not allowed"),
+while POST with the identical query string answers 200 with the real
+<SearchResponse> XML. LIVE-TESTED (OPTIONS + GET + POST) against every one of
+this module's CCHS_COUNTIES tenants: Lincoln, Madison and Henderson (us4) 405
+on GET / 200 on POST; Duplin (us4) likewise; Burke and Cleveland (us5) still
+200 on GET and re-confirmed 200 on POST too (unaffected either way — the same
+live sweep that checked rod/county_sweeps.py's 17 HOSTED_CCHS tenants, where
+all 10 us4 tenants showed the identical symptom and all 7 us3+us5 tenants did
+not). `_search_or_post` (below) retries a 405 via `http_client.post_text`
+(plain httpx — a verb restriction is not a TLS-fingerprint issue, so no
+impersonation tier is needed for the POST) at the same url, used by
+`_get_search_text` (so `_cchs_fetch` and `sweep_loss_instruments` both pick it
+up) and by `search_by_name` directly. A tenant that still works on GET never
+takes the new branch.
+"""
+from __future__ import annotations
+
+import html
+import re
+from dataclasses import dataclass, field
+from datetime import date, datetime, timedelta, timezone
+from urllib.parse import urlencode
+
+import httpx
+import structlog
+from dateutil import parser as dateparser
+
+from ..deed_index import DeedInstrument, Party, derive_loss
+from ..http_client import client, get_text, post_text
+from ..name_normalize import normalize_name
+from . import deed_stamp
+from .inst_class import LOSS_CLASSES, classify_instrument
+from .models import RodDoc, normalize_doc_type
+
+log = structlog.get_logger()
+
+# (state, county) -> (host, app_slug, root_slug). Burke + Cleveland share the
+# us5 classic-ASP install. Lincoln runs the SAME classic-ASP SearchService.asp
+# flow on us4/LincolnNCNW (verified live 2026-07-03: search returns recordcount,
+# getall returns real <r> rows with grantor/grantee/book-page/doc#). The separate
+# us4/LincolnNC2 ASP.NET-MVC install is NOT used — it's a different app surface.
+CCHS_COUNTIES = {
+    ("NC", "Burke"): ("us5", "BurkeNCNW", "burkenc"),
+    ("NC", "Cleveland"): ("us5", "ClevelandNCNW", "clevelandnc"),
+    ("NC", "Lincoln"): ("us4", "LincolnNCNW", "lincolnnc"),
+    ("NC", "Madison"): ("us4", "MadisonNCNW", "madisonnc"),
+    ("NC", "Henderson"): ("us4", "HendersonNCNW", "hendersonnc"),
+    # Duplin added 2026-10-18 (docs/gap_matrix's atty_rod_lien_checked/liens gap,
+    # next_action "register: Courthouse Computer Systems classic ASP
+    # (us4.courthousecomputersystems.com/duplinncnw)"). LIVE-VERIFIED same day: root
+    # bootstrap (https://us4.courthousecomputersystems.com/duplinnc/) 403s (IIS "access
+    # denied"), and application.asp?resize=true 403s too (Cloudflare "Just a moment..."),
+    # but neither blocks the flow below (_cchs_fetch/search_by_name never check their
+    # status) -- realestatesearch.asp itself 200s (163KB, the real search app) and
+    # SearchService.asp (via curl-cffi chrome impersonation, the SAME escalation tier
+    # get_text(..., impersonate=True) already auto-tries) returns a real
+    # <SearchResponse><recordcount>7</recordcount>...<doccount>1</doccount></SearchResponse>
+    # for a 90-day FCL/LIS-P/FORECLOSURE/LIS-PENDEN window, and getall returns a real
+    # LIS PENDENS (Book 2126/Page 570, Doc# 10070136, grantor GORE MIRACALE SHANTE'T /
+    # grantee BOEHLING LAWRENCE S. among others) in the exact same <r> shape _parse_rows
+    # already parses. Same vendor product as Burke/Cleveland/Lincoln/Madison/Henderson,
+    # not the newer DevExpress product (rod/ccs_devexpress.py) Randolph's register runs on.
+    ("NC", "Duplin"): ("us4", "duplinncnw", "duplinnc"),
+}
+
+_NOD_TYPES = "FCL,LIS/P,FORECLOSURE,LIS PENDEN"
+# Loss-class instrument kinds, read from the county kind dictionaries on
+# realestatesearch.asp: Burke (279 kinds) and Lincoln (214) on 2026-09-20, Cleveland
+# (365) per docs/deed_index_scoping_2026-09-20.md. The list this replaced was
+# "COM/D,FORECLOSURE DEED,SUBTRUSTEE DEED,TRUSTEE". Only COM/D is a real kind, so
+# the post-sale sweep never saw a trustee's deed (finding F4).
+LOSS_KINDS = ("TR/D", "COM/D", "SHF/D")
+_EXTRA_LOSS_KINDS = {("NC", "Cleveland"): ("TR/DEED", "COMM/D", "COMM/DEED", "SHERIFFS DEED")}
+_SOLD_TYPES = ",".join(LOSS_KINDS)
+_UA = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/126"}
+
+NOD_KEYWORDS = ("FORECLOS", "LIS PENDEN", "LIS/P", "FCL", "NOTICE OF SALE", "NOS", "NOD")
+POST_SALE_KEYWORDS = ("TRUSTEE", "COMMISSIONER", "COM/D", "FORECLOSURE DEED", "POWER OF SALE")
+_MONEY_RE = re.compile(r"([\d,]+(?:\.\d{2})?)")
+
+
+def _is_nod(doc_type: str | None, ki: str = "") -> bool:
+    s = (str(ki or "") + " " + str(doc_type or "")).upper()
+    return any(k in s for k in NOD_KEYWORDS)
+
+
+def _is_post_sale(doc_type: str | None, ki: str = "") -> bool:
+    s = (str(ki or "") + " " + str(doc_type or "")).upper()
+    # The keyword list misses the vendor codes TR/D and SHF/D; the classifier has them.
+    return (any(k in s for k in POST_SALE_KEYWORDS)
+            or classify_instrument(ki, doc_type) in LOSS_CLASSES)
+
+
+def loss_kinds(state: str, county: str) -> tuple[str, ...]:
+    """Static loss-kind list for a county (the dictionary-derived list wins when
+    the search page could be read; see sweep_loss_instruments)."""
+    return LOSS_KINDS + _EXTRA_LOSS_KINDS.get((state, county), ())
+
+
+def _money(s: str | None) -> float | None:
+    if not s:
+        return None
+    m = _MONEY_RE.search(s.replace("$", ""))
+    if not m:
+        return None
+    try:
+        v = float(m.group(1).replace(",", ""))
+    except ValueError:
+        return None
+    return v if 0 < v <= 50_000_000 else None
+
+
+def _cdata(v: str) -> str:
+    return re.sub(r"<!\[CDATA\[|\]\]>", "", v or "").strip()
+
+
+def _field(rec: str, tag: str) -> str:
+    m = re.search(rf"<{tag}>(.*?)</{tag}>", rec, re.S)
+    return _cdata(m.group(1)) if m else ""
+
+
+def _base(host: str, app: str) -> str:
+    return f"https://{host}.courthousecomputersystems.com/{app}"
+
+
+def search_url(state: str, county: str) -> str | None:
+    cfg = CCHS_COUNTIES.get((state, county))
+    return f"{_base(cfg[0], cfg[1])}/realestatesearch.asp" if cfg else None
+
+
+def _parse_rows(xml: str, state: str, county: str, *, sold: bool) -> list[RodDoc]:
+    """Parse a getall reply into one RodDoc per document.
+
+    2026-10-03: every `<r>` also carries `orc`/`eec` (the vendor's OWN "I"
+    individual vs "F" firm/entity classification for the grantor/grantee
+    party) and `ors`/`ees` (a role suffix like "TR" trustee, "AIF"
+    attorney-in-fact) -- live-verified on Burke, never read here even though
+    `deed_index.py`'s `Party(name, kind, suffix)` + `_is_person()` /
+    `derive_loss()` are BUILT to consume exactly this (and `_party()` below
+    already reads it for the separate deed-index sweep). Without it, every
+    caller of `discover_recent_nods`/`discover_recent_sold_recordings`
+    (nc_rod_substitute_trustee.py) only had a bare name string and had to
+    guess person-vs-firm from name text alone -- confirmed live on Burke
+    instrument 2026005171: a real owner (JACKSON CLYDE EUGENE JR., orc="I")
+    shares the grantor side with CAPE FEAR TRUSTEE SERVICES, LLC and BELL
+    CARRINGTON PRICE & GREGG, PLLC (both orc="F", the foreclosing trustee and
+    its law firm), and the pre-sale path's `_all_grantor_names()` had no
+    institutional filter at all -- all three would be joined into one
+    `defendant` string. Now carried in `raw['grantor_parties']`/
+    `raw['grantee_parties']` as the same `[kind, suffix]` pairing
+    `deed_index.py.upsert()` already serializes, alongside the existing flat
+    `raw['grantors']`/`raw['grantees']` name lists (unchanged, so any
+    existing reader of the plain-string convention keeps working).
+    """
+    docs: dict[tuple, RodDoc] = {}
+    for rec in re.findall(r"<r>(.*?)</r>", xml or "", re.S):
+        ki = _field(rec, "ki")
+        bk, pg, dn = _field(rec, "bk"), _field(rec, "pg"), _field(rec, "dn")
+        key = (bk, pg, dn)
+        gp, ep = _party(rec, "or"), _party(rec, "ee")
+        grantor = gp.name if gp else None
+        grantee = ep.name if ep else None
+        seen = docs.get(key)
+        if seen is not None:
+            # A later party row of a document already read. doc.grantor stays the
+            # first row's (a trustee's deed often opens with the law firm), so the
+            # full party lists ride in raw for anything that needs the losers.
+            for names, name in ((seen.raw["grantors"], grantor), (seen.raw["grantees"], grantee)):
+                if name and name not in names:
+                    names.append(name)
+            for parties, p in ((seen.raw["grantor_parties"], gp), (seen.raw["grantee_parties"], ep)):
+                if p and p.name not in {q["name"] for q in parties}:
+                    parties.append({"name": p.name, "kind": p.kind, "suffix": p.suffix})
+            continue
+        try:
+            recorded = dateparser.parse(_field(rec, "da")) if _field(rec, "da") else None
+        except (ValueError, TypeError, OverflowError):
+            recorded = None
+        doc = RodDoc(
+            county=county, state=state, doc_type=normalize_doc_type(ki),
+            recorded_date=recorded, book=bk or None, page=pg or None,
+            instrument_no=dn or None, grantor=grantor, grantee=grantee,
+            parcel_id=_field(rec, "pk") or None, notes=_field(rec, "de") or ki or None,
+            raw={"ki": ki, "cchs": True,
+                 "grantors": [grantor] if grantor else [],
+                 "grantees": [grantee] if grantee else [],
+                 "grantor_parties": ([{"name": gp.name, "kind": gp.kind, "suffix": gp.suffix}]
+                                      if gp else []),
+                 "grantee_parties": ([{"name": ep.name, "kind": ep.kind, "suffix": ep.suffix}]
+                                      if ep else [])},
+        )
+        if sold:
+            # NC excise stamp = $1 per $500 of consideration; <mo> carries the stamp.
+            stamp = _money(_field(rec, "mo"))
+            if stamp:
+                doc.excise_tax_stamp = stamp
+                # Canonical guarded conversion — a misfired stamp yields None
+                # (no garbage comp) rather than a bogus consideration.
+                doc.consideration_amount = deed_stamp.consideration_from_fields(None, stamp)
+        docs[key] = doc
+    return list(docs.values())
+
+
+async def _search_or_post(url: str, xhr: dict) -> str:
+    """GET SearchService.asp via get_text(impersonate=True); on a plain HTTP 405
+    ("HTTP verb used to access this page is not allowed") retry the SAME url via
+    POST, which answers a clean 200 with the identical query string.
+
+    2026-11-06: us4.courthousecomputersystems.com started rejecting GET on this
+    one page -- a verb restriction, not a Cloudflare block, so the curl-cffi
+    impersonation tier above has no bearing on it. LIVE-CONFIRMED for every one
+    of this module's own us4 tenants (Lincoln, Madison, Henderson, Duplin): 405
+    on GET, 200 on POST with a real <SearchResponse>; Burke/Cleveland (us5) still
+    200 on GET and were re-confirmed unaffected, so they never take the POST
+    branch here -- nothing changes for them. Raises exactly like a plain
+    get_text() call on any OTHER status (a real 403/429/503 block, a 404, a
+    timeout), so _get_search_text's CchsWall mapping and search_by_name's
+    swallow-to-[] handling are unchanged."""
+    try:
+        return await get_text(url, headers=xhr, timeout=40.0, impersonate=True)
+    except httpx.HTTPStatusError as exc:
+        if exc.response is None or exc.response.status_code != 405:
+            raise
+        return await post_text(url, headers=xhr, timeout=40.0)
+
+
+async def _cchs_fetch(state: str, county: str, instrument_types: str, from_date: datetime,
+                      today: datetime, max_docs: int, *, sold: bool) -> list[RodDoc]:
+    """Raises CchsWall (defined below, alongside the deed-index sweep's own wall
+    detection) when the host answers with a 403/challenge/CAPTCHA/login page —
+    see _get_search_text. Every OTHER failure (network blip, parse miss, a
+    genuinely dead host) is still swallowed to [] with a logged warning, exactly
+    as before 2026-10-14: only the wall case needs to be distinguishable from a
+    legitimate empty answer, per the silent-failure sweep's follow-up queue item
+    1 (cchs-dependent callers getting a visible BLOCKED signal instead of a
+    wall silently folding into a smaller-but-nonzero total)."""
+    cfg = CCHS_COUNTIES.get((state, county))
+    if not cfg:
+        return []
+    host, app, root = cfg
+    hostname = f"{host}.courthousecomputersystems.com"
+    base = _base(host, app)
+    xhr = {**_UA, "X-Requested-With": "XMLHttpRequest", "Referer": f"{base}/realestatesearch.asp"}
+    try:
+        async with client(timeout=40.0, headers=_UA) as c:
+            # 1) session bootstrap — plain httpx is fine here, these always 200.
+            for u in (f"https://{hostname}/{root}/",
+                      f"{base}/application.asp?resize=true", f"{base}/realestatesearch.asp"):
+                await c.get(u, follow_redirects=True)
+        # 2) search — SearchService.asp is Cloudflare-fronted and blocks WHICHEVER
+        # of plain-httpx / curl-cffi-impersonate its fingerprint rule currently
+        # targets (live-confirmed flips between runs — see module docstring);
+        # _get_search_text (get_text(..., impersonate=True) underneath) tries
+        # plain first and auto-escalates to the curl-cffi tier only on a block
+        # status code, so this clears either direction of the flip without
+        # hard-coding one tier, and raises CchsWall instead of a bare exception
+        # when BOTH tiers (or a soft 200 challenge page) come back blocked.
+        q = {"cmd": "search", "last": "", "given": "", "searchtype": 3, "indextype": 3,
+             "codetype": 3, "fromdate": from_date.strftime("%m/%d/%Y"),
+             "todate": today.strftime("%m/%d/%Y"), "instrumenttypes": instrument_types,
+             "description": "", "docnumber": "", "booknumber": "", "pagenumber": "",
+             "resultstype": 1, "maxrecordcount": max_docs, "sortorder": 1,
+             "sortfield": "docno", "rangetype": "doc"}
+        search_text = await _get_search_text(
+            hostname, f"{base}/SearchService.asp?{urlencode(q)}", xhr, f"search county={county}")
+        m = re.search(r"<recordcount>(\d+)</recordcount>", search_text, re.I)
+        count = int(m.group(1)) if m else 0
+        if count <= 0:
+            return []
+        # 3) getall
+        getall_text = await _get_search_text(
+            hostname, f"{base}/SearchService.asp?cmd=getall&start=0&offset={min(count, max_docs)}",
+            xhr, f"getall county={county}")
+        return _parse_rows(getall_text, state, county, sold=sold)
+    except CchsWall:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        log.warning("cchs.fetch_failed", host=host, county=county, sold=sold,
+                    error=f"{type(exc).__name__}: {str(exc)[:160]}")
+        return []
+
+
+async def discover_recent_nods(state: str, county: str, days_back: int = 60,
+                               max_docs: int = 200) -> list[RodDoc]:
+    """Recent NOD / lis-pendens / foreclosure recordings (pre-foreclosure leads)."""
+    today = datetime.now()
+    docs = await _cchs_fetch(state, county, _NOD_TYPES, today - timedelta(days=max(1, days_back)),
+                             today, max_docs, sold=False)
+    out = [d for d in docs if _is_nod(d.doc_type, d.raw.get("ki", ""))]
+    return out[:max_docs]
+
+
+async def discover_recent_sold_recordings(state: str, county: str, days_back: int = 90,
+                                          max_docs: int = 200) -> list[RodDoc]:
+    """Recent post-sale recordings (commissioner's / trustee's deed upon sale)."""
+    today = datetime.now()
+    docs = await _cchs_fetch(state, county, ",".join(loss_kinds(state, county)),
+                             today - timedelta(days=max(1, days_back)), today, max_docs, sold=True)
+    out = [d for d in docs if _is_post_sale(d.doc_type, d.raw.get("ki", ""))]
+    return out[:max_docs]
+
+
+async def search_by_name(state: str, county: str, name: str, max_docs: int = 50) -> list[RodDoc]:
+    """All recorded docs for a grantor/grantee name (lien-stack / payoff tracing)."""
+    cfg = CCHS_COUNTIES.get((state, county))
+    if not cfg or not name:
+        return []
+    host, app, root = cfg
+    base = _base(host, app)
+    xhr = {**_UA, "X-Requested-With": "XMLHttpRequest", "Referer": f"{base}/realestatesearch.asp"}
+    last = name.strip().split()[0] if name.strip() else ""
+    try:
+        async with client(timeout=40.0, headers=_UA) as c:
+            for u in (f"https://{host}.courthousecomputersystems.com/{root}/",
+                      f"{base}/application.asp?resize=true", f"{base}/realestatesearch.asp"):
+                await c.get(u, follow_redirects=True)
+        q = {"cmd": "search", "last": last, "given": "", "searchtype": 1, "indextype": 1,
+             "codetype": 0, "fromdate": "", "todate": "", "instrumenttypes": "",
+             "resultstype": 1, "maxrecordcount": max_docs, "sortorder": 1,
+             "sortfield": "docno", "rangetype": "name"}
+        # See _cchs_fetch: plain-first, auto-escalate (tier the host blocks flips
+        # between runs — see module docstring); _search_or_post also retries a
+        # plain HTTP 405 (us4's 2026-11-06 verb restriction) via POST.
+        search_text = await _search_or_post(f"{base}/SearchService.asp?{urlencode(q)}", xhr)
+        m = re.search(r"<recordcount>(\d+)</recordcount>", search_text, re.I)
+        count = int(m.group(1)) if m else 0
+        if count <= 0:
+            return []
+        getall_text = await _search_or_post(
+            f"{base}/SearchService.asp?cmd=getall&start=0&offset={min(count, max_docs)}", xhr)
+        return _parse_rows(getall_text, state, county, sold=False)[:max_docs]
+    except Exception as exc:  # noqa: BLE001
+        log.warning("cchs.search_by_name_failed", host=host, county=county,
+                    error=f"{type(exc).__name__}: {str(exc)[:160]}")
+        return []
+
+
+# --------------------------------------------------------------------------- #
+# Deed-index sweep                                                            #
+# --------------------------------------------------------------------------- #
+
+#: The search page's own hard-coded maxrecordcount (Manager constructor in
+#: realestatesearch.asp). A reply at this count is treated as cut off.
+CCHS_MAX_ROWS = 5000
+
+_DOCTYPE_RE = re.compile(
+    r"doctype\.name\s*=\s*'((?:[^'\\]|\\.)*)';\s*doctype\.kind\s*=\s*'((?:[^'\\]|\\.)*)';")
+_BOOKTYPE_RE = re.compile(r"BookTypes\[BookTypes\.length-1\]\.name\s*=\s*'([^']*)'")
+_WALL_TITLE = re.compile(
+    r"<title>[^<]*(?:Just a moment|Attention Required|Access Denied|log ?in|sign ?in)", re.I)
+_WALL_MARKER = re.compile(r"g-recaptcha|h-captcha|cf-browser-verification", re.I)
+
+
+class CchsWall(Exception):
+    """The host answered with a 403, a challenge, a CAPTCHA or a login page. That
+    host is done: never retry it and never try to get past it."""
+
+
+def _wall_reason(status: int, text: str) -> str | None:
+    if status in (401, 403, 407, 429, 503):
+        return f"HTTP {status}"
+    head = (text or "")[:6000]
+    if _WALL_TITLE.search(head) or _WALL_MARKER.search(head):
+        return "challenge, CAPTCHA or login page"
+    return None
+
+
+def _check_wall(resp, host: str, what: str) -> None:
+    reason = _wall_reason(resp.status_code, resp.text)
+    if reason:
+        raise CchsWall(f"{host} {what}: {reason}")
+
+
+_IMPERSONATE_STATUS_RE = re.compile(r"impersonate got (\d+)")
+
+
+async def _get_search_text(host: str, url: str, xhr: dict, what: str) -> str:
+    """SearchService.asp calls go through get_text(..., impersonate=True):
+    plain httpx first, auto-escalating to the curl-cffi Chrome-fingerprint tier
+    only on a block status code — live probing shows Cloudflare's fingerprint
+    rule here FLIPS which tier it blocks between runs (see module docstring),
+    so hard-coding either tier alone is itself a bug. A failure here can
+    surface as either an httpx.HTTPStatusError (a non-block code, or the plain
+    tier's own retries exhausted) or a RuntimeError (the curl-cffi escalation
+    tier also got a block code) — this wrapper adapts both to the same
+    CchsWall contract the sweep already relies on, and a 200 still gets the
+    WALL_TITLE/WALL_MARKER check in case Cloudflare ever serves a soft
+    challenge with a 200 status. _search_or_post also retries a plain HTTP 405
+    (us4's 2026-11-06 verb restriction, unrelated to Cloudflare) via POST before
+    either exception type below would otherwise fire."""
+    try:
+        text = await _search_or_post(url, xhr)
+    except RuntimeError as exc:
+        m = _IMPERSONATE_STATUS_RE.search(str(exc))
+        reason = f"HTTP {m.group(1)}" if m else str(exc)
+        raise CchsWall(f"{host} {what}: {reason}") from exc
+    except httpx.HTTPStatusError as exc:
+        code = exc.response.status_code if exc.response is not None else None
+        raise CchsWall(f"{host} {what}: HTTP {code}") from exc
+    reason = _wall_reason(200, text)
+    if reason:
+        raise CchsWall(f"{host} {what}: {reason}")
+    return text
+
+
+def parse_doctypes(page_html: str) -> list[tuple[str, str, str]]:
+    """(book_type, kind, name) for every instrument kind on a realestatesearch.asp
+    page. The dictionary is inline JavaScript: `doctype.name = '...'; doctype.kind =
+    '...'` blocks, closed by a BookTypes name. Names are HTML-escaped ("&apos;")."""
+    out: list[tuple[str, str, str]] = []
+    pending: list[tuple[str, str]] = []
+    for m in re.finditer(f"{_DOCTYPE_RE.pattern}|{_BOOKTYPE_RE.pattern}", page_html or ""):
+        if m.group(3) is not None:
+            out.extend((m.group(3), k, n) for k, n in pending)
+            pending = []
+        else:
+            pending.append((html.unescape(m.group(2)), html.unescape(m.group(1))))
+    out.extend(("", k, n) for k, n in pending)
+    return out
+
+
+def dictionary_loss_kinds(doctypes: list[tuple[str, str, str]]) -> tuple[str, ...]:
+    """Kinds whose code or name reads as a loss deed. Working from the county's own
+    dictionary keeps a kind the static list does not know (and drops one the
+    county does not have) without a code change."""
+    out: list[str] = []
+    for _book, kind, name in doctypes:
+        if classify_instrument(kind, name) in LOSS_CLASSES and kind not in out:
+            out.append(kind)
+    return tuple(out)
+
+
+def _iso_date(v: str) -> str | None:
+    try:
+        return dateparser.parse(v).date().isoformat() if v else None
+    except (ValueError, TypeError, OverflowError):
+        return None
+
+
+def _stamp(v: str | None) -> float | None:
+    """The excise stamp as served. Unlike _money, a served "$0.00" stays 0.0, so
+    "no stamp" and "zero stamp" stay different (a zero stamp is never a comp)."""
+    m = _MONEY_RE.search((v or "").replace("$", ""))
+    if not m:
+        return None
+    try:
+        return float(m.group(1).replace(",", ""))
+    except ValueError:
+        return None
+
+
+def _party(rec: str, tag: str) -> Party | None:
+    """The party in the `or*` (grantor) or `ee*` (grantee) columns of one <r>.
+    An individual is split last / first / middle, a firm is all in the first tag."""
+    name = " ".join(p for p in (_field(rec, tag), _field(rec, tag + "1"), _field(rec, tag + "2")) if p)
+    if not name:
+        return None
+    return Party(name, kind=_field(rec, tag + "c"), suffix=_field(rec, tag + "s"))
+
+
+def collapse_documents(xml: str, state: str, county: str) -> list[DeedInstrument]:
+    """One DeedInstrument per document from the party rows of a getall reply.
+
+    Grantors and grantees are the distinct parties across all rows of the
+    document, so the result is the same whether the vendor repeats the grantee on
+    every row or gives it on the first only. Documents are keyed on book, page and
+    instrument number; the loser derivation runs here, on the grantors."""
+    docs: dict[tuple, dict] = {}
+    for rec in re.findall(r"<r>(.*?)</r>", xml or "", re.S):
+        key = (_field(rec, "bk"), _field(rec, "pg"), _field(rec, "dn"))
+        d = docs.setdefault(key, {"ki": _field(rec, "ki"), "da": _field(rec, "da"),
+                                  "grantors": {}, "grantees": {}, "pk": "", "de": "", "mo": None})
+        for tag, bucket in (("or", "grantors"), ("ee", "grantees")):
+            p = _party(rec, tag)
+            if p:
+                d[bucket].setdefault(normalize_name(p.name), p)
+        d["pk"] = d["pk"] or _field(rec, "pk")
+        d["de"] = d["de"] or _field(rec, "de")
+        stamp = _stamp(_field(rec, "mo"))
+        if stamp is not None and (d["mo"] is None or stamp > d["mo"]):
+            d["mo"] = stamp
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    out: list[DeedInstrument] = []
+    for (bk, pg, dn), d in docs.items():
+        inst_class = classify_instrument(d["ki"])
+        grantors = list(d["grantors"].values())
+        loss_kind, losers = derive_loss(inst_class, grantors, d["de"])
+        out.append(DeedInstrument(
+            county=county, state=state, source="cchs_classic", inst_code=d["ki"],
+            inst_class=inst_class, recorded_date=_iso_date(d["da"]), book=bk or None,
+            page=pg or None, instrument_no=dn or None, grantors=[p.name for p in grantors],
+            grantor_parties=grantors, grantees=[p.name for p in d["grantees"].values()],
+            excise_stamp=d["mo"], parcel_id=d["pk"] or None, description=d["de"] or None,
+            loss_kind=loss_kind, loser_names=losers, fetched_at=now))
+    return out
+
+
+@dataclass
+class SweepResult:
+    state: str
+    county: str
+    instruments: list[DeedInstrument] = field(default_factory=list)
+    kinds: tuple[str, ...] = ()
+    kinds_source: str = ""            # "dictionary" (read from the search page) or "static"
+    requests: int = 0
+    windows: int = 0                  # searches that returned rows
+    rows: int = 0                     # party rows read
+    truncated: list[str] = field(default_factory=list)   # windows still at the row cap at one day
+    problems: list[str] = field(default_factory=list)    # shape problems; never read as "no records"
+    walled: str | None = None         # set when a wall stopped the host
+
+
+def _year_windows(start: date, end: date):
+    y = start.year
+    while y <= end.year:
+        yield max(start, date(y, 1, 1)), min(end, date(y, 12, 31))
+        y += 1
+
+
+def _search_params(kinds: tuple[str, ...], a: date, b: date, max_rows: int) -> dict:
+    return {"cmd": "search", "last": "", "given": "", "searchtype": 3, "indextype": 3,
+            "codetype": 3, "fromdate": a.strftime("%m/%d/%Y"), "todate": b.strftime("%m/%d/%Y"),
+            "instrumenttypes": ",".join(kinds), "description": "", "docnumber": "",
+            "booknumber": "", "pagenumber": "", "resultstype": 1, "maxrecordcount": max_rows,
+            "sortorder": 1, "sortfield": "docno", "rangetype": "doc"}
+
+
+async def _sweep_window(host: str, base: str, xhr: dict, res: SweepResult,
+                        a: date, b: date, max_rows: int) -> None:
+    label = f"{a.isoformat()}..{b.isoformat()}"
+    span = (b - a).days
+
+    async def halves() -> None:
+        mid = a + timedelta(days=span // 2)
+        await _sweep_window(host, base, xhr, res, a, mid, max_rows)
+        await _sweep_window(host, base, xhr, res, mid + timedelta(days=1), b, max_rows)
+
+    # SearchService.asp is Cloudflare-fronted (see _cchs_fetch); go through the
+    # Chrome-fingerprint tier via _get_search_text, which raises CchsWall the
+    # same way _check_wall does for the plain-httpx bootstrap calls.
+    res.requests += 1
+    search_text = await _get_search_text(
+        host, f"{base}/SearchService.asp?{urlencode(_search_params(res.kinds, a, b, max_rows))}",
+        xhr, f"search {label}")
+    m = re.search(r"<recordcount>(\d+)</recordcount>", search_text, re.I)
+    if not m:
+        res.problems.append(f"{label}: search reply has no <recordcount>, not read as 'no records'")
+        return
+    n = int(m.group(1))
+    if n == 0:
+        return
+    if n >= max_rows and span >= 1:
+        await halves()               # at the cap: the reply may be the head of a longer list
+        return
+    res.requests += 1
+    getall_text = await _get_search_text(
+        host, f"{base}/SearchService.asp?cmd=getall&start=0&offset={n}", xhr, f"getall {label}")
+    got = len(re.findall(r"<r>", getall_text))
+    if got < n and span >= 1:
+        await halves()               # a short page: narrow the window until it fits
+        return
+    if got != n:
+        res.problems.append(f"{label}: <recordcount> {n} but getall returned {got} rows")
+    if n >= max_rows:
+        res.truncated.append(label)
+    docs = collapse_documents(getall_text, res.state, res.county)
+    dm = re.search(r"<doccount>(\d+)</doccount>", search_text, re.I)
+    if dm and int(dm.group(1)) != len(docs):
+        res.problems.append(f"{label}: <doccount> {dm.group(1)} but {len(docs)} documents collapsed")
+    loss = [d for d in docs if d.inst_class in LOSS_CLASSES]
+    if len(loss) != len(docs):
+        res.problems.append(f"{label}: {len(docs) - len(loss)} of {len(docs)} documents were not "
+                            f"loss kinds (kind filter ignored?); dropped")
+    res.rows += got
+    res.windows += 1
+    res.instruments.extend(loss)
+
+
+async def sweep_loss_instruments(state: str, county: str, from_date: date, to_date: date,
+                                 *, max_rows: int = CCHS_MAX_ROWS) -> SweepResult:
+    """Every loss-class instrument (trustee's, commissioner's, sheriff's deed)
+    recorded from from_date to to_date, one DeedInstrument per document.
+
+    One session, one search and one getall per year window (more only when a
+    window reaches the cap). Requests go through the throttled shared client, so
+    the host sees roughly one request a second. A wall stops the sweep and comes
+    back in SweepResult.walled with whatever was read before it."""
+    res = SweepResult(state, county)
+    cfg = CCHS_COUNTIES.get((state, county))
+    if not cfg:
+        res.problems.append(f"{county}, {state} is not a CCHS classic-ASP county")
+        return res
+    host, app, root = cfg
+    hostname = f"{host}.courthousecomputersystems.com"
+    base = _base(host, app)
+    xhr = {**_UA, "X-Requested-With": "XMLHttpRequest", "Referer": f"{base}/realestatesearch.asp"}
+    try:
+        async with client(timeout=40.0, headers=_UA) as c:
+            page = ""
+            for u in (f"https://{hostname}/{root}/", f"{base}/application.asp?resize=true",
+                      f"{base}/realestatesearch.asp"):
+                r = await c.get(u, follow_redirects=True)
+                res.requests += 1
+                _check_wall(r, hostname, "bootstrap")
+                page = r.text
+            found = dictionary_loss_kinds(parse_doctypes(page))
+            if found:
+                res.kinds, res.kinds_source = found, "dictionary"
+            else:
+                res.kinds, res.kinds_source = loss_kinds(state, county), "static"
+                res.problems.append("no kind dictionary on realestatesearch.asp; used the static loss kinds")
+            for a, b in _year_windows(from_date, to_date):
+                await _sweep_window(hostname, base, xhr, res, a, b, max_rows)
+    except CchsWall as w:
+        res.walled = str(w)
+    except Exception as exc:  # noqa: BLE001
+        res.problems.append(f"sweep aborted: {type(exc).__name__}: {str(exc)[:160]}")
+    res.instruments = list({d.doc_key: d for d in res.instruments}.values())
+    return res

@@ -1,0 +1,89 @@
+{
+ "_note": "Real records of the county's Real Estate Appraisal Residential Building 2024 table (services6.arcgis.com/VLA0ImJ33zhtGEaP, captured 2026-10-06) for the pinnums of buncombe_elderly_condo_layer.json: PIN is the 15-character pinnum, a condominium unit's carries its letter ('9627023924C0102'). No owner or address data.",
+ "records": [
+  {
+   "PIN": "060588087900000",
+   "Condition": "P",
+   "Grade": "D",
+   "YearBuilt": 1938
+  },
+  {
+   "PIN": "060588087900000",
+   "Condition": "P",
+   "Grade": "D",
+   "YearBuilt": 1938
+  },
+  {
+   "PIN": "060971548000000",
+   "Condition": "F",
+   "Grade": "C",
+   "YearBuilt": 1980
+  },
+  {
+   "PIN": "9627023924C0102",
+   "Condition": "N",
+   "Grade": "C",
+   "YearBuilt": 1995
+  },
+  {
+   "PIN": "9627023924C3606",
+   "Condition": "N",
+   "Grade": "C",
+   "YearBuilt": 1995
+  },
+  {
+   "PIN": "9627023924C3804",
+   "Condition": "N",
+   "Grade": "C",
+   "YearBuilt": 1995
+  },
+  {
+   "PIN": "9627023924C4501",
+   "Condition": "N",
+   "Grade": "C",
+   "YearBuilt": 1995
+  },
+  {
+   "PIN": "9645995181C0007",
+   "Condition": "N",
+   "Grade": "C",
+   "YearBuilt": 1984
+  },
+  {
+   "PIN": "9645995181C0013",
+   "Condition": "N",
+   "Grade": "C",
+   "YearBuilt": 1984
+  },
+  {
+   "PIN": "9654438960CA102",
+   "Condition": "N",
+   "Grade": "C",
+   "YearBuilt": 2001
+  },
+  {
+   "PIN": "9654438960CB201",
+   "Condition": "N",
+   "Grade": "C",
+   "YearBuilt": 2001
+  },
+  {
+   "PIN": "9654438960CD407",
+   "Condition": "N",
+   "Grade": "C",
+   "YearBuilt": 2001
+  },
+  {
+   "PIN": "9654438960CD408",
+   "Condition": "N",
+   "Grade": "C",
+   "YearBuilt": 2001
+  },
+  {
+   "PIN": "9654438960CF601",
+   "Condition": "N",
+   "Grade": "C",
+   "YearBuilt": 2001
+  }
+ ]
+}

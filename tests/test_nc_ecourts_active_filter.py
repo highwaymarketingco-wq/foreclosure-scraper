@@ -1,0 +1,127 @@
+"""Pin the NC eCourts → _active_only fix.
+
+Run #16 collected 571 NC eCourts listings, none of which made it to
+docs/listings.json. Root cause: the scraper was setting `sale_date` to
+the judgment's ordered_date (when the lis pendens / lien was entered),
+which is typically 1-3 months in the past. _active_only requires
+sale_date to be in the past 2 days OR within 120 days future, OR for
+the source to be in DATELESS_OK_SOURCES. The first two failed because
+ordered_date was historic; DATELESS_OK_SOURCES only fires when
+sale_date is None.
+
+Fix: scraper now sets sale_date=None unconditionally for NC eCourts
+listings; the judgment date is preserved in raw.nc_ecourts.ordered_date_iso
+where the dashboard can show it without gating the active filter.
+"""
+from __future__ import annotations
+
+from datetime import datetime, timedelta
+from foreclosure_scraper.scrapers.counties_nc.nc_ecourts_lis_pendens import (
+    _hit_to_listing,
+)
+from foreclosure_scraper.main import _active_only, DATELESS_OK_SOURCES
+
+
+def _hit(case_no: str, ordered_iso: str,
+         cause: str = "CV - Lis Pendens",
+         location: str = "Wake County Courthouse") -> dict:
+    """Build a fake Tyler-Odyssey 'hit' dict matching the live API
+    shape that _hit_to_listing parses."""
+    return {
+        "caseNumber": case_no,
+        "orderedDate": ordered_iso,
+        "judgmentType": "Civil",
+        "civilJudgmentStatus": "Active",
+        "caseCategoryKey": "CV",
+        "caseID": "abc123",
+        "judgmentId": "j-001",
+        "causeOfActionDesc": cause,
+        "location": location,
+        "debtors": [{"name": "Smith John"}],
+        "creditors": [{"name": "Acme Bank"}],
+    }
+
+
+def test_nc_ecourts_sale_date_is_none():
+    """Lis pendens listings must NOT carry sale_date — that field is for
+    actual auction dates, not judgment dates."""
+    # 60 days ago — historic ordered_date that previously dropped listings
+    historic = (datetime.utcnow() - timedelta(days=60)).isoformat()
+    li = _hit_to_listing(_hit("26M000463-910", historic),
+                         "counties_nc.nc_ecourts_lis_pendens")
+    assert li is not None
+    assert li.sale_date is None, (
+        "lis pendens must not set sale_date — the judgment date is "
+        "preserved in raw.nc_ecourts.ordered_date_iso instead"
+    )
+
+
+def test_nc_ecourts_passes_active_only_via_dateless():
+    """Without sale_date, the source must be in DATELESS_OK_SOURCES so
+    _active_only keeps the listing."""
+    assert "counties_nc.nc_ecourts_lis_pendens" in DATELESS_OK_SOURCES
+    historic = (datetime.utcnow() - timedelta(days=60)).isoformat()
+    li = _hit_to_listing(_hit("26M000463-910", historic),
+                         "counties_nc.nc_ecourts_lis_pendens")
+    assert _active_only(li, horizon_days=120) is True, (
+        "Run #16 dropped 571 listings here — fix regression."
+    )
+
+
+def test_nc_ecourts_ordered_date_preserved_in_raw():
+    """The dashboard still needs the judgment date for display + sorting.
+    It must end up in raw.nc_ecourts so the slim_raw whitelist keeps it."""
+    historic = (datetime.utcnow() - timedelta(days=60)).isoformat()
+    li = _hit_to_listing(_hit("26M000463-910", historic),
+                         "counties_nc.nc_ecourts_lis_pendens")
+    nc = li.raw.get("nc_ecourts") or {}
+    assert nc.get("ordered_date_iso"), (
+        "ordered_date_iso missing — dashboard can't show when the "
+        "judgment was entered"
+    )
+
+
+def test_recent_judgment_carries_no_upset_bid_window():
+    """court_signals audit 2026-10-09: a judgment's order date is not a sale date, so a
+    judgment entered 5 days ago carries no raw.upset_bid and no upset_bid_deadline."""
+    recent = (datetime.utcnow() - timedelta(days=5)).isoformat()
+    li = _hit_to_listing(
+        _hit("26SP012345-910", recent, cause="CV - Lis Pendens"),
+        "counties_nc.nc_ecourts_lis_pendens",
+    )
+    assert li is not None
+    assert "upset_bid" not in li.raw
+    assert li.upset_bid_deadline is None
+
+
+def test_nc_ecourts_alias_names_surfaced_when_present():
+    """2026-10-03 (HERMES extraction-completeness audit, batch 5):
+    debtorAliasNames/creditorAliasNames are already on every hit but were
+    never read. Live-sampled 11/800 (1.4%) carry one -- rare but real and
+    zero marginal cost."""
+    hit = _hit("26CV005886-100", "2026-07-16T23:00:00-05:00")
+    hit["creditorAliasNames"] = [{
+        "name": "LAWSON, CRYSTAL B", "aliasFullName": "Blanton, Crystal Jean",
+    }]
+    li = _hit_to_listing(hit, "counties_nc.nc_ecourts_lis_pendens")
+    assert li.raw["nc_ecourts"]["plaintiff_aliases"] == ["Blanton, Crystal Jean"]
+    assert "defendant_aliases" not in li.raw["nc_ecourts"]
+
+
+def test_nc_ecourts_no_alias_key_when_absent():
+    """Must not fabricate an empty list/key when the hit carries none (the
+    overwhelming majority case)."""
+    li = _hit_to_listing(_hit("26CV000001-100", "2026-07-16T23:00:00-05:00"),
+                          "counties_nc.nc_ecourts_lis_pendens")
+    assert "defendant_aliases" not in li.raw["nc_ecourts"]
+    assert "plaintiff_aliases" not in li.raw["nc_ecourts"]
+
+
+def test_nc_ecourts_in_web_artifact_keep_list():
+    """raw.nc_ecourts and raw.upset_bid must be in RAW_KEEP so they
+    survive the slim-on-write step. Otherwise the dashboard can't see
+    cause/orderedDate/upset-bid metadata even though the listing
+    survives the filter."""
+    from foreclosure_scraper.web_artifact import RAW_KEEP
+    assert "nc_ecourts" in RAW_KEEP
+    assert "upset_bid" in RAW_KEEP

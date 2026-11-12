@@ -1,0 +1,1107 @@
+{
+ "batch": "sc_batch1",
+ "generated": "2026-10-07",
+ "counties": [
+  {
+   "county": "abbeville",
+   "state": "SC",
+   "rod": {
+    "platform": "Online Record System (NameSearch.php / NamePick.php / NameDisplay.php); same platform as Barnwell, Berkeley, Colleton, Dorchester, Florence, Georgetown, York",
+    "url": "https://search.abbevilledeeds.com/NameSearch.php?Accept=Accept",
+    "free_name_search": "yes",
+    "access": "disclaimer_click",
+    "index_online_back_to_year": 1978,
+    "images_free": "yes",
+    "legal_description_in_index": "no",
+    "plat_books_or_maps_online": "yes",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: opened search.abbevilledeeds.com (disclaimer text is accuracy/liability only, no automation clause), then NameSearch.php?Accept=Accept: 'Verified Through' today's date, start-date field defaults to 10/03/1978, instrument groups DEEDS/LIENS/MORTGAGE/PLATS/UCC, book-page and property-description (subdivision/lot/block) search. One SMITH 2024 test search: rows carry Date, Book-Page, Type, Grantor, Grantee, Description, Amount, Image, with direct view_image.php?...&type=pdf|tif links and no cart, fee or login text. Same platform's image link returned application/pdf with no login on Georgetown the same day.",
+    "notes": "1978 is the form's default start date, read as the start of the typed index (not stated in words). Description cell is a short property note, not the deed's legal; the legal is on the free PDF. Date window is ignored here per repo (returns head of index), so name lookup only."
+   },
+   "probate": {
+    "system": "Abbeville County Probate Court page lists forms and contacts only, no online case search. Not in the southcarolinaprobate.net dropdown per the repo's 2026-10-02 read. southcarolinaprobate.net returned HTTP 403 (nginx) to a plain GET of /search/ and of the home page on 2026-10-07, so its county dropdown could not be re-read today; the repo's sc_probate_net.py records the dropdown as read live on 2026-10-02: Aiken, Bamberg, Barnwell, Charleston, Cherokee, Chester, Colleton, Dorchester, Florence, Georgetown, Kershaw, Lancaster, Marlboro, Oconee, Orangeburg, Sumter, York, with only Charleston, Dorchester and York returning any cases.",
+    "url": "https://abbevillecountysc.com/probate-court/",
+    "free_search": "no",
+    "access": null,
+    "notes": "No online estate index found; check in person or by phone."
+   },
+   "tax": {
+    "url": "https://abbevilletreasurer.qpaybill.com/Taxes/TaxesDefaultType4.aspx",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "unreachable",
+    "notes": "On 2026-10-07 the root redirected to Info.aspx 'Sorry the site is currently off line' and the search page timed out. Answers are from the shared platform: qPayBill (Springbrook/PUBLIQ) Type4 tax search: verified on Allendale 2026-10-07 - search by Map Number (TMS), Owner, Tax ID, Address, Notice No.; Paid/Unpaid/All; tax years 2016-2026 plus All; no login or CAPTCHA on the form; cart only for paying."
+   },
+   "gis": {
+    "url": "https://qpublic.schneidercorp.com/Application.aspx?AppID=613&LayerID=10508&PageTypeID=2&PageID=4483",
+    "legal_description_field": "unknown",
+    "deed_book_page_field": "unknown",
+    "owner_field": "unknown",
+    "notes": "qPublic (Schneider) answered a plain GET with a Cloudflare 'Just a moment...' challenge (HTTP 403) on 2026-10-07 (checked on Abbeville's app); a person in a normal browser can open the parcel card. Field list not verifiable without passing the challenge. No county ArcGIS parcel service is in the repo for Abbeville."
+   },
+   "we_already_read": {
+    "rod": "partial",
+    "tax": "yes",
+    "gis": "no",
+    "evidence": "enrichment_rod_name_index.py (name lookup on this ROD); qpaybill_delinquent_roll.py + abbeville_delinquent_tax.py (tax); no Abbeville entry in parcel_cache.py or SC_GIS"
+   },
+   "manual_lane": "Index and deed PDFs are free online from about 1978, so a person is needed only for older chain links (abstractor or the book indexes at the office), the qPublic parcel card (open in a normal browser), and probate, which has no online index (call or visit the Probate Court).",
+   "confidence": "high"
+  },
+  {
+   "county": "aiken",
+   "state": "SC",
+   "rod": {
+    "platform": null,
+    "url": "https://www.aikencountysc.gov/RMC/",
+    "free_name_search": "unknown",
+    "access": "blocked",
+    "index_online_back_to_year": null,
+    "images_free": "unknown",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "unknown",
+    "how_verified": "2026-10-07: plain GET of www.aikencountysc.gov/ and /RMC/ both returned Cloudflare 'Attention Required' (HTTP 403); not pursued further. A web-search snippet of the county's own FAQ says the ROD has an online search by name and by book/page, that documents recorded after 6/12/2005 are imaged and viewable on office computers, and older ones are in books; that snippet was not read on the live page.",
+    "notes": "Online search reportedly exists but could not be opened by us; treat as browser-only."
+   },
+   "probate": {
+    "system": "Aiken County Probate Court. A web-search snippet of the county 'Probate Records' page says the public can see decedent names and case numbers on the SC Probate website (southcarolinaprobate.net). Aiken is in that site's dropdown, but the repo's 2026-10-02 probe returned no Aiken cases. southcarolinaprobate.net returned HTTP 403 (nginx) to a plain GET of /search/ and of the home page on 2026-10-07, so its county dropdown could not be re-read today; the repo's sc_probate_net.py records the dropdown as read live on 2026-10-02: Aiken, Bamberg, Barnwell, Charleston, Cherokee, Chester, Colleton, Dorchester, Florence, Georgetown, Kershaw, Lancaster, Marlboro, Oconee, Orangeburg, Sumter, York, with only Charleston, Dorchester and York returning any cases.",
+    "url": "https://www.southcarolinaprobate.net/search/",
+    "free_search": "unknown",
+    "access": "blocked",
+    "notes": "County site (Cloudflare) and the statewide probate site (403) both refused our plain requests on 2026-10-07."
+   },
+   "tax": {
+    "url": "https://aikencountysctax.com/",
+    "free_by_parcel": "unknown",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "Catalis 'Search & Pay Taxes' site loads with no login (2026-10-07). Bill history per repo sc_catalis_delinquent_roll.py: its API takes year=-1 (all years) with per-bill ids and paid/unpaid status. Parcel-number search field not confirmed by us (the repo queries by name prefix)."
+   },
+   "gis": {
+    "url": "https://gis.cityofaikensc.gov/arcgis/rest/services/PublicGIS/MapServer/13",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "Layer 'Parcels' read 2026-10-07: LegalDescription, OwnerName + mailing, SaleDate/SaleBuyer/SaleSeller/SalePrice/SaleBookPage, PLATBOOK/PLATPAGE, PARCEL_ASR. Hosted on the City of Aiken server but county-wide (returnCountOnly 103,300)."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "yes",
+    "gis": "partial",
+    "evidence": "sc_catalis_delinquent_roll.py + aiken_delinquent_tax.py (tax); parcel_cache.py 'Aiken' reads owner/mail/situs from the same layer but not LegalDescription or SaleBookPage"
+   },
+   "manual_lane": "The ROD search sits behind the county's Cloudflare wall, so a person must open aikencountysc.gov/RMC in a browser (or ask the abstractor) for the deed chain; county GIS already gives the assessor legal description, last sale book/page and plat book/page for free.",
+   "confidence": "low"
+  },
+  {
+   "county": "allendale",
+   "state": "SC",
+   "rod": {
+    "platform": null,
+    "url": null,
+    "free_name_search": "unknown",
+    "access": null,
+    "index_online_back_to_year": null,
+    "images_free": "unknown",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "unknown",
+    "how_verified": "2026-10-07: county home page (allendalecounty.com) lists no deeds or land-records link; the county-offices page timed out. A third-party directory (web search) says the Clerk of Court keeps land records and has no online database. Not on the sclandrecords.com (Avenu) county picker read the same day.",
+    "notes": "No online ROD index found. Repo registry row (404) agrees there is no known recorder URL."
+   },
+   "probate": {
+    "system": "Allendale County Probate Court; no online search found. Not in the southcarolinaprobate.net dropdown per the repo's 2026-10-02 read. southcarolinaprobate.net returned HTTP 403 (nginx) to a plain GET of /search/ and of the home page on 2026-10-07, so its county dropdown could not be re-read today; the repo's sc_probate_net.py records the dropdown as read live on 2026-10-02: Aiken, Bamberg, Barnwell, Charleston, Cherokee, Chester, Colleton, Dorchester, Florence, Georgetown, Kershaw, Lancaster, Marlboro, Oconee, Orangeburg, Sumter, York, with only Charleston, Dorchester and York returning any cases.",
+    "url": null,
+    "free_search": "no",
+    "access": null,
+    "notes": "Office visit or phone."
+   },
+   "tax": {
+    "url": "https://allendaletreasurer.qpaybill.com/Taxes/TaxesDefaultType4.aspx",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "Opened 2026-10-07. qPayBill (Springbrook/PUBLIQ) Type4 tax search: verified on Allendale 2026-10-07 - search by Map Number (TMS), Owner, Tax ID, Address, Notice No.; Paid/Unpaid/All; tax years 2016-2026 plus All; no login or CAPTCHA on the form; cart only for paying."
+   },
+   "gis": {
+    "url": "https://qpublic.schneidercorp.com/Application.aspx?App=AllendaleCountySC&Layer=Parcels&PageType=Search",
+    "legal_description_field": "unknown",
+    "deed_book_page_field": "unknown",
+    "owner_field": "unknown",
+    "notes": "URL from repo registry; not fetched. qPublic (Schneider) answered a plain GET with a Cloudflare 'Just a moment...' challenge (HTTP 403) on 2026-10-07 (checked on Abbeville's app); a person in a normal browser can open the parcel card. Field list not verifiable without passing the challenge."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "yes",
+    "gis": "no",
+    "evidence": "qpaybill_delinquent_roll.py (tax); no Allendale parcel layer in parcel_cache.py or SC_GIS"
+   },
+   "manual_lane": "No online deed index: a person or the abstractor must search the deed books at the Allendale Clerk of Court; the parcel card is qPublic in a normal browser; tax bills are free on qPayBill.",
+   "confidence": "low"
+  },
+  {
+   "county": "anderson",
+   "state": "SC",
+   "rod": {
+    "platform": "ACPASS (county-built CGI) for 7/1/1974-2/20/2026; scanned index pages 7/1/1948-6/30/1974 (rod.andersoncountysc.org PDF viewer); Ingenuity 'Online Services' (sc.ingcountyapps.com/anderson_rod) for 2/21/2026-current",
+    "url": "https://acpass.andersoncountysc.org/deed.cgi",
+    "free_name_search": "yes",
+    "access": "open",
+    "index_online_back_to_year": 1948,
+    "images_free": "yes",
+    "legal_description_in_index": "no",
+    "plat_books_or_maps_online": "yes",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: opened ACPASS deed.cgi menu: 'Older Plats' (Deedoplats.cgi), 'July 1, 1948 thru June 30, 1974' (disclaimer then rod.andersoncountysc.org frameset RODSearch.aspx/PDFReport.aspx), 'July 1, 1974 thru February 20, 2026' (deeda.cgi), 'February 21, 2026 thru Current' (link to sc.ingcountyapps.com/anderson_rod), tax liens 1996-2026; note 'Adobe Acrobat Reader Required to view images'. ACPASS Disclaimer.htm has no automation clause. Opened the Ingenuity page: its Terms say users may not use bots, spiders, scrapers or offline readers. Image access per repo docs/enumeration_r4/r4_deed_mining.md (detail page has a free 'View Images' link); not re-opened today.",
+    "notes": "Big change: deeds recorded since 2/21/2026 are only in the new Ingenuity system, whose terms forbid automation, so the ACPASS reader stops at 2/20/2026. ACPASS robots.txt is Disallow: / (owner ruled robots not a wall). Index DESCRIPTION is a short free-text note, not the full legal."
+   },
+   "probate": {
+    "system": "Anderson probate is reached through ACPASS 'Courts' (courts.htm), which redirected to a login form (free registration) on 2026-10-07. Not in the southcarolinaprobate.net dropdown per the repo's 2026-10-02 read. southcarolinaprobate.net returned HTTP 403 (nginx) to a plain GET of /search/ and of the home page on 2026-10-07, so its county dropdown could not be re-read today; the repo's sc_probate_net.py records the dropdown as read live on 2026-10-02: Aiken, Bamberg, Barnwell, Charleston, Cherokee, Chester, Colleton, Dorchester, Florence, Georgetown, Kershaw, Lancaster, Marlboro, Oconee, Orangeburg, Sumter, York, with only Charleston, Dorchester and York returning any cases.",
+    "url": "https://acpass.andersoncountysc.org/courts.htm",
+    "free_search": "no",
+    "access": "login",
+    "notes": "Free account login; we do not log in."
+   },
+   "tax": {
+    "url": "https://acpass.andersoncountysc.org/taxes.htm",
+    "free_by_parcel": "no",
+    "shows_bill_history": "unknown",
+    "access": "login",
+    "notes": "taxes.htm redirected to loginreg3/login.php ('Not registered yet? Register Here') on 2026-10-07. Repo walls register: ACPASS tax balance 403 auth-gated."
+   },
+   "gis": {
+    "url": "https://propertyviewer.andersoncountysc.org/arcgis/rest/services/NewPropertyViewer/MapServer/5",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "no",
+    "notes": "Fields read 2026-10-07: TMS, DBOOK, DPAGE, DESCRIPTIO (short-form legal such as lot/subdivision or acreage), CPLAT (plat book/page), PHYS_ADDR, SALE_PRICE, SALE_YEAR, MRKT_VALUE; TAXOWNSTR exists but was null on all 5 sampled rows (repo: always null)."
+   },
+   "we_already_read": {
+    "rod": "partial",
+    "tax": "partial",
+    "gis": "yes",
+    "evidence": "anderson_acpass_deeds.py (POA + court-order types only, ACPASS 1974-2/20/2026); enrichment_acpass.py needs ACPASS login credentials; SC_GIS['Anderson'] + parcel_cache.py + assessor_cards/anderson_sc.py"
+   },
+   "manual_lane": "Deeds recorded since 2/21/2026 must be looked up by a person in the new Ingenuity system (its terms forbid automation); tax bills and probate need a free ACPASS login a person can use, or a call to the offices; pre-1948 deeds need the abstractor.",
+   "confidence": "high"
+  },
+  {
+   "county": "bamberg",
+   "state": "SC",
+   "rod": {
+    "platform": "Avenu Insights / Neumo Records Management (GRIDS), reached from the sclandrecords.com county picker",
+    "url": "https://bambergsc.avenuinsights.com/",
+    "free_name_search": "unknown",
+    "access": null,
+    "index_online_back_to_year": null,
+    "images_free": "unknown",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "unknown",
+    "how_verified": "2026-10-07: county home page links 'SC Land Records' (sclandrecords.com/sclr); that picker's JS sends Bamberg to bambergsc.avenuinsights.com, whose /Home/index.html ('Neumo Records Management') only offers 'View Office Records' and 'Search' buttons pointing to grids.avenuinsights.com, which loops back to the same landing on a plain GET. No search form, terms or fee text reachable without running the JS app; stopped there.",
+    "notes": "Same vendor platform as Cherokee, whose terms forbid data mining, robots and spiders (repo docs/ROD_PORTAL_ACCESS.md); treat as no-automation until Bamberg's own terms are read by a person."
+   },
+   "probate": {
+    "system": "Bamberg County Probate Court page (estate administration, marriage, etc.) has no online search. Bamberg is in the southcarolinaprobate.net dropdown but returned no cases in the repo's 2026-10-02 probe. southcarolinaprobate.net returned HTTP 403 (nginx) to a plain GET of /search/ and of the home page on 2026-10-07, so its county dropdown could not be re-read today; the repo's sc_probate_net.py records the dropdown as read live on 2026-10-02: Aiken, Bamberg, Barnwell, Charleston, Cherokee, Chester, Colleton, Dorchester, Florence, Georgetown, Kershaw, Lancaster, Marlboro, Oconee, Orangeburg, Sumter, York, with only Charleston, Dorchester and York returning any cases.",
+    "url": "https://www.bambergcounty.sc.gov/county-courts/probate-court",
+    "free_search": "no",
+    "access": null,
+    "notes": "Office visit or phone."
+   },
+   "tax": {
+    "url": "https://bambergcountytreasurer.qpaybill.com/Taxes/TaxesDefaultType4.aspx",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "Link read off the county home page 2026-10-07; the Bamberg page itself was not opened. qPayBill (Springbrook/PUBLIQ) Type4 tax search: verified on Allendale 2026-10-07 - search by Map Number (TMS), Owner, Tax ID, Address, Notice No.; Paid/Unpaid/All; tax years 2016-2026 plus All; no login or CAPTCHA on the form; cart only for paying."
+   },
+   "gis": {
+    "url": "https://qpublic.schneidercorp.com/Application.aspx?App=BambergCountySC&Layer=Parcels&PageType=Search",
+    "legal_description_field": "unknown",
+    "deed_book_page_field": "unknown",
+    "owner_field": "unknown",
+    "notes": "URL from repo registry; not fetched. qPublic (Schneider) answered a plain GET with a Cloudflare 'Just a moment...' challenge (HTTP 403) on 2026-10-07 (checked on Abbeville's app); a person in a normal browser can open the parcel card. Field list not verifiable without passing the challenge."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "yes",
+    "gis": "no",
+    "evidence": "qpaybill_delinquent_roll.py (tax); bamberg_sheriff.py is sales only; no Bamberg parcel layer in parcel_cache.py"
+   },
+   "manual_lane": "Deed searches go through the Avenu/Neumo portal, which we leave to a person in a browser (or the abstractor) because the same vendor's terms forbid automation; probate is office-only.",
+   "confidence": "medium"
+  },
+  {
+   "county": "barnwell",
+   "state": "SC",
+   "rod": {
+    "platform": "Online Record System (NameSearch.php / NamePick.php / NameDisplay.php)",
+    "url": "https://barnwelldeeds.com/NameSearch.php?Accept=Accept",
+    "free_name_search": "yes",
+    "access": "disclaimer_click",
+    "index_online_back_to_year": null,
+    "images_free": "yes",
+    "legal_description_in_index": "no",
+    "plat_books_or_maps_online": "yes",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: opened barnwelldeeds.com (disclaimer) and NameSearch.php?Accept=Accept ('Verified Through' 10/6/2026, PLATS instrument group, property-description search; start-date field has no default so the index start year is not shown). Root disclaimer is the platform's accuracy/liability text with no automation clause (read 2026-10-07). Platform check 2026-10-07: index rows link view_image.php?...&type=pdf|tif with no cart/fee/login text (Abbeville test search); one such link on Georgetown returned application/pdf with no login.",
+    "notes": "Repo measured that Barnwell honours the date window (bulk date-range reads possible). Barnwell was dropped from the Avenu sclandrecords picker (commented out)."
+   },
+   "probate": {
+    "system": "Barnwell County Probate Court; county site did not resolve/connect on 2026-10-07. Barnwell is in the southcarolinaprobate.net dropdown but returned no cases in the repo's 2026-10-02 probe. southcarolinaprobate.net returned HTTP 403 (nginx) to a plain GET of /search/ and of the home page on 2026-10-07, so its county dropdown could not be re-read today; the repo's sc_probate_net.py records the dropdown as read live on 2026-10-02: Aiken, Bamberg, Barnwell, Charleston, Cherokee, Chester, Colleton, Dorchester, Florence, Georgetown, Kershaw, Lancaster, Marlboro, Oconee, Orangeburg, Sumter, York, with only Charleston, Dorchester and York returning any cases.",
+    "url": "https://www.southcarolinaprobate.net/search/",
+    "free_search": "no",
+    "access": "blocked",
+    "notes": "No working free estate index found."
+   },
+   "tax": {
+    "url": "https://barnwelltreasurer.qpaybill.com/Taxes/TaxesDefaultType4.aspx",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "Not opened today; answers from the shared platform. qPayBill (Springbrook/PUBLIQ) Type4 tax search: verified on Allendale 2026-10-07 - search by Map Number (TMS), Owner, Tax ID, Address, Notice No.; Paid/Unpaid/All; tax years 2016-2026 plus All; no login or CAPTCHA on the form; cart only for paying."
+   },
+   "gis": {
+    "url": "https://services8.arcgis.com/qqnlHdXochyJPfSY/arcgis/rest/services/ParcelData_ExportFeatures/FeatureServer/2",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "Fields read 2026-10-07: Legal_Description1/2, Deed_Book/Deed_Page, Deed_Ref_Dt, Plat_Book/Plat_Page, Consideration, Prev_Owner, Prev_Deed_Ref and 2Prev_Deed_Ref (two earlier deed references), Name/Name_2, mailing, Map_Number. The prior-deed fields give two links of the chain for free."
+   },
+   "we_already_read": {
+    "rod": "partial",
+    "tax": "yes",
+    "gis": "partial",
+    "evidence": "enrichment_rod_name_index.py (name lookup; bulk_by_date allowed here); qpaybill_delinquent_roll.py; parcel_cache.py 'Barnwell' (owner/mail, not legal or prior-deed fields)"
+   },
+   "manual_lane": "ROD index and deed PDFs are free; a person is needed only for chain links older than the online index (start year not published) and for probate, which has no working online index.",
+   "confidence": "high"
+  },
+  {
+   "county": "beaufort",
+   "state": "SC",
+   "rod": {
+    "platform": "NewVision Systems BrowserView (rod.beaufortcountysc.gov/BrowserViewDMP)",
+    "url": "https://rod.beaufortcountysc.gov/searchng/",
+    "free_name_search": "unknown",
+    "access": "captcha",
+    "index_online_back_to_year": null,
+    "images_free": "unknown",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "unknown",
+    "how_verified": "2026-10-07: /searchng/ redirected to /BrowserViewDMP/ ('Search - BrowserView', NewVision Systems). Every search tab (name, instrument, book/page, town, lot/block) carries 'Please verify that you are not a robot'; the page also has Log In / Create account and a 'Print Cart'. Stopped at the CAPTCHA.",
+    "notes": "County site also lists 'Register of Deeds Old Plats' (not opened). Coverage years not shown on the landing."
+   },
+   "probate": {
+    "system": "Beaufort County Probate Court page offers forms (sccourts.org) and marriage licence info; no online estate search found. Not in the southcarolinaprobate.net dropdown per the repo's 2026-10-02 read. southcarolinaprobate.net returned HTTP 403 (nginx) to a plain GET of /search/ and of the home page on 2026-10-07, so its county dropdown could not be re-read today; the repo's sc_probate_net.py records the dropdown as read live on 2026-10-02: Aiken, Bamberg, Barnwell, Charleston, Cherokee, Chester, Colleton, Dorchester, Florence, Georgetown, Kershaw, Lancaster, Marlboro, Oconee, Orangeburg, Sumter, York, with only Charleston, Dorchester and York returning any cases.",
+    "url": "https://www.beaufortcountysc.gov/probate-court/index.html",
+    "free_search": "no",
+    "access": null,
+    "notes": "Office visit or phone."
+   },
+   "tax": {
+    "url": "https://www.beaufortcountytreasurer.com/tax-bill-lookup",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "unknown",
+    "access": "open",
+    "notes": "Treasurer 'Tax Document Lookup' form takes 'Last Name or PIN or AIN' (read 2026-10-07); payment at mybeaufortcounty.com (account optional). Also GovernMax 'Real Property Information' (sc-beaufort-county.governmax.com, timed out today) and an archive real-property lookup."
+   },
+   "gis": {
+    "url": "https://gis.beaufortcountysc.gov/server/rest/services/EnerGov/MapServer/1",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "Fields read 2026-10-07: GisFile_LegalDescr, GisFile_Book/GisFile_Page, GisFile_RecordDate/SaleDate/SalePrice, GisFile_Owner1/Owner2 + mailing, GisFile_PIN/AIN, situs, values, exemption."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "no",
+    "gis": "partial",
+    "evidence": "SC_GIS['Beaufort'] + sc_coastal_rosters.py (owner/situs/value/book-page; legal not used); beaufort_flc.py is forfeited land, not bills"
+   },
+   "manual_lane": "The ROD search is behind a CAPTCHA on every search, so a person must run deed-chain searches in a browser (or the abstractor); county GIS gives the assessor legal description and last deed book/page free.",
+   "confidence": "medium"
+  },
+  {
+   "county": "berkeley",
+   "state": "SC",
+   "rod": {
+    "platform": "Online Record System (NameSearch.php / NamePick.php / NameDisplay.php)",
+    "url": "https://search.berkeleydeeds.com/NameSearch.php?Accept=Accept",
+    "free_name_search": "yes",
+    "access": "disclaimer_click",
+    "index_online_back_to_year": 1983,
+    "images_free": "yes",
+    "legal_description_in_index": "no",
+    "plat_books_or_maps_online": "yes",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: opened search.berkeleydeeds.com (disclaimer) and NameSearch.php?Accept=Accept: 'Verified Through' today, start-date field defaults to 07/01/1983, PLATS instrument group, property-description search. Root disclaimer is the platform's accuracy/liability text with no automation clause (read 2026-10-07). Platform check 2026-10-07: index rows link view_image.php?...&type=pdf|tif with no cart/fee/login text (Abbeville test search); one such link on Georgetown returned application/pdf with no login.",
+    "notes": "1983 is the form's default start date, read as the start of the typed index. Repo: date window ignored here, name lookup only."
+   },
+   "probate": {
+    "system": "Berkeley County Probate Court; county site (berkeleycountysc.gov) answered a Cloudflare 'Just a moment...' challenge (403) on 2026-10-07. Not in the southcarolinaprobate.net dropdown per the repo's 2026-10-02 read. southcarolinaprobate.net returned HTTP 403 (nginx) to a plain GET of /search/ and of the home page on 2026-10-07, so its county dropdown could not be re-read today; the repo's sc_probate_net.py records the dropdown as read live on 2026-10-02: Aiken, Bamberg, Barnwell, Charleston, Cherokee, Chester, Colleton, Dorchester, Florence, Georgetown, Kershaw, Lancaster, Marlboro, Oconee, Orangeburg, Sumter, York, with only Charleston, Dorchester and York returning any cases.",
+    "url": "https://berkeleycountysc.gov/dept/probate/",
+    "free_search": "unknown",
+    "access": "blocked",
+    "notes": "Could not read whether an online estate index exists."
+   },
+   "tax": {
+    "url": "https://berkeleycountysc.paystar.io/",
+    "free_by_parcel": "unknown",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "PayStar 'Berkeley County Taxes' app loads with no login (2026-10-07). Repo berkeley_paystar_tax.py: unauthenticated search API with TaxYear and PaymentStatus facets (so multiple years and paid/unpaid), terms of use judged non-prohibitive there. TMS as a search key not confirmed by us."
+   },
+   "gis": {
+    "url": "https://gis.berkeleycountysc.gov/arcgis/rest/services/internet/MapServer/4",
+    "legal_description_field": "no",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "Fields read 2026-10-07: O_TMS, OwnerName, CareOf, mailing, DeedBook, DeedPage, Plat, SalePrice, SaleDate, TotalAcres, TotalTaxValue, GIS_Address; no legal-description field."
+   },
+   "we_already_read": {
+    "rod": "partial",
+    "tax": "yes",
+    "gis": "yes",
+    "evidence": "enrichment_rod_name_index.py (name lookup); berkeley_paystar_tax.py (unpaid roll); parcel_cache.py 'Berkeley'"
+   },
+   "manual_lane": "Deed index and PDFs are free online from about 1983; a person or abstractor is needed for older chain links, and probate (county site behind Cloudflare) must be checked by phone or visit.",
+   "confidence": "high"
+  },
+  {
+   "county": "calhoun",
+   "state": "SC",
+   "rod": {
+    "platform": "TitleSearcher (paid subscription); Clerk of Court is ex officio Register of Deeds",
+    "url": "https://www.titlesearcher.com/index.php",
+    "free_name_search": "no",
+    "access": "payment",
+    "index_online_back_to_year": null,
+    "images_free": "no",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "unknown",
+    "how_verified": "2026-10-07: Calhoun Clerk of Court page says the clerk is also the Register of Deeds and that property records are online via TitleSearcher, 'a paid service that requires a subscription'. TitleSearcher itself not opened.",
+    "notes": "No free online deed index."
+   },
+   "probate": {
+    "system": "Calhoun County Probate Court site links an 'Estate File Search' on Spartan hosted Public Inquiry (govcloud2.hostedbyspartan.com/CalhounPRO); landing shows 'Search Cases' and 'Search Parties', no login or CAPTCHA. Copies require a court visit. Not in the southcarolinaprobate.net dropdown per the repo's 2026-10-02 read.",
+    "url": "https://govcloud2.hostedbyspartan.com/CalhounPRO/PublicProbate/pages/InquiryMainPage.aspx",
+    "free_search": "yes",
+    "access": "open",
+    "notes": "Opened 2026-10-07 (the govcloud1 link on the court's home page is a stale 404; the Estate File Search page links govcloud2). No search was run."
+   },
+   "tax": {
+    "url": "https://calhountreasurer.qpaybill.com/Taxes/TaxesDefaultType4.aspx",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "Linked from the county home page ('Pay Taxes Online', 'Lookup Property'); not opened today. qPayBill (Springbrook/PUBLIQ) Type4 tax search: verified on Allendale 2026-10-07 - search by Map Number (TMS), Owner, Tax ID, Address, Notice No.; Paid/Unpaid/All; tax years 2016-2026 plus All; no login or CAPTCHA on the form; cart only for paying."
+   },
+   "gis": {
+    "url": "https://gis.aecomonline.net/arcgis/rest/services/CalhounCO/Parcel/MapServer/2",
+    "legal_description_field": "unknown",
+    "deed_book_page_field": "unknown",
+    "owner_field": "yes",
+    "notes": "AECOM-hosted server timed out on 2026-10-07. Repo parcel_cache.py documents Name1/Name2 owner, Sale_Price, Sale_Date on this layer (13,867 parcels). County also links calhounscmaps.com and an ArcGIS Experience app."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "yes",
+    "gis": "partial",
+    "evidence": "qpaybill_delinquent_roll.py; parcel_cache.py 'Calhoun'; calhoun_overage_claims.py"
+   },
+   "manual_lane": "Deeds are only on paid TitleSearcher or at the Clerk of Court office, so the attorney's abstractor (or a subscription) is needed for the chain and legal description; the free probate party search can be checked by a person.",
+   "confidence": "medium"
+  },
+  {
+   "county": "charleston",
+   "state": "SC",
+   "rod": {
+    "platform": "Charleston County ROD document search (county-built pages on charlestoncounty.gov) plus Day Book and Archival Room",
+    "url": "https://www.charlestoncounty.gov/departments/rod/rodsearch.php",
+    "free_name_search": "yes",
+    "access": "disclaimer_click",
+    "index_online_back_to_year": 1978,
+    "images_free": "yes",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "yes",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: opened the ROD Name/Date search: checkbox 'I have read and I agree to the terms in the legal disclaimer'; table states Deed/Mortgage Index Data 1978 thru 10/06/26, image record dates 10/1994 thru 10/06/26, plat images, liens from 1999; search by name, type, book/page, tracer, Parcel ID (PID). Help & FAQs says copies can be downloaded from the web site at no cost and older records need microfilm at the office. Archive page: RMC record books 1719-1960 are being digitized and put online. County legal disclaimer has no automation clause. No search was run.",
+    "notes": "Archival Room also lists old deed, mortgage, plat and probate (heir/deceased) indexes. Images are free downloads per the county FAQ (1994/1997 onward)."
+   },
+   "probate": {
+    "system": "Charleston Probate Court publishes estates and wills on southcarolinaprobate.net/charlestonprobatesearch (linked from the county's online-services page as 'Estates and Wills Search'). southcarolinaprobate.net returned HTTP 403 (nginx) to a plain GET of /search/ and of the home page on 2026-10-07, so its county dropdown could not be re-read today; the repo's sc_probate_net.py records the dropdown as read live on 2026-10-02: Aiken, Bamberg, Barnwell, Charleston, Cherokee, Chester, Colleton, Dorchester, Florence, Georgetown, Kershaw, Lancaster, Marlboro, Oconee, Orangeburg, Sumter, York, with only Charleston, Dorchester and York returning any cases.",
+    "url": "https://www.southcarolinaprobate.net/charlestonprobatesearch/",
+    "free_search": "yes",
+    "access": "blocked",
+    "notes": "Free name search per the repo (sc_probate_net.py reads it), but the site returned 403 to our plain requests on 2026-10-07, so a person may need a browser."
+   },
+   "tax": {
+    "url": "https://sc-charleston.publicaccessnow.com/RealPropertyBillSearch.aspx",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "unknown",
+    "access": "open",
+    "notes": "Public Access site (read 2026-10-07): Real Property Record, Sales and Bill searches; bill search by PIN (no dashes) or owner/address; no login or CAPTCHA seen."
+   },
+   "gis": {
+    "url": "https://gisccapps.charlestoncounty.org/arcgis/rest/services/ENERGOV/energov_css/MapServer/4",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "Fields read 2026-10-07: PID, OWNER1/OWNER2, mailing, LEGAL_DESCR, SUBDIVISION, ACREAGE (deeded), RECORDED_DATE, DOC_DATE, DEED_BOOK_PAGE, PLAT_BOOK_PAGE, SALE_PRICE, appraisal. The repo's SC_GIS URL (GIS_VIEWER/New_Parcel_Search/MapServer/61) answered 'Service ... not started' (error 500) today."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "partial",
+    "gis": "yes",
+    "evidence": "parcel_cache.py 'Charleston' (energov_css layer 4); SC_GIS['Charleston'] points at the stopped New_Parcel_Search service; charleston_delinquent_tax.py + charleston_tax_sale_xlsx.py (sale lists, not per-parcel bills); sc_probate_net.py (probate)"
+   },
+   "manual_lane": "Index from 1978 and images from the mid-1990s are free; earlier chain links need the Archival Room (partly online) or the abstractor/microfilm at the ROD.",
+   "confidence": "high"
+  },
+  {
+   "county": "cherokee",
+   "state": "SC",
+   "rod": {
+    "platform": "Avenu Insights / Neumo Records Management (GRIDS), via sclandrecords.com",
+    "url": "https://cherokeesc.avenuinsights.com/",
+    "free_name_search": "yes",
+    "access": null,
+    "index_online_back_to_year": 1995,
+    "images_free": "yes",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "yes",
+    "how_verified": "2026-10-07: read the county ROD page (cherokeecountysc.gov/register-of-deeds): 'Search online public deed records at www.sclandrecords.com', indexes from Jan. 3, 1995, scanned images from Sept. 25, 2002, 'Copies: free'; an account is needed only for fraud alerts. The portal itself was NOT opened: per the task and repo docs/ROD_PORTAL_ACCESS.md its terms forbid data mining, robots and spiders.",
+    "notes": "Free for a person in a browser; no automated use. Repo cherokee_rod.py is dead code (stale URL)."
+   },
+   "probate": {
+    "system": "Cherokee County Probate Court estates page has no online search. Cherokee is in the southcarolinaprobate.net dropdown but returned no cases in the repo's 2026-10-02 probe. southcarolinaprobate.net returned HTTP 403 (nginx) to a plain GET of /search/ and of the home page on 2026-10-07, so its county dropdown could not be re-read today; the repo's sc_probate_net.py records the dropdown as read live on 2026-10-02: Aiken, Bamberg, Barnwell, Charleston, Cherokee, Chester, Colleton, Dorchester, Florence, Georgetown, Kershaw, Lancaster, Marlboro, Oconee, Orangeburg, Sumter, York, with only Charleston, Dorchester and York returning any cases.",
+    "url": "https://cherokeecountysc.gov/probate-court/estates/",
+    "free_search": "no",
+    "access": null,
+    "notes": "Office visit or phone."
+   },
+   "tax": {
+    "url": "https://cherokeecountysctax.qpaybill.com/Taxes/TaxesDefaultType4.aspx",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "Not opened today; answers from the shared platform. qPayBill (Springbrook/PUBLIQ) Type4 tax search: verified on Allendale 2026-10-07 - search by Map Number (TMS), Owner, Tax ID, Address, Notice No.; Paid/Unpaid/All; tax years 2016-2026 plus All; no login or CAPTCHA on the form; cart only for paying. Repo walls register: Cherokee wp-json tax-sale PDFs also read."
+   },
+   "gis": {
+    "url": "https://qpublic.schneidercorp.com/Application.aspx?App=CherokeeCountySC&Layer=Parcels&PageType=Search",
+    "legal_description_field": "unknown",
+    "deed_book_page_field": "unknown",
+    "owner_field": "unknown",
+    "notes": "Not fetched. qPublic (Schneider) answered a plain GET with a Cloudflare 'Just a moment...' challenge (HTTP 403) on 2026-10-07 (checked on Abbeville's app); a person in a normal browser can open the parcel card. Field list not verifiable without passing the challenge. Repo walls register: no free county ArcGIS owner/situs layer (the 'Cherokee_County_Parcels_' AGOL service is Cherokee County, Georgia); assessor_cards/cherokee_sc.py renders qPublic cards on demand."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "yes",
+    "gis": "partial",
+    "evidence": "qpaybill_delinquent_roll.py + enrichment_qpaybill_tax.py + cherokee_delinquent_tax.py; assessor_cards/cherokee_sc.py (qPublic card, on demand)"
+   },
+   "manual_lane": "The deed index (1995+) and free images (2002+) are on the Avenu portal, whose terms forbid automation, so a person searches it in a browser; anything before 1995 needs the abstractor or the office books; probate is office-only.",
+   "confidence": "medium"
+  },
+  {
+   "county": "chester",
+   "state": "SC",
+   "rod": {
+    "platform": "Avenu Insights / Neumo Records Management (GRIDS), via sclandrecords.com",
+    "url": "https://chestersc.avenuinsights.com/",
+    "free_name_search": "unknown",
+    "access": null,
+    "index_online_back_to_year": null,
+    "images_free": "unknown",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "unknown",
+    "how_verified": "2026-10-07: sclandrecords.com/sclr county picker (read 2026-10-07) sends this county to <county>sc.avenuinsights.com, a 'Neumo Records Management' landing whose Search button goes to the shared GRIDS app (grids.avenuinsights.com), which only loops back to its landing on a plain GET. The county ROD page (chestercountysc.gov/register-of-deeds) answered a Cloudflare 'Just a moment...' challenge (403), so coverage years could not be read.",
+    "notes": "Same vendor as Cherokee, whose terms forbid data mining, robots and spiders; treat as no-automation."
+   },
+   "probate": {
+    "system": "Chester County Probate Court; county site behind Cloudflare. Chester is in the southcarolinaprobate.net dropdown but returned no cases in the repo's 2026-10-02 probe. southcarolinaprobate.net returned HTTP 403 (nginx) to a plain GET of /search/ and of the home page on 2026-10-07, so its county dropdown could not be re-read today; the repo's sc_probate_net.py records the dropdown as read live on 2026-10-02: Aiken, Bamberg, Barnwell, Charleston, Cherokee, Chester, Colleton, Dorchester, Florence, Georgetown, Kershaw, Lancaster, Marlboro, Oconee, Orangeburg, Sumter, York, with only Charleston, Dorchester and York returning any cases.",
+    "url": null,
+    "free_search": "no",
+    "access": "blocked",
+    "notes": "No working free estate index found."
+   },
+   "tax": {
+    "url": "https://chestercountysctax.com/",
+    "free_by_parcel": "unknown",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "Not opened today. Catalis tax site; repo sc_catalis_delinquent_roll.py (verified live 2026-09-21) reads its public API with no login or CAPTCHA; the API takes year=-1 (all years) and returns per-bill ids with paid/unpaid status."
+   },
+   "gis": {
+    "url": "https://services8.arcgis.com/7uCc8YS9s04rg0sr/arcgis/rest/services/Parcels_10_7_24/FeatureServer/0",
+    "legal_description_field": "no",
+    "deed_book_page_field": "no",
+    "owner_field": "yes",
+    "notes": "Fields read 2026-10-07: TMS, Map_Number, Name_1/Name_2, mailing, DEED_ACRES, SUBDIV_NO, LOT_NO, appraised values; no legal or deed book/page. Layer name says it is a 10/7/2024 snapshot."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "yes",
+    "gis": "yes",
+    "evidence": "sc_catalis_delinquent_roll.py + chester_delinquent_tax.py; parcel_cache.py 'Chester'"
+   },
+   "manual_lane": "Deed searches must be done by a person in the Avenu portal (or by the abstractor); the county site itself blocks automated reads, so probate and ROD coverage questions go by phone.",
+   "confidence": "low"
+  },
+  {
+   "county": "chesterfield",
+   "state": "SC",
+   "rod": {
+    "platform": "Avenu Insights / Neumo Records Management (GRIDS), via sclandrecords.com",
+    "url": "https://chesterfieldsc.avenuinsights.com/",
+    "free_name_search": "unknown",
+    "access": null,
+    "index_online_back_to_year": null,
+    "images_free": "unknown",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "yes",
+    "terms_forbid_automation": "unknown",
+    "how_verified": "2026-10-07: county Register of Deeds page links 'SC Land Records' (sclandrecords.com/sclr) and a county 'Plat Index' page; sclandrecords.com/sclr county picker (read 2026-10-07) sends this county to <county>sc.avenuinsights.com, a 'Neumo Records Management' landing whose Search button goes to the shared GRIDS app (grids.avenuinsights.com), which only loops back to its landing on a plain GET. A third-party directory (web search) says official records since Aug. 1, 1996 are online; not confirmed on a county page.",
+    "notes": "Same vendor as Cherokee, whose terms forbid data mining, robots and spiders; treat as no-automation. Plat index is on the county's own site (chesterfieldcountysc.com/plat-index, not opened)."
+   },
+   "probate": {
+    "system": "Chesterfield County Probate Court page (chesterfieldcountysc.com/probate-court) describes services only; no online search. Not in the southcarolinaprobate.net dropdown per the repo's 2026-10-02 read. southcarolinaprobate.net returned HTTP 403 (nginx) to a plain GET of /search/ and of the home page on 2026-10-07, so its county dropdown could not be re-read today; the repo's sc_probate_net.py records the dropdown as read live on 2026-10-02: Aiken, Bamberg, Barnwell, Charleston, Cherokee, Chester, Colleton, Dorchester, Florence, Georgetown, Kershaw, Lancaster, Marlboro, Oconee, Orangeburg, Sumter, York, with only Charleston, Dorchester and York returning any cases.",
+    "url": "https://www.chesterfieldcountysc.com/probate-court",
+    "free_search": "no",
+    "access": null,
+    "notes": "Office visit or phone."
+   },
+   "tax": {
+    "url": "https://chesterfieldcountytax.qpaybill.com/Taxes/TaxesDefaultType4.aspx",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "Linked from the county home page; not opened today. qPayBill (Springbrook/PUBLIQ) Type4 tax search: verified on Allendale 2026-10-07 - search by Map Number (TMS), Owner, Tax ID, Address, Notice No.; Paid/Unpaid/All; tax years 2016-2026 plus All; no login or CAPTCHA on the form; cart only for paying."
+   },
+   "gis": {
+    "url": "https://chesterfieldsc.wthgis.com/",
+    "legal_description_field": "unknown",
+    "deed_book_page_field": "unknown",
+    "owner_field": "unknown",
+    "notes": "WTH 'tgis' viewer linked from the county home page; not opened. Repo parcel_cache notes WTH viewers expose no ArcGIS REST service."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "yes",
+    "gis": "no",
+    "evidence": "qpaybill_delinquent_roll.py; no Chesterfield parcel layer in parcel_cache.py"
+   },
+   "manual_lane": "Deed searches must be done by a person in the Avenu portal (or by the abstractor); parcel details come from the WTH map viewer by hand; probate is office-only.",
+   "confidence": "low"
+  },
+  {
+   "county": "clarendon",
+   "state": "SC",
+   "rod": {
+    "platform": "Harris AcclaimWeb",
+    "url": "https://acclaimprod.clarendoncountygov.org/acclaimweb",
+    "free_name_search": "yes",
+    "access": "blocked",
+    "index_online_back_to_year": null,
+    "images_free": "yes",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "yes",
+    "terms_forbid_automation": "unknown",
+    "how_verified": "2026-10-07: county ROD page says records are offered 'free of charge through our online Public Records Search', deed images begin June 9, 1988, plat images June 13, 1988, mortgage images November 2002, and links acclaimprod.clarendoncountygov.org/acclaimweb. A plain GET of that AcclaimWeb URL returned Cloudflare 'Attention Required' (403); stopped there.",
+    "notes": "Free for a person in a browser per the county; automated reads are blocked. Index start year not stated (images from 1988)."
+   },
+   "probate": {
+    "system": "Clarendon County Probate page links state court forms only; no online search. Not in the southcarolinaprobate.net dropdown per the repo's 2026-10-02 read. southcarolinaprobate.net returned HTTP 403 (nginx) to a plain GET of /search/ and of the home page on 2026-10-07, so its county dropdown could not be re-read today; the repo's sc_probate_net.py records the dropdown as read live on 2026-10-02: Aiken, Bamberg, Barnwell, Charleston, Cherokee, Chester, Colleton, Dorchester, Florence, Georgetown, Kershaw, Lancaster, Marlboro, Oconee, Orangeburg, Sumter, York, with only Charleston, Dorchester and York returning any cases.",
+    "url": "https://www.clarendoncountysc.gov/our-government/probate/",
+    "free_search": "no",
+    "access": null,
+    "notes": "Office visit or phone."
+   },
+   "tax": {
+    "url": "https://clarendoncountysctax.qpaybill.com/Taxes/TaxesDefaultType4.aspx",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "Not opened today; answers from the shared platform. qPayBill (Springbrook/PUBLIQ) Type4 tax search: verified on Allendale 2026-10-07 - search by Map Number (TMS), Owner, Tax ID, Address, Notice No.; Paid/Unpaid/All; tax years 2016-2026 plus All; no login or CAPTCHA on the form; cart only for paying."
+   },
+   "gis": {
+    "url": "https://qpublic.schneidercorp.com/Application.aspx?App=ClarendonCountySC&Layer=Parcels&PageType=Search",
+    "legal_description_field": "unknown",
+    "deed_book_page_field": "unknown",
+    "owner_field": "unknown",
+    "notes": "Not fetched. qPublic (Schneider) answered a plain GET with a Cloudflare 'Just a moment...' challenge (HTTP 403) on 2026-10-07 (checked on Abbeville's app); a person in a normal browser can open the parcel card. Field list not verifiable without passing the challenge. Repo county-breadth research (2026-09-21): parcels only in qPublic (Cloudflare) and a WTH viewer with no REST."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "yes",
+    "gis": "no",
+    "evidence": "qpaybill_delinquent_roll.py; clarendon_tax_auction.py; no parcel layer"
+   },
+   "manual_lane": "A person can search the free AcclaimWeb index and view deed images back to 1988 in a browser (automated reads are blocked); older links need the abstractor.",
+   "confidence": "medium"
+  },
+  {
+   "county": "colleton",
+   "state": "SC",
+   "rod": {
+    "platform": "Online Record System (NameSearch.php / NamePick.php / NameDisplay.php)",
+    "url": "https://search.colletondeeds.com/NameSearch.php?Accept=Accept",
+    "free_name_search": "yes",
+    "access": "disclaimer_click",
+    "index_online_back_to_year": 1986,
+    "images_free": "yes",
+    "legal_description_in_index": "no",
+    "plat_books_or_maps_online": "yes",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: opened search.colletondeeds.com (disclaimer) and NameSearch.php?Accept=Accept: 'Verified Through' today, start-date field defaults to 08/01/1986, PLATS instrument group, property-description search. Root disclaimer is the platform's accuracy/liability text with no automation clause (read 2026-10-07). Platform check 2026-10-07: index rows link view_image.php?...&type=pdf|tif with no cart/fee/login text (Abbeville test search); one such link on Georgetown returned application/pdf with no login.",
+    "notes": "1986 is the form's default start date, read as the start of the typed index. Repo: date window ignored here, name lookup only."
+   },
+   "probate": {
+    "system": "Colleton County Probate Court. Colleton is in the southcarolinaprobate.net dropdown and the repo queries it every run, but it returned no cases (court does not feed the site). southcarolinaprobate.net returned HTTP 403 (nginx) to a plain GET of /search/ and of the home page on 2026-10-07, so its county dropdown could not be re-read today; the repo's sc_probate_net.py records the dropdown as read live on 2026-10-02: Aiken, Bamberg, Barnwell, Charleston, Cherokee, Chester, Colleton, Dorchester, Florence, Georgetown, Kershaw, Lancaster, Marlboro, Oconee, Orangeburg, Sumter, York, with only Charleston, Dorchester and York returning any cases.",
+    "url": "https://www.southcarolinaprobate.net/search/",
+    "free_search": "no",
+    "access": "blocked",
+    "notes": "No working free estate index found."
+   },
+   "tax": {
+    "url": "https://colleton.qpaybill.com/Taxes/TaxesDefaultType4.aspx",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "Subdomain from repo qpaybill_delinquent_roll.py ('colleton'); not opened today. qPayBill (Springbrook/PUBLIQ) Type4 tax search: verified on Allendale 2026-10-07 - search by Map Number (TMS), Owner, Tax ID, Address, Notice No.; Paid/Unpaid/All; tax years 2016-2026 plus All; no login or CAPTCHA on the form; cart only for paying."
+   },
+   "gis": {
+    "url": "https://services1.arcgis.com/m0cnLGKdhwao8WvM/arcgis/rest/services/Public_Data/FeatureServer/2",
+    "legal_description_field": "no",
+    "deed_book_page_field": "no",
+    "owner_field": "yes",
+    "notes": "Fields read 2026-10-07: PIN, Acreage, LegalAcres, PropertyAddress, OwnerName1/2 + mailing, PropertyClass, TaxDistrict; no legal text or deed reference."
+   },
+   "we_already_read": {
+    "rod": "partial",
+    "tax": "yes",
+    "gis": "yes",
+    "evidence": "enrichment_rod_name_index.py (name lookup); qpaybill_delinquent_roll.py + colleton_tax_sale.py; SC_GIS['Colleton'] + parcel_cache.py"
+   },
+   "manual_lane": "Index and deed PDFs are free online from about 1986; older links need the abstractor; probate is office-only.",
+   "confidence": "high"
+  },
+  {
+   "county": "darlington",
+   "state": "SC",
+   "rod": {
+    "platform": "Cott Systems RECORDhub",
+    "url": "https://recordhub.cottsystems.com/DarlingtonSC/Portal/",
+    "free_name_search": "unknown",
+    "access": "login",
+    "index_online_back_to_year": null,
+    "images_free": "unknown",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "yes",
+    "how_verified": "2026-10-07: county site (darcosc.com) links RECORDhub for Darlington (Clerk of Court). Landing offers Sign up / Login only. RECORDhub Terms: access is by prepaid subscription through a user account, and users may not use any spider, crawler, robot or automated data-mining or scraping process. FAQ: depending on the site, free access may exist only when entering from the government office's own website; not tested.",
+    "notes": "Treat as login + subscription; a free tier for county-site visitors is possible but unconfirmed."
+   },
+   "probate": {
+    "system": "Darlington County Probate Judge page (darcosc.com) has no online case search. Not in the southcarolinaprobate.net dropdown per the repo's 2026-10-02 read. southcarolinaprobate.net returned HTTP 403 (nginx) to a plain GET of /search/ and of the home page on 2026-10-07, so its county dropdown could not be re-read today; the repo's sc_probate_net.py records the dropdown as read live on 2026-10-02: Aiken, Bamberg, Barnwell, Charleston, Cherokee, Chester, Colleton, Dorchester, Florence, Georgetown, Kershaw, Lancaster, Marlboro, Oconee, Orangeburg, Sumter, York, with only Charleston, Dorchester and York returning any cases.",
+    "url": "https://www.darcosc.com/courts_legal/probate_judge.php",
+    "free_search": "no",
+    "access": null,
+    "notes": "Office visit or phone."
+   },
+   "tax": {
+    "url": "https://darlingtontreasurer.qpaybill.com/Taxes/TaxesDefaultType4.aspx",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "Linked from the county home page; not opened today. qPayBill (Springbrook/PUBLIQ) Type4 tax search: verified on Allendale 2026-10-07 - search by Map Number (TMS), Owner, Tax ID, Address, Notice No.; Paid/Unpaid/All; tax years 2016-2026 plus All; no login or CAPTCHA on the form; cart only for paying."
+   },
+   "gis": {
+    "url": "https://services5.arcgis.com/8FJikaProY6O3ncx/arcgis/rest/services/PARCELS/FeatureServer/1",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "Fields read 2026-10-07: Map_Number/MBP, Name/Name_2 + mailing, Deed_Book, Deed_Page, Plat_Book, Plat_Page, LEGAL1, LEGAL2, DESCRIPT1/2, SUBDIV_NAM, values. County also links qpublic.net/sc/darlington and an ArcGIS Experience map."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "yes",
+    "gis": "partial",
+    "evidence": "qpaybill_delinquent_roll.py + darlington_delinquent_tax.py; parcel_cache.py 'Darlington' (owner/mail/situs, not LEGAL1/2 or deed fields)"
+   },
+   "manual_lane": "The deed index is on Cott RECORDhub (account/subscription, no automation allowed), so the chain must come from the abstractor or a person with a RECORDhub account; county GIS gives the assessor legal, deed book/page and plat book/page free.",
+   "confidence": "medium"
+  },
+  {
+   "county": "dillon",
+   "state": "SC",
+   "rod": {
+    "platform": "Avenu Insights / Neumo Records Management (GRIDS), via sclandrecords.com",
+    "url": "https://dillonsc.avenuinsights.com/",
+    "free_name_search": "unknown",
+    "access": null,
+    "index_online_back_to_year": null,
+    "images_free": "unknown",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "unknown",
+    "how_verified": "2026-10-07: county Clerk of Court page says the Clerk is also Register of Deeds and lists no online search link; sclandrecords.com/sclr county picker (read 2026-10-07) sends this county to <county>sc.avenuinsights.com, a 'Neumo Records Management' landing whose Search button goes to the shared GRIDS app (grids.avenuinsights.com), which only loops back to its landing on a plain GET.",
+    "notes": "Same vendor as Cherokee, whose terms forbid data mining, robots and spiders; treat as no-automation."
+   },
+   "probate": {
+    "system": "Dillon County Probate Judge page (dilloncountysc.org) is a biography/contact page with no online search. Not in the southcarolinaprobate.net dropdown per the repo's 2026-10-02 read. southcarolinaprobate.net returned HTTP 403 (nginx) to a plain GET of /search/ and of the home page on 2026-10-07, so its county dropdown could not be re-read today; the repo's sc_probate_net.py records the dropdown as read live on 2026-10-02: Aiken, Bamberg, Barnwell, Charleston, Cherokee, Chester, Colleton, Dorchester, Florence, Georgetown, Kershaw, Lancaster, Marlboro, Oconee, Orangeburg, Sumter, York, with only Charleston, Dorchester and York returning any cases.",
+    "url": "https://www.dilloncountysc.org/departments/courts/probate_judge.php",
+    "free_search": "no",
+    "access": null,
+    "notes": "Office visit or phone."
+   },
+   "tax": {
+    "url": "https://dilloncountysctaxes.qpaybill.com/Taxes/TaxesDefaultType4.aspx",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "Subdomain from repo qpaybill_delinquent_roll.py; not opened today. qPayBill (Springbrook/PUBLIQ) Type4 tax search: verified on Allendale 2026-10-07 - search by Map Number (TMS), Owner, Tax ID, Address, Notice No.; Paid/Unpaid/All; tax years 2016-2026 plus All; no login or CAPTCHA on the form; cart only for paying."
+   },
+   "gis": {
+    "url": "https://dillonsc.wthgis.com/",
+    "legal_description_field": "unknown",
+    "deed_book_page_field": "unknown",
+    "owner_field": "unknown",
+    "notes": "WTH viewer linked from the county GIS page (2026-10-07); not opened. Repo: WTH viewers expose no ArcGIS REST."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "yes",
+    "gis": "no",
+    "evidence": "qpaybill_delinquent_roll.py + dillon_delinquent_tax.py; dillon_sheriff.py (sales); no parcel layer"
+   },
+   "manual_lane": "Deed searches by a person in the Avenu portal or by the abstractor; parcel facts from the WTH viewer by hand; probate is office-only.",
+   "confidence": "low"
+  },
+  {
+   "county": "dorchester",
+   "state": "SC",
+   "rod": {
+    "platform": "Online Record System (NameSearch.php / NamePick.php / NameDisplay.php)",
+    "url": "https://search.dorchesterdeeds.com/NameSearch.php?Accept=Accept",
+    "free_name_search": "yes",
+    "access": "disclaimer_click",
+    "index_online_back_to_year": null,
+    "images_free": "yes",
+    "legal_description_in_index": "no",
+    "plat_books_or_maps_online": "yes",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: opened search.dorchesterdeeds.com (disclaimer) and NameSearch.php?Accept=Accept ('Verified Through' today, PLATS group, property-description search; no default start date, so the index start year is not shown). Root disclaimer is the platform's accuracy/liability text with no automation clause (read 2026-10-07). Platform check 2026-10-07: index rows link view_image.php?...&type=pdf|tif with no cart/fee/login text (Abbeville test search); one such link on Georgetown returned application/pdf with no login.",
+    "notes": "Repo: date window ignored here (returns head of index), name lookup only."
+   },
+   "probate": {
+    "system": "Dorchester Probate publishes to southcarolinaprobate.net (repo sc_probate_net.py reads 'Dorchester Probate' and 'Dorchester Marriage'; about 20 hits for one surname in the 2026-10-02 probe). Per repo, document links there open a paid viewer. southcarolinaprobate.net returned HTTP 403 (nginx) to a plain GET of /search/ and of the home page on 2026-10-07, so its county dropdown could not be re-read today; the repo's sc_probate_net.py records the dropdown as read live on 2026-10-02: Aiken, Bamberg, Barnwell, Charleston, Cherokee, Chester, Colleton, Dorchester, Florence, Georgetown, Kershaw, Lancaster, Marlboro, Oconee, Orangeburg, Sumter, York, with only Charleston, Dorchester and York returning any cases.",
+    "url": "https://www.southcarolinaprobate.net/search/",
+    "free_search": "yes",
+    "access": "blocked",
+    "notes": "Index free per the repo, documents paid; site returned 403 to us today. County site (dorchestercountysc.gov) returned Akamai 'Access Denied'."
+   },
+   "tax": {
+    "url": "https://dorchestercountyscdelinquenttax.billtrax.com/",
+    "free_by_parcel": "unknown",
+    "shows_bill_history": "unknown",
+    "access": "open",
+    "notes": "BillTrax delinquent-tax app loads (2026-10-07; Angular app, no login or CAPTCHA per repo dorchester_billtrax_delinquent_tax.py). This covers delinquent accounts only; the county's current-bill lookup sits on dorchestercountysc.gov, which returned Akamai 'Access Denied' to us."
+   },
+   "gis": {
+    "url": "https://gisportal.dorchestercounty.net/hosting/rest/services/General_Data/Parcels_Public/MapServer/0",
+    "legal_description_field": "no",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "Fields read 2026-10-07: FULL_TMS/TMS, OWNER, CARE_OF, mailing, PROPERTY_LOCATION, PLAT, LOT, SUBDIVISION, SUB_INFO, GRANTOR, GRANTEE, DEED, RECORDING_DATE, SALE_DATE, SALE_PRICE, PARENT_PARCELNO. No single legal-description field, but plat/lot/subdivision pieces and the last grantor/grantee are there."
+   },
+   "we_already_read": {
+    "rod": "partial",
+    "tax": "yes",
+    "gis": "no",
+    "evidence": "enrichment_rod_name_index.py (name lookup); dorchester_billtrax_delinquent_tax.py; GIS verified but held back per parcel_cache.py comment; sc_probate_net.py (probate)"
+   },
+   "manual_lane": "Deed index and PDFs are free on the Online Record System; older links (start year not published) need the abstractor; current tax bills and probate documents need a person (county site blocks automated reads, probate images are paid).",
+   "confidence": "high"
+  },
+  {
+   "county": "edgefield",
+   "state": "SC",
+   "rod": {
+    "platform": "Avenu Insights / Neumo Records Management (GRIDS), via sclandrecords.com",
+    "url": "https://edgefieldsc.avenuinsights.com/",
+    "free_name_search": "unknown",
+    "access": null,
+    "index_online_back_to_year": null,
+    "images_free": "unknown",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "unknown",
+    "how_verified": "2026-10-07: county Clerk of Court page says the Clerk is also Register of Deeds, records go back to 1913 on paper and documents recorded after 1996 are digital; it links sclandrecords.com/sclr and edgefieldclerkofcourt.org (not opened). sclandrecords.com/sclr county picker (read 2026-10-07) sends this county to <county>sc.avenuinsights.com, a 'Neumo Records Management' landing whose Search button goes to the shared GRIDS app (grids.avenuinsights.com), which only loops back to its landing on a plain GET.",
+    "notes": "Digital records start 1996 per the county. Same vendor as Cherokee, whose terms forbid data mining, robots and spiders; treat as no-automation."
+   },
+   "probate": {
+    "system": "Edgefield County Probate Court page has no online search link. Not in the southcarolinaprobate.net dropdown per the repo's 2026-10-02 read. southcarolinaprobate.net returned HTTP 403 (nginx) to a plain GET of /search/ and of the home page on 2026-10-07, so its county dropdown could not be re-read today; the repo's sc_probate_net.py records the dropdown as read live on 2026-10-02: Aiken, Bamberg, Barnwell, Charleston, Cherokee, Chester, Colleton, Dorchester, Florence, Georgetown, Kershaw, Lancaster, Marlboro, Oconee, Orangeburg, Sumter, York, with only Charleston, Dorchester and York returning any cases.",
+    "url": "https://edgefieldcounty.sc.gov/probate-court/",
+    "free_search": "no",
+    "access": null,
+    "notes": "Office visit or phone."
+   },
+   "tax": {
+    "url": "https://edgefieldcountysc.qpaybill.com/Taxes/TaxesDefaultType4.aspx",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "Subdomain from repo qpaybill_delinquent_roll.py (county directory links it); not opened today. qPayBill (Springbrook/PUBLIQ) Type4 tax search: verified on Allendale 2026-10-07 - search by Map Number (TMS), Owner, Tax ID, Address, Notice No.; Paid/Unpaid/All; tax years 2016-2026 plus All; no login or CAPTCHA on the form; cart only for paying."
+   },
+   "gis": {
+    "url": "http://qpublic.net/sc/edgefield/",
+    "legal_description_field": "unknown",
+    "deed_book_page_field": "unknown",
+    "owner_field": "unknown",
+    "notes": "Link read off the county GIS page 2026-10-07; not fetched. qPublic (Schneider) answered a plain GET with a Cloudflare 'Just a moment...' challenge (HTTP 403) on 2026-10-07 (checked on Abbeville's app); a person in a normal browser can open the parcel card. Field list not verifiable without passing the challenge. Repo parcel_cache.py: Edgefield parcels only behind the qPublic Cloudflare challenge."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "yes",
+    "gis": "no",
+    "evidence": "qpaybill_delinquent_roll.py + edgefield_delinquent_tax.py; no parcel layer"
+   },
+   "manual_lane": "Deed searches by a person in the Avenu portal (digital from 1996) and by the abstractor before that; parcel card in qPublic by hand; probate is office-only.",
+   "confidence": "low"
+  },
+  {
+   "county": "fairfield",
+   "state": "SC",
+   "rod": {
+    "platform": "Avenu Insights / Neumo Records Management (GRIDS)",
+    "url": "https://fairfieldsc.avenuinsights.com/Home/index.html",
+    "free_name_search": "unknown",
+    "access": null,
+    "index_online_back_to_year": null,
+    "images_free": "unknown",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "unknown",
+    "how_verified": "2026-10-07: county Clerk of Court / Register of Deeds page links fairfieldsc.avenuinsights.com/Home/index.html directly. sclandrecords.com/sclr county picker (read 2026-10-07) sends this county to <county>sc.avenuinsights.com, a 'Neumo Records Management' landing whose Search button goes to the shared GRIDS app (grids.avenuinsights.com), which only loops back to its landing on a plain GET.",
+    "notes": "Same vendor as Cherokee, whose terms forbid data mining, robots and spiders; treat as no-automation."
+   },
+   "probate": {
+    "system": "Fairfield County Probate Court pages (estate administration, FAQ) list no online search; repo county-breadth research (2026-09-21) found no online estate search (fairfieldcountyprobate.com is Fairfield County, Ohio). Not in the southcarolinaprobate.net dropdown per the repo's 2026-10-02 read. southcarolinaprobate.net returned HTTP 403 (nginx) to a plain GET of /search/ and of the home page on 2026-10-07, so its county dropdown could not be re-read today; the repo's sc_probate_net.py records the dropdown as read live on 2026-10-02: Aiken, Bamberg, Barnwell, Charleston, Cherokee, Chester, Colleton, Dorchester, Florence, Georgetown, Kershaw, Lancaster, Marlboro, Oconee, Orangeburg, Sumter, York, with only Charleston, Dorchester and York returning any cases.",
+    "url": "https://www.fairfieldsc.com/departments/probate-court",
+    "free_search": "no",
+    "access": null,
+    "notes": "Office visit or phone."
+   },
+   "tax": {
+    "url": "https://fairfieldsctax.com/",
+    "free_by_parcel": "unknown",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "Not opened today. Catalis tax site; repo sc_catalis_delinquent_roll.py (verified live 2026-09-21) reads its public API with no login or CAPTCHA; the API takes year=-1 (all years) and returns per-bill ids with paid/unpaid status. Fairfield labels records 'Real' with a delinquency switch rather than 'Delinquent'."
+   },
+   "gis": {
+    "url": "https://beacon.schneidercorp.com/Application.aspx?AppID=796&LayerID=11834&PageTypeID=1&PageID=5735",
+    "legal_description_field": "unknown",
+    "deed_book_page_field": "unknown",
+    "owner_field": "unknown",
+    "notes": "County 'Online Maps (GIS)' redirects to Schneider Beacon, which answered a Cloudflare 'Just a moment...' challenge (403) on 2026-10-07."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "yes",
+    "gis": "no",
+    "evidence": "sc_catalis_delinquent_roll.py + fairfield_delinquent_tax.py; no parcel layer"
+   },
+   "manual_lane": "Deed searches by a person in the Avenu portal or by the abstractor; parcel card on Beacon in a normal browser; probate is office-only.",
+   "confidence": "low"
+  },
+  {
+   "county": "florence",
+   "state": "SC",
+   "rod": {
+    "platform": "Online Record System (NameSearch.php / NamePick.php / NameDisplay.php) plus 'Old Index Book Search' (scanned index books)",
+    "url": "https://search.florencedeeds.com/NameSearch.php?Accept=Accept",
+    "free_name_search": "yes",
+    "access": "disclaimer_click",
+    "index_online_back_to_year": 1889,
+    "images_free": "yes",
+    "legal_description_in_index": "no",
+    "plat_books_or_maps_online": "yes",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: opened search.florencedeeds.com (disclaimer) and NameSearch.php?Accept=Accept ('Verified Through' today, PLATS group, property-description search, no default start date) and oldIndexes/oldindexsearch.php: scanned index books 1889-1937, 1928-1937, 1938-1962, 1963-1973, 1974-1983 (deeds), mortgage books 1938-1983, plat index 1889-2003, viewed by book and page number. Root disclaimer is the platform's accuracy/liability text with no automation clause (read 2026-10-07). Platform check 2026-10-07: index rows link view_image.php?...&type=pdf|tif with no cart/fee/login text (Abbeville test search); one such link on Georgetown returned application/pdf with no login.",
+    "notes": "1889 is the start of the scanned index-book pages (browse by page, not a typed search); typed index start year not shown. The county Clerk of Court also runs a free 'Public Records Inquiry' by Map/Block/Parcel (web.florenceco.org/cgi-bin/coc/mbp.cgi), linked from GIS as PROPERTYHISTORY; landing opened, no parcel queried. Repo: date window ignored here."
+   },
+   "probate": {
+    "system": "Florence County Probate Court FAQ says 'You can view our records online' and links southcarolinaprobate.net/search; estates before 2018 by email request. The repo's 2026-10-02 probe of 'Florence' there returned no cases for one surname. southcarolinaprobate.net returned HTTP 403 (nginx) to a plain GET of /search/ and of the home page on 2026-10-07, so its county dropdown could not be re-read today; the repo's sc_probate_net.py records the dropdown as read live on 2026-10-02: Aiken, Bamberg, Barnwell, Charleston, Cherokee, Chester, Colleton, Dorchester, Florence, Georgetown, Kershaw, Lancaster, Marlboro, Oconee, Orangeburg, Sumter, York, with only Charleston, Dorchester and York returning any cases.",
+    "url": "http://www.southcarolinaprobate.net/search",
+    "free_search": "unknown",
+    "access": "blocked",
+    "notes": "County says online (from about 2018); repo saw no hits; 403 to us today."
+   },
+   "tax": {
+    "url": "http://web.florenceco.org/cgi-bin/ta/tax-pr.cgi",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "unknown",
+    "access": "open",
+    "notes": "'Florence County Taxes Inquiry' (opened 2026-10-07): search by Map/Block/Parcel, 'Current Tax Inquiries', no login; GIS PROPERTYCARD links point here per parcel."
+   },
+   "gis": {
+    "url": "https://services1.arcgis.com/40L6yX6OtdCifNez/arcgis/rest/services/County_Tax_Parcel/FeatureServer/0",
+    "legal_description_field": "no",
+    "deed_book_page_field": "no",
+    "owner_field": "yes",
+    "notes": "Fields read 2026-10-07: TMS, OWNERNAME, ADD1-3 (mailing), MAP/BLOCK/PARCEL, ADDR_SITE, TOTBDGVAL, acreage, PROPERTYCARD (tax card URL) and PROPERTYHISTORY (Clerk of Court property-history URL). No legal or deed fields on the layer itself."
+   },
+   "we_already_read": {
+    "rod": "partial",
+    "tax": "partial",
+    "gis": "yes",
+    "evidence": "enrichment_rod_name_index.py (name lookup); florence_delinquent_tax.py (delinquent list, not per-parcel bills); parcel_cache.py 'Florence'"
+   },
+   "manual_lane": "Free typed index, deed PDFs and scanned index books back to 1889 cover most chains; a person is needed to page through the scanned index books and for probate (statewide probate site blocks us).",
+   "confidence": "high"
+  },
+  {
+   "county": "georgetown",
+   "state": "SC",
+   "rod": {
+    "platform": "Online Record System (NameSearch.php / NamePick.php / NameDisplay.php)",
+    "url": "https://georgetowndeeds.com/NameSearch.php?Accept=Accept",
+    "free_name_search": "yes",
+    "access": "disclaimer_click",
+    "index_online_back_to_year": 1977,
+    "images_free": "yes",
+    "legal_description_in_index": "no",
+    "plat_books_or_maps_online": "yes",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: opened georgetowndeeds.com (disclaimer) and NameSearch.php?Accept=Accept: 'Verified Through' today, start-date field defaults to 01/01/1977, PLATS group, property-description search. Ran one SMITH 2024 test search: rows give Date, Book-Page, Type, Grantor, Grantee, Description (short 'PD:' property note), Amount, Image; one view_image.php link returned application/pdf with no login. Root disclaimer is the platform's accuracy/liability text with no automation clause (read 2026-10-07).",
+    "notes": "1977 is the form's default start date. Repo: Georgetown honours the date window (bulk date-range reads possible). Removed from the Avenu sclandrecords picker (commented out)."
+   },
+   "probate": {
+    "system": "Georgetown County Probate Court. Georgetown is in the southcarolinaprobate.net dropdown and the repo queries it every run, but it returned no cases. southcarolinaprobate.net returned HTTP 403 (nginx) to a plain GET of /search/ and of the home page on 2026-10-07, so its county dropdown could not be re-read today; the repo's sc_probate_net.py records the dropdown as read live on 2026-10-02: Aiken, Bamberg, Barnwell, Charleston, Cherokee, Chester, Colleton, Dorchester, Florence, Georgetown, Kershaw, Lancaster, Marlboro, Oconee, Orangeburg, Sumter, York, with only Charleston, Dorchester and York returning any cases.",
+    "url": "https://www.southcarolinaprobate.net/search/",
+    "free_search": "no",
+    "access": "blocked",
+    "notes": "No working free estate index found; county probate page not opened."
+   },
+   "tax": {
+    "url": "https://georgetowncountysctax.com/",
+    "free_by_parcel": "unknown",
+    "shows_bill_history": "unknown",
+    "access": "open",
+    "notes": "Tax site loads as a JavaScript app ('Loading...') on 2026-10-07; search fields not readable without running it. Repo walls register: no qPayBill for Georgetown and no per-parcel tax balance captured."
+   },
+   "gis": {
+    "url": "https://gis1.georgetowncountysc.org/portal/rest/services/GCGIS_Energov/MapServer/2",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "Fields read 2026-10-07: TMS, ParcelID, Owner1/Owner2, billing address, LegalDescription (short form, e.g. lot/block/subdivision), LegalReference (deed book-page), PLAT (plat book-page), SaleDate, SalePrice, situs number/name."
+   },
+   "we_already_read": {
+    "rod": "partial",
+    "tax": "partial",
+    "gis": "yes",
+    "evidence": "enrichment_rod_name_index.py (name lookup + bulk_by_date allowed); georgetown_civicengage.py (sale PDFs only); SC_GIS['Georgetown'] + sc_coastal_rosters.py + assessor_cards/georgetown_sc.py; sc_probate_net.py"
+   },
+   "manual_lane": "Index from 1977 and deed PDFs are free; earlier links need the abstractor; probate and current tax bills need a person (probate site blocks us, tax site is a JS app).",
+   "confidence": "high"
+  },
+  {
+   "county": "greenville",
+   "state": "SC",
+   "rod": {
+    "platform": "GovOS (Kofile) Cloud Search at greenville.sc.publicsearch.us; county 'Old Search' viewer (viewer.greenvillecounty.org) for after-1985 records and all plats; county pre-1985 directory of scanned index books, deeds and land grants; pre-1800 deed books on the county library's CONTENTdm",
+    "url": "https://www.greenvillecounty.org/rod/searchrecords.aspx",
+    "free_name_search": "yes",
+    "access": "open",
+    "index_online_back_to_year": 1787,
+    "images_free": "unknown",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "yes",
+    "terms_forbid_automation": "unknown",
+    "how_verified": "2026-10-07: county 'Search Records' page lists Grantor/Grantee/Mortgagor/Mortgagee indexes 1787 to present, plats index 1951+, document images: deeds 1787+, mortgages 1919+, plats 1903+, misc liens 1955+; pre-1985 section = all index books, deeds and land grants; links GovOS Cloud Search, the viewer, and the library's pre-1800 deed books. Opened greenville.sc.publicsearch.us landing: no sign-in wall shown, but a notice that S.C. Code 30-2-50 makes using these records for commercial solicitation a misdemeanor. viewer.greenvillecounty.org is a JS app (not run). No search was run.",
+    "notes": "Deepest free online reach in this batch. Image access cost not stated on the pages read (only certified copies are sold). GovOS search may want a free account (Oconee's GovOS site does); not checked. Repo MASTER_GAPS lists Greenville as a county the owner said not to build new sources for, so any automation here is the owner's call."
+   },
+   "probate": {
+    "system": "Greenville County Probate Court 'Probate Case Search' (greenvillecounty.org/appsAS400/Probate): free search by party name or case number with party-type filter, no login (opened 2026-10-07; repo research 2026-09-21 says the detail page gives decedent address and date of death). Copies by request form or email. Not in the southcarolinaprobate.net dropdown.",
+    "url": "https://www.greenvillecounty.org/appsAS400/Probate/",
+    "free_search": "yes",
+    "access": "open",
+    "notes": "The index itself is free; the attorney's paid subscription likely covers documents/filings, which are not online free (copies by request). No search was run."
+   },
+   "tax": {
+    "url": "https://www.greenvillecounty.org/disclaimer/PublicRecords.aspx?DirURL=TaxQuery",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "unknown",
+    "access": "disclaimer_click",
+    "notes": "County 'Property Tax Search' and 'Real Estate Property Search' sit behind a one-click 'I accept this disclaimer' page with no automation clause (read 2026-10-07). GIS layer also carries the current bill (TOTTAX, ACCTNO, PAIDDATE)."
+   },
+   "gis": {
+    "url": "https://www.gcgis.org/arcgis3/rest/services/GreenvilleNJ/QueryLayers/MapServer/0",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "Fields read 2026-10-07: PIN, OWNAM1/OWNAM2, mailing, POWNNM (previous owner), CUBOOK/CUPAGE (current deed book/page), DEEDDATE, PLTBK1/PPAGE1 (plat), DESCR (a few words, e.g. lot), SUBDIV, SLPRICE, TOTTAX, PAIDDATE."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "partial",
+    "gis": "yes",
+    "evidence": "parcel_cache.py 'Greenville' + greenville_unpaid_tax_parcels ArcGIS layer; greenville_delinquent_tax.py (tax sale); assessor_cards/greenville_sc.py (appsas400 RealProperty)"
+   },
+   "manual_lane": "Everything back to 1787 is indexed and imaged online, so a person can pull the full chain in a browser; probate documents beyond the free index come by copy request or the attorney's subscription.",
+   "confidence": "medium"
+  }
+ ],
+ "summary": {
+  "rod_open_free": 10,
+  "rod_walled": 6,
+  "rod_unreachable": 1,
+  "rod_not_determined": 6,
+  "images_free": 11,
+  "legal_description_online": 15,
+  "index_back_to_before_1980": 6,
+  "counties_done": 23,
+  "notable": [
+   "Anderson: deeds recorded since 2/21/2026 moved from ACPASS to an Ingenuity system whose terms forbid bots and scrapers; ACPASS (and the repo reader) stops at 2/20/2026.",
+   "Greenville's GovOS search page carries a notice that S.C. Code 30-2-50 makes using these public records for commercial solicitation a misdemeanor; worth an attorney's read before records feed outreach.",
+   "Greenville probate has a free public name/case-number index (appsAS400/Probate); only documents need a request or subscription.",
+   "southcarolinaprobate.net returned 403 to plain requests on 2026-10-07; Charleston's main GIS parcel service (New_Parcel_Search) was stopped (error 500), the energov_css layer works.",
+   "Seven counties (Bamberg, Cherokee, Chester, Chesterfield, Dillon, Edgefield, Fairfield) use the Avenu/Neumo GRIDS portal; Cherokee's terms forbid automation, the rest are treated the same."
+  ],
+  "rod_buckets": {
+   "abbeville": "open_free",
+   "aiken": "walled",
+   "allendale": "unreachable",
+   "anderson": "open_free",
+   "bamberg": "not_determined",
+   "barnwell": "open_free",
+   "beaufort": "walled",
+   "berkeley": "open_free",
+   "calhoun": "walled",
+   "charleston": "open_free",
+   "cherokee": "walled",
+   "chester": "not_determined",
+   "chesterfield": "not_determined",
+   "clarendon": "walled",
+   "colleton": "open_free",
+   "darlington": "walled",
+   "dillon": "not_determined",
+   "dorchester": "open_free",
+   "edgefield": "not_determined",
+   "fairfield": "not_determined",
+   "florence": "open_free",
+   "georgetown": "open_free",
+   "greenville": "open_free"
+  },
+  "how_counted": "rod_open_free: free name search reachable by plain request with no login (open or one-click disclaimer) and no terms against automation. rod_walled: login, CAPTCHA, payment, bot block (Cloudflare/Akamai) or terms that forbid automation; several of these are still free for a person in a browser (see each county's notes). rod_unreachable: no online ROD index found. rod_not_determined: an Avenu/Neumo GRIDS portal whose search and terms could not be read without running its JS app (same vendor as Cherokee, whose terms forbid automation). images_free counts counties where free deed images were confirmed (by us or the county's own page), including ones only a person can reach. legal_description_online: a free route to a legal description exists - free deed image, legal text in the ROD index, or a legal-description field in free county GIS (GIS legal is the assessor's short form, not the deed text). index_back_to_before_1980: earliest year a free online index (typed or scanned index books) reaches is before 1980."
+ }
+}

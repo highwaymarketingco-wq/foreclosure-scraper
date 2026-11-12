@@ -1,0 +1,800 @@
+"""Dorchester County SC delinquent real-property tax roll via the county's BillTrax
+Angular SPA -> its BillTrax_County/MongoDB API.
+
+WHY THIS EXISTS
+    Dorchester (~160K population, part of the "17-county thin tax-coverage cluster" --
+    docs/completeness_audit_2026-09-29.md) had ZERO delinquent-tax scraper. Not qPayBill
+    (not on that vendor), not the Catalis/Sturgis CDN roll (a prior probe found
+    dorchestercountytaxesonline.com embedding a Catalis GUID, but every live POST to that
+    CloudFront distribution -- including a control request with Pickens' own known-good
+    GUID -- came back 403 "Request blocked" from CloudFront itself, an infrastructure-side
+    condition of that whole distribution, not evidence Dorchester specifically lacks data;
+    see qpaybill_delinquent_roll.py's 2026-09-23 docstring and
+    tests/test_qpaybill_dillon_edgefield_gap_counties.py). That CloudFront path is
+    unrelated to this one: this module targets a THIRD, distinct vendor --
+    dorchestercountyscdelinquenttax.billtrax.com -- never before probed in this repo.
+
+THE SITE
+    dorchestercountyscdelinquenttax.billtrax.com is an Angular SPA (webpack chunk name
+    "county_ui", the same shared white-label template BillTrax deploys per county -- its
+    index.html even ships a commented-out `<title>Greenville County</title>` left over
+    from copying that build). The entry page is a clean 200, no CAPTCHA, no login, no
+    click-through terms. Checked 2026-09-29 for sibling SC tenants under the same
+    "<county>countyscdelinquenttax.billtrax.com" naming: none of the other 16 counties in
+    the thin-coverage cluster (Abbeville, Allendale, Bamberg, Barnwell, Calhoun, Chester,
+    Chesterfield, Darlington, Edgefield, Fairfield, Greenwood, Lee, Marlboro, McCormick,
+    Williamsburg) resolve, nor do Greenville/Anderson/Spartanburg/Pickens/Oconee (DNS
+    failures on every guess) -- Dorchester appears to be BillTrax's only
+    "delinquent-tax"-specific SC tenant, so this is a single-county win, not multi-county.
+
+REVERSE-ENGINEERING THE API (no browser tool available; done by downloading the app's
+own JS bundles with plain HTTP GETs and reading them)
+    The app's environment config (baked into main.<hash>.js and duplicated inside two
+    lazy webpack chunks) names the real data host:
+        api: "https://dorchestercountyscdelinquenttaxapi.billtrax.com"
+    Every HTTP call in the app funnels through a shared CommonService whose `post(c,S)`
+    method wraps S as JSON inside a browser FormData field named "RequestData" and POSTs
+    to `api + c`, with a header `ar: 5e3d803410d9620e488249eb` set on EVERY request
+    (anonymous or not) via `getHttpHeader()`. That "ar" value is not a login/session
+    secret -- it is a static string baked into the public, unauthenticated JS bundle that
+    ships to every visitor's browser (the same class of "app-identifier" header as e.g. a
+    referrer-restricted public API key), sent by anonymous quick-pay searches with no
+    session cookie. There is no bearer token, no CAPTCHA and no click-through gate on the
+    actual data calls below -- confirmed by calling them cold, with no prior page load and
+    no cookies, and getting real data back (verified live 2026-09-29).
+
+    Two calls, both public POSTs, both returning `HasErrors: false`:
+
+    1. POST /crm/api/utilities/getbyidquickpay  {"utilityId": "<24-hex ObjectId>"}
+       Bootstraps the search-field template (NewQuickPayParams: AccountNumber/BillNumber/
+       PropertyOwner/PropertyLocation) for one "bill type". The Dorchester utility list
+       (POST /crm/api/utilities/list) has exactly one entry:
+           Id="6832cda4f10fe04836869fcc"  Name="Delinquent Tax"  BillTypeUniqueId="delinquenttax"
+       This whole subdomain is single-purpose, so that id is hardcoded below (UTILITY_ID)
+       rather than re-discovered every run -- but a live sanity call is still made, because
+       a hand-built minimal request body (Id + NewQuickPayParams + PageCriteria only, no
+       other keys) got a server-side NullReferenceException: the backend deserializes the
+       WHOLE getbyidquickpay response into one shared model and touches a field this
+       scraper doesn't otherwise need, so the safest, most stable shape is "echo back
+       exactly what the real client got, with only FieldValue/IsPaid/PageCriteria changed"
+       -- the same principle CLAUDE.md asks for (verify the real shape, don't guess it).
+
+    2. POST /crm/api/payment/SearchNewForQuickPayRawBsonExecutorWithRateLimit  <mutated
+       copy of #1's response>
+       Returns Results[0].Rows[*].BillsAndPayments[*].Bill[] (list of {FieldName,
+       FieldValue} pairs) plus Results[0].PageAttributes.TotalRecords.
+
+    CRITICAL VERIFIED FINDING -- the IsPaid filter parameter ("All"/"Paid"/"Unpaid") does
+    NOTHING on a blank-owner query: all three values returned an IDENTICAL
+    PageAttributes.TotalRecords (22,386) on 2026-09-29. Per CLAUDE.md ("never accept a
+    status code -- or a label -- as evidence"), this was checked rather than trusted: a
+    3,000-row sample under "Unpaid" showed 2,167 rows with TotalDueNow == 0 (a bill that
+    was HISTORICALLY delinquent and has since been paid off -- IsDeliquent stays true
+    forever as a permanent marker) versus 819 rows with a genuine nonzero current balance.
+    So "Unpaid" means "ever flagged delinquent", not "currently owed" -- this module
+    filters on the actual TotalDueNow > 0 value, not the filter label.
+
+    Also verified on that same 3,000-row sample: BillNumber's prefix distinguishes bill
+    type perfectly and matches AccountNumber's shape 100% of the time --
+        "R-YYYY-########"  (2,917/2,917) -> AccountNumber is a real-estate TMS,
+                                              NNN-NN-NN-NNN-NNN (e.g. 012-00-00-137-000)
+        "M-YYYY-########"  (83/83)        -> AccountNumber is a plain digit string or an
+                                              "FIL########" id (vehicle/manufactured-home/
+                                              business-personal-property account, not a
+                                              parcel)
+    Only "R" (real-estate, TMS-shaped AccountNumber) rows are kept here, matching this
+    repo's convention elsewhere (Catalis's RealPropertyType filter, Aiken's mobile-home
+    exclusion) of not poisoning parcel-keyed dedupe with non-parcel account numbers.
+
+    A blank PropertyOwner + blank AccountNumber query returns the WHOLE roll directly
+    (paginated via PageCriteria), so no qPayBill-style A-Z name-prefix sweep is needed --
+    confirmed page 0 and page 1 return disjoint AccountNumbers at PageSize=200, and
+    PageSize up to 2,000 returned exactly 2,000 rows with no silent cap (a full sweep of
+    22,386 rows is ~12 requests of 2,000 each, well under any reasonable "gentle" budget).
+
+    Free, public, no login. Confirmed multiple times against LIVE production data
+    2026-09-29 (not a fixture, not a guess): e.g. account 012-00-00-137-000, owner
+    "SMITH THERESA LORAINE", situs "MOUNT ZION RD", notice R-2025-03500291.
+
+WHAT A RECORD CARRIES
+    AccountNumber   the TMS (real-estate rows only; see filter above)
+    BillNumber      "<R|M>-<year>-########" -- the year is the tax year of THIS bill
+    PropertyOwner   billing name (often "LAST FIRST" or an entity)
+    PropertyLocation situs, no city/state/zip (single free-text line)
+    TotalDueNow     current balance owed on THIS bill, string-encoded double
+    BillDate        ISO datetime the notice was issued
+    BlockPayment / ReasonToBlockPayment  the county has taken this bill off online pay
+                    (e.g. already at the delinquent-tax office) -- kept in raw, not
+                    treated as "not a lead"
+    BillId / PropertyId  the vendor's own MongoDB ids for this bill/property
+
+    A parcel delinquent for multiple years arrives as multiple bills sharing one
+    AccountNumber -- aggregated here into one Listing per parcel (sc_catalis_
+    delinquent_roll.aggregate_bills's exact pattern), balances summed, years listed.
+
+PER-BILL NOTICE PDF (AUDITED 2026-10-03)
+    Every bill also carries `PdfName` + `ContainerName` -- not previously captured
+    anywhere, despite most real (non-placeholder) ones pointing at a genuine, per-bill
+    delinquent-tax NOTICE PDF (live sample of 57 current nonzero-balance real-estate
+    bills: 35 (61%) had a real filename like "dc_R-2025-10078864_delq.pdf" or
+    "mobile_R-2024-10076383-00.pdf"; the rest were the generic placeholder
+    "empty-bill.pdf"/"ICVehicleEmpty.pdf" the app falls back to for a too-new bill
+    with no notice generated yet).
+
+    Reverse-engineered the actual document retrieval live with a real browser
+    (static JS-bundle analysis alone was not enough -- the backend call that mints
+    the signed URL is buried in a lazy-loaded Angular chunk this session never
+    isolated): the app's "View Bill" action calls
+    `window.open("/view/bill/pdfbill?" + base64(f"pdfName={PdfName}&container={ContainerName}"))`
+    (URL-encoded). That route is NOT a server redirect -- a plain `httpx`/`fetch`
+    GET to it just returns the Angular shell (200 text/html) -- it only resolves once
+    a REAL browser navigates to it, Angular bootstraps, and the route's own component
+    calls a (still-unidentified) backend endpoint that mints a short-lived (~20 min)
+    Azure Blob SAS URL and does `location.href = <that URL>`. CONFIRMED working live
+    2026-10-03 (both the placeholder "empty-bill.pdf"/container "billtrax" and a real
+    "dc_R-2025-10078864_delq.pdf"/container "dorchester-proptax-2025" -- the FIRST
+    attempt at the real one silently hung because the container name is PER-BILL, not
+    always "billtrax"; using the bill's own ContainerName fixed it) -- the browser
+    tab's title and origin changed to the target PDF / `billtraxblob.blob.core.windows.net`
+    in both cases.
+
+    Because that redirect is JS-driven (not a plain HTTP 302), this scraper's plain
+    httpx stack CANNOT resolve it to PDF bytes server-side -- there is no browser
+    runtime in the scrape loop, and running one per-bill at 22k+ rows is not this
+    codebase's architecture (see "no browser tool available" elsewhere in this file).
+    So the DETERMINISTIC view-URL (same base64 scheme, built from fields already on
+    every bill) is captured into raw as `notice_pdf_view_url` -- a real, always-correct
+    link a human (or a future browser-based enrichment pass) can open directly -- but
+    is deliberately kept OUT of enrichment_doc_ocr.py's `_DOC_FIELDS` scan (that
+    enricher fetches with plain httpx too, so it would just download the Angular
+    shell, not the PDF -- harmless, but useless, so there is no point feeding it in).
+    Only built when PdfName is a real, non-placeholder filename.
+
+    UPDATE 2026-10-13 -- the "no browser needed" / "CANNOT resolve" split above turned
+    out to be about the WRONG hop. The /view/bill/pdfbill Angular route (what a browser
+    navigates to) is genuinely JS-driven and genuinely unreachable by plain httpx -- that
+    part holds. But that route's own component is itself just a thin wrapper: downloading
+    runtime.js's webpack chunk-id->hash map and grep'ing every one of its ~63 lazy chunks
+    (none of this is in the main bundle, which is why the 2026-10-03 pass -- static
+    analysis only, no browser -- never found it) turned up the component's actual code in
+    chunk 3523.<hash>.js:
+        getPdf() { const i = {PdfName: this.pdfName, ContainerName: this.container};
+          this.settingsService.GeneratePdfToken(i).subscribe(n => {
+            const a = {...i, token: n.token};
+            this.settingsService.GetPdfUrl(a).subscribe(c => window.location.href = c.Url) }) }
+    and GeneratePdfToken/GetPdfUrl are themselves just two more calls through the SAME
+    dataService.post() CommonService shape (FormData "RequestData" + the "ar" header)
+    this module already uses for getbyidquickpay/search -- confirmed by grepping that
+    chunk's own dataService class for the literal "RequestData"/"ar" strings. So the
+    actual backend contract is two plain, public POSTs:
+        1. POST /crm/api/Bills/GeneratePdfToken {"PdfName": ..., "ContainerName": ...}
+                                                 -> {"token": ..., "HasErrors": false}
+        2. POST /crm/api/Bills/geturl {"PdfName": ..., "ContainerName": ..., "token": ...}
+                                       -> {"Url": "https://billtraxblob.blob.core.windows
+                                           .net/<container>/<pdfName>?sv=...&sig=...&st=
+                                           ...&se=...&sp=r", "HasErrors": false}
+    LIVE-VERIFIED 2026-10-13 against real production bills (not a fixture) through
+    `_post` -- the exact same helper this module already uses, no curl-cffi impersonation
+    and no browser needed: 3/3 sampled real (non-placeholder) nonzero-balance real-estate
+    bills resolved to a `Url` whose GET came back 200 `application/pdf` with real PDF
+    bytes (`%PDF-` magic). So plain httpx CAN get the actual document after all -- the
+    2026-10-03 docstring text above was correct about the Angular route, just one hop
+    short of the fix.
+
+    What this changes: `_resolve_notice_pdf_url` performs that two-call dance for a
+    capped, time-budgeted sample of the highest-balance real/nonzero bills each run (see
+    PDF_RESOLVE_CAP -- resolving EVERY real notice across the ~22k-row roll would be
+    thousands of extra POST pairs, and the vendor's own "...WithRateLimit" endpoint name
+    is already a signal not to push volume there) and stores the result as
+    `notice_pdf_resolved_url` / `notice_pdf_resolved_at`. That Url is still NOT fed into
+    enrichment_doc_ocr.py's `_DOC_FIELDS` -- not because httpx can't fetch it (it can),
+    but because the returned SAS link measured live st/se exactly 20 minutes apart: a
+    link resolved at scrape time will almost always be expired by the time a later,
+    separately-scheduled OCR pass reads raw['document_url']. `notice_pdf_view_url` (the
+    deterministic Angular route) remains the durable, open-it-whenever human link; the
+    newly-added `notice_pdf_resolved_url` is a scrape-time bonus -- real PDF bytes,
+    right now, for whichever bills the budget reached -- not a replacement for it.
+
+Free, public, no login, no CAPTCHA.
+Slug: counties_sc.dorchester_billtrax_delinquent_tax
+Category: county_tax
+ListingType: TAX_LIEN (standing roll -- no scheduled sale/redemption date on this source)
+"""
+from __future__ import annotations
+
+import asyncio
+import base64
+import json
+import os
+import re
+import time
+from datetime import datetime
+from typing import Iterable
+from urllib.parse import quote as _urlquote
+
+import httpx
+import structlog
+
+from ...base_scraper import BaseScraper, OUTCOME_OK, OUTCOME_BLOCKED, OUTCOME_PARTIAL, OUTCOME_ZERO
+from ...models import Listing, ListingType, PropertyKind
+from ...tax_calendar import completed_delinquent_years
+
+log = structlog.get_logger()
+
+SLUG = "counties_sc.dorchester_billtrax_delinquent_tax"
+
+SITE_URL = "https://dorchestercountyscdelinquenttax.billtrax.com/"
+API_BASE = "https://dorchestercountyscdelinquenttaxapi.billtrax.com"
+UTILITY_PATH = "/crm/api/utilities/getbyidquickpay"
+SEARCH_PATH = "/crm/api/payment/SearchNewForQuickPayRawBsonExecutorWithRateLimit"
+
+#: Dorchester's single bill type ("Delinquent Tax"), from POST /crm/api/utilities/list
+#: (verified live 2026-09-29). This whole subdomain is single-purpose, so it is not
+#: re-discovered every run.
+UTILITY_ID = "6832cda4f10fe04836869fcc"
+
+#: The static "app-identifier" header the public JS bundle sends on every call, anonymous
+#: or not -- see module docstring. Not a session/login secret.
+_AR_HEADER = "5e3d803410d9620e488249eb"
+
+_UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+       "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
+
+#: Real-estate TMS shape observed on every "R-"-prefixed bill: NNN-NN-NN-NNN-NNN.
+_TMS_RE = re.compile(r"^\d{3}-\d{2}-\d{2}-\d{3}-\d{3}$")
+
+#: Page size per request. 2,000 measured live with no server-side cap and ~7s response
+#: time; the full ~22k-row roll is ~12 requests at this size.
+PAGE_SIZE = int(os.getenv("BILLTRAX_DORCHESTER_PAGE_SIZE", "2000"))
+
+#: Hard ceiling on pages fetched in one run, independent of the server's own
+#: PageAttributes.TotalRecords -- a safety valve if that total is ever wrong or the roll
+#: grows sharply, not a number expected to bind in practice (22,386 / 2,000 ~= 12 pages).
+MAX_PAGES = int(os.getenv("BILLTRAX_DORCHESTER_MAX_PAGES", "40"))
+
+#: Gentle pace between page requests. The endpoint's own name
+#: ("...WithRateLimit") says the vendor throttles it; nothing here has hit a 429 yet, and
+#: this stays cheap on purpose rather than testing where that line is.
+_PACE_S = float(os.getenv("BILLTRAX_DORCHESTER_PACE_S", "1.0"))
+
+_REQUEST_TIMEOUT = float(os.getenv("BILLTRAX_DORCHESTER_TIMEOUT_S", "45.0"))
+
+_BACKOFF_S = 5.0
+
+
+class BillTraxBlocked(RuntimeError):
+    """The host answered 403 or otherwise refused the request. That is the host
+    declining, not a rate limit: stop, do not retry, do not work around it (the same
+    posture as sc_catalis_delinquent_roll.CatalisBlocked and the CLAUDE.md compliance
+    line -- a WAF/challenge/login is a wall, not something to defeat)."""
+
+
+def _headers() -> dict:
+    return {
+        "User-Agent": _UA,
+        "ar": _AR_HEADER,
+        "Accept": "application/json",
+        "Referer": SITE_URL,
+        "Origin": SITE_URL.rstrip("/"),
+    }
+
+
+async def _post(client: httpx.AsyncClient, path: str, body: dict) -> dict:
+    """POST body as JSON inside a multipart 'RequestData' field, matching the app's own
+    CommonService.post() exactly (see module docstring) -- a hand-built minimal body
+    without this shape 500'd with a server-side NullReferenceException."""
+    last_exc: Exception | None = None
+    for attempt in range(4):
+        try:
+            r = await client.post(
+                API_BASE + path,
+                files={"RequestData": (None, json.dumps(body))},
+            )
+        except httpx.HTTPError as exc:
+            last_exc = exc
+            await asyncio.sleep(_BACKOFF_S * (attempt + 1))
+            continue
+        if r.status_code == 403:
+            raise BillTraxBlocked(f"HTTP 403 for {path}")
+        if r.status_code == 429 or r.status_code >= 500:
+            wait = float(r.headers.get("Retry-After") or 0) or _BACKOFF_S * (2 ** attempt)
+            log.info("dorchester_billtrax.retry", path=path, status=r.status_code,
+                     attempt=attempt + 1, sleeping=round(wait, 1))
+            await asyncio.sleep(min(wait, 60.0))
+            continue
+        r.raise_for_status()
+        data = r.json()
+        if data.get("HasErrors"):
+            raise ValueError(f"API HasErrors=true for {path}: "
+                             f"{str(data.get('Exception') or data.get('Errors'))[:200]}")
+        return data
+    raise last_exc or RuntimeError(f"gave up on {path} after retries")
+
+
+def _field_map(fields: list[dict]) -> dict[str, str]:
+    return {f.get("FieldName"): f.get("FieldValue") for f in (fields or [])}
+
+
+def _num(v) -> float | None:
+    try:
+        if v in (None, ""):
+            return None
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _parse_dt(v: str | None) -> datetime | None:
+    if not v:
+        return None
+    try:
+        return datetime.fromisoformat(v.replace("Z", "+00:00")).replace(tzinfo=None)
+    except ValueError:
+        return None
+
+
+def _bill_year(bill_number: str | None) -> int | None:
+    """'R-2025-03500291' -> 2025. Best-effort; returns None on any other shape."""
+    if not bill_number:
+        return None
+    parts = bill_number.split("-")
+    if len(parts) >= 2 and parts[1].isdigit() and len(parts[1]) == 4:
+        return int(parts[1])
+    return None
+
+
+def _is_real_estate(account_number: str | None) -> bool:
+    return bool(account_number and _TMS_RE.match(account_number))
+
+
+#: The app falls back to one of these generic templates when a bill is too new to
+#: have a real per-bill notice PDF generated yet (live-confirmed on current-page
+#: bills) -- a view-URL built from one of these would only show boilerplate.
+_PLACEHOLDER_PDF_NAMES = {"empty-bill.pdf", "icvehicleempty.pdf", ""}
+
+
+def _notice_pdf_view_url(pdf_name: str | None, container_name: str | None) -> str | None:
+    """The deterministic Angular route that -- ONLY in a real browser, see module
+    docstring's "PER-BILL NOTICE PDF" section -- redirects to this bill's actual
+    notice PDF. None for a blank/placeholder PdfName."""
+    pdf_name = (pdf_name or "").strip()
+    container_name = (container_name or "").strip()
+    if not pdf_name or not container_name or pdf_name.lower() in _PLACEHOLDER_PDF_NAMES:
+        return None
+    payload = f"pdfName={pdf_name}&container={container_name}"
+    b64 = base64.b64encode(payload.encode()).decode()
+    return f"{SITE_URL.rstrip('/')}/view/bill/pdfbill?{_urlquote(b64)}"
+
+
+#: The two backend calls the "pdfbill" route's (lazy-loaded) Angular component makes to
+#: turn a PdfName/ContainerName into a real document URL -- see module docstring's
+#: "UPDATE 2026-10-13" paragraph for how these were found (static analysis of a lazy
+#: webpack chunk, not a browser) and live-verified.
+PDF_TOKEN_PATH = "/crm/api/Bills/GeneratePdfToken"
+PDF_GETURL_PATH = "/crm/api/Bills/geturl"
+
+#: Cap + time-budget on the live PDF-resolve pass below, mirroring
+#: national/landwatch.py's DETAIL_FETCH_CAP_PER_COUNTY and counties_nc/polk_tax.py's
+#: _DETAIL_FETCH_CAP / _DETAIL_BUDGET_SHARE. Resolving is 2 extra POSTs per bill; the
+#: 2026-10-03 docstring measured 61% of nonzero-balance real-estate bills on a 57-row
+#: sample carrying a real notice, which scales to thousands across the whole ~22k-row
+#: roll -- so this is deliberately a SAMPLE (highest balance first, see
+#: _pdf_resolve_candidates), not an attempt at every one, each run.
+PDF_RESOLVE_CAP = int(os.getenv("BILLTRAX_DORCHESTER_PDF_RESOLVE_CAP", "40"))
+PDF_RESOLVE_BUDGET_SHARE = float(os.getenv("BILLTRAX_DORCHESTER_PDF_RESOLVE_BUDGET_SHARE", "0.15"))
+#: Gentle pace between resolve attempts -- same "...WithRateLimit" vendor-name caution
+#: that set _PACE_S for the page-search endpoint; these are a different endpoint family
+#: but the same host, so the same courtesy applies.
+PDF_RESOLVE_PACE_S = float(os.getenv("BILLTRAX_DORCHESTER_PDF_RESOLVE_PACE_S", "0.5"))
+
+
+async def _resolve_notice_pdf_url(
+    client: httpx.AsyncClient, pdf_name: str, container_name: str,
+) -> str | None:
+    """Live-resolve one bill's notice PDF to an actual, fetchable Azure Blob SAS URL --
+    the two-call dance documented in the module docstring's "UPDATE 2026-10-13"
+    paragraph, through the same `_post` helper already used for getbyidquickpay/search
+    (no curl-cffi impersonation, no browser). Returns None on ANY failure: this is a
+    best-effort, capped/budgeted enrichment (PDF_RESOLVE_CAP) that must never raise into
+    the caller's loop or cost the underlying listing."""
+    try:
+        tok = await _post(client, PDF_TOKEN_PATH,
+                           {"PdfName": pdf_name, "ContainerName": container_name})
+        token = tok.get("token")
+        if not token:
+            return None
+        res = await _post(client, PDF_GETURL_PATH,
+                           {"PdfName": pdf_name, "ContainerName": container_name,
+                            "token": token})
+        return res.get("Url") or None
+    except Exception as exc:  # noqa: BLE001 - best-effort; must never raise into the caller
+        log.debug("dorchester_billtrax.pdf_resolve_failed", pdf_name=pdf_name[:80],
+                  error=str(exc)[:160])
+        return None
+
+
+def _pdf_resolve_candidates(bills: Iterable[dict]) -> list[dict]:
+    """Real-estate, currently-owed bills carrying a real (non-placeholder) notice PDF,
+    highest current balance first -- so a capped/budgeted resolve pass spends itself on
+    the bills most likely to matter to a human calling leads, not whichever happened to
+    page in first."""
+    cands = []
+    for b in bills:
+        acct = (b.get("AccountNumber") or "").strip()
+        if not _is_real_estate(acct):
+            continue
+        if (_num(b.get("TotalDueNow")) or 0) <= 0:
+            continue
+        pdf_name = (b.get("PdfName") or "").strip()
+        container_name = (b.get("ContainerName") or "").strip()
+        if not pdf_name or not container_name or pdf_name.lower() in _PLACEHOLDER_PDF_NAMES:
+            continue
+        cands.append(b)
+    cands.sort(key=lambda b: _num(b.get("TotalDueNow")) or 0, reverse=True)
+    return cands
+
+
+async def _fetch_page(client: httpx.AsyncClient, template: dict, page: int,
+                       page_size: int = PAGE_SIZE) -> tuple[list[dict], int]:
+    """One search window: records [page*page_size, (page+1)*page_size). Returns
+    (bill dicts, TotalRecords). `page_size` is exposed (not always the module-level
+    PAGE_SIZE) so _fetch_range_with_recovery can re-request a failing window at a
+    finer resolution -- see that function."""
+    body = dict(template)
+    body["Filter"] = ""
+    body["IsPaid"] = "All"  # verified this param does not change the result set on a
+                             # blank query (module docstring) -- filtering happens
+                             # client-side on TotalDueNow instead.
+    params = []
+    for p in template.get("NewQuickPayParams", []):
+        p2 = dict(p)
+        p2["FieldValue"] = ""
+        params.append(p2)
+    body["NewQuickPayParams"] = params
+    body["PageCriteria"] = {"PageNumberToFetch": page, "PageSize": page_size,
+                             "SortOrder": "Desc", "SortColumn": ""}
+    data = await _post(client, SEARCH_PATH, body)
+    results = data.get("Results") or [{}]
+    res0 = results[0] if results else {}
+    bills: list[dict] = []
+    for row in res0.get("Rows", []) or []:
+        for bp in row.get("BillsAndPayments", []) or []:
+            bill = _field_map(bp.get("Bill"))
+            bill["_IsDeliquent"] = bp.get("IsDeliquent")
+            bill["_IsPaid"] = bp.get("IsPaid")
+            bill["_BillId"] = bp.get("BillId")
+            bill["_PropertyId"] = bp.get("PropertyId")
+            bills.append(bill)
+    total = int((res0.get("PageAttributes") or {}).get("TotalRecords") or 0)
+    return bills, total
+
+
+#: Floor window size for _fetch_range_with_recovery's split. Live-diagnosed 2026-09-29: a
+#: full PAGE_SIZE=2000 page failed with a server-side MongoDB "not a valid 24 digit hex
+#: string" error (a malformed ObjectId on ONE record in BillTrax's own data, not anything
+#: this scraper sends). The first version bisected 2000 -> 1000 -> 500 -> 250 and stopped
+#: there, because 250 = 2 x 125 cannot be HALVED again into equal integer windows, so the
+#: whole 250-record window around the one bad record was skipped on every run (the
+#: 2026-10-08 VM run: offset 17,000, 250 of 22,394 raw bills).
+#:
+#: A window does not have to be halved. The API pages by (PageNumberToFetch, PageSize),
+#: so any child size that divides the parent size keeps every child offset a multiple of
+#: its own size: 250 -> 2 x 125 -> 5 x 25 -> 5 x 5 -> 5 x 1. The split now uses the
+#: window's smallest prime factor and goes down to ONE record, so a single bad record
+#: costs that record only.
+_MIN_WINDOW = 1
+
+
+def _smallest_factor(n: int) -> int:
+    """The smallest prime factor of n (n itself when prime); the split arity for a window."""
+    f = 2
+    while f * f <= n:
+        if n % f == 0:
+            return f
+        f += 1
+    return n
+
+
+def _is_record_data_error(exc: Exception) -> bool:
+    """The API's own deterministic data error (a malformed id in one of the window's
+    records). Re-sending the same window gets the same answer, so it is split at once
+    instead of retried after a backoff."""
+    msg = str(exc)
+    return isinstance(exc, ValueError) and "HasErrors" in msg and "hex string" in msg
+
+
+async def _fetch_range_with_recovery(
+    client: httpx.AsyncClient, template: dict, offset: int, size: int,
+) -> tuple[list[dict], int | None, list[tuple[int, int]]]:
+    """Fetch bills in [offset, offset+size). On failure, retries once (not for the API's
+    deterministic record-data error), then splits the window into k equal children (k =
+    its smallest prime factor) down to single records, so a bad record loses only itself.
+    Returns (bills, TotalRecords-or-None, skipped [(offset, size), ...] windows that still
+    failed at one record)."""
+    assert size > 0 and offset % size == 0, f"offset {offset} must be a multiple of size {size}"
+    page = offset // size
+    try:
+        bills, total = await _fetch_page(client, template, page, page_size=size)
+        return bills, total, []
+    except Exception as exc:  # noqa: BLE001
+        log.warning("dorchester_billtrax.window_error", offset=offset, size=size,
+                    error=str(exc)[:160])
+        data_error = _is_record_data_error(exc)
+    if not data_error:
+        await asyncio.sleep(_BACKOFF_S)
+        try:
+            bills, total = await _fetch_page(client, template, page, page_size=size)
+            return bills, total, []
+        except Exception as exc:  # noqa: BLE001
+            log.warning("dorchester_billtrax.window_error_retry_failed", offset=offset,
+                        size=size, error=str(exc)[:160])
+    if size <= _MIN_WINDOW:
+        log.warning("dorchester_billtrax.window_skipped", offset=offset, size=size,
+                    note="bounded gap: this record failed on its own and is skipped "
+                         "rather than blocking the rest of the roll")
+        return [], None, [(offset, size)]
+    k = _smallest_factor(size)
+    child = size // k
+    bills: list[dict] = []
+    total = None
+    skipped: list[tuple[int, int]] = []
+    for i in range(k):
+        b, t, s = await _fetch_range_with_recovery(client, template, offset + i * child, child)
+        bills.extend(b)
+        total = total or t
+        skipped.extend(s)
+    return bills, total, skipped
+
+
+def _aggregate(
+    bills: Iterable[dict],
+    resolved: dict[tuple[str, str], tuple[str, str]] | None = None,
+) -> list[Listing]:
+    """One Listing per real-estate parcel, balances summed across bill-years -- the same
+    shape as sc_catalis_delinquent_roll.aggregate_bills, for the same reason: a parcel
+    delinquent for N years arrives as N bills sharing one AccountNumber, and the board
+    merges same-parcel rows on the parcel key anyway.
+
+    `resolved` is the output of fetch()'s capped live PDF-resolve pass: a
+    {(pdf_name, container_name): (url, resolved_at_iso)} map for whichever bills that
+    budgeted pass reached (see PDF_RESOLVE_CAP) -- empty/None for the incremental
+    self.partial calls fetch() makes while still paging, since that pass only runs once
+    after paging completes."""
+    by_parcel: dict[str, list[dict]] = {}
+    skipped_non_real_estate = 0
+    skipped_zero_balance = 0
+    for b in bills:
+        acct = (b.get("AccountNumber") or "").strip()
+        if not _is_real_estate(acct):
+            skipped_non_real_estate += 1
+            continue
+        if (_num(b.get("TotalDueNow")) or 0) <= 0:
+            skipped_zero_balance += 1
+            continue
+        by_parcel.setdefault(acct, []).append(b)
+
+    now = datetime.utcnow()
+    out: list[Listing] = []
+    for acct, group in by_parcel.items():
+        group = sorted(group, key=lambda b: _bill_year(b.get("BillNumber")) or 0, reverse=True)
+        latest = group[0]
+        owner = (latest.get("PropertyOwner") or "").strip() or None
+        situs = (latest.get("PropertyLocation") or "").strip() or None
+
+        per_bill = []
+        for b in group:
+            pdf_name = b.get("PdfName")
+            container_name = b.get("ContainerName")
+            resolved_entry = (resolved or {}).get(
+                ((pdf_name or "").strip(), (container_name or "").strip()))
+            per_bill.append({
+                "bill_number": b.get("BillNumber"),
+                "year": _bill_year(b.get("BillNumber")),
+                "total_due_now": _num(b.get("TotalDueNow")),
+                "bill_date": b.get("BillDate"),
+                "block_payment": str(b.get("BlockPayment")).lower() == "true",
+                "reason_to_block_payment": b.get("ReasonToBlockPayment") or None,
+                "bill_id": b.get("_BillId"),
+                "property_id": b.get("_PropertyId"),
+                "sticker_no": (b.get("StickerNo") or "").strip() or None,
+                "pdf_name": pdf_name or None,
+                "container_name": container_name or None,
+                "notice_pdf_view_url": _notice_pdf_view_url(pdf_name, container_name),
+                # Live-resolved, right-now-fetchable Azure Blob SAS URL -- see module
+                # docstring's "UPDATE 2026-10-13" paragraph. Only set for whichever
+                # bills fetch()'s capped/budgeted resolve pass reached; None otherwise.
+                "notice_pdf_resolved_url": resolved_entry[0] if resolved_entry else None,
+                "notice_pdf_resolved_at": resolved_entry[1] if resolved_entry else None,
+            })
+        years = sorted({p["year"] for p in per_bill if p["year"]})
+        total_due = round(sum(p["total_due_now"] or 0 for p in per_bill), 2) or None
+        # Surface the most relevant (current-year, or else newest) real notice link
+        # at the parcel level too, so it's reachable without scanning every bill.
+        notice_url = next(
+            (p["notice_pdf_view_url"] for p in per_bill if p["notice_pdf_view_url"]),
+            None)
+        notice_resolved_url, notice_resolved_at = next(
+            ((p["notice_pdf_resolved_url"], p["notice_pdf_resolved_at"])
+             for p in per_bill if p["notice_pdf_resolved_url"]),
+            (None, None))
+
+        raw = {
+            "billtrax_dorchester_delinquent_tax": {
+                "account_number": acct,
+                "owner": owner,
+                "property_location": situs,
+                "bills": per_bill,
+                "years": years,
+                # LATE unpaid levy years (tax_calendar, 2026-10-07); the raw count apart
+                "years_delinquent": len(completed_delinquent_years(years, "SC", "Dorchester")),
+                "unpaid_bill_years": len(years),
+                "is_two_year_plus": len(completed_delinquent_years(years, "SC", "Dorchester")) >= 2,
+                "total_due": total_due,
+                "property_id": latest.get("_PropertyId"),
+                # Deliberately NOT a top-level raw["document_url"]/etc key. Neither URL
+                # below is a safe _DOC_FIELDS input, for two DIFFERENT reasons (see
+                # module docstring's "UPDATE 2026-10-13" paragraph): notice_pdf_view_url
+                # needs a JS runtime enrichment_doc_ocr's plain-httpx fetch doesn't have;
+                # notice_pdf_resolved_url needs none, but is a ~20-minute Azure SAS link
+                # resolved at SCRAPE time, so it will almost always be dead by the time a
+                # later, separately-scheduled OCR pass reads it.
+                "notice_pdf_view_url": notice_url,
+                "notice_pdf_resolved_url": notice_resolved_url,
+                "notice_pdf_resolved_at": notice_resolved_at,
+            },
+        }
+        if total_due:
+            raw["tax_owed"] = {"balance": total_due, "kind": "delinquent_tax", "source": SLUG,
+                               "year": years[-1] if years else None, "basis": "own_record"}
+
+        span = f"{years[0]}-{years[-1]}" if len(years) > 1 else (str(years[0]) if years else "")
+        out.append(Listing(
+            source=SLUG,
+            source_url=SITE_URL,
+            listing_type=ListingType.TAX_LIEN,
+            property_kind=PropertyKind.UNKNOWN,
+            state="SC",
+            county="Dorchester",
+            parcel_id=acct,
+            defendant=owner,
+            owner_name=owner,
+            street_address=situs,
+            description=(f"Delinquent property tax {span}"
+                         f" ({len(years) or len(group)} bill"
+                         f"{'s' if (len(years) or len(group)) != 1 else ''})"
+                         + (f": ${total_due:,.2f} due" if total_due else "")),
+            first_seen=now, last_seen=now,
+            raw=raw,
+        ))
+    if skipped_non_real_estate or skipped_zero_balance:
+        log.info("dorchester_billtrax.filtered", non_real_estate=skipped_non_real_estate,
+                 zero_balance=skipped_zero_balance, kept_parcels=len(out))
+    return out
+
+
+class DorchesterBillTraxDelinquentTax(BaseScraper):
+    slug = SLUG
+    name = "Dorchester SC Delinquent Tax (BillTrax)"
+    category = "county_tax"
+    # 2026-10-08 VM run: 281.6 s with the old 250-record skip. Splitting the bad window
+    # down to its one record adds about 20 small requests (no backoff on the data error).
+    timeout_s = 480.0
+    expected_min_count = 200
+    optional = True
+
+    async def fetch(self) -> Iterable[Listing]:
+        t0 = time.monotonic()
+        async with httpx.AsyncClient(timeout=_REQUEST_TIMEOUT, headers=_headers()) as client:
+            try:
+                template = await _post(client, UTILITY_PATH, {"utilityId": UTILITY_ID})
+            except BillTraxBlocked:
+                log.warning("dorchester_billtrax.blocked_403", stage="getbyidquickpay",
+                            note="host answered 403; treating as a wall, not retrying")
+                self.last_outcome = OUTCOME_BLOCKED
+                self.last_reason = "HTTP 403 on getbyidquickpay"
+                return []
+            except Exception as exc:  # noqa: BLE001
+                log.error("dorchester_billtrax.template_fetch_error", error=str(exc)[:200])
+                self.last_outcome = OUTCOME_ZERO
+                self.last_reason = f"could not fetch search template: {exc}"[:200]
+                return []
+
+            all_bills: list[dict] = []
+            total_records = None
+            all_skipped: list[tuple[int, int]] = []
+            page = 0
+            while page < MAX_PAGES:
+                offset = page * PAGE_SIZE
+                try:
+                    bills, total, skipped = await _fetch_range_with_recovery(
+                        client, template, offset, PAGE_SIZE)
+                except BillTraxBlocked:
+                    log.warning("dorchester_billtrax.blocked_403", stage="search", page=page,
+                                note="host answered 403; stopping, shipping what we have")
+                    self.partial = _aggregate(all_bills)
+                    self.last_outcome = OUTCOME_PARTIAL if all_bills else OUTCOME_BLOCKED
+                    self.last_reason = f"HTTP 403 on search page {page}"
+                    return self.partial
+
+                if skipped:
+                    # A page-sized window failed even after a retry and full bisection
+                    # down to _MIN_WINDOW (see _fetch_range_with_recovery's docstring):
+                    # a small, precisely-bounded gap, logged so it is visible in the run
+                    # report rather than silently thinning the roll. The final message
+                    # (using the fully-accumulated totals) is built once after the loop
+                    # ends, not here, so it never reports a stale partial count.
+                    all_skipped.extend(skipped)
+
+                if total_records is None and total:
+                    total_records = total
+                    log.info("dorchester_billtrax.total_records", total=total_records)
+                all_bills.extend(bills)
+                self.partial = _aggregate(all_bills)
+                page += 1
+                covered = page * PAGE_SIZE
+                if total_records:
+                    # The authoritative stop condition. A page thinned by a skipped
+                    # sub-window still legitimately advances `covered` by a full
+                    # PAGE_SIZE -- it is the OFFSET that has been walked past, not the
+                    # row count, so a skip must never be mistaken for "reached the end".
+                    if covered >= total_records:
+                        break
+                elif not bills and not skipped:
+                    # total_records still unknown (even page 0 never returned one) --
+                    # fall back to "an empty, non-skipped page means done".
+                    break
+                await asyncio.sleep(_PACE_S)
+
+            # Capped, budgeted live PDF-resolve pass -- still inside the `async with`
+            # block (needs `client`), runs once the roll is fully paged, never while a
+            # page is still outstanding. Best-effort only: _resolve_notice_pdf_url never
+            # raises, so a bad bill or a slow/blocked host here costs nothing more than
+            # that one resolve, never the listings themselves (see its docstring).
+            resolved: dict[tuple[str, str], tuple[str, str]] = {}
+            candidates = _pdf_resolve_candidates(all_bills)
+            if candidates:
+                resolve_deadline = time.monotonic() + self.timeout_s * PDF_RESOLVE_BUDGET_SHARE
+                resolved_count = 0
+                for b in candidates:
+                    if resolved_count >= PDF_RESOLVE_CAP:
+                        log.info("dorchester_billtrax.pdf_resolve_cap_reached",
+                                 cap=PDF_RESOLVE_CAP, candidates=len(candidates))
+                        break
+                    if time.monotonic() > resolve_deadline:
+                        log.info("dorchester_billtrax.pdf_resolve_budget_spent",
+                                 resolved=resolved_count,
+                                 remaining=len(candidates) - resolved_count)
+                        break
+                    pdf_name = (b.get("PdfName") or "").strip()
+                    container_name = (b.get("ContainerName") or "").strip()
+                    key = (pdf_name, container_name)
+                    if key in resolved:
+                        continue
+                    resolved_count += 1
+                    url = await _resolve_notice_pdf_url(client, pdf_name, container_name)
+                    if url:
+                        resolved[key] = (
+                            url, datetime.utcnow().isoformat(timespec="seconds") + "Z")
+                    await asyncio.sleep(PDF_RESOLVE_PACE_S)
+                log.info("dorchester_billtrax.pdf_resolve_done",
+                         attempted=resolved_count, resolved=len(resolved),
+                         candidates=len(candidates))
+
+        listings = _aggregate(all_bills, resolved=resolved)
+        incomplete_reason = None
+        if all_skipped:
+            incomplete_reason = (
+                f"{len(all_skipped)} window(s) totalling "
+                f"{sum(s for _, s in all_skipped)} rows skipped after bisection "
+                f"(first at offset {all_skipped[0][0]}); {len(all_bills)} of "
+                f"{total_records or '?'} raw bills read")
+        log.info("dorchester_billtrax.done", pages=page, raw_bills=len(all_bills),
+                 total_records=total_records, parcels=len(listings),
+                 elapsed_s=round(time.monotonic() - t0, 1), incomplete=bool(incomplete_reason))
+        if incomplete_reason:
+            self.partial = listings
+            self.last_outcome = OUTCOME_PARTIAL if listings else OUTCOME_ZERO
+            self.last_reason = incomplete_reason
+        else:
+            self.last_outcome = OUTCOME_OK if listings else OUTCOME_ZERO
+        return listings

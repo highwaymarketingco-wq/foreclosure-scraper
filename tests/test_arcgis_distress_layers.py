@@ -1,0 +1,687 @@
+"""The config-driven county distress-layer reader.
+
+Built to close a measured gap: the 18 per-county enumeration docs list ~525
+verified free endpoints and 263 are still unbuilt, most of them a single layer
+that IS the signal and needs only a field mapping.
+
+Two invariants matter more than the parsing:
+  * outFields is never a wildcard — several of these layers carry the phone and
+    email of the person who FILED the complaint, who is not a distressed owner.
+  * a declared layer that fails is a hard failure, not a smaller number.
+"""
+from __future__ import annotations
+
+import asyncio
+from contextlib import asynccontextmanager
+from unittest.mock import MagicMock
+
+import pytest
+
+import foreclosure_scraper.scrapers.counties_generic.arcgis_distress_layers as M
+from foreclosure_scraper import layer_guard
+from foreclosure_scraper.layer_guard import PartialHarvest
+
+# ROOT CAUSE (2026-10-03, confirmed with pytest's faulthandler_timeout and a
+# real stack-trace dump -- see project_test_arcgis_hang_fix for the session
+# that found this): this file was measured to take ~192s standalone, which
+# reads exactly like an indefinite hang if you check on it with a short
+# timeout -- the process sits at ~0% CPU inside asyncio's `selectors.select`,
+# indistinguishable at a glance from blocked I/O.
+#
+# ArcgisDistressLayers.fetch() builds its LayerHarvest with attempts=3 and
+# never exposes retry_delay_s (default 2.0s, real `asyncio.sleep`, never
+# mocked) to the caller. Three of the tests below deliberately make every
+# layer (or several) fail to exercise the hard-fail contract, and each
+# failing layer pays two REAL sleeps (2s then 4s) before it is recorded dead
+# -- 25 layers failing at once (test_arcgis_200_with_an_error_body_is_a_failure)
+# alone accounts for ~150s of real wall time that has nothing to do with what
+# the test is actually asserting. tests/test_layer_guard.py already treats
+# this as a known seam and passes retry_delay_s=0 to every LayerHarvest it
+# constructs directly -- this file has no such injection point because the
+# guard is built *inside* fetch(), so the same discipline has to be applied
+# by neutralizing the sleep itself.
+#
+# This autouse fixture is the regression guard: it keeps retry COUNT/behavior
+# intact (so test_http_error_on_one_layer_hard_fails etc. still exercise real
+# retry attempts) while removing the real wall-clock cost, for every test in
+# this module, present and future.
+@pytest.fixture(autouse=True)
+def _no_real_retry_backoff(monkeypatch):
+    async def _instant_sleep(_delay: float) -> None:
+        return None
+
+    monkeypatch.setattr(layer_guard.asyncio, "sleep", _instant_sleep)
+
+
+# Backstop for the backstop: if a future change reintroduces a real sleep on
+# this path (or any other blocking call), fail loudly in seconds instead of
+# silently costing minutes. Every test below runs in well under 1s once the
+# fixture above is in place.
+pytestmark = pytest.mark.timeout(15)
+
+
+def _resp(status=200, body=None):
+    r = MagicMock()
+    r.status_code = status
+    r.json = MagicMock(return_value=body if body is not None else {"features": []})
+    return r
+
+
+def _client(handler):
+    @asynccontextmanager
+    async def _cm(*a, **kw):
+        stub = MagicMock()
+        stub.get = handler
+        yield stub
+    return _cm
+
+
+def test_outfields_is_never_a_wildcard():
+    """A wildcard here would sweep up complainant phone/email from the Lincoln
+    and Pickens layers. Pin it at the config level."""
+    for lay in M.LAYERS:
+        assert lay.fields, f"{lay.slug} declares no fields"
+        assert "*" not in lay.fields, f"{lay.slug} requests a wildcard"
+
+
+def test_no_complainant_contact_field_is_ever_requested():
+    banned = {"name", "phone", "email", "pocphone", "pocemail", "pocfullname",
+              "pocfirstname", "poclastname"}
+    for lay in M.LAYERS:
+        leak = {f for f in lay.fields if f.lower() in banned}
+        assert not leak, f"{lay.slug} requests complainant PII: {leak}"
+
+
+def test_requested_fields_reach_the_query(monkeypatch):
+    seen = {}
+
+    async def get(url, **kw):
+        seen[url] = kw.get("params", {})
+        return _resp(200, {"features": []})
+
+    monkeypatch.setattr(M, "client", _client(get))
+    asyncio.run(M.ArcgisDistressLayers().fetch())
+    assert seen, "no query issued"
+    for params in seen.values():
+        assert params["outFields"] != "*"
+        assert params["returnGeometry"] == "false"
+
+
+def test_arcgis_200_with_an_error_body_is_a_failure(monkeypatch):
+    """ArcGIS answers 200 with an error payload. Treating that as an empty
+    result is how a token wall or a renamed layer reads as 'no rows today'."""
+    async def get(url, **kw):
+        return _resp(200, {"error": {"code": 499, "message": "Token Required"}})
+
+    monkeypatch.setattr(M, "client", _client(get))
+    with pytest.raises(PartialHarvest):
+        asyncio.run(M.ArcgisDistressLayers().fetch())
+
+
+def test_http_error_on_one_layer_hard_fails(monkeypatch):
+    # services6.arcgis.com carries the county-scale layers (Buncombe et al) --
+    # those stay hard-fail. lincolncountync (single-city, TLS-chain issue) was
+    # moved to the tolerate-list 2026-09-15; see
+    # test_tolerated_single_host_layer_does_not_sink_the_batch below.
+    async def get(url, **kw):
+        if "services6.arcgis.com" in url:
+            return _resp(503)
+        return _resp(200, {"features": []})
+
+    monkeypatch.setattr(M, "client", _client(get))
+    with pytest.raises(PartialHarvest):
+        asyncio.run(M.ArcgisDistressLayers().fetch())
+
+
+def test_tolerated_single_host_layer_does_not_sink_the_batch(monkeypatch):
+    """lincolncountync.gov has an incomplete TLS chain (found 2026-09-15) and
+    was discarding all 18 layers' rows every run because the guard hard-
+    failed the whole batch on this one flaky single-host layer. It's now in
+    the harvester's tolerate-list, same treatment as the three county-owned
+    layers -- a failure here must not raise PartialHarvest."""
+    async def get(url, **kw):
+        if "lincolncountync" in url:
+            raise ConnectionError("certificate verify failed")
+        return _resp(200, {"features": []})
+
+    monkeypatch.setattr(M, "client", _client(get))
+    # Should not raise — the flaky layer is tolerated, the rest still land.
+    asyncio.run(M.ArcgisDistressLayers().fetch())
+
+
+def test_row_without_address_or_parcel_is_dropped():
+    lay = M.LAYERS[0]
+    assert M._to_listing({"owner1_last_name": "SMITH"}, lay) is None
+
+
+def test_buncombe_row_maps_to_a_usable_lead():
+    """Live-verified shape (2026-09-29): address_line1/city/state/postal_code is the
+    TAXPAYER'S MAILING address, e.g. owner ROBINSON LORA's bill is mailed to "28 Dode
+    Whitaker Rd, Fairview NC" while her actual parcel sits at "42 Dode Whitaker Rd" per
+    house_num/street_name/street_type -- same street, different house, a real
+    absentee-adjacent case, not a typo. street_address must come from the situs
+    columns, not address_line1 (that bug is what DENY_SOURCES / board_selfcheck.py
+    document as the buncombe_unpaid_bills vs multi_year_delinquent_tax fusion gap)."""
+    lay = next(x for x in M.LAYERS if x.slug == "buncombe_unpaid_bills")
+    li = M._to_listing({
+        "bill": "0003018081-2025-2025-0000-00", "pin": "9686-54-0826-00000",
+        "owner1_last_name": "ROBINSON", "owner1_first_name": "LORA",
+        "house_num": "42", "street_direction": None, "street_name": "DODE WHITAKER RD",
+        "street_type": None,
+        "address_line1": "28 DODE WHITAKER RD", "city": "FAIRVIEW", "state": "NC",
+        "postal_code": "28730", "total_value": 374100.0, "real_value": 374100.0,
+    }, lay)
+    assert li.owner_name == "ROBINSON, LORA"
+    assert li.parcel_id == "9686-54-0826-00000"
+    assert li.street_address == "42 DODE WHITAKER RD"
+    assert li.tax_value == 374100.0
+    assert li.county == "Buncombe" and li.state == "NC"
+    assert li.foreclosure_process == "tax"
+    # city/zip_code are left unset -- this layer has no genuine situs city/zip column,
+    # only the mailing one, and asserting the mailing city as the property's own would
+    # be wrong for an absentee/out-of-state owner (see the out-of-state test below).
+    assert li.city is None and li.zip_code is None
+
+
+def test_buncombe_mailing_address_is_kept_separate_not_asserted_as_situs():
+    """The mailing block still reaches the board (useful absentee/out-of-state signal)
+    but under raw['owner_mailing'], never as street_address/city/zip_code. Live-verified
+    2026-09-29: owner RADIFY ASHEVILLE LLC's bill mails to North Bend, WA while the
+    parcel is 155 Tunnel Rd, Asheville NC -- an out-of-state absentee LLC landlord."""
+    lay = next(x for x in M.LAYERS if x.slug == "buncombe_unpaid_bills")
+    li = M._to_listing({
+        "pin": "0000000000000", "owner1_last_name": "RADIFY ASHEVILLE LLC",
+        "house_num": "155", "street_name": "TUNNEL RD",
+        "address_line1": "249 MAIN AVE S STE 107 PMB 362", "city": "NORTH BEND",
+        "state": "WA", "postal_code": "98045", "real_value": 200000.0,
+    }, lay)
+    assert li.street_address == "155 TUNNEL RD"
+    om = li.raw["owner_mailing"]
+    assert om["situs"] == "155 TUNNEL RD"
+    assert om["mailing"] == "249 MAIN AVE S STE 107 PMB 362 NORTH BEND WA 98045"
+    assert om["mail_state"] == "WA"
+    assert om["out_of_state"] is True
+    assert om["absentee"] is True
+    # Tagged like multi_year_delinquent_tax.py tags this same Buncombe table, so
+    # repair_parcel_from_address.py's PARCEL_MAILING_SOURCES recognizes the block.
+    assert om["source"] == "county_tax_roll"
+
+
+def test_buncombe_house_number_sentinel_is_dropped_not_joined_in():
+    """NC layers write '0' or '99999' in the house-number slot to mean 'no address
+    assigned' -- a real sentinel, not a real number (same convention as
+    web_artifact._PLACEHOLDER_HOUSE_NUM_RE / enrichment_parcel_from_geo.
+    _NC_NO_NUMBER_SENTINELS). Live-verified 2026-09-29 (owner GENEVA SUMNER, house_num
+    '0', street NEW COVENANT DR). Joining it in verbatim would produce '0 NEW COVENANT
+    DR', a different (fake) address from the '0'-less situs multi_year_delinquent_tax
+    emits for the same parcel, defeating the whole point of the fix."""
+    lay = next(x for x in M.LAYERS if x.slug == "buncombe_unpaid_bills")
+    li = M._to_listing({
+        "pin": "1111111111111", "owner1_last_name": "SUMNER",
+        "house_num": "0", "street_name": "NEW COVENANT DR",
+        "address_line1": "7776 SUTTER RD", "city": "GREENSBORO", "state": "NC",
+        "postal_code": "27455", "real_value": 50000.0,
+    }, lay)
+    assert li.street_address == "NEW COVENANT DR"
+
+
+def test_buncombe_filter_excludes_personal_property():
+    """7,900 unpaid bills, but 6,873 are vehicle tax. Only real property is a
+    lead; without this filter the board gains 6,873 non-properties."""
+    lay = next(x for x in M.LAYERS if x.slug == "buncombe_unpaid_bills")
+    assert "real_value>0" in lay.where
+
+
+def test_lincoln_filter_excludes_closed_violations():
+    """3,465 violations back to 1999; 66 are open. A closed violation is not a
+    distress signal."""
+    lay = next(x for x in M.LAYERS if x.slug == "lincoln_code_violations")
+    assert "STATUS='Open'" in lay.where
+
+
+def test_every_layer_slug_is_unique():
+    slugs = [x.slug for x in M.LAYERS]
+    assert len(slugs) == len(set(slugs))
+
+
+# ---------------------------------------------------------------------------
+# Batch 2: tax-sale + county-owned surplus.
+# ---------------------------------------------------------------------------
+
+def test_county_surplus_is_tagged_so_it_cannot_reach_an_outreach_list():
+    """The owner on these rows is the county itself. Buying at a surplus sale
+    and cold-calling an owner in default are different workflows; if surplus
+    leaks into a mail merge we are writing to the county tax office."""
+    surplus = [x for x in M.LAYERS if x.slug.endswith("_county_owned")]
+    assert surplus, "no surplus layers declared"
+    for lay in surplus:
+        assert lay.process == "county_surplus", lay.slug
+
+
+def test_no_surplus_layer_is_typed_as_a_foreclosure_or_tax_lien():
+    """Typing county inventory as TAX_LIEN would make it score as distress."""
+    from foreclosure_scraper.models import ListingType
+    for lay in M.LAYERS:
+        if lay.process == "county_surplus":
+            assert lay.listing_type not in (
+                ListingType.TAX_LIEN, ListingType.TAX_SALE,
+                ListingType.FORECLOSURE_SALE), lay.slug
+
+
+def test_split_situs_columns_are_composed_into_an_address():
+    """Buncombe's surplus layer has no single address column; without this all
+    98 rows land with street_address=None and cannot be driven to."""
+    lay = next(x for x in M.LAYERS if x.slug == "buncombe_county_owned")
+    assert lay.situs_parts, "buncombe surplus declares no situs_parts"
+    li = M._to_listing({"pin": "9699215869", "owner": "COUNTY OF BUNCOMBE",
+                        "HouseNumber": "550", "streetname": "OLD US 70",
+                        "StreetType": "HWY"}, lay)
+    assert li.street_address == "550 OLD US 70 HWY"
+
+
+def test_spartanburg_maps_only_self_describing_columns():
+    """The CAMA join renamed every column to a positional alias. Those shift if
+    the county rebuilds the join, so only the Tax_Sale_* columns may drive the
+    mapping — a wrong owner is worse than no owner."""
+    lay = next(x for x in M.LAYERS if x.slug == "spartanburg_city_tax_sale")
+    for role in (lay.parcel, lay.owner_last, lay.situs):
+        assert role.startswith("Tax_Sale_"), f"{role} is a positional alias"
+
+
+def test_spartanburg_row_maps():
+    lay = next(x for x in M.LAYERS if x.slug == "spartanburg_city_tax_sale")
+    li = M._to_listing({"Tax_Sale_1": "7-17-10-041.00", "Tax_Sale_2": "RT & C LLC",
+                        "Tax_Sale_4": "2117 OAKHURST CIR",
+                        "L20CAMA_18": "LOT 8 BLK A OAKHURST DEV CO"}, lay)
+    assert li.parcel_id == "7-17-10-041.00"
+    assert li.owner_name == "RT & C LLC"
+    assert li.street_address == "2117 OAKHURST CIR"
+    assert li.county == "Spartanburg" and li.state == "SC"
+
+
+def test_every_layer_declares_a_way_to_locate_the_property():
+    """A layer with neither a parcel column nor any address column produces
+    rows that are dropped on the floor — declare it and you get silence."""
+    for lay in M.LAYERS:
+        assert lay.parcel or lay.situs or lay.situs_parts, lay.slug
+
+
+def test_no_layer_carries_an_owner_or_complainant_phone():
+    """Buncombe's HMGP layer has a Phone column and Lincoln's has PHONE/EMAIL.
+    Contact data belongs to the skip-trace path under its own DNC rules, not to
+    a source reader that has no consent context."""
+    banned = {"phone", "phone_number", "email", "homeowner_phone_number",
+              "pocphone", "pocemail"}
+    for lay in M.LAYERS:
+        leak = {f for f in lay.fields if f.lower() in banned}
+        assert not leak, f"{lay.slug} requests {leak}"
+
+
+def test_storm_damage_counties_are_actually_covered():
+    """Transylvania and Burke read ZERO on storm damage not because they were
+    undamaged but because only Buncombe's roll was wired."""
+    storm = {x.county for x in M.LAYERS if x.process == "storm_damage"}
+    assert {"Burke", "Transylvania", "Buncombe"} <= storm, storm
+
+
+def test_every_layer_has_a_distinct_process_tag():
+    """process drives how a lead may be used. A buyout applicant, a county
+    surplus parcel and a delinquent owner are three different workflows."""
+    for lay in M.LAYERS:
+        assert lay.process, f"{lay.slug} has no process tag"
+
+
+# --- 2026-10-07 extraction audit. Values below are made up. ---
+
+def _layer(slug):
+    return next(lay for lay in M.LAYERS if lay.slug == slug)
+
+
+def test_greenville_requests_sale_deed_value_and_building_columns():
+    f = set(_layer("greenville_unpaid_tax_parcels").fields)
+    for col in ("SLPRICE", "DEEDDATE", "CUBOOK", "CUPAGE", "FAIRMKTVAL", "LANDVAL",
+                "BLDGVAL", "SQFEET", "BEDROOMS", "BATHRMS", "POWNNM", "GIS_ACRES"):
+        assert col in f, col
+
+
+def test_greenville_new_columns_land_in_the_raw_block():
+    li = M._to_listing({"PIN": "0000000000002", "OWNAM1": "SAMPLE OWNER", "STRNUM": "5",
+                        "LOCATE": "TEST", "STRTYP": "RD", "TAXMKTVAL": 1000, "TOTTAX": 10.0,
+                        "SLPRICE": 90000, "DEEDDATE": 1577836800000, "CUBOOK": "1234",
+                        "CUPAGE": 56, "FAIRMKTVAL": 120000, "SQFEET": 1400, "BEDROOMS": 3,
+                        "POWNNM": "EXAMPLE PAT", "GIS_ACRES": 0.3},
+                       _layer("greenville_unpaid_tax_parcels"))
+    b = li.raw["arcgis_distress"]
+    assert b["SLPRICE"] == 90000 and b["CUBOOK"] == "1234" and b["CUPAGE"] == 56
+    assert b["FAIRMKTVAL"] == 120000 and b["SQFEET"] == 1400 and b["BEDROOMS"] == 3
+    assert b["POWNNM"] == "EXAMPLE PAT" and b["GIS_ACRES"] == 0.3
+
+
+def test_new_hanover_uses_its_own_coordinates_and_keeps_the_permit_description():
+    lay = _layer("new_hanover_demolition_permits")
+    li = M._to_listing({"PERMIT_NUMBER": "P-1", "WORK_CLASS": "Demolition",
+                        "PERMIT_STATUS": "Issued", "NUMBER": "1", "STREET": "TEST",
+                        "TYPE": "ST", "PID": "R00000-000-000-000", "DESCRIPTION": "Demo house",
+                        "ISSUE_DATE": 1704067200000, "Lat": 34.2, "Lon": -77.9}, lay)
+    assert (li.latitude, li.longitude) == (34.2, -77.9)
+    assert li.raw["arcgis_distress"]["DESCRIPTION"] == "Demo house"
+    assert li.raw["arcgis_distress"]["ISSUE_DATE"] == 1704067200000
+
+
+def test_zero_or_missing_own_coordinates_are_not_used():
+    lay = _layer("new_hanover_demolition_permits")
+    base = {"NUMBER": "1", "STREET": "TEST", "TYPE": "ST", "PID": "R00000-000-000-001"}
+    assert M._to_listing({**base, "Lat": 0, "Lon": 0}, lay).latitude is None
+    assert M._to_listing(base, lay).latitude is None
+
+
+# --- 2026-11-10 vacant/condemned coverage-gap research pass: greenville_city_demolition_permits
+# (City of Greenville SC building permits, PERMIT_TYPE DEMR/DEMC). Fixture row below is real,
+# trimmed to the fields this layer reads, live 2026-11-10 (permit 2600004610, 8 Manning St).
+
+def test_greenville_city_demolition_permits_filters_to_demr_and_demc_only():
+    lay = _layer("greenville_city_demolition_permits")
+    assert lay.where == "PERMIT_TYPE IN ('DEMR','DEMC')"
+    assert lay.state == "SC" and lay.county == "Greenville"
+
+
+def test_greenville_city_demolition_permits_maps_owner_address_and_description():
+    lay = _layer("greenville_city_demolition_permits")
+    li = M._to_listing({
+        "PERMIT_NUM": "2600004610", "PERMIT_TYPE": "DEMR",
+        "APPLIC_DESCRIPTION": "DEMOLITION, RESIDENTIAL SINGLE FAMILY        ",
+        "BP_STATUS": "IS", "STREETADDRESS": "8   MANNING ST  ",
+        "OWNER_NAME": "FABANWO JOHN I                ",
+        "OWNER_ADDR": "FABANWO REBECCA D             ",
+        "OWNER_ADDR2": "8 MANNING ST                  ",
+        "OWNER_ZIP": "29601    ", "NewIssueDate": 1794114000000,
+    }, lay)
+    assert li.state == "SC" and li.county == "Greenville"
+    assert li.street_address == "8   MANNING ST"
+    assert li.owner_name == "FABANWO JOHN I"
+    assert "DEMOLITION, RESIDENTIAL SINGLE FAMILY" in li.description
+    assert li.raw["owner_mailing"]["mailing"] == "FABANWO REBECCA D 8 MANNING ST"
+
+
+def test_greenville_city_demolition_permits_is_a_permit_not_a_condemnation():
+    """Owner/contractor-FILED permits (CONTRACTOR_NAME is sometimes literally 'HOME OWNER' in
+    the live data) are not the same signal as a city condemnation order -- same distinction
+    new_hanover_demolition_permits already draws, and for the same reason: `condemned` and
+    `code_enforcement` must stay unset here or this would silently inflate those two columns
+    with a different, weaker signal type."""
+    lay = _layer("greenville_city_demolition_permits")
+    assert lay.condemned is False
+    li = M._to_listing({"PERMIT_NUM": "1", "STREETADDRESS": "1 TEST ST",
+                        "APPLIC_DESCRIPTION": "DEMOLITION, RESIDENTIAL SINGLE FAMILY"}, lay)
+    assert "condemned" not in li.raw
+    assert "code_enforcement" not in li.raw
+    assert li.raw["arcgis_distress"]  # still a real, read lead -- just not these two columns
+
+
+def test_an_ssn_like_column_never_reaches_the_raw_block():
+    li = M._to_listing({"PIN": "0000000000003", "OWNAM1": "SAMPLE", "STRNUM": "1",
+                        "LOCATE": "TEST", "TCSSN1": "000-00-0000"},
+                       _layer("greenville_unpaid_tax_parcels"))
+    assert "TCSSN1" not in li.raw["arcgis_distress"]
+
+
+# ---------------------------------------------------------------------------
+# 2026-10-13 source-completeness audit, Pattern A: ArcGIS attachments
+# (hasAttachments/queryAttachments). Live-checked all 26 layers in this file;
+# only transylvania_damage_assessment and burke_storm_damage carry real
+# per-feature photos. lincoln_county_owned (hasAttachments:true but the
+# "attachments" are 14 repeating map-legend category icons, not photos) and
+# burke_county_owned (hasAttachments:true but 100% application/pdf deed
+# scans) were live-checked and confirmed NOT wired -- see Layer.
+# has_attachments docstring for the full live evidence.
+# ---------------------------------------------------------------------------
+
+def _stub_client(handler):
+    stub = MagicMock()
+    stub.get = handler
+    return stub
+
+
+def test_has_attachments_flag_is_scoped_to_the_two_live_confirmed_layers():
+    """Pins the 2026-10-13 live result so a future edit can't silently widen (or
+    narrow) which layers fetch attachments without a deliberate, re-verified change."""
+    flagged = {lay.slug for lay in M.LAYERS if lay.has_attachments}
+    assert flagged == {"transylvania_damage_assessment", "burke_storm_damage"}
+
+
+def test_lincoln_and_burke_county_owned_are_not_flagged():
+    """The two live false positives (icons / PDFs, not photos) must stay off."""
+    for slug in ("lincoln_county_owned", "burke_county_owned"):
+        assert _layer(slug).has_attachments is False, slug
+
+
+def test_to_listing_attaches_real_photos_when_given():
+    lay = _layer("transylvania_damage_assessment")
+    li = M._to_listing({"pin": "8597-54-8900-000", "house_number": "178",
+                        "road_name": "Deavor Rd", "severity_level": "3"},
+                       lay, photos=["https://example.test/1/attachments/1",
+                                     "https://example.test/1/attachments/2"])
+    assert li.raw["images"] == {"real": ["https://example.test/1/attachments/1",
+                                          "https://example.test/1/attachments/2"]}
+
+
+def test_to_listing_without_photos_has_no_images_key():
+    lay = _layer("transylvania_damage_assessment")
+    li = M._to_listing({"pin": "8597-54-8900-000", "house_number": "178",
+                        "road_name": "Deavor Rd"}, lay)
+    assert "images" not in li.raw
+
+
+def test_to_listing_empty_photos_list_has_no_images_key():
+    """An attachments call that resolved but found nothing real (e.g. every
+    attachment was a non-image) must not stamp a hollow images block."""
+    lay = _layer("transylvania_damage_assessment")
+    li = M._to_listing({"pin": "8597-54-8900-000", "house_number": "178",
+                        "road_name": "Deavor Rd"}, lay, photos=[])
+    assert "images" not in li.raw
+
+
+def test_fetch_attachments_builds_urls_and_filters_non_images():
+    """Matches the asheville_helene.py convention exactly: only image/* content
+    types are kept, built as {layer_url}/{objectid}/attachments/{attachmentId}."""
+    async def get(url, **kw):
+        assert url.endswith("/queryAttachments")
+        return _resp(200, {"attachmentGroups": [
+            {"parentObjectId": 1, "attachmentInfos": [
+                {"id": 10, "contentType": "image/jpeg"},
+                {"id": 11, "contentType": "application/pdf"},  # must be dropped
+            ]},
+            {"parentObjectId": 2, "attachmentInfos": [
+                {"id": 20, "contentType": "IMAGE/JPEG"},  # case-insensitive match
+            ]},
+        ]})
+
+    c = _stub_client(get)
+    out = asyncio.run(M._fetch_attachments(c, "https://example.test/FeatureServer/0", [1, 2]))
+    assert out == {
+        1: ["https://example.test/FeatureServer/0/1/attachments/10"],
+        2: ["https://example.test/FeatureServer/0/2/attachments/20"],
+    }
+
+
+def test_fetch_attachments_caps_photos_per_feature():
+    infos = [{"id": i, "contentType": "image/jpeg"} for i in range(20)]
+
+    async def get(url, **kw):
+        return _resp(200, {"attachmentGroups": [
+            {"parentObjectId": 1, "attachmentInfos": infos}]})
+
+    c = _stub_client(get)
+    out = asyncio.run(M._fetch_attachments(c, "https://example.test/FeatureServer/0", [1]))
+    assert len(out[1]) == M._MAX_PHOTOS
+
+
+def test_fetch_attachments_chunks_object_ids():
+    seen_chunks = []
+
+    async def get(url, **kw):
+        ids = kw["params"]["objectIds"].split(",")
+        seen_chunks.append(ids)
+        return _resp(200, {"attachmentGroups": []})
+
+    c = _stub_client(get)
+    many_ids = list(range(1, M._ATTACH_CHUNK * 2 + 5))
+    asyncio.run(M._fetch_attachments(c, "https://example.test/FeatureServer/0", many_ids))
+    assert len(seen_chunks) == 3
+    assert all(len(chunk) <= M._ATTACH_CHUNK for chunk in seen_chunks)
+    assert sum(len(chunk) for chunk in seen_chunks) == len(many_ids)
+
+
+def test_fetch_attachments_returns_empty_for_no_object_ids():
+    calls = []
+
+    async def get(url, **kw):
+        calls.append(url)
+        return _resp(200, {"attachmentGroups": []})
+
+    c = _stub_client(get)
+    out = asyncio.run(M._fetch_attachments(c, "https://example.test/FeatureServer/0", []))
+    assert out == {}
+    assert calls == []  # no network call at all when there is nothing to look up
+
+
+def test_fetch_attachments_never_raises_on_http_error_status():
+    async def get(url, **kw):
+        return _resp(500)
+
+    c = _stub_client(get)
+    out = asyncio.run(M._fetch_attachments(c, "https://example.test/FeatureServer/0", [1, 2]))
+    assert out == {}
+
+
+def test_fetch_attachments_never_raises_on_transport_exception():
+    async def get(url, **kw):
+        raise ConnectionError("boom")
+
+    c = _stub_client(get)
+    out = asyncio.run(M._fetch_attachments(c, "https://example.test/FeatureServer/0", [1, 2]))
+    assert out == {}
+
+
+def test_fetch_layer_wires_real_photos_without_leaking_objectid_into_raw(monkeypatch):
+    """End-to-end through _fetch_layer: the objectid added to outFields purely to
+    key the attachment lookup must reach raw['images'] but never raw['arcgis_distress']
+    (that block is documented as explicit-outFields-only -- see _raw_block)."""
+    lay = _layer("transylvania_damage_assessment")
+
+    async def get(url, **kw):
+        if url.endswith("/queryAttachments"):
+            assert kw["params"]["objectIds"] == "121"
+            return _resp(200, {"attachmentGroups": [
+                {"parentObjectId": 121, "attachmentInfos": [
+                    {"id": 1, "contentType": "image/jpeg"}]}]})
+        assert "objectid" in kw["params"]["outFields"].split(",")
+        return _resp(200, {"features": [{"attributes": {
+            "pin": "8597-54-8900-000", "house_number": "178", "road_name": "Deavor Rd",
+            "severity_level": "3", "objectid": 121}}]})
+
+    c = _stub_client(get)
+    listings = asyncio.run(M._fetch_layer(c, lay))
+    assert len(listings) == 1
+    li = listings[0]
+    assert li.raw["images"] == {"real": [f"{lay.url}/121/attachments/1"]}
+    assert "objectid" not in li.raw["arcgis_distress"]
+    assert "OBJECTID" not in li.raw["arcgis_distress"]
+
+
+def test_fetch_layer_handles_uppercase_objectid_field_name(monkeypatch):
+    """Burke's layer declares OBJECTID (uppercase); the case-insensitive lookup
+    this change added must still find it and key the photo lookup correctly."""
+    lay = _layer("burke_storm_damage")
+
+    async def get(url, **kw):
+        if url.endswith("/queryAttachments"):
+            return _resp(200, {"attachmentGroups": [
+                {"parentObjectId": 1, "attachmentInfos": [
+                    {"id": 7, "contentType": "image/jpeg"}]}]})
+        return _resp(200, {"features": [{"attributes": {
+            "REID": 1, "dmg_loc": "101 Woodsway Ln", "OBJECTID": 1}}]})
+
+    c = _stub_client(get)
+    listings = asyncio.run(M._fetch_layer(c, lay))
+    assert len(listings) == 1
+    assert listings[0].raw["images"]["real"] == [f"{lay.url}/1/attachments/7"]
+
+
+def test_fetch_layer_without_has_attachments_never_calls_queryattachments():
+    """The other 24 layers in this file must see zero behavior change: no
+    objectid added to outFields, no queryAttachments call at all."""
+    lay = _layer("buncombe_unpaid_bills")
+    calls = []
+
+    async def get(url, **kw):
+        calls.append(url)
+        assert "objectid" not in kw["params"].get("outFields", "").split(",")
+        return _resp(200, {"features": [{"attributes": {
+            "pin": "1", "owner1_last_name": "SMITH", "house_num": "1",
+            "street_name": "MAIN ST", "real_value": 1000}}]})
+
+    c = _stub_client(get)
+    listings = asyncio.run(M._fetch_layer(c, lay))
+    assert len(listings) == 1
+    assert "images" not in listings[0].raw
+    assert not any(u.endswith("/queryAttachments") for u in calls)
+
+
+def test_fetch_layer_survives_a_total_queryattachments_failure():
+    """A broken attachments call for a has_attachments layer must never break
+    that layer's own main listing fetch -- the row still lands, just without photos."""
+    lay = _layer("burke_storm_damage")
+
+    async def get(url, **kw):
+        if url.endswith("/queryAttachments"):
+            raise ConnectionError("attachments endpoint is down")
+        return _resp(200, {"features": [{"attributes": {
+            "REID": 1, "dmg_loc": "101 Woodsway Ln", "OBJECTID": 1}}]})
+
+    c = _stub_client(get)
+    listings = asyncio.run(M._fetch_layer(c, lay))
+    assert len(listings) == 1
+    assert "images" not in listings[0].raw
+
+
+def test_attachments_failure_on_both_flagged_layers_does_not_sink_the_whole_batch(monkeypatch):
+    """The exact contract the task required: a broken attachments call on
+    transylvania_damage_assessment and burke_storm_damage (both failing outright,
+    one via HTTP 500 and one via a raised exception) must never discard the other
+    24 layers' good rows. Runs the real ArcgisDistressLayers().fetch() -- the full
+    batch, LayerHarvest guard included -- not just _fetch_layer in isolation."""
+    attach_calls = []
+
+    async def get(url, **kw):
+        if url.endswith("/queryAttachments"):
+            attach_calls.append(url)
+            if "ProOLvsmwpY1RmFG" in url:   # transylvania
+                return _resp(500)
+            if "axQ4OCSpcxALIQsV" in url and "119" in url:   # burke_storm_damage
+                raise ConnectionError("attachments endpoint is down")
+            return _resp(200, {"attachmentGroups": []})
+        if "Unpaid%20Property%20Bills%20from%202025" in url:
+            # A healthy, unrelated layer's real row -- must survive intact.
+            return _resp(200, {"features": [{"attributes": {
+                "pin": "1", "owner1_last_name": "SMITH", "house_num": "1",
+                "street_name": "MAIN ST", "real_value": 1000}}]})
+        if "ProOLvsmwpY1RmFG" in url:
+            return _resp(200, {"features": [{"attributes": {
+                "pin": "8597-54-8900-000", "house_number": "178",
+                "road_name": "Deavor Rd", "objectid": 1}}]})
+        if "axQ4OCSpcxALIQsV" in url and "119" in url:
+            return _resp(200, {"features": [{"attributes": {
+                "REID": 1, "dmg_loc": "101 Woodsway Ln", "OBJECTID": 1}}]})
+        return _resp(200, {"features": []})
+
+    monkeypatch.setattr(M, "client", _client(get))
+    listings = asyncio.run(M.ArcgisDistressLayers().fetch())
+    assert len(attach_calls) == 2
+    by_slug = {li.source.rsplit(".", 1)[-1]: li for li in listings}
+    assert by_slug["buncombe_unpaid_bills"].owner_name == "SMITH"
+    assert "images" not in by_slug["buncombe_unpaid_bills"].raw
+    assert by_slug["transylvania_damage_assessment"].street_address == "178 Deavor Rd"
+    assert "images" not in by_slug["transylvania_damage_assessment"].raw
+    assert by_slug["burke_storm_damage"].street_address == "101 Woodsway Ln"
+    assert "images" not in by_slug["burke_storm_damage"].raw

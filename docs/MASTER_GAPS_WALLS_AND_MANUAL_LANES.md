@@ -1,0 +1,222 @@
+# MASTER: Gaps, Walls, Skip-Tracing, and the Manual Lanes
+
+**One doc, everything.** What the engine cannot get and why, what a human does by hand and the exact steps, what is genuinely missing on the board, and the hard rules. Built 2026-08-18 against the live committed board (`data/checkpoint/board.json.gz`, 40,702 leads) and the forensic wall reference. Where a number is a live count it is stated as such. Style: no em dashes, colons and parentheses only.
+
+**Read this first, then `docs/blocked_sources_forensic.md` for the row-level detail (123 rows).** This doc is the map. The forensic doc is the territory.
+
+---
+
+## CORRECTIONS, 2026-09-21 (the original text below is kept as written; where they disagree, this block wins)
+
+This document was built on 2026-08-18 against a 40,702-lead board and has not been re-probed since. The operations audit (`docs/audit_operations_2026-09-21.md`, appendix C1) found these statements now false or misleading. Nothing below was deleted; each is superseded here.
+
+| Original statement | Correct as of 2026-09-21 |
+|---|---|
+| "Built against the live committed board (`data/checkpoint/board.json.gz`, 40,702 leads)" | `data/` is gitignored, so that file is not committed; it is a 65 MB checkpoint dated 9/9. The live board is 170,066 rows (`docs/run_meta.json`) |
+| "Board = 40,702 leads. NC 22,872 / SC 17,830" | 170,066 rows; NC 93,030, SC 77,036 |
+| Fill rates: owner_mailing 74.5%, owner_phone 21.4%, parcel 72.5%, real CAMA 32%, equity 30.2%, vision 32.7% | Measured on the 40.7k board and not re-measured board-wide. Vision alone is about 13% of 170k rows (22,326). The SC phone gate (`docs/phone_gate_2026-09-21.md`) changed the meaning of "owner_phone" |
+| "The footprint is exactly 18 counties ... eastern/coastal NC (New Hanover) DENIED ... Every in-scope county has coverage" | The 18 counties are the **flip** footprint. Distressed-type leads are in scope anywhere in NC and SC (owner rule 2026-09-15; `config.in_scope_distressed`), and the board holds New Hanover (2,230) and Charleston (1,455) rows. Flip-type leads outside the 18 counties are now excluded on every admission path, including the coastal ones (`main._flip_outside_footprint`, 2026-09-21) |
+| "Board-writer mutex prevents an ingest colliding with a full run" | Was true only for the writers that used the lock. Since 2026-09-21 `write_artifact` itself refuses without the lock, so it is true of every writer that goes through it (`docs/ops_fixes_2026-09-21.md`, section 2) |
+| Rule 2 below: defeating a CAPTCHA, login wall or WAF bot-check "is NOT permitted ... even when directed to" | Still the rule, and now the only rule: `CLAUDE.md` used to say the opposite (CAPTCHA solving and Cloudflare bypass allowed if free). See the reconciliation directly below |
+| Currency note: dates "true when probed" | Nothing here was re-probed after 8/18 while the source set changed by more than 15,000 rows in September. Re-verify before relying on a DEAD or CANT entry (rule 4) |
+
+### The compliance line: one rule, stated by the owner (decided 2026-09-20)
+
+**A `robots.txt` Disallow is not a wall. A CAPTCHA, a login, a Cloudflare (or other WAF) challenge and click-through terms still are.**
+
+- Fetch politely (rate limits, honest identification where the site expects it) from pages that only a `robots.txt` Disallow forbids. Being disallowed there is not, by itself, a reason to skip a free public source.
+- Do not defeat a CAPTCHA, do not log in behind a wall or hold credentials to sustain automation, do not defeat a Cloudflare or WAF challenge, and do not click through terms that prohibit automated access. This is a code-plus-policy line, not a horsepower one.
+- Stealth that only runs the page's own JavaScript (fingerprint impersonation such as `curl_cffi`, a real headless browser) remains permitted; that is not defeating a challenge.
+- Consequences applied on 2026-09-21: `CLAUDE.md` now states this rule; `scripts/run_daily_court.sh` defaults `TYLER_USE_WAF_SOLVER` to 0 (the WAF solver defeats a bot-check; the job is disabled anyway); The Kofile module already dropped its robots gate (`tests/test_kofile_robots_guard.py`); its docstring there also repeats the older "all free techniques including anti-bot evasion" wording, which this reconciliation supersedes for CAPTCHAs, logins, Cloudflare or WAF challenges and click-through terms. Code that still treats a `Disallow` as a wall is a separate change, not made here.
+
+---
+
+## 0. THE HARD RULES (never break, no matter who asks)
+
+1. **FREE and PUBLIC only.** Everything the robots pull is free public data reached through ordinary public search. No paid APIs, no paid unblockers (Bright Data, residential proxies), no paid CAPTCHA solvers, no paid skip-trace, no paid broker data (PropStream, ATTOM, OpenCorporates, NCOALink, Trepp, UniCourt, Trellis). If it costs money to get, it is out of scope for the automated engine. The operator may buy data as a business decision, but the engine does not.
+2. **The compliance line (see the 2026-09-21 reconciliation above: a robots.txt Disallow is not a wall).** Fingerprinting stealth that runs the page's own JS (curl_cffi impersonate, StealthyFetcher / patchright) is permitted. Defeating a CAPTCHA, a login wall, a WAF bot-check, or a ToS scraper-prohibition is NOT, even when directed to. A smarter model does not change this. The wall is code plus policy, not horsepower.
+3. **No logins the robot holds.** The engine does not log in behind a wall or store credentials to sustain automation. The human operator, as the account holder, may log in and save pages by hand (the manual lane, Section 5). The robot only parses what the human saved.
+4. **DEAD means "dead the day it was probed," not "dead forever."** Re-verify every DEAD / CANT source live before believing it. This session alone, two sources on the dead list (irsauctions.gov, Meares) turned out live. Do not let a July stamp stop a re-probe.
+
+---
+
+## 1. SKIP-TRACING AND CONTACTABILITY (the #1 ceiling, and it must stay free)
+
+Contactability is the single biggest cap on the engine, and it is a compliance ceiling, not a missing source. You cannot buy your way past it inside the rules, so the whole design is free-channel skip-tracing.
+
+### Live yields on the board
+| Field | Fill | Meaning |
+|---|---:|---|
+| owner_mailing | 74.5% | The scaled outbound channel. Direct mail reaches 3 of 4 leads. |
+| skip_trace ran | 71.0% | Attempted on most leads. |
+| **owner_phone yielded** | **21.4%** | Only 1 in 5 leads gets a real phone, free. This is the wall. |
+
+### The free skip-trace channels that ARE wired (do not rebuild these)
+- **`enrichment_voter_phone.py`** — NC voter file (NCSBE free bulk download). `full_phone_number` column ~69% populated. Matches owner-OCCUPANT by name AND street, near-zero false positives. This is the one free, ToS-clean personal-phone source. Absentee owners will not match here by design.
+- **`enrichment_county_phone.py`** — County-published owner phone + mailing on open ArcGIS tables, parcel-keyed. Buncombe Accela ParcelOwner table = 135,079 owner rows, 73,965 with a phone, straight parcel join. Beats the voter lane for absentee / LLC / trust / estate owners. Config-driven, add counties as their tables surface.
+- **`enrichment_owner_mailing.py` / `sc_parcel_mailing.py` / `mailing_shape.py`** — Owner mailing address from county GIS, the direct-mail spine. Absentee / out-of-state mismatch is both a distress signal AND the reason mail is the primary channel.
+- **`enrichment_skip_trace.py`** — Provider-pluggable, default `tax_records_only` (FREE, cross-references defendant name + property to county tax records). Paid providers exist as plug points but are OFF and stay off.
+- **`contact_ingest.py`** — Ingests contact data the OPERATOR exports by hand from their own free account (e.g. a free PropWire export). Compliant because the human pulls it.
+
+### What is WONT (paid or bot-walled skip-trace, do not chase)
+TruePeopleSearch, FastPeopleSearch, Radaris, Whitepages: all Cloudflare-403 or paywall-teaser + ToS ban on automation. PropWire skip-trace: DataDome + account-gated third-party PII. These have a working bypass or a checkout button, which is exactly why they are off-limits. The compliant answer is direct mail + the free voter/county phone lanes above.
+
+### The honest takeaway
+Phone caps around 21% free. Mail reaches 74%. To lift phone you would have to either cross the paid/PII line (not allowed) or the operator pulls contacts by hand from their own accounts (`contact_ingest.py`). Hermes cannot raise this with more sources.
+
+---
+
+## 2. THE LIVE GAPS ON THE BOARD (what is actually thin, with real numbers)
+
+Board = 40,702 leads. NC 22,872 / SC 17,830. These are the current committed-board fill rates (the running job lifts CAMA / phone / resolver further when it lands).
+
+### Solved (do not spend time here)
+| Field | Fill |
+|---|---:|
+| Street address | 98.0% |
+| Owner name | 92.5% |
+| Valuation computed (raw.calc) | 91.3% |
+| Grade / intent score | 77-91% |
+
+### The real ceilings (this is where the work is)
+| Field | Fill | Why it is stuck |
+|---|---:|---|
+| **owner_phone** | **21.4%** | Contactability wall (Section 1). Free channels only. |
+| Owner mailing | 74.5% | The workaround: mail, not phone. |
+| **Resolved parcel** | **72.5%** | ~11k leads not welded to a hard parcel. Name→parcel matching ceiling ~25-30%. Code problem, not a source. |
+| **Real CAMA building specs** | **32.0%** | 2/3 of valuations lean on proxies → noisy ARV. The assessor-card grind lifts this. SC exempt-deed sqft is ABSENT. |
+| **Equity known** | **30.2%** | Needs value + loan/lien. Debt side is partly ABSENT. |
+| tax_owed $ | 37.3% | Delinquent dollar figure. Partly extraction gap, partly ABSENT (NC power-of-sale debt). |
+| amount_owed | 61.8% | Judgment / assessed / opening-bid derived. |
+| Vision (photo condition) | 32.7% | Bounded by photo supply. |
+
+### Per-county coverage — NO HOLES (verified against config.py allow-list)
+
+The footprint is exactly **18 counties** (the allow-list in `src/foreclosure_scraper/config.py`; everything else is denied, many by explicit user direction). Do NOT invent target counties. The list:
+- **SC (7):** Spartanburg, Anderson, Pickens, Oconee, Cherokee, Union, Laurens
+- **NC (11):** Rutherford, Cleveland, Henderson, Polk, Gaston, Buncombe, Transylvania, McDowell, Lincoln, Mitchell, Burke
+
+**Every in-scope county has board coverage. There are zero county holes.** Counts: Spartanburg 9,224 / Buncombe 6,836 / Rutherford 4,952 / Pickens 2,850 / McDowell 2,282 / Lincoln 1,612 / Oconee 1,691 / Henderson 1,569 / Anderson 1,275 / Laurens 952 / Cherokee 606 / Union 495 / Gaston 361 / Cleveland 271 / Polk 236 / Transylvania 228 / Burke 212 / Mitchell 142. The lowest (Mitchell, Burke, Transylvania, Polk, Cleveland) are thin because they are small rural counties, not because a source is missing.
+
+**Explicitly DENIED, do not build (per user direction):** Greenville SC, Horry SC (Myrtle Beach), Haywood/Madison/Yancey NC, Mecklenburg + all Charlotte-adjacent + eastern/coastal NC (New Hanover, Brunswick, Onslow, etc.), Newberry/Greenwood/Abbeville SC. If a source only serves these, skip it.
+
+**[CORRECTED 2026-11-10]** This line predates the 2026-09-15 distressed-anywhere rule (`config.in_scope_distressed`, see the correction block above) and the FLIP/DISTRESSED split it created (`main._FLIP_LISTING_TYPES`). The denial still holds for FLIP-type sources (a scheduled sale, auction, or REO you could buy today). It does not hold for DISTRESSED-type sources (tax delinquency, tax sale, liens, probate, etc.) in Haywood, Madison or Yancey NC: Madison and Haywood already carry real distressed-type rows on the board today, and Yancey NC's own Finance Office page (`yanceycountync.gov/174/Finance-Office`) was confirmed live 2026-11-10 to list 6 current county-held surplus parcels, now read by `counties_nc.wnc_tax_foreclosures`. Re-verify the rest of this line (Mecklenburg, the coastal counties, the SC counties) before treating it as current; it was not re-checked this session.
+
+### Distress-signal coverage (the catalog is broad; the thin ones are walled)
+Present and healthy: recorded_debt (22,806), absentee (13,377), tax_delinquent (12,331), tax_lien (11,442), distressed_condition (6,273), probate/estate (5,698), vacant (3,488), tax_sale (3,268), lis_pendens (2,736), out_of_state (2,566), code_enforcement (939), condemned (734), STR-lapsed (581), foreclosure_sale (521), incarceration (243), storm_damage (174), bankruptcy (148), divorce (92), upset_bid (84).
+Thin or missing signals, and why: **eviction** (SC magistrate rosters ABSENT, Section 4), **divorce** (only 92, NC-only; SC Family Court is access-restricted), **builder_distress** (LiensNC, manual lane), **bankruptcy_stay** (built this cycle). The gaps in the signal catalog are the ABSENT-walled ones, not buildable ones.
+
+### The extraction gaps (buildable yield sitting on the floor)
+~25 scrapers fetch data then drop it (phones, values, parcel_ids, names not persisted). Queue lives in `docs/extraction_gaps.md`. This is free yield already being fetched, just not saved. Higher ROI than hunting a new source.
+
+### The missing layer that is not a source at all
+**No act-on-it layer.** The engine produces and grades leads; nothing fires them into outbound (no CRM, no mail-merge, no dialer handoff). This is a separate build (the n8n idea in the notes), not something more sources close.
+
+---
+
+## 3. WONT — a bypass exists, we refuse it (compliance choice)
+
+These have a working bypass or a checkout button. We decline. The operator can pull them by hand (Section 5) or pay, as a business choice.
+
+| Source | The wall | Your manual step |
+|---|---|---|
+| SC PublicIndex broad sweep | ToS bars automated/repetitive querying; Rule 610 is per-held-case; F5 + CAPTCHA | Manual save per county → `scripts/ingest_publicindex_files.py` |
+| NC eCourts power-of-sale lane | Real browser works but rides a human-solved AWS-WAF CAPTCHA | Manual save → offline parser |
+| Consumer people-search (phone) | Cloudflare-403 / paywall + ToS ban | Direct mail + free voter/county phone (Section 1) |
+| PropWire | DataDome + account-gated PII | Export from your own free PropWire account → `contact_ingest.py` |
+| Cott RecordRoom (Rutherford/Polk ROD) | Subscriber login | Paid subscriber, or Union probate via `cott_recordroom.py` |
+| Cherokee / AcclaimWeb ROD images | Subscriber / login wall | Paid, or skip |
+| SC SoS entity search | CAPTCHA | NC SoS is free (`enrichment_sos_agent`); SC by hand |
+| GSA realestatesales.gov JSON API | 302 → login | Not needed, the HTML `/our-listing/` index works |
+| US Marshals real property | 403 | Covered via Bid4Assets |
+| Sites whose robots.txt names ClaudeBot / GPTBot | robots Disallow | SeeClickFix (511 cases), Transylvania Times TNCMS (2,301 notices): do not scrape |
+| Kofile / Oconee ROD, Anderson ACPASS, Rutherford Sturgis/Avalon | robots Disallow: / | Manual, or per-parcel by hand |
+| landwatch / land.com | Akamai (robots.txt itself 403s) | Skip; land covered via landandfarm/landsofamerica |
+
+---
+
+## 4. CANT / DEAD / ABSENT — technical wall, dead site, or data that does not exist
+
+### CANT (technical, no free path found; a paid unblocker MIGHT crack some)
+| Source | Blocker | Your step |
+|---|---|---|
+| NC eCourts Smart Search estates + divorce | AWS-WAF escalating image-grid CAPTCHA (vision solver clears 2, WAF issues more) | Manual save, or skip estates (permanent) |
+| NC tax-foreclosure docket state machine: return-of-service/citation-issued events, order of sale (dirty_deeds #21) | Two-part wall, live-verified 2026-09-29: (1) the county-vs-owner tax-foreclosure suit itself is ABSENT from the open Judgment Search JSON, not merely uncaptured -- queried the exact case numbers of 3 real board rows (Edgecombe `25CV003307-320`, `26CV001028-320`, `26CV001041-320`) via `queryString` (0 hits each) and pulled all 5,862 Edgecombe civil-judgment hits over an 800-day window (0 case-number matches, 0 hits with the county or a tax collector as creditor/plaintiff in any of the 29 real causeOfActionDesc values seen); the endpoint's fully-enumerated 23-value cause vocabulary (`docs/case_type_code_map.md` sec 1.2) has no tax-foreclosure-suit cause, only `CV - Federal Tax Lien`/`CV - NC Certificate of Tax Liability` (IRS/DOR liens, a different instrument). (2) Even where a case IS indexed, the endpoint is a JUDGMENT index (NCGS 7A-109(b)(6)) -- one snapshot per entered order (`judgmentType`/`civilJudgmentStatus`/`orderedDate`) -- never a Register of Actions, so pre-judgment docket events (citation issued, return of service) cannot exist there by construction; those live only on the per-case Tyler ROA/Smart Search detail page, which sits behind the AWS-WAF image-grid (the wall directly above) or the authenticated Tyler-account path (`enrichment_nc_case_status_tyler.py`), and a login is a wall per the compliance line, not just a CAPTCHA. `court_detail_parser.parse_register_of_actions` already extracts this exact granularity (see its `_DOC_TYPES`, incl. "Order of Foreclosure and Sale") when fed ROA page text -- the parser is not the gap, reaching the page is. | No free build possible without WAF/login. Manual: human saves the Smart Search ROA page per case -> `parse_register_of_actions` (already wired, per keep-bypass-code policy) |
+| ~~Cherokee SC delinquent tax~~ | ~~Cloudflare 403~~ RESOLVED 2026-09-28: no wall, wp-json media discovery already live since 2026-08-18 (528 rows). Real gap now: the CURRENT-year PDF (TAX-SALE-TAB.pdf) is a scanned image, no text layer -- needs OCR, see `project_doc_ocr.md` | none (OCR backfill is the remaining lift) |
+| ~~Spartanburg delinquent-tax URL~~ | ~~404 (CMS migration)~~ RESOLVED: never actually moved -- DocumentCenter/View/11161 fetched clean, 2,171 rows, 2026-09-28 | none |
+| ~~Laurens delinquent-tax URL~~ | ~~404 (CMS migration)~~ PARTIALLY RESOLVED 2026-09-28: page is live (200) but has no table anymore (own FLC/Overage list links are broken to error.html); real per-parcel roll w/ $ amounts already covered by `counties_sc.qpaybill_delinquent_roll` (laurenstreasurer subdomain) | none (qpaybill roll is authoritative) |
+| ~~Union SC delinquent tax~~ | ~~DNS failure~~ RESOLVED 2026-09-28: gearupunionsc.com (current site) resolves fine, no table on it either, links to qpaybill; old classic-ASP domain (countyofunion.org) now cleanly redirects into the WordPress site, fully retired not broken; real per-parcel roll w/ $ amounts already covered by `counties_sc.qpaybill_delinquent_roll` (uniontreasurer subdomain) | none (qpaybill roll is authoritative) |
+| Anderson tax balance (ACPASS) | 403 auth-gated | Per-parcel by hand |
+| **SCDOT SC_Parcels** | now token-walled, silent 200 + error | Situs resolver degraded; parcel-cache (`project_parcel_cache`) is the workaround |
+| CCHS ROD (Burke/Lincoln/Cleveland/Henderson) | DECOMMISSIONED, IIS-404 | Find county's new provider |
+| PropWire, mewborn_deselms | DataDome / Cloudflare 403 | Onslow covered via Column |
+| DealStream, BusinessesForSale | DataDome / Cloudflare 403 | none |
+| LoopNet (res + MF), auction.com MF | hard 403 / login | Crexi (only free MF source) |
+
+### DEAD (decommissioned; re-verify before trusting, per Rule 4)
+homesales.gov (HTTP 000), US Marshals (403), GSA `/api/properties` (302 login), SBA REO (no portal), dead GovDeals API key (HTTP 400, re-discover from live JS bundle), Gaston "delinquent taxes" doc (a library flyer), Burke NCPTS delinquent tenant (now zero blobs).
+**Proven-stale this session:** irsauctions.gov (now live, built), Meares / mpa-sc.com (now live, built). Re-probe the rest.
+
+### ABSENT (structurally not published; nobody free or paid extracts what does not exist)
+| Data | Why | Only route |
+|---|---|---|
+| SC deed sale price on exempt deeds | SC §12-24-70 states no value | Per-parcel qPublic CARD, or paid CAMA extract |
+| NC power-of-sale debt $ | Statute puts only terms/deposit/upset in the notice | Clerk's office in person |
+| SC magistrate eviction rosters | County-operated, no free bulk feed; portal exposes only Circuit types | FOIA Chief Magistrate, or LSC data-share (civilcourtdata@lsc.gov) |
+| Live mortgage payoff balance | Servicer PII | The servicer only |
+| SC Family Court divorce | Separate access-restricted system, not on the public portal | Paid UniCourt/Trellis, or newspaper classifieds |
+| SC heated sqft / SaleAmount on free GIS | Blank across every free SC layer | qPublic card, or paid extract |
+| Structured investor buy-box | Does not exist as a feed | Built by hand (curated registry) |
+
+---
+
+## 5. THE MANUAL LANE (what the human operator does by hand, step by step)
+
+The compliant pattern for every walled source: the OPERATOR (as account holder / human) opens the site, runs the search, saves the page or exports CSV, drops the file in a folder, and an offline parser ingests it. The robot never logs in or defeats the wall.
+
+### LiensNC (builder / investor distress) — `scripts/ingest_liensnc.py`
+1. Log in at apps.liensnc.com. Run **Advanced Search by county + date range** (last ~90 days). No keyword needed, just county.
+2. In results, the **"Active Related Filings? = Yes"** column flags the clusters (over-leveraged flippers, contractors lining up).
+3. For a Yes-project, open the **Related Filings Report** (Action menu) → **DOWNLOAD → CSV**. This lists every contractor on that project.
+4. Drop the CSV (or save the results page as HTML) into a folder → run `ingest_liensnc.py`. Clusters are tagged `builder_distress`.
+
+### SC PublicIndex — `scripts/ingest_publicindex_files.py`
+1. Log in, search per county (lis pendens, foreclosure, probate, tax).
+2. Save the results page (Ctrl-S, "Webpage, HTML only"). Note: saved HTML has the LIST, not per-case detail (detail is dead `__doPostBack` JS). Save a detail page only when you need one specific dollar amount.
+3. Drop → parse offline.
+
+### NC eCourts — offline parser
+Open Judgment Search (JSON, lis-pendens + divorce) works. Smart Search (estates) is WAF-walled. Save what you can, parse offline.
+
+### Operator run buttons (no terminal)
+Desktop "Run Foreclosure Engine.app" (`gui_run.sh`), "Ingest Saved Court Pages.app" (`ingest_saved.sh`), Tue/Fri weekly popup (`prompt_run.sh`). Board-writer mutex prevents an ingest colliding with a full run.
+
+---
+
+## 6. WHAT "100%" ACTUALLY MEANS (the honest ceiling)
+
+County coverage is already COMPLETE (all 18 in-scope counties have leads, Section 2). So Hermes's remaining source work is NOT filling county holes. It is: working the extraction-gaps queue (data already fetched then dropped), and re-verifying the DEAD/CANT list to recover any source that has come back online. That is real but bounded work.
+
+The larger ceiling is NOT sources at all, and Hermes cannot close it with scrapers:
+1. **Contactability** capped ~21% phone / 74% mail (free-only ceiling).
+2. **Resolver** at 72.5% parcel (matching-code ceiling ~25-30% on name→parcel).
+3. **Valuation depth** at 32% real specs / 30% equity (the assessor-card grind + the SC ABSENT sqft wall).
+4. **ABSENT data**: debt $, mortgage payoffs, magistrate evictions, exempt-deed prices, SC family-court divorce. Permanent, unfixable at any budget inside the rules.
+5. **The act-on-it layer**: a separate build, not a source.
+
+So the honest statement: after Hermes sorts sources you are source-complete and county-complete, not engine-complete. Anyone who says "sources done = 100%" is wrong by about 30%, and that 30% is where the deals actually get worked.
+
+---
+
+## 7. DOC MAP (where the detail lives)
+
+- **`docs/blocked_sources_forensic.md`** — 123 rows, the row-level authority: Source | Category | Bypass that would work | Exact error | Why | Your manual step.
+- `docs/SOURCE_REGISTER.md` Section 4 — the WONT/CANT/ABSENT/DEAD index into the above.
+- `docs/manual_source_inventory.md` — definitive count of every walled/manual portal x county x signal.
+- `docs/manual_playbook_and_limits.md` — Part 2: exact click-paths, what each save gives you, where to drop the file.
+- `docs/honest_operator_manual.md` — walls re-probed live (~65 endpoints).
+- `docs/operator_playbook_liensnc_and_bankruptcy.md` — LiensNC + bankruptcy cross-reference, step by step.
+- `docs/extraction_gaps.md` — the fetch-but-drop queue.
+- `docs/hermes_blueprint.md` — the full engine brief for a zero-context agent.
+
+**Currency note:** these carry different probe dates (blueprint 2026-07-03, honest-manual 2026-07-31, register Section 4 through 2026-08-06, this doc 2026-08-18). Treat dates as "true when probed." Re-verify DEAD/CANT before acting.

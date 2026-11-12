@@ -1,0 +1,231 @@
+"""Lincoln County NC vacant-parcels extraction-completeness audit (2026-10-03,
+HERMES batch 5).
+
+Diffed the live ArcGIS layer schema (MapServer/25?f=json, 55 fields) against
+the old 9-field outFields list and live-sampled 500 real VACANT='YES' rows:
+
+  - CITY/STATE/ZIP (499/500 filled) -- the owner's own MAILING address --
+    were never even REQUESTED. This scraper's whole stated purpose is
+    flagging out-of-area owners as motivated-seller prospects, yet nothing
+    in the old code could tell an in-county owner from one mailing from
+    Boca Raton FL. ADDRESS1 WAS already fetched but only stashed under the
+    private raw["lincoln_vacant"] key nothing downstream reads.
+  - DEEDBK/DEEDPG/DEEDYR (100% filled) -- a real deed reference.
+  - SDATE (100% filled) -- the last-sale DATE; SALEPRICE was already
+    captured but its paired date was not, so enrichment_last_sale's
+    raw['gis']['last_sale'] key was unreachable even on a real sale amount.
+  - NAME2 (51% filled) -- a co-owner dropped on jointly-owned parcels.
+  - PLATBK/PLATPG (31%) -- a plat reference.
+
+GOTCHA caught live-verifying the absentee heuristic: PHYSICALADDR on vacant
+land is usually just a road name with NO house number ("CAT SQUARE RD"), so
+comparing leading street tokens unconditionally (the Pickens-style original)
+flagged ~99% of the live 14,731-row set absentee on formatting alone, not a
+real signal. _is_absentee only runs that comparison when situs itself starts
+with a digit; live re-check after the guard: 3,048/14,731 (21%), matching the
+893 out-of-state + 1,157 PO-box counts plus genuine street mismatches.
+"""
+from __future__ import annotations
+
+import asyncio
+
+from foreclosure_scraper.scrapers.counties_nc import lincoln_vacant as m
+from tests._arcgis_fakes import FakeHttp
+
+
+class _Ctx:
+    def __init__(self, http):
+        self.http = http
+
+    async def __aenter__(self):
+        return self.http
+
+    async def __aexit__(self, *a):
+        return False
+
+
+def _run_fetch(features: list[dict]):
+    http = FakeHttp(pages=[{"features": features}])
+    original = m.httpx.AsyncClient
+    m.httpx.AsyncClient = lambda *a, **kw: _Ctx(http)  # noqa: E731
+    try:
+        return asyncio.run(m.LincolnVacant().fetch())
+    finally:
+        m.httpx.AsyncClient = original
+
+
+ROW_FULL = {
+    "PARCELID": "50396", "PIN": "2646977606", "PHYSICALADDR": "OLD NC 18 RD",
+    "NAME1": "LUTZ MARVIN L III", "NAME2": "LUTZ THOMAS L",
+    "ADDRESS1": "2646 GOLDENROD LN", "ADDRESS2": "UNIT 4",
+    "CITY": "GLENVIEW", "STATE": "IL", "ZIP": "60026",
+    "IMPROVALUE": 0, "TOTALVALUE": 77868, "MAINAREASQFT": None,
+    "SALEPRICE": 190000, "SDATE": "04/16/2024",
+    "DEEDBK": "3317", "DEEDPG": "847", "DEEDYR": 2024,
+    "PLATBK": "12", "PLATPG": "158", "SBDIVN": "BOBBY L MARTIN FAMILY",
+}
+
+ROW_SPARSE = {
+    "PARCELID": "00104", "PIN": "2685460418", "PHYSICALADDR": "CAT SQUARE RD",
+    "NAME1": "RICHARDSON JERRY PAUL HEIRS OF", "NAME2": None,
+    "ADDRESS1": "7347 HENRY RD", "ADDRESS2": None,
+    "CITY": "VALE", "STATE": "NC", "ZIP": "28168",
+    "IMPROVALUE": 0, "TOTALVALUE": 27755, "MAINAREASQFT": None,
+    "SALEPRICE": 0, "SDATE": None,
+    "DEEDBK": None, "DEEDPG": None, "DEEDYR": None,
+    "PLATBK": None, "PLATPG": None, "SBDIVN": None,
+}
+
+ROW_INSTATE_NO_HOUSENUM = {
+    # Same county, mailing street has NO house number paired with a situs
+    # that also has none -- must NOT be flagged absentee by formatting alone.
+    "PARCELID": "99999", "PIN": "1112223334", "PHYSICALADDR": "ROCKDALE RD",
+    "NAME1": "LOCAL OWNER", "NAME2": None,
+    "ADDRESS1": "PO BOX 10", "ADDRESS2": None,
+    "CITY": "LINCOLNTON", "STATE": "NC", "ZIP": "28092",
+    "IMPROVALUE": 0, "TOTALVALUE": 5000, "MAINAREASQFT": None,
+    "SALEPRICE": 0, "SDATE": None,
+    "DEEDBK": None, "DEEDPG": None, "DEEDYR": None,
+    "PLATBK": None, "PLATPG": None, "SBDIVN": None,
+}
+
+
+def test_out_of_state_mailing_surfaces_owner_mailing_and_absentee_flag():
+    out = _run_fetch([{"attributes": ROW_FULL}])
+    assert len(out) == 1
+    li = out[0]
+
+    assert li.raw["owner_mailing"] == {
+        "street": "2646 GOLDENROD LN", "street2": "UNIT 4",
+        "city": "GLENVIEW", "state": "IL", "zip": "60026",
+        "source": "lincoln_county_gis",
+        # 2026-10-04 audit: enrichment_lead_signals.py / distress_score.py read
+        # raw['owner_mailing']['absentee'] (mailing_shape.mailing_of), never the
+        # bare raw['absentee_owner'] key below -- both must agree.
+        "absentee": True,
+        # 2026-10-07 audit: the standard keys the phone payload (_SLIM_RAW) keeps.
+        "mailing": "2646 GOLDENROD LN, UNIT 4, GLENVIEW IL 60026",
+        "mail_state": "IL", "out_of_state": True,
+    }
+    assert li.raw["absentee_owner"] is True
+    assert li.raw["lincoln_vacant"]["co_owner"] == "LUTZ THOMAS L"
+    assert li.raw["lincoln_vacant"]["deed_book"] == "3317"
+    assert li.raw["lincoln_vacant"]["deed_page"] == "847"
+    assert li.raw["lincoln_vacant"]["deed_year"] == 2024
+    assert li.raw["lincoln_vacant"]["plat_book"] == "12"
+    assert li.raw["lincoln_vacant"]["subdivision"] == "BOBBY L MARTIN FAMILY"
+    # Canonical shape enrichment_last_sale.py reads.
+    assert li.raw["gis"]["last_sale"] == {
+        "amount": 190000.0, "date": "04/16/2024", "source": "lincoln_county_gis",
+    }
+
+
+def test_sparse_row_does_not_fabricate_optional_fields():
+    out = _run_fetch([{"attributes": ROW_SPARSE}])
+    assert len(out) == 1
+    li = out[0]
+    assert "absentee_owner" not in li.raw
+    assert "gis" not in li.raw
+    assert li.raw["lincoln_vacant"]["deed_book"] is None
+    assert li.raw["lincoln_vacant"]["co_owner"] is None
+    # Still gets owner_mailing (CITY/STATE present) even though not absentee.
+    assert li.raw["owner_mailing"]["state"] == "NC"
+
+
+def test_a_nominal_totalvalue_is_not_published_as_a_real_dollar_value():
+    """2026-10-17 gap-sweep wave 7, top80-fill-values-sane: a nominal TOTALVALUE (an HOA
+    common-area sliver, an unassessed new lot) was written straight through as a real
+    assessed_value/market_value with no plausibility floor every other value producer in
+    this codebase enforces. Live PIN 4603518698 (a Triangle Trace HOA common area) carries
+    TOTALVALUE=5 today -- reproduced here with a made-up PIN in the same shape."""
+    row = dict(ROW_SPARSE, PIN="9999999999", TOTALVALUE=5)
+    out = _run_fetch([{"attributes": row}])
+    li = out[0]
+    assert li.assessed_value is None
+    assert li.market_value is None
+
+
+def test_a_plausible_totalvalue_still_fills_assessed_and_market_value():
+    out = _run_fetch([{"attributes": ROW_FULL}])
+    li = out[0]
+    assert li.assessed_value == 77868.0
+    assert li.market_value == 77868.0
+
+
+def test_po_box_mailing_is_absentee_even_in_state():
+    out = _run_fetch([{"attributes": ROW_INSTATE_NO_HOUSENUM}])
+    li = out[0]
+    assert li.raw["absentee_owner"] is True  # PO Box tell, not the street-token tell
+    assert li.raw["owner_mailing"]["absentee"] is True
+
+
+def test_street_token_mismatch_only_checked_when_situs_has_a_house_number():
+    """Regression guard for the false-positive-inflation bug: a vacant-land
+    situs with no house number must not, by itself, trigger the absentee
+    street-mismatch tell just because it fails a leading-token comparison
+    against a real mailing street."""
+    row = {**ROW_SPARSE, "ADDRESS1": "123 SOME OTHER ST", "STATE": "NC",
+           "CITY": "LINCOLNTON"}
+    out = _run_fetch([{"attributes": row}])
+    li = out[0]
+    # In-state, no PO box, situs has no leading digit -> not flagged.
+    assert "absentee_owner" not in li.raw
+
+
+def test_is_absentee_runs_street_check_only_with_house_numbered_situs():
+    assert m._is_absentee("NC", "123 ELM ST", "456 OAK ST") is True
+    assert m._is_absentee("NC", "123 ELM ST", "123 ELM ST") is False
+    assert m._is_absentee("NC", "123 ELM ST", "OAK RD") is False  # no house # on situs
+    assert m._is_absentee("SC", "123 ELM ST", "OAK RD") is True   # out of state
+    assert m._is_absentee("NC", "PO BOX 5", "OAK RD") is True     # PO box
+
+
+# --- 2026-10-07 extraction audit. Values below are made up. ---
+
+ROW_NEW = {**ROW_SPARSE, "PARCELID": "00777", "PIN": "1234567890",
+           "LANDVALUE": 30000, "ACRE": 2.5, "MAPPEDACRE": 2.61, "LANDEFERRED": 12000,
+           "QUALIFIEDCODE": "U", "ZONING": "R-T", "TAXYEAR": 2026,
+           "SALEPRICE": 41000, "SDATE": "01/02/2020"}
+
+
+def test_parcel_id_is_the_ten_digit_pin_and_parcelid_stays_as_the_alias():
+    """Owner decision 2026-10-07: PIN is the identity; PARCELID (5-6 chars, nulled by
+    validation) stays in raw, where parcel_alias.py reads it to fold the old rows in."""
+    li = _run_fetch([{"attributes": ROW_NEW}])[0]
+    assert li.parcel_id == "1234567890"
+    assert li.raw["lincoln_vacant"]["PARCELID"] == "00777"
+
+
+def test_new_layer_columns_are_requested_and_captured():
+    for col in ("LANDVALUE", "ACRE", "MAPPEDACRE", "LANDEFERRED", "QUALIFIEDCODE", "ZONING"):
+        assert col in m._OUT.split(","), col
+    li = _run_fetch([{"attributes": ROW_NEW}])[0]
+    b = li.raw["lincoln_vacant"]
+    assert b["land_value"] == 30000.0 and b["land_deferred"] == 12000.0
+    assert b["acre"] == 2.5 and b["mapped_acre"] == 2.61
+    assert b["sale_qualified_code"] == "U" and b["zoning"] == "R-T" and b["tax_year"] == 2026
+    assert li.acreage == 2.5 and li.zoning == "R-T"
+    assert li.raw["gis"]["last_sale"]["qualification"] == "U"
+
+
+def test_in_state_mailing_carries_the_standard_keys():
+    om = _run_fetch([{"attributes": ROW_NEW}])[0].raw["owner_mailing"]
+    assert om["mailing"] == "7347 HENRY RD, VALE NC 28168"
+    assert om["mail_state"] == "NC" and om["out_of_state"] is False
+
+
+def test_every_row_is_also_salvaged_into_self_partial():
+    """2026-10-16: fetch() never populated self.partial, so base_scraper.safe_run()'s
+    timeout handler -- which only ever salvages rows already sitting there -- had
+    nothing to recover. A real ~123s timeout on 2026-10-15 (over the 120s cap) lost
+    this source's entire ~14.7k-row run instead of just the unread pages."""
+    http = FakeHttp(pages=[{"features": [{"attributes": ROW_FULL}, {"attributes": ROW_SPARSE}]}])
+    original = m.httpx.AsyncClient
+    m.httpx.AsyncClient = lambda *a, **kw: _Ctx(http)  # noqa: E731
+    scraper = m.LincolnVacant()
+    try:
+        result = asyncio.run(scraper.fetch())
+    finally:
+        m.httpx.AsyncClient = original
+    assert len(result) == 2
+    assert scraper.partial == result   # every row that reached `out` also reached partial

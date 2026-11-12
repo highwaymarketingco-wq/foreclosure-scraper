@@ -1,0 +1,261 @@
+{
+ "objectIdFieldName": "OBJECTID",
+ "geometryType": "esriGeometryPoint",
+ "spatialReference": {
+  "wkid": 4326
+ },
+ "features": [
+  {
+   "attributes": {
+    "OBJECTID": 5620,
+    "caseID": "3075",
+    "dateReceived": 1704758400000,
+    "parcelOwner": "Chandler, Tina",
+    "address": "753 HOLBERT RD",
+    "violationType": "Nuisance",
+    "PIN": "\t965120887",
+    "dispositionStatus": "In Progress - Case Assigned and Staff Reviewing",
+    "complaintID": "3075",
+    "dispositionDate": null
+   },
+   "geometry": {
+    "x": -82.51242299970016,
+    "y": 35.376245999625
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 6291,
+    "caseID": "3334",
+    "dateReceived": 1785780060000,
+    "parcelOwner": "PINEDA, HERMILO TINOCO",
+    "address": "435 PINEY RIDGE DR",
+    "violationType": "Vehicle Graveyard",
+    "PIN": "9651402108",
+    "dispositionStatus": "In Progress - Case Assigned and Staff Reviewing",
+    "complaintID": "03Aug26-435 PINEY RIDGE DR",
+    "dispositionDate": 1785780060000
+   },
+   "geometry": {
+    "x": -82.508841,
+    "y": 35.375958
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 3186,
+    "caseID": "272",
+    "dateReceived": 1129680000000,
+    "parcelOwner": "Towry, Nettie",
+    "address": "204 Gull Ave",
+    "violationType": "General",
+    "PIN": "9577984987",
+    "dispositionStatus": "In Progress - Case Assigned and Staff Reviewing",
+    "complaintID": "272",
+    "dispositionDate": 1172880000000
+   },
+   "geometry": {
+    "x": -82.42044750036816,
+    "y": 35.29263600037156
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 5667,
+    "caseID": "3117",
+    "dateReceived": 1718755200000,
+    "parcelOwner": "Godlove, Vivian Danielle ET Al",
+    "address": "111 E FOX RIDGE DR",
+    "violationType": "Nuisance",
+    "PIN": "9548060064",
+    "dispositionStatus": "In Progress - Case Assigned and Staff Reviewing",
+    "complaintID": "3117",
+    "dispositionDate": null
+   },
+   "geometry": {
+    "x": -82.5534134995485,
+    "y": 35.30841299986191
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 4798,
+    "caseID": "2170",
+    "dateReceived": 1532908800000,
+    "parcelOwner": "Reimer, Laureen",
+    "address": "111 E FOX RIDGE DR",
+    "violationType": "Nuisance",
+    "PIN": "9548060064",
+    "dispositionStatus": "In Progress - Case Assigned and Staff Reviewing",
+    "complaintID": "2170",
+    "dispositionDate": 1588723200000
+   },
+   "geometry": {
+    "x": -82.5534134995485,
+    "y": 35.30841299986191
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 6270,
+    "caseID": "3323",
+    "dateReceived": 1783648200000,
+    "parcelOwner": "James E. Lowe",
+    "address": "138 Evans Cove rd., Zirconia, NC. 28790",
+    "violationType": "Junkyard",
+    "PIN": "9585091716",
+    "dispositionStatus": "Notice of Violation Issued",
+    "complaintID": "09Jul26-138 Evans Cove rd., Zirconia, NC. 28790",
+    "dispositionDate": 1783648200000
+   },
+   "geometry": {
+    "x": -82.415879719,
+    "y": 35.23990651799999
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 6234,
+    "caseID": "3305",
+    "dateReceived": 1781112180000,
+    "parcelOwner": "RICO, CRISTINA JAIMES",
+    "address": "67 Deer Trl",
+    "violationType": "Junkyard",
+    "PIN": "9538985051",
+    "dispositionStatus": "Notice of Violation Issued",
+    "complaintID": "10Jun26-67 Deer Trl",
+    "dispositionDate": 1781112180000
+   },
+   "geometry": {
+    "x": -82.555209,
+    "y": 35.31392099999999
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 6292,
+    "caseID": "3335",
+    "dateReceived": 1785783900000,
+    "parcelOwner": "Ronald Walls",
+    "address": "261 Blooming Laurel Dr Hendersonville nc",
+    "violationType": "Nuisance",
+    "PIN": "9661459539",
+    "dispositionStatus": "In Progress - Case Assigned and Staff Reviewing",
+    "complaintID": "03Aug26-261 Blooming Laurel Dr Hendersonville nc",
+    "dispositionDate": 1785783900000
+   },
+   "geometry": {
+    "x": -82.473708562,
+    "y": 35.39177583599999
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 6290,
+    "caseID": "3332",
+    "dateReceived": 1785765000000,
+    "parcelOwner": "Jannette Corn ",
+    "address": "163 Bethea Dr HENDERSONVILLE NC 28791",
+    "violationType": "Minimum Housing Complaint",
+    "PIN": "9651406313",
+    "dispositionStatus": "In Progress - Case Assigned and Staff Reviewing",
+    "complaintID": "03Aug26-163 Bethea Dr HENDERSONVILLE NC 28791",
+    "dispositionDate": 1785765000000
+   },
+   "geometry": {
+    "x": -82.507527,
+    "y": 35.37642599999999
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 6289,
+    "caseID": "3333",
+    "dateReceived": 1785521280000,
+    "parcelOwner": "DONAR, ERNEST L",
+    "address": "111 ROBERTS RIDGE DR",
+    "violationType": "Nuisance",
+    "PIN": "9529104957",
+    "dispositionStatus": "In Progress - Case Assigned and Staff Reviewing",
+    "complaintID": "31Jul26-111 ROBERTS RIDGE DR",
+    "dispositionDate": 1785521280000
+   },
+   "geometry": {
+    "x": -82.6162425,
+    "y": 35.32003199999999
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 6288,
+    "caseID": "3331",
+    "dateReceived": 1785513420000,
+    "parcelOwner": "CORN, GAIL K",
+    "address": "32, 50, and 26 HEAVENLY VALLEY LN",
+    "violationType": "Nuisance",
+    "PIN": "9578514232",
+    "dispositionStatus": "Notice of Violation Issued",
+    "complaintID": "31Jul26-32, 50, and 26 HEAVENLY VALLEY LN",
+    "dispositionDate": 1785513420000
+   },
+   "geometry": {
+    "x": -82.434420571,
+    "y": 35.29862687899999
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 6284,
+    "caseID": "3330",
+    "dateReceived": 1785431160000,
+    "parcelOwner": "STATON, MARK G;STATON, ANGELA S",
+    "address": "49 ROCKY TOP RD",
+    "violationType": "Nuisance",
+    "PIN": "9565913180",
+    "dispositionStatus": "Notice of Violation Issued",
+    "complaintID": "30Jul26-49 ROCKY TOP RD",
+    "dispositionDate": 1785431160000
+   },
+   "geometry": {
+    "x": -82.451142,
+    "y": 35.215488
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 6281,
+    "caseID": "3328",
+    "dateReceived": 1784814420000,
+    "parcelOwner": "Elizabeth Argueta Nolasco",
+    "address": "95 Youngs Gap Rd",
+    "violationType": "Nuisance",
+    "PIN": "9673982813",
+    "dispositionStatus": "Notice of Violation Issued",
+    "complaintID": "23Jul26-95 Youngs Gap Rd",
+    "dispositionDate": 1784814420000
+   },
+   "geometry": {
+    "x": -82.428157014,
+    "y": 35.457276011
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 6280,
+    "caseID": "3329",
+    "dateReceived": 1784729460000,
+    "parcelOwner": "William Patterson Estate",
+    "address": "3385 Howard Gap Road, Hendersonville, NC 28792",
+    "violationType": "Solid Waste",
+    "PIN": "9670505982",
+    "dispositionStatus": "In Progress - Case Assigned and Staff Reviewing",
+    "complaintID": "22Jul26-3385 Howard Gap Road, Hendersonville, NC 28792",
+    "dispositionDate": 1784729460000
+   },
+   "geometry": {
+    "x": -82.43637207,
+    "y": 35.352568252
+   }
+  }
+ ]
+}

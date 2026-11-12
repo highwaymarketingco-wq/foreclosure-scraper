@@ -1,0 +1,61 @@
+{
+ "buckets": 1,
+ "counts": {
+  "confirmed": 48,
+  "refuted": 146,
+  "rows": 285,
+  "stale": 3,
+  "unconfirmed": 86,
+  "wall": 0
+ },
+ "generated_at": "2026-10-17T14:28:27Z",
+ "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
+ "host": "SMB-LTSEO05",
+ "kind": "verification_ledger_manifest",
+ "last_run": {
+  "at": "2026-10-17T14:28:27Z",
+  "county": null,
+  "host": "SMB-LTSEO05",
+  "max_rows": 300,
+  "recheck_only": false,
+  "requests": {
+   "errors": {},
+   "requests": {
+    "berkeleycountysc.paystar.io": 10,
+    "cama.harnett.org": 3,
+    "services1.arcgis.com": 31,
+    "spartanburgcountytax.qpaybill.com": 4,
+    "tax.buncombenc.gov": 41,
+    "tax.transylvaniacounty.org": 56,
+    "taxbill.catawbacountync.gov": 555
+   }
+  },
+  "result": {
+   "budget_stop": 1
+  },
+  "seconds": 1513,
+  "selection": {
+   "applies": 261,
+   "due_new": 166,
+   "due_version": 1,
+   "not_due_retry": 45,
+   "not_due_ttl": 49
+  },
+  "source": null,
+  "tier": null
+ },
+ "rows": 285,
+ "schema": 1,
+ "shard_max_bytes": 8388608,
+ "shards": [
+  {
+   "bucket": 0,
+   "bytes": 324831,
+   "file": "000.json",
+   "rows": 285,
+   "sha256": "6715b74b47c05be205553cac32996d02e473ced8ad781fa0083c9b2068ef557c"
+  }
+ ],
+ "signal": "bankruptcy_stay",
+ "version": 1
+}

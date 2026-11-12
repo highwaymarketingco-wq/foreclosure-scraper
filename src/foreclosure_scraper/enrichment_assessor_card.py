@@ -1,0 +1,370 @@
+"""Distress-ranked ON-DEMAND per-parcel assessor-card enricher.
+
+For the leads worth the call, fetch the county's PER-PARCEL assessor card and fill
+the two fields the bulk CAMA/GIS feed omits in SC: heated/finished living sqft and
+recorded SALE PRICE (+ history). This is the per-subject, low-volume path that
+sidesteps the bulk-distribution / WAF walls that block scraping the same data in
+bulk — a title company researches one chain at a time, and so do we.
+
+UNLOCK 3 — widened sqft gate. The original gate was grade A/B ONLY, which on the
+real board (mostly unrated/None or C/D leads, the A/B bucket is ~dozens) left the
+qPublic counties almost entirely un-enriched: 2,063 props (69.7%) had no
+living_sqft, capping ARV confidence. The gate is now:
+
+  * include any lead MISSING true living_sqft (living_sqft is None or an ESTIMATE),
+  * that sits in a county with an adapter,
+  * that has a usable parcel key (a parcel_id, or SC lat/lng for the resolver),
+  * and is NOT vacant land (a card yields no heated sqft for raw land — wasting a
+    render slot), then
+  * RANK by distress (grade tier, then distress_stack score) and take the top-N.
+
+The cap is the bound. qPublic is a per-parcel browser render (~30s-3min each), so a
+run could balloon without one. ASSESSOR_CARD_MAX (default 300) is the hard cap;
+ASSESSOR_CARD_GRADES (default "A,B,C,") tunes which grades are eligible — a trailing
+empty token (the default) ALSO admits unrated/None-grade BUILT leads, which is most
+of the missing-sqft inventory. Set ASSESSOR_CARD_GRADES="A,B" to restore the old
+high-grade-only behavior.
+
+FAIR SHARE (2026-10-16). _rank_key ranks an unrated lead below even an F-grade one, so
+ranking the WHOLE eligible pool and slicing to one global cap always spent the entire
+cap on counties with a large C-or-better population, leaving several adapter counties
+(mostly unrated inventory) at zero fills every run regardless of distress. The cap is
+now split into an equal per-county share (ASSESSOR_CARD_COUNTY_MAX, default 100) before
+ranking within each county — every adapter county gets guaranteed throughput.
+
+Wiring: runs AFTER the first calc/grade pass (so grade + distress_stack exist to
+rank on) and is followed by a re-calc/re-grade of the touched leads — a real card
+sqft clears the footprint-ESTIMATE flag, which lets ARV grade at HIGH confidence
+(calc caps to MEDIUM while living_sqft_estimated is True). Fills only missing
+fields.
+
+OFF by default; enable with ASSESSOR_CARD_ON=1 (the merge/daily scripts document
+the full invocation, e.g.
+``ASSESSOR_CARD_ON=1 python scripts/regenerate_dashboard.py``). Adapters live in
+assessor_cards/.
+"""
+from __future__ import annotations
+
+import asyncio
+import os
+import threading
+
+import structlog
+
+from .models import Listing, PropertyKind
+
+log = structlog.get_logger()
+
+# Grades that historically counted as "high value" (kept for the A/B fast path and
+# for back-compat with _is_bplus, which the test-suite gates on).
+GRADE_GATE = {"A", "B"}
+
+# Default eligible grades. The trailing empty string ("") is intentional: it admits
+# UNRATED / None-grade leads (vacant-land-ish unrated rows are filtered separately),
+# which is where most of the missing-sqft built inventory lives on the real board.
+_DEFAULT_GRADES = "A,B,C,"
+
+# Per-run hard cap (circuit breaker). qPublic is a per-parcel render, so this is
+# what keeps a run from ballooning. Widened gate => a few hundred, not unbounded.
+_DEFAULT_MAX = 300
+
+# Per-county ceiling within that cap (fair-share fix, 2026-10-16) -- keeps one county's
+# own render-count cost bounded the way it always was, same role as _DEFAULT_MAX itself,
+# just scoped to one county instead of the whole run.
+_DEFAULT_COUNTY_MAX = 100
+
+# Render-class counties (Cloudflare-solving browser per parcel, ~30s-3min each).
+# ASSESSOR_CARD_SKIP_RENDER=1 skips them for a fast JSON/HTML-only pass.
+# 2026-11-11: added Clarendon/Lee/Fairfield (qpublic_render.py gap-sweep add --
+# same Schneider qPublic/Beacon Cloudflare wall as Spartanburg/Oconee/Pickens/Union,
+# live-reconfirmed real the same night).
+_RENDER_COUNTIES = {("SC", "Spartanburg"), ("SC", "Oconee"), ("SC", "Pickens"),
+                    ("SC", "Union"), ("NC", "Buncombe"),
+                    ("SC", "Clarendon"), ("SC", "Lee"), ("SC", "Fairfield")}
+
+# Counties whose card renders behind a Cloudflare/WAF challenge that can ONLY be
+# reached by SOLVING it (qPublic Turnstile + Union WAF). When
+# FORECLOSURE_NO_CF_SOLVE=1 the render passes solve_cloudflare=False, so these can
+# never yield — attempting them just burns ~2 min/lead on an unsolved challenge.
+# Buncombe (Spatialest) renders WITHOUT a challenge, so it is NOT here and still
+# fills under no-solve. Skipping these keeps a compliant backfill efficient.
+_SOLVE_REQUIRED_COUNTIES = {("SC", "Spartanburg"), ("SC", "Oconee"),
+                            ("SC", "Pickens"), ("SC", "Union"),
+                            ("SC", "Clarendon"), ("SC", "Lee"), ("SC", "Fairfield")}
+
+# Property kinds that have no heated/finished living area — a card render returns no
+# sqft for these, so they're excluded to keep the (capped) budget on built homes.
+_NO_STRUCTURE_KINDS = {PropertyKind.LAND}
+
+# Rank weight per grade bucket (higher = fetched first within the cap).
+_GRADE_RANK = {"A": 5, "B": 4, "C": 3, "D": 2, "F": 1}
+
+
+def _adapters() -> dict:
+    """(state, county) -> async fetch. Auto-discovered: any module in
+    assessor_cards/ that exposes COUNTY=(state, county) + an async fetch(li) is
+    registered. Each module is imported defensively so one broken adapter never
+    breaks the pipeline (it's just skipped)."""
+    import importlib
+    import pkgutil
+
+    from . import assessor_cards as pkg
+
+    table: dict = {}
+    for m in pkgutil.iter_modules(pkg.__path__):
+        if m.name == "base" or m.name.startswith("_"):
+            continue
+        try:
+            mod = importlib.import_module(f".assessor_cards.{m.name}", __package__)
+            fetch = getattr(mod, "fetch", None)
+            if not callable(fetch):
+                continue
+            # a module registers one COUNTY=(state,county) or many COUNTIES=[...]
+            keys = getattr(mod, "COUNTIES", None) or ([getattr(mod, "COUNTY")] if getattr(mod, "COUNTY", None) else [])
+            for k in keys:
+                table[tuple(k)] = fetch
+        except Exception:  # noqa: BLE001
+            log.warning("assessor_card.adapter_import_failed", adapter=m.name)
+    return table
+
+
+def _is_bplus(li: Listing) -> bool:
+    return (((li.raw or {}).get("grade") or {}).get("overall")) in GRADE_GATE
+
+
+def _eligible_grades() -> set[str]:
+    """Parse ASSESSOR_CARD_GRADES into a set of accepted grade strings. A blank
+    token (e.g. trailing comma) is kept as "" and means 'also unrated/None-grade'."""
+    raw = os.environ.get("ASSESSOR_CARD_GRADES")
+    if raw is None:
+        raw = _DEFAULT_GRADES
+    return {tok.strip().upper() for tok in raw.split(",")}
+
+
+def _grade_of(li: Listing) -> str | None:
+    return ((li.raw or {}).get("grade") or {}).get("overall")
+
+
+def _distress_score(li: Listing) -> int:
+    """Numeric distress signal for ranking (raw.distress_stack.score), 0 if absent."""
+    try:
+        return int(((li.raw or {}).get("distress_stack") or {}).get("score") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _needs_sqft(li: Listing) -> bool:
+    """True when living_sqft is absent OR only a footprint-based ESTIMATE — i.e. a
+    real card sqft would actually move ARV confidence off the MEDIUM cap."""
+    return (not li.living_sqft) or bool(getattr(li, "living_sqft_estimated", False))
+
+
+def _has_structure(li: Listing) -> bool:
+    """Exclude raw land — a card has no heated/finished living area for it, so
+    fetching one only burns a render slot. Conservative: only the explicit LAND
+    kind is dropped (UNKNOWN may well be a house with a missing kind)."""
+    return li.property_kind not in _NO_STRUCTURE_KINDS
+
+
+def _has_key(li: Listing) -> bool:
+    """A usable lookup key for the adapter: a parcel_id, or (SC only) lat/lng the
+    parcel_resolver can turn into a county key. Avoids queueing leads that would
+    just no-op at fetch time."""
+    if (li.parcel_id or "").strip():
+        return True
+    return li.state == "SC" and li.latitude is not None and li.longitude is not None
+
+
+def _grade_ok(li: Listing, grades: set[str]) -> bool:
+    """A lead's grade is eligible if it's in the configured set. The blank token
+    "" in `grades` means 'also admit UNRATED / None-grade leads' (which carry no
+    overall grade because they lack a bankable ARV — yet most missing-sqft BUILT
+    homes land here, and a card sqft is exactly what would let them grade)."""
+    g = _grade_of(li)
+    if g is None:
+        return "" in grades
+    return g.upper() in grades
+
+
+def _is_card_eligible(li: Listing, grades: set[str], adapters: dict,
+                      skip_render: bool) -> bool:
+    if (li.state, li.county) not in adapters:
+        return False
+    if skip_render and (li.state, li.county) in _RENDER_COUNTIES:
+        return False
+    # Under the no-CAPTCHA-solve policy, the solve-required counties can't yield —
+    # skip them so a compliant backfill doesn't burn its budget on unsolved challenges.
+    from .assessor_cards.base import cf_solving_disabled
+    if cf_solving_disabled() and (li.state, li.county) in _SOLVE_REQUIRED_COUNTIES:
+        return False
+    if not _grade_ok(li, grades):
+        return False
+    if not _needs_sqft(li):
+        return False
+    if not _has_structure(li):
+        return False
+    return _has_key(li)
+
+
+def _rank_key(li: Listing) -> tuple:
+    """Sort key (descending) — fetch the most worthwhile leads first within the cap:
+    A/B grades, then highest distress score, then any grade rank, then has-parcel_id
+    (cheaper than a resolver round-trip)."""
+    return (
+        _GRADE_RANK.get(_grade_of(li) or "", 0),
+        _distress_score(li),
+        1 if (li.parcel_id or "").strip() else 0,
+    )
+
+
+def _apply(li: Listing, res, stats: dict) -> None:
+    if not isinstance(li.raw, dict):
+        li.raw = {}
+    if res.living_sqft and (li.living_sqft is None or li.living_sqft_estimated):
+        li.living_sqft = res.living_sqft
+        li.living_sqft_estimated = False   # real card sqft -> unlock HIGH-confidence ARV
+        stats["filled_sqft"] += 1
+    if res.year_built and not li.year_built:
+        li.year_built = res.year_built
+    if res.bedrooms and li.bedrooms is None:
+        li.bedrooms = res.bedrooms
+    if res.bathrooms and li.bathrooms is None:
+        li.bathrooms = res.bathrooms
+
+    prov: dict = {"source_url": res.source_url}
+    if res.sales:
+        prov["sales"] = [s.as_dict() for s in res.sales[:8]]
+    sp = res.best_sale_price()
+    if sp:
+        prov["sale_price"] = sp
+        stats["filled_price"] += 1
+    if li.market_value is None and res.market_value:
+        li.market_value = res.market_value
+    li.raw["assessor_card"] = prov
+
+
+async def _aenrich(listings: list[Listing]) -> dict:
+    adapters = _adapters()
+    if not adapters:
+        return {}
+    cap = int(os.environ.get("ASSESSOR_CARD_MAX", str(_DEFAULT_MAX)))
+    county_cap = int(os.environ.get("ASSESSOR_CARD_COUNTY_MAX", str(_DEFAULT_COUNTY_MAX)))
+    skip_render = os.environ.get("ASSESSOR_CARD_SKIP_RENDER", "").lower() in ("1", "true", "yes")
+    grades = _eligible_grades()
+    eligible = [li for li in listings
+                if _is_card_eligible(li, grades, adapters, skip_render)]
+    # FAIR SHARE (audit 2026-10-16, same pattern already fixed in enrichment_dot_ocr.py).
+    # _rank_key sorts an unrated lead (grade=None) BELOW even an F-grade one, so a single
+    # global rank-and-slice always filled the cap entirely from counties with a large
+    # C-or-better population (Spartanburg/Greenville/Buncombe) -- 7-9 of this module's 16
+    # adapter counties (Cherokee, Georgetown, Union, Gaston, Lincoln, Polk, Cleveland,
+    # effectively Pickens/Oconee) got zero or near-zero fills every run no matter how
+    # distressed their own (mostly unrated) leads were. Give every county its own ranked
+    # sub-list and an equal share of the cap (bounded by county_cap); a share a county
+    # does not use is NOT carried to another county, same tradeoff dot_ocr already makes.
+    by_county: dict[tuple[str, str], list] = {}
+    for li in eligible:
+        by_county.setdefault(((li.state or "").strip(), (li.county or "").strip()), []).append(li)
+    for group in by_county.values():
+        group.sort(key=_rank_key, reverse=True)
+    share = max(1, min(county_cap, -(-cap // max(1, len(by_county)))))
+    targets: list = []
+    for group in by_county.values():
+        targets.extend(group[:share])
+    targets.sort(key=_rank_key, reverse=True)
+    targets = targets[:cap]
+    stats = {"eligible": len(eligible), "cap": cap, "county_share": share,
+             "counties": len(by_county), "targets": len(targets),
+             "key_resolved": 0, "matched": 0, "filled_sqft": 0, "filled_price": 0,
+             "skipped_fallback_point": 0}
+    # resolve_sc_parcel_key point-queries SCDOT by li.latitude/longitude with no parcel/address
+    # check of its own (unlike enrichment_parcel_from_geo's resolver, gated since 2026-10-06):
+    # at a geocoder fallback point (a county seat or a point many leads share) that query
+    # returns whichever OTHER parcel happens to sit there, and the line below used to write it
+    # straight onto li.parcel_id -- the exact bug 420bbc94 fixed for the other resolver, through
+    # a second, never-gated entry point (audit 2026-10-18, block-binding-family-gis: Anderson's
+    # courthouse parcel on 446+ rows).
+    from .block_binding import imprecise_point, own_location, shared_points as _shared_points
+    try:
+        shared_pts = _shared_points(listings)
+    except Exception:  # noqa: BLE001 - no shared points is the lenient side
+        shared_pts = set()
+    for li in targets:
+        # Most B+ leads lack parcel_id but have lat/lng — resolve the county key
+        # via point-in-polygon against SCDOT so the adapter has something to fetch.
+        if not li.parcel_id and li.state == "SC":
+            if imprecise_point(li, shared_pts) and not own_location(li):
+                stats["skipped_fallback_point"] += 1
+            else:
+                try:
+                    from .parcel_resolver import resolve_sc_parcel_key
+                    key = await resolve_sc_parcel_key(li)
+                except Exception:  # noqa: BLE001
+                    key = None
+                if key:
+                    li.parcel_id = key
+                    stats["key_resolved"] += 1
+        try:
+            res = await adapters[(li.state, li.county)](li)
+        except Exception:  # noqa: BLE001
+            log.debug("assessor_card.adapter_failed", county=li.county,
+                      url=(li.source_url or "")[:100])
+            continue
+        if not res or not res.has_fill():
+            continue
+        stats["matched"] += 1
+        _apply(li, res, stats)
+    return stats
+
+
+def _run_in_worker_thread(coro_factory) -> dict:
+    """Run an async pass on its OWN loop in a worker thread.
+
+    Used when the caller already has a running loop: a second loop cannot be
+    started on the same thread (``asyncio.run`` raises "cannot be called from a
+    running event loop", and ``new_event_loop().run_until_complete`` raises
+    "Cannot run the event loop while another loop is running"). A dedicated
+    thread has no running loop, so ``asyncio.run`` there is legal.
+    """
+    result: dict = {}
+    error: list[BaseException] = []
+
+    def _target() -> None:
+        try:
+            result.update(asyncio.run(coro_factory()))
+        except BaseException as exc:  # noqa: BLE001 — re-raised on the caller's thread
+            error.append(exc)
+
+    t = threading.Thread(target=_target, name="assessor-card", daemon=True)
+    t.start()
+    t.join()
+    if error:
+        raise error[0]
+    return result
+
+
+async def aenrich_assessor_card(listings: list[Listing]) -> dict:
+    """Async entrypoint — await this from inside an async orchestrator."""
+    if os.environ.get("ASSESSOR_CARD_ON", "").lower() not in ("1", "true", "yes"):
+        return {}
+    return await _aenrich(listings)
+
+
+def enrich_assessor_card(listings: list[Listing]) -> dict:
+    """Sync entrypoint for the orchestrator. No-op unless ASSESSOR_CARD_ON is set.
+
+    Await-safe: when a loop is already running on this thread (the orchestrator
+    calls this from inside async code) the pass is handed to a worker thread
+    with its own loop instead of trying — and failing — to nest a second loop.
+    Callers that are themselves async should await ``aenrich_assessor_card``.
+    """
+    if os.environ.get("ASSESSOR_CARD_ON", "").lower() not in ("1", "true", "yes"):
+        return {}
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        # No loop on this thread — the plain sync path.
+        return asyncio.run(_aenrich(listings))
+    log.info("assessor_card.offloaded_to_thread",
+             reason="called from a running event loop")
+    return _run_in_worker_thread(lambda: _aenrich(listings))

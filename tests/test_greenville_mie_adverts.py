@@ -1,0 +1,270 @@
+"""Greenville SC Master-in-Equity adverts: TMS + the actual judgment debt.
+
+docs/blocked_sources_forensic.md recorded "SC PublicIndex — per-case DETAIL (TMS +
+judgment $)" as ABSENT, reasoning that the detail sits behind __doPostBack links that are
+dead in a saved HTML file. That reasoned from the wrong artifact. The Master-in-Equity is
+REQUIRED to advertise every foreclosure sale, and Greenville publishes those adverts as
+ordinary web pages. publicindex.sccourts.org is never touched, so the ToS wall stands.
+
+Live 2026-09-11: 772 adverts enumerable, 40/40 sampled parsed with BOTH a TMS and a
+judgment amount.
+
+The judgment figure is what makes this valuable: it is the actual debt against the
+property, not an estimate. calc.est_gross_margin -- the input to the margin-covers-
+curative test that IS the buy box -- was populated on 1,297 of 94,384 board rows, 1.4%.
+"""
+from __future__ import annotations
+
+from datetime import datetime, timedelta
+
+import pytest
+
+from foreclosure_scraper.models import ListingType
+from foreclosure_scraper.scrapers.counties_sc.greenville_mie_adverts import (
+    SITEMAP, parse_advert, parse_sitemap,
+)
+
+#: Trimmed verbatim from https://mie.greenvillejournal.com/advert/2022-cp-23-03386/
+REAL = """
+<html><body>
+<p>STATE OF SOUTH CAROLINA COUNTY OF GREENVILLE</p>
+<p>Case No. 2022-CP-23-03386</p>
+<p>AmeriHome Mortgage Company, LLC,<br/>Plaintiff,<br/>vs.<br/>
+Jane Q Homeowner,<br/>Defendant.</p>
+<p>BY VIRTUE of a decree heretofore granted, I will sell on 08/07/2023 at public auction.</p>
+<p>TMS map: 0577040104000</p>
+<p>THE STREET ADDRESS IS:<br/>4002 Fork Shoals Rd Simpsonville, SC 29680</p>
+<p>the total judgment debt set forth in the Order is $161,897.79 plus interest.</p>
+</body></html>
+"""
+
+URL = "https://mie.greenvillejournal.com/advert/2022-cp-23-03386/"
+
+
+def test_every_field_the_buy_box_needs():
+    li = parse_advert(URL, REAL)
+    assert li is not None
+    assert li.case_number == "2022-CP-23-03386"
+    assert li.parcel_id == "0577040104000"
+    assert li.judgment_amount == 161897.79
+    assert li.street_address == "4002 Fork Shoals Rd Simpsonville"
+    assert li.zip_code == "29680"
+    # 08/07/2023 is in the past relative to any reasonable test run date,
+    # so this row types as DISTRESSED (resolved case) and its structured
+    # sale_date is None by design (see test_a_past_sale_date_types_as_...
+    # below) -- the original date string still survives in raw.
+    assert li.sale_date is None
+    assert li.raw["greenville_mie"]["sale_date"] == "08/07/2023"
+    assert li.state == "SC" and li.county == "Greenville"
+    assert li.raw["greenville_mie"]["total_judgment_debt"] == 161897.79
+
+
+def test_the_judgment_amount_is_parsed_as_a_number_not_a_string():
+    """It feeds arithmetic. A '$161,897.79' string silently breaks every margin calc."""
+    li = parse_advert(URL, REAL)
+    assert isinstance(li.judgment_amount, float)
+
+
+@pytest.mark.parametrize("tms", ["0577040104000", "0028.01-01-007.00", "030000114300"])
+def test_the_real_tms_formats_all_parse(tms):
+    """Greenville mixes a 13-digit form and a dotted/dashed form; both are live."""
+    li = parse_advert(URL, REAL.replace("0577040104000", tms))
+    assert li.parcel_id == tms
+
+
+def test_a_row_with_neither_parcel_nor_address_is_not_a_lead():
+    """It could not be underwritten, joined to the assessor, or routed to a county."""
+    stripped = REAL.replace("TMS map: 0577040104000", "").replace(
+        "THE STREET ADDRESS IS:<br/>4002 Fork Shoals Rd Simpsonville, SC 29680", "")
+    assert parse_advert(URL, stripped) is None
+
+
+def test_a_missing_judgment_does_not_lose_the_lead():
+    """No dollar figure is a weaker lead, not a discarded one."""
+    li = parse_advert(URL, REAL.replace(
+        "the total judgment debt set forth in the Order is $161,897.79 plus interest.", ""))
+    assert li is not None
+    assert li.judgment_amount is None
+    assert li.parcel_id == "0577040104000"
+
+
+def test_the_case_number_falls_back_to_the_url_slug():
+    """The slug IS the case number, which is also the join key to any SC case list."""
+    li = parse_advert(URL, "<html><body>TMS map: 0577040104000</body></html>")
+    assert li.case_number == "2022-CP-23-03386"
+
+
+# --------------------------------------------------------------------------
+# The sitemap answers HTTP 404 while serving 772 valid entries
+# --------------------------------------------------------------------------
+
+def test_the_sitemap_parses_regardless_of_status_code():
+    """THE trap. wp-sitemap-posts-advert-1.xml returns 404 with 96KB of valid XML. A
+    probe that checks the status and stops sees nothing -- the same shape as the qPayBill
+    detail page written off for a wrong URL: the status said no, the body said yes."""
+    xml = ('<?xml version="1.0"?><urlset>'
+           '<url><loc>https://mie.greenvillejournal.com/advert/2022-cp-23-03386/</loc></url>'
+           '<url><loc>https://mie.greenvillejournal.com/advert/2026-cp-23-00730/</loc></url>'
+           '</urlset>')
+    got = parse_sitemap(xml)
+    assert len(got) == 2
+    assert got[0].endswith("/advert/2022-cp-23-03386/")
+
+
+def test_the_sitemap_parser_ignores_non_advert_urls_and_dedupes():
+    xml = ('<urlset>'
+           '<url><loc>https://mie.greenvillejournal.com/advert/a/</loc></url>'
+           '<url><loc>https://mie.greenvillejournal.com/advert/a/</loc></url>'
+           '<url><loc>https://mie.greenvillejournal.com/about/</loc></url>'
+           '</urlset>')
+    assert parse_sitemap(xml) == ["https://mie.greenvillejournal.com/advert/a/"]
+
+
+def test_empty_sitemap_yields_nothing_rather_than_raising():
+    assert parse_sitemap("") == []
+    assert parse_sitemap("<urlset></urlset>") == []
+
+
+def test_the_sitemap_url_is_the_advert_post_type():
+    assert SITEMAP.endswith("wp-sitemap-posts-advert-1.xml")
+
+
+def test_a_past_sale_date_types_as_lis_pendens_not_foreclosure_sale():
+    """User-confirmed policy (2026-09-15): 'if they are actual foreclosures
+    going to sale, do not grab them [for Greenville]. if they are real
+    distressed etc then grab them.' A sale already in the past is no longer
+    an active auction to bid on -- it's a resolved case whose remaining
+    value is the judgment-debt/party data, admitted statewide (the fixture's
+    08/07/2023 date is in the past relative to any reasonable test run date).
+
+    CHANGED 2026-09-21 (audit F10): the type was DISTRESSED, which scored it PROPERTY 10 as
+    if it were a bad building. It is a foreclosure record with a judgment, so it types
+    LIS_PENDENS (FINANCIAL 28). LIS_PENDENS is not in main._FLIP_LISTING_TYPES, so the scope
+    policy above is unchanged: it is still admitted anywhere and never denied for Greenville."""
+    from foreclosure_scraper.main import _FLIP_LISTING_TYPES
+    li = parse_advert(URL, REAL)
+    assert li is not None
+    assert li.listing_type == ListingType.LIS_PENDENS
+    assert li.listing_type not in _FLIP_LISTING_TYPES
+
+
+def test_resolved_case_has_no_structured_sale_date_but_keeps_it_in_raw():
+    """The structured sale_date field must be None for a resolved case, not
+    just the listing_type -- main._active_only()'s DATELESS_OK_SOURCES
+    exemption only fires on sale_date is None; a non-None-but-old date
+    still gets window-checked and would silently drop every one of these
+    DISTRESSED rows regardless of the whitelist entry, undoing the entire
+    point of the type split. The original date string must still survive
+    in raw for anyone who wants it."""
+    li = parse_advert(URL, REAL)
+    assert li is not None
+    assert li.sale_date is None
+    assert li.raw["greenville_mie"]["sale_date"] == "08/07/2023"
+
+
+def test_an_upcoming_sale_date_types_as_foreclosure_sale():
+    """A still-upcoming sale IS an active auction -- FORECLOSURE_SALE, a
+    flip lead, correctly denied for Greenville by the scope deny-list."""
+    future = (datetime.utcnow() + timedelta(days=30)).strftime("%m/%d/%Y")
+    html = REAL.replace("08/07/2023", future)
+    li = parse_advert(URL, html)
+    assert li is not None
+    assert li.listing_type == ListingType.FORECLOSURE_SALE
+
+
+def test_no_sale_date_defaults_to_foreclosure_sale_not_distressed():
+    """No date yet is not evidence the sale already happened -- default to
+    the more restrictive (flip, narrow-scope) typing, not the more
+    permissive one."""
+    html = REAL.replace(
+        "<p>BY VIRTUE of a decree heretofore granted, I will sell on "
+        "08/07/2023 at public auction.</p>",
+        "<p>BY VIRTUE of a decree heretofore granted.</p>",
+    )
+    li = parse_advert(URL, html)
+    assert li is not None
+    assert li.sale_date is None
+    assert li.listing_type == ListingType.FORECLOSURE_SALE
+
+
+# ---------------------------------------------------------------------------
+# AUDITED 2026-10-03: Additional Defendants / senior-encumbrance / interim-
+# interest-rate were plainly printed on every live advert sampled (15/15)
+# but never read. Fixture shape (paragraph layout, blank-line gap after a
+# genuinely-empty "Additional Defendants:") copied from the real
+# 2026-CP-23-00913 / 2025-CP-23-00924 adverts quoted in the module docstring.
+# ---------------------------------------------------------------------------
+
+REAL_WITH_EXTRAS = """
+<html><body>
+<p>STATE OF SOUTH CAROLINA COUNTY OF GREENVILLE</p>
+<p>Case No. 2026-CP-23-00913</p>
+<p>Freedom Mortgage Corporation,<br/>Plaintiff,<br/>vs.<br/>
+Codi C. Hindman,<br/>Defendant.</p>
+<p>Additional Defendants: James Brett Hindman Superior Pool Products LLC</p>
+<p>BY VIRTUE of a decree heretofore granted, I will sell on 10/05/2099 at public auction.</p>
+<p>TMS map: 0532000101200</p>
+<p>THE STREET ADDRESS IS:<br/>303 Wood Dr Greer, SC 29651</p>
+<p>the total judgment debt set forth in the Order is $171,673.15.</p>
+<p>This property will be sold subject to the following mortgage(s)/ senior encumbrances: None</p>
+<p>The successful bidder must pay interim interest from the date of the Sale through date of compliance at the rate of 2.75%.</p>
+</body></html>
+"""
+
+REAL_BLANK_EXTRAS = """
+<html><body>
+<p>STATE OF SOUTH CAROLINA COUNTY OF GREENVILLE</p>
+<p>Case No. 2025-CP-23-00924</p>
+<p>Some Bank,<br/>Plaintiff,<br/>vs.<br/>
+John Q Homeowner, Jr.,<br/>Defendant.</p>
+<p>Additional Defendants: </p>
+<p>BY VIRTUE of a decree heretofore granted, I will sell on 10/05/2099 at public auction.</p>
+<p>TMS map: 0577040104000</p>
+<p>THE STREET ADDRESS IS:<br/>1 Any St Greenville, SC 29601</p>
+<p>the total judgment debt set forth in the Order is $50,000.00.</p>
+</body></html>
+"""
+
+
+def test_additional_defendants_captured_when_present():
+    li = parse_advert(URL, REAL_WITH_EXTRAS)
+    assert li is not None
+    assert (li.raw["greenville_mie"]["additional_defendants"]
+            == "James Brett Hindman Superior Pool Products LLC")
+
+
+def test_senior_encumbrances_and_interest_rate_captured():
+    li = parse_advert(URL, REAL_WITH_EXTRAS)
+    assert li.raw["greenville_mie"]["senior_encumbrances"] == "None"
+    assert li.raw["greenville_mie"]["interim_interest_rate"] == "2.75%"
+
+
+def test_blank_additional_defendants_is_none_not_a_false_match():
+    """The core correctness property: a genuinely-empty 'Additional
+    Defendants: ' line (immediately followed by the next paragraph) must
+    resolve to None, not fall through and capture the auction's own
+    opening sentence -- which is exactly what a \\s*-based (newline-
+    crossing) regex did before this fix."""
+    li = parse_advert(URL, REAL_BLANK_EXTRAS)
+    assert li is not None
+    assert li.raw["greenville_mie"]["additional_defendants"] is None
+    assert "I will sell" not in (li.raw["greenville_mie"]["additional_defendants"] or "")
+
+
+def test_missing_senior_encumbrance_and_rate_sections_are_none():
+    li = parse_advert(URL, REAL_BLANK_EXTRAS)
+    assert li.raw["greenville_mie"]["senior_encumbrances"] is None
+    assert li.raw["greenville_mie"]["interim_interest_rate"] is None
+
+
+def test_real_senior_mortgage_captured_verbatim():
+    """A genuinely attached senior mortgage (not just 'None') -- a real
+    valuation input, not boilerplate -- must survive intact."""
+    html = REAL_WITH_EXTRAS.replace(
+        "sold subject to the following mortgage(s)/ senior encumbrances: None",
+        "sold subject to the following mortgage(s)/ senior encumbrances: "
+        "SUBJECT TO A SENIOR MORTGAGE HELD BY MERS FOR NVR MORTGAGE FINANCE, "
+        "INC. RECORDED IN BOOK 5679 AT PAGE 1191.",
+    )
+    li = parse_advert(URL, html)
+    assert "NVR MORTGAGE FINANCE" in li.raw["greenville_mie"]["senior_encumbrances"]

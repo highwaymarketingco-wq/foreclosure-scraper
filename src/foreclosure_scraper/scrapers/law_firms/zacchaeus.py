@@ -1,0 +1,475 @@
+"""Zacchaeus Legal Services (ZLS) — NC tax foreclosures.
+
+https://www.zls-nc.com/listings is a Blazor Server app. A one-time
+"I AGREE" disclaimer button gates the listings (same consent pattern as
+aldridge_pite's disclaimer Referer, but here it is a real in-page button).
+After the click, a DevExpress Blazor grid renders its rows over WebSocket.
+
+A plain GET (curl/httpx) returns only the Blazor error placeholder
+("An error has occurred. This application may no longer respond..."), so
+this scraper drives a real stealth browser (Scrapling StealthyFetcher,
+the same render tier mcmichael_taylor_gray uses): load -> click I AGREE ->
+wait for the grid -> page through every page collecting rows.
+
+Grid columns (verified live 2026-06-26, re-verified + extended 2026-10-01):
+  0 Tax Office (county)   1 Parcel #   2 Status   3 Sale Date
+  4 Upset Bidding Deadline   5 Opening Bid   6 Current Bid
+  7 Notice of Sale   8 Address ("⚠️ STREET, CITY, NC ZIP")   9 (empty)
+
+There is NO case-number column. The grid is paginated (~11 rows/page,
+~21 pages); we click the "Next page" pager button until it disables.
+
+THREE LINKS FOUND ON 2026-10-01 RE-AUDIT, two wired, one confirmed dead:
+  * Column 1 (Parcel #) is itself an `<a href>` to the county's own GIS
+    parcel-detail page (e.g. "https://gis.moorecountync.gov/mooreinfo2010/
+    Parcel.aspx?PARID=00025637") -- the real assessor record for that
+    parcel. Captured as raw["zls"]["parcel_gis_url"].
+  * Column 8 (Address) is an `<a href>` to a Google Maps place link that
+    embeds exact coordinates in its path ("/@35.2451071,-79.5659757,19z/").
+    Live-verified: 0/207 rows had latitude/longitude before this fix. Parsed
+    out and set as first-class Listing.latitude/longitude.
+  * Column 7 ("Notice of Sale", labeled "Notice (link)" in the original
+    2026-06-26 audit) is NOT an `<a href>` any more -- it is now a
+    `<button>` with no href at all, that presumably triggers a server-side
+    Blazor action (a WebSocket postback, not a static URL) when clicked.
+    Live-verified 2026-10-01: 0 of 207 real rows carry a notice_url with the
+    existing `tds[7].querySelector('a[href]')` extraction, confirming this
+    is a genuine site change (the column WAS a link on 2026-06-26), not an
+    extraction bug. Actually opening it would mean clicking a button on
+    every one of ~207 rows and intercepting whatever response/download that
+    triggers -- a much larger, separately-scoped piece of work, not a
+    same-shape fix. Left as a documented, confirmed-real, not-cheaply-closed
+    gap; the extraction attempt is harmless and kept in case a future row
+    renders it as a plain link again.
+  * Column 0 (Tax Office) is also an `<a href>` to the county's own tax-
+    department homepage (not parcel-specific) -- low marginal value, but
+    free to capture, so it rides along as raw["zls"]["tax_office_url"].
+
+STATUS FILTER: emit only still-actionable leads. A property whose status
+shows it is paid off (Redeemed) or already sold (Sale Confirmed / Deed
+Recorded) is not a lead and is dropped. Everything else — upset bidding,
+courthouse sale, pending confirmation, scheduled/upcoming — is emitted.
+The raw status is always stashed in raw["zls"]["status"].
+
+FIX 2026-10-04 (extraction-completeness audit): the grid's own "Upset
+Bidding Deadline" column (col 4) is a REAL, site-published deadline --
+not derived, the actual date -- and was already being parsed and set as
+``upset_bid_deadline``. But enrichment_upset_bid.py's generic NC rule
+(sale_date + 10 days, NCGS §45-21.27) will OVERWRITE that real value
+with its own weaker guess once ``li.sale_date`` falls into the generic
+0-10-day post-sale window, unless the row's raw["upset_bid"] already
+carries ``source: "published"`` (the convention scrapers.national.
+nc_upset_bids / law_firms.hutchens use) -- this scraper never set that
+key at all (its own raw dict lives under raw["zls"], a different name),
+so the real published deadline was silently vulnerable to being clobbered
+by the generic estimate on every run. Worse for this source specifically:
+when an upset deadline is later than the courthouse-sale date, the code
+above already promotes it to ``sale_date`` itself (the "actionable-date
+keying" comment below), so the generic rule would then derive yet
+another +10-day guess FROM the real deadline date rather than from a
+true sale date at all. Now sets raw["upset_bid"] with source="published"
+whenever a real upset_dt is parsed, so the generic enrichment skips this
+row and the real, site-published deadline survives untouched.
+
+LIVE RE-VERIFY 2026-10-13 (source-completeness audit, Pattern D -- is there a
+plain API behind the Notice-of-Sale button after all?): confirmed, with one
+short-lived headless browser session, NOT a WASM app -- the page loads
+_framework/blazor.server.js and POSTs /_blazor/negotiate, i.e. genuine Blazor
+**Server** running a stateful SignalR circuit. Clicking "Notice" on a live
+row fires ZERO new HTTP requests (network log identical before/after); the
+notice text renders in an in-page modal pushed entirely over the already-open
+circuit. There is no discrete URL, PDF, or download anywhere in this flow --
+the "document" is plain text delivered over a stateful WebSocket, not a
+static resource -- so a direct httpx/requests fetch cannot reach it at any
+URL, confirming the 2026-10-01 finding rather than overturning it. One new
+fact worth flagging for whoever picks this up: the notice text itself
+contains the real NC case number (e.g. "24CV002697-620") and the defendant /
+property-owner name (e.g. "SHIRLEY B. HALE"), neither of which this grid
+exposes anywhere else (see "no case-number column" above) -- real lead value,
+not just boilerplate. That raises the payoff of eventually closing this gap,
+but not its cost: capturing it would mean clicking into every row's Notice
+button individually (~200+ modal opens per run, one at a time) on top of the
+existing 21-page pager loop, a materially heavier live-browser task than
+today's per-page paging. Left as a documented, confirmed-real,
+not-cheaply-closed gap -- a good candidate for a dedicated follow-up scoped
+around owner-name + case-number capture specifically, not attempted here.
+"""
+from __future__ import annotations
+
+import re
+from datetime import datetime
+from typing import Iterable
+
+from dateutil import parser as dateparser
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
+
+from ..._upstate_city_to_county import upstate_county_for
+from ...base_scraper import BaseScraper
+from ...models import Listing, ListingType, PropertyKind
+
+LISTINGS_URL = "https://www.zls-nc.com/listings"
+
+# Pager "Next page" button (DevExpress Blazor). Disabled state adds dxbl-disabled.
+_NEXT_SEL = (
+    ".dxbl-grid-pager button[aria-label='Next page'], "
+    ".dxbl-pager button[aria-label='Next page']"
+)
+
+# Status substrings that mark a DEAD lead (paid off or already sold) -> dropped.
+# Matched case-insensitively as substrings so the combined grid value
+# "Sale Confirmed / Deed Recorded" is caught.
+_DEAD_STATUS_MARKERS = ("redeemed", "sale confirmed", "deed recorded")
+
+_ADDR_TAIL_RE = re.compile(
+    r"^(.*?),\s*([A-Za-z .'-]+?),?\s+([A-Z]{2}),?\s+(\d{5})(?:-\d{4})?\s*$"
+)
+_BID_RE = re.compile(r"\$\s*([\d,]+(?:\.\d{2})?)")
+#: Exact coordinates embedded in the Google Maps place link the Address
+#: column links to: ".../@35.2451071,-79.5659757,19z/data=...".
+_MAPS_LATLNG_RE = re.compile(r"/@(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+),")
+
+
+def _latlng_from_maps_url(url: str | None) -> tuple[float | None, float | None]:
+    if not url:
+        return None, None
+    m = _MAPS_LATLNG_RE.search(url)
+    if not m:
+        return None, None
+    try:
+        return float(m.group(1)), float(m.group(2))
+    except ValueError:
+        return None, None
+
+
+def _clean_money(raw: str | None) -> float | None:
+    """'$7,750.00' -> 7750.0 ; 'n/a'/'' -> None."""
+    if not raw:
+        return None
+    m = _BID_RE.search(raw)
+    if not m:
+        return None
+    try:
+        v = float(m.group(1).replace(",", ""))
+    except ValueError:
+        return None
+    return v if 0 < v <= 50_000_000 else None
+
+
+def _parse_date(raw: str | None) -> datetime | None:
+    raw = (raw or "").strip()
+    if not raw or raw.lower() in ("n/a", "na", "-"):
+        return None
+    try:
+        return dateparser.parse(raw)
+    except (ValueError, TypeError, OverflowError):
+        return None
+
+
+#: The "Tax Office" column is not always a county. ZLS also collects for
+#: municipalities ("City of Laurinburg", "Town of Plymouth") and occasionally
+#: names a court ("Wake County General Courts of Justice"). Tagging those
+#: strings as the county produces a county that matches nothing downstream, so
+#: we normalize the county cases and return None for municipalities (the city
+#: parsed out of the address then attributes them instead).
+_MUNICIPALITY_RE = re.compile(r"^\s*(?:city|town|village)\s+of\s+(.+?)\s*$", re.I)
+_COUNTY_OFFICE_RE = re.compile(r"^\s*(.+?)\s+county\b", re.I)
+
+
+def _municipality(office: str | None) -> str | None:
+    """'City of Laurinburg' -> 'Laurinburg'; anything else -> None."""
+    if not office:
+        return None
+    m = _MUNICIPALITY_RE.match(office)
+    return m.group(1).strip() or None if m else None
+
+
+def _clean_county(office: str | None) -> str | None:
+    """'Onslow County Tax Office' -> 'Onslow'.
+
+    'Wake County General Courts of Justice' -> 'Wake' (the word 'County' is
+    mid-string, not a suffix). 'City of Laurinburg' -> None (not a county).
+    """
+    if not office or _municipality(office):
+        return None
+    m = _COUNTY_OFFICE_RE.match(office)
+    if m:
+        return m.group(1).strip() or None
+    s = re.sub(r"\s+tax\s+office\s*$", "", office, flags=re.IGNORECASE).strip()
+    return s or None
+
+
+def _clean_address(raw: str | None) -> str | None:
+    """Strip the '⚠️ ' warning prefix the grid prepends to each address."""
+    if not raw:
+        return None
+    s = raw.replace("⚠️", "").replace("⚠", "").strip()
+    return s or None
+
+
+def _is_dead(status: str | None) -> bool:
+    s = (status or "").lower()
+    return any(m in s for m in _DEAD_STATUS_MARKERS)
+
+
+def _row_to_listing(row: dict, slug: str) -> Listing | None:
+    """Convert one captured grid row dict into a Listing, or None to drop.
+
+    Drops rows that are missing a parcel AND an address (empty/placeholder
+    rows) and rows whose status marks them dead (paid off / already sold)."""
+    status = (row.get("status") or "").strip() or None
+    if _is_dead(status):
+        return None
+
+    county = _clean_county(row.get("office"))
+    municipality = _municipality(row.get("office"))
+    parcel = (row.get("parcel") or "").strip() or None
+    addr_full = _clean_address(row.get("addr"))
+    if not parcel and not addr_full:
+        return None  # empty grid row, nothing to key on
+
+    # Address comes as "STREET, CITY, NC ZIP" (or just a street). Split out
+    # city/zip when it parses, else keep the whole thing as the street.
+    street = city = zip_code = None
+    if addr_full:
+        m = _ADDR_TAIL_RE.match(addr_full)
+        if m:
+            street, city, _st, zip_code = m.group(1), m.group(2), m.group(3), m.group(4)
+        else:
+            street = addr_full
+
+    # Municipal collections carry no county. Attribute them from the city in
+    # the address so an in-footprint town (e.g. a City of Shelby row =
+    # Cleveland County) survives the scope gate instead of being dropped on a
+    # bogus "City of Shelby" county tag.
+    if county is None:
+        county = upstate_county_for(city or municipality, "NC")
+
+    sale_dt = _parse_date(row.get("sale"))
+    upset_dt = _parse_date(row.get("upset"))
+
+    # Actionable-date keying. An "Upset Bidding in Progress" row has already gone
+    # to courthouse sale (past sale_date) but stays LIVE until the upset-bid
+    # deadline — under NCGS §45-21.27 anyone can raise the bid until that date,
+    # so it is the strongest actionable signal on the grid. The orchestrator's
+    # active-window filter (main._active_only) keys purely on sale_date, so a
+    # past courthouse-sale date strands these leads even while the window is open.
+    # When the upset deadline is present and still ahead of the sale date, surface
+    # it as the sale_date the board keys on; the true courthouse-sale date is
+    # preserved in raw.zls.sale_date. Rows without a future upset deadline
+    # (upcoming Courthouse Sale = future sale_date; stale Pending Confirmation =
+    # long-past date, no deadline) are unchanged and filter normally.
+    actionable_date = sale_dt
+    if upset_dt is not None and (sale_dt is None or upset_dt > sale_dt):
+        actionable_date = upset_dt
+
+    lat, lng = _latlng_from_maps_url(row.get("maps_url"))
+
+    zls_raw = {
+        "status": status,
+        "tax_office": (row.get("office") or "").strip() or None,
+        "tax_office_url": (row.get("tax_office_url") or "").strip() or None,
+        "parcel_gis_url": (row.get("parcel_gis_url") or "").strip() or None,
+        "municipality": municipality,
+        "sale_date": (row.get("sale") or "").strip() or None,
+        "upset_deadline": (row.get("upset") or "").strip() or None,
+        "current_bid": (row.get("current_bid") or "").strip() or None,
+        "notice_url": (row.get("notice_url") or "").strip() or None,
+        "maps_url": (row.get("maps_url") or "").strip() or None,
+    }
+
+    listing = Listing(
+        source=slug,
+        source_url=LISTINGS_URL,
+        listing_type=ListingType.TAX_SALE,
+        property_kind=PropertyKind.UNKNOWN,
+        state="NC",
+        county=county,
+        parcel_id=parcel,
+        street_address=street,
+        city=city,
+        zip_code=zip_code,
+        latitude=lat,
+        longitude=lng,
+        sale_date=actionable_date,
+        upset_bid_deadline=upset_dt,
+        opening_bid=_clean_money(row.get("opening_bid")),
+        auction_status=status,
+        foreclosure_process="tax",
+        description=(
+            f"ZLS NC tax foreclosure — {county or ''} parcel {parcel or ''}"
+            f" ({status or 'status n/a'})"
+        ).strip(),
+        first_seen=datetime.utcnow(),
+        last_seen=datetime.utcnow(),
+        raw={"zls": zls_raw},
+    )
+
+    # Real, site-published deadline -- mark it so enrichment_upset_bid.py's
+    # generic sale_date+10-day rule does not overwrite it (see module
+    # docstring's 2026-10-04 fix).
+    if upset_dt is not None:
+        now = datetime.utcnow()
+        days_left = (upset_dt.date() - now.date()).days
+        listing.raw["upset_bid"] = {
+            "source": "published",
+            "in_window": days_left >= 0,
+            "deadline_iso": upset_dt.isoformat(),
+            "days_remaining": max(0, days_left),
+            "current_bid": listing.raw["zls"].get("current_bid"),
+            "sale_datetime_iso": sale_dt.isoformat() if sale_dt else None,
+            "county": county,
+            "statute": "NCGS §45-21.27",
+            "feed": "zacchaeus",
+            "page_url": LISTINGS_URL,
+        }
+    return listing
+
+
+# JS run inside the rendered page: read every data row of the current grid
+# page into a flat dict (text + the Notice link href).
+_GRID_JS = """
+() => {
+  const rows = [...document.querySelectorAll('table.dxbl-grid-table tbody tr')];
+  const hrefOf = (td) => {
+    if (!td) return '';
+    const a = td.querySelector('a[href]');
+    return a ? a.href : '';
+  };
+  return rows.map(r => {
+    const tds = [...r.querySelectorAll('td')];
+    const txt = i => (tds[i] ? tds[i].innerText.trim() : '');
+    return {
+      office: txt(0),
+      tax_office_url: hrefOf(tds[0]),
+      parcel: txt(1),
+      parcel_gis_url: hrefOf(tds[1]),
+      status: txt(2),
+      sale: txt(3),
+      upset: txt(4),
+      opening_bid: txt(5),
+      current_bid: txt(6),
+      // Notice of Sale (col 7) is a Blazor <button> with no href as of
+      // 2026-10-01 (it was a plain link on 2026-06-26) -- this is kept in
+      // case a row ever renders it as a link again, but confirmed live to
+      // be empty for all 207 current rows.
+      notice_url: hrefOf(tds[7]),
+      addr: txt(8),
+      // The Address cell links to a Google Maps place URL that embeds
+      // exact coordinates in its path.
+      maps_url: hrefOf(tds[8]),
+    };
+  });
+}
+"""
+
+
+async def _fetch_rows() -> list[dict]:
+    """Drive the Blazor grid: agree -> wait -> page through all pages.
+    Returns raw row dicts (the parser drops dead/empty ones). [] on failure."""
+    try:
+        from patchright.async_api import Error as PatchrightError
+        from scrapling.fetchers import StealthyFetcher
+    except ImportError:
+        return []
+
+    captured: dict[str, list[dict]] = {"rows": []}
+
+    async def page_action(page):
+        # Blazor mounts over WebSocket after first paint — give it a beat,
+        # then click the "I AGREE" consent button (NOT "I DO NOT AGREE").
+        await page.wait_for_timeout(6000)
+        await page.evaluate(
+            """() => {
+                for (const b of document.querySelectorAll('button')) {
+                    if ((b.innerText || '').trim().toLowerCase() === 'i agree') {
+                        b.click();
+                        return true;
+                    }
+                }
+                return false;
+            }"""
+        )
+        # Wait for the DevExpress grid to render its first rows.
+        try:
+            await page.wait_for_selector(
+                "table.dxbl-grid-table tbody tr", timeout=45000
+            )
+        except Exception:
+            return
+        await page.wait_for_timeout(2500)
+
+        seen: dict[tuple, dict] = {}
+        for _ in range(60):  # hard cap; real grid is ~21 pages
+            rows = await page.evaluate(_GRID_JS)
+            for r in rows or []:
+                key = (r.get("office"), r.get("parcel"), r.get("addr"), r.get("status"))
+                if any(key):
+                    seen[key] = r
+            # Stop when the Next-page button is gone or disabled.
+            disabled = await page.evaluate(
+                "(s) => { const b = document.querySelector(s);"
+                " return b ? b.className.includes('dxbl-disabled') : true; }",
+                _NEXT_SEL,
+            )
+            if disabled:
+                break
+            await page.evaluate(
+                "(s) => { const b = document.querySelector(s); if (b) b.click(); }",
+                _NEXT_SEL,
+            )
+            await page.wait_for_timeout(2200)
+
+        captured["rows"] = list(seen.values())
+
+    # Retried up to 3 times (short exponential-jitter backoff) on a transport/
+    # navigation/timeout error from the stealth browser -- confirmed 2026-11-07,
+    # same gap already fixed tonight for the Column legal-notice API scrapers,
+    # spartan_weekly_legals.py, and arcgis_webmap.query_features(): this call had
+    # zero retry cushioning, and because law_firms.zacchaeus has no date-window
+    # fallback (main.DATELESS_OK_SOURCES), a single transient blip here silently
+    # zeroed the whole ~21-page grid capture, reported as a healthy empty result.
+    # Scrapling's StealthyFetcher launches and drives the page through `patchright`
+    # under the hood (engines/_browsers/_stealth.py's AsyncStealthySession starts
+    # `patchright.async_api.async_playwright()`, not plain Playwright's) -- a
+    # separate fork with its own distinct Error/TimeoutError classes, so this
+    # targets patchright's exception type rather than copying the httpx tuple the
+    # other three fixes use. A real in-page failure (e.g. the grid never
+    # rendering) does not raise here at all -- page_action already swallows that
+    # internally -- so only a genuine connection/navigation/timeout error retries.
+    try:
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((PatchrightError, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                await StealthyFetcher.async_fetch(
+                    LISTINGS_URL,
+                    headless=True,
+                    network_idle=False,
+                    timeout=300000,
+                    page_action=page_action,
+                    solve_cloudflare=False,
+                )
+    except Exception:
+        return []
+    return captured["rows"]
+
+
+class Zacchaeus(BaseScraper):
+    slug = "law_firms.zacchaeus"
+    name = "Zacchaeus Legal Services (NC tax foreclosure, Blazor grid, stealth)"
+    category = "law_firm"
+    requires_apify = False
+    requires_render = True
+    expected_min_count = 0  # actionable count varies with the sale cycle
+    timeout_s = 360.0  # ~21 paged grid loads in a real browser
+
+    async def fetch(self) -> Iterable[Listing]:
+        out: list[Listing] = []
+        for row in await _fetch_rows():
+            li = _row_to_listing(row, self.slug)
+            if li is not None:
+                out.append(li)
+        return out

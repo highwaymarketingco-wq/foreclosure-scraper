@@ -1,0 +1,268 @@
+{
+ "generated": "2026-11-06 17:27 EST",
+ "commit": "60181489",
+ "fingerprint": {
+  "inputs": {
+   "docs/walls_register.json": "fe0651e20d9ef95d",
+   "docs/county_records/county_records_matrix.json": "48adb93a841480ac",
+   "docs/county_records/nc_rod_platform_clusters.md": "a4f5831e7c7cbb9d",
+   "docs/county_records/sc_rod_platform_clusters.md": "a1031bf224f1ac1c",
+   "docs/new_sources_2026-10-07_contact_and_facts.json": "aa5cddac3cb79e06",
+   "docs/new_sources_2026-10-07_distress.json": "7572dfc70ff761f3",
+   "docs/new_sources_2026-10-07_liens_courts.json": "78c80420b0cb1aa0",
+   "docs/gap_matrix/declined_registry.json": "86e9091d6b7afe93",
+   "docs/gap_matrix/gap_matrix_2026-10-07.json": "321e8b5f9780fb4d",
+   "docs/gap_matrix/gap_matrix_2026-10-09.json": "a20f3554f4355869",
+   "docs/gap_matrix/gap_matrix_2026-10-16.json": "9c009b312dd7afcd",
+   "docs/gap_matrix/gap_matrix_2026-10-17.json": "da7bc641995b1d36",
+   "docs/gap_matrix/gap_matrix_2026-10-18.json": "6879ea62de6d37cc",
+   "docs/gap_matrix/gap_matrix_2026-10-19.json": "713bb14ca8d6847d",
+   "docs/gap_matrix/gap_matrix_2026-10-20.json": "b2c564d4b73b2918",
+   "docs/gap_matrix/gap_matrix_2026-10-21.json": "90c3e7cad907f878",
+   "docs/gap_matrix/gap_matrix_2026-10-22.json": "54c132af6fbd1149",
+   "docs/gap_matrix/gap_matrix_2026-10-23.json": "d34a8f9a5d8727b0",
+   "docs/gap_matrix/gap_matrix_2026-10-24.json": "0e63df8a7792956b",
+   "docs/gap_matrix/gap_matrix_2026-10-28.json": "45bddf0d13bb66b2",
+   "docs/gap_matrix/gap_matrix_2026-11-03.json": "a35fa4541a9e2841",
+   "docs/gap_matrix/gap_matrix_2026-11-04.json": "e8bf42e1386d7d5a",
+   "docs/gap_matrix/county_signal_coverage_2026-11-04.csv": "c9b6b3990746a005"
+  },
+  "adapters": [
+   "NC|Alamance|nc_cott_v4|FORECLOSURE_NC_COTT_ROD|off",
+   "NC|Alexander|nc_cott_v4|FORECLOSURE_NC_COTT_ROD|off",
+   "NC|Anson|nc_logan_remote|FORECLOSURE_NC_LOGAN_REMOTE_ROD|off",
+   "NC|Ashe|nc_logan_remote|FORECLOSURE_NC_LOGAN_REMOTE_ROD|off",
+   "NC|Avery|nc_lookup|FORECLOSURE_NC_LOOKUP_ROD|off",
+   "NC|Beaufort|nc_lrsearch|FORECLOSURE_NC_LRSEARCH_ROD|on",
+   "NC|Bertie|nc_lookup|FORECLOSURE_NC_LOOKUP_ROD|off",
+   "NC|Bladen|nc_logan_remote|FORECLOSURE_NC_LOGAN_REMOTE_ROD|off",
+   "NC|Buncombe|nc_cott_v4|FORECLOSURE_NC_COTT_ROD|off",
+   "NC|Cabarrus|nc_logan_blazor|FORECLOSURE_NC_LOGAN_BLAZOR_ROD|off",
+   "NC|Carteret|nc_harris|FORECLOSURE_NC_HARRIS_ROD|off",
+   "NC|Catawba|nc_logan_blazor|FORECLOSURE_NC_LOGAN_BLAZOR_ROD|off",
+   "NC|Chatham|nc_logan_blazor|FORECLOSURE_NC_LOGAN_BLAZOR_ROD|off",
+   "NC|Cherokee|nc_logan_remote|FORECLOSURE_NC_LOGAN_REMOTE_ROD|off",
+   "NC|Clay|nc_lookup|FORECLOSURE_NC_LOOKUP_ROD|off",
+   "NC|Columbus|nc_lookup|FORECLOSURE_NC_LOOKUP_ROD|off",
+   "NC|Cumberland|nc_logan_blazor|FORECLOSURE_NC_LOGAN_BLAZOR_ROD|off",
+   "NC|Davidson|nc_ors|FORECLOSURE_NC_ORS_ROD|off",
+   "NC|Davie|nc_logan_remote|FORECLOSURE_NC_LOGAN_REMOTE_ROD|off",
+   "NC|Durham|nc_tyler|FORECLOSURE_NC_TYLER_ROD|off",
+   "NC|Edgecombe|nc_cott_v4|FORECLOSURE_NC_COTT_ROD|off",
+   "NC|Forsyth|nc_ors|FORECLOSURE_NC_ORS_ROD|off",
+   "NC|Graham|nc_cott_v4|FORECLOSURE_NC_COTT_ROD|off",
+   "NC|Granville|nc_cott_v4|FORECLOSURE_NC_COTT_ROD|off",
+   "NC|Guilford|nc_ors|FORECLOSURE_NC_ORS_ROD|off",
+   "NC|Halifax|nc_cott_v4|FORECLOSURE_NC_COTT_ROD|off",
+   "NC|Haywood|nc_lookup|FORECLOSURE_NC_LOOKUP_ROD|off",
+   "NC|Jackson|nc_cott_v4|FORECLOSURE_NC_COTT_ROD|off",
+   "NC|Johnston|nc_tyler|FORECLOSURE_NC_TYLER_ROD|off",
+   "NC|Jones|nc_cott_v4|FORECLOSURE_NC_COTT_ROD|off",
+   "NC|Lenoir|nc_cott_v4|FORECLOSURE_NC_COTT_ROD|off",
+   "NC|Macon|nc_lookup|FORECLOSURE_NC_LOOKUP_ROD|off",
+   "NC|Martin|nc_logan_remote|FORECLOSURE_NC_LOGAN_REMOTE_ROD|off",
+   "NC|McDowell|nc_lookup|FORECLOSURE_NC_LOOKUP_ROD|off",
+   "NC|Mecklenburg|nc_harris|FORECLOSURE_NC_HARRIS_ROD|off",
+   "NC|Mitchell|nc_lookup|FORECLOSURE_NC_LOOKUP_ROD|off",
+   "NC|Nash|nc_cott_v4|FORECLOSURE_NC_COTT_ROD|off",
+   "NC|New Hanover|nc_ors|FORECLOSURE_NC_ORS_ROD|off",
+   "NC|Northampton|nc_logan_remote|FORECLOSURE_NC_LOGAN_REMOTE_ROD|off",
+   "NC|Onslow|nc_cott_v4|FORECLOSURE_NC_COTT_ROD|off",
+   "NC|Orange|nc_cchs_classic|FORECLOSURE_NC_CCHS_CLASSIC_ROD|off",
+   "NC|Pamlico|nc_cott_v4|FORECLOSURE_NC_COTT_ROD|off",
+   "NC|Pitt|nc_cott_v4|FORECLOSURE_NC_COTT_ROD|off",
+   "NC|Polk|cott|FORECLOSURE_COTT_ROD|on",
+   "NC|Polk|nc_cott_v4|FORECLOSURE_NC_COTT_ROD|off",
+   "NC|Robeson|nc_lookup|FORECLOSURE_NC_LOOKUP_ROD|off",
+   "NC|Rutherford|nc_cott_v4|FORECLOSURE_NC_COTT_ROD|off",
+   "NC|Sampson|nc_logan_blazor|FORECLOSURE_NC_LOGAN_BLAZOR_ROD|off",
+   "NC|Scotland|nc_cott_v4|FORECLOSURE_NC_COTT_ROD|off",
+   "NC|Stanly|nc_cchs_classic|FORECLOSURE_NC_CCHS_CLASSIC_ROD|off",
+   "NC|Surry|nc_cchs_classic|FORECLOSURE_NC_CCHS_CLASSIC_ROD|off",
+   "NC|Swain|nc_logan_remote|FORECLOSURE_NC_LOGAN_REMOTE_ROD|off",
+   "NC|Transylvania|nc_lookup|FORECLOSURE_NC_LOOKUP_ROD|off",
+   "NC|Union|nc_logan_blazor|FORECLOSURE_NC_LOGAN_BLAZOR_ROD|off",
+   "NC|Vance|nc_logan_remote|FORECLOSURE_NC_LOGAN_REMOTE_ROD|off",
+   "NC|Warren|nc_logan_remote|FORECLOSURE_NC_LOGAN_REMOTE_ROD|off",
+   "NC|Wayne|nc_cott_v4|FORECLOSURE_NC_COTT_ROD|off",
+   "NC|Wilkes|nc_logan_blazor|FORECLOSURE_NC_LOGAN_BLAZOR_ROD|off",
+   "NC|Wilson|nc_cott_v4|FORECLOSURE_NC_COTT_ROD|off",
+   "NC|Yadkin|nc_logan_remote|FORECLOSURE_NC_LOGAN_REMOTE_ROD|off",
+   "NC|Yancey|nc_lookup|FORECLOSURE_NC_LOOKUP_ROD|off",
+   "SC|Abbeville|sc_online_record_system|FORECLOSURE_SC_ORS_ROD|off",
+   "SC|Anderson|anderson_acpass_rod|FORECLOSURE_SC_ACPASS_ROD|off",
+   "SC|Barnwell|sc_online_record_system|FORECLOSURE_SC_ORS_ROD|off",
+   "SC|Berkeley|sc_online_record_system|FORECLOSURE_SC_ORS_ROD|off",
+   "SC|Colleton|sc_online_record_system|FORECLOSURE_SC_ORS_ROD|off",
+   "SC|Dorchester|sc_online_record_system|FORECLOSURE_SC_ORS_ROD|off",
+   "SC|Florence|sc_online_record_system|FORECLOSURE_SC_ORS_ROD|off",
+   "SC|Georgetown|sc_online_record_system|FORECLOSURE_SC_ORS_ROD|off",
+   "SC|Greenville|publicsearch|FORECLOSURE_SC_PUBLICSEARCH_ROD|on",
+   "SC|Greenwood|greenwood_docsearch|FORECLOSURE_SC_GREENWOOD_ROD|on",
+   "SC|Horry|acclaim_names|FORECLOSURE_SC_ACCLAIM_ROD|on",
+   "SC|Lancaster|sc_online_record_system|FORECLOSURE_SC_ORS_ROD|off",
+   "SC|Laurens|sc_online_record_system|FORECLOSURE_SC_ORS_ROD|off",
+   "SC|Marlboro|sc_cott_esearch|FORECLOSURE_SC_COTT_ESEARCH_ROD|on",
+   "SC|Oconee|kofile|FORECLOSURE_KOFILE_ROD|on",
+   "SC|Oconee|publicsearch|FORECLOSURE_SC_PUBLICSEARCH_ROD|on",
+   "SC|Pickens|acclaim_names|FORECLOSURE_SC_ACCLAIM_ROD|on",
+   "SC|Spartanburg|sc_lookup|FORECLOSURE_SC_LOOKUP_ROD|on",
+   "SC|Sumter|sc_countyfusion|FORECLOSURE_SC_COUNTYFUSION_ROD|on",
+   "SC|Union|sc_recordroom|FORECLOSURE_SC_RECORDROOM_ROD|on",
+   "SC|York|sc_online_record_system|FORECLOSURE_SC_ORS_ROD|off"
+  ],
+  "dormant": [
+   "counties_sc.abbeville_delinquent_tax",
+   "counties_sc.aiken_delinquent_tax",
+   "counties_sc.beaufort_flc",
+   "counties_sc.clarendon_tax_auction",
+   "counties_sc.colleton_tax_sale",
+   "counties_sc.darlington_delinquent_tax",
+   "counties_sc.edgefield_delinquent_tax",
+   "counties_sc.fairfield_delinquent_tax",
+   "counties_sc.greenwood_delinquent_tax",
+   "counties_sc.kershaw_flc",
+   "counties_sc.lancaster_delinquent_tax",
+   "counties_sc.marlboro_delinquent_tax",
+   "counties_sc.newberry_delinquent_tax",
+   "counties_sc.saluda_delinquent_tax",
+   "counties_sc.sc_delinquent_tax_list",
+   "counties_sc.sc_dor_delinquent_taxpayers",
+   "counties_sc.sc_tax_delinquent",
+   "national.epa_superfund",
+   "national.legacy_obituaries",
+   "national.liensnc",
+   "national.opencorporates",
+   "national.probate_foreclosure_leads",
+   "national.propwire",
+   "national.sc_sos_entity",
+   "national.va_acquired"
+  ],
+  "new_source_files": [
+   "new_sources_2026-10-07_contact_and_facts.json",
+   "new_sources_2026-10-07_distress.json",
+   "new_sources_2026-10-07_liens_courts.json"
+  ]
+ },
+ "inputs": [
+  {
+   "path": "docs/walls_register.json",
+   "sha": "fe0651e20d9ef95d",
+   "date": "2026-10-11"
+  },
+  {
+   "path": "docs/county_records/county_records_matrix.json",
+   "sha": "48adb93a841480ac",
+   "date": "2026-10-24"
+  },
+  {
+   "path": "docs/county_records/nc_rod_platform_clusters.md",
+   "sha": "a4f5831e7c7cbb9d",
+   "date": "2026-10-09"
+  },
+  {
+   "path": "docs/county_records/sc_rod_platform_clusters.md",
+   "sha": "a1031bf224f1ac1c",
+   "date": "2026-10-07"
+  },
+  {
+   "path": "docs/new_sources_2026-10-07_contact_and_facts.json",
+   "sha": "aa5cddac3cb79e06",
+   "date": "2026-10-07"
+  },
+  {
+   "path": "docs/new_sources_2026-10-07_distress.json",
+   "sha": "7572dfc70ff761f3",
+   "date": "2026-10-08"
+  },
+  {
+   "path": "docs/new_sources_2026-10-07_liens_courts.json",
+   "sha": "78c80420b0cb1aa0",
+   "date": "2026-10-08"
+  },
+  {
+   "path": "docs/gap_matrix/declined_registry.json",
+   "sha": "86e9091d6b7afe93",
+   "date": "2026-10-24"
+  },
+  {
+   "path": "docs/gap_matrix/gap_matrix_2026-10-07.json",
+   "sha": "321e8b5f9780fb4d",
+   "date": "2026-10-07"
+  },
+  {
+   "path": "docs/gap_matrix/gap_matrix_2026-10-09.json",
+   "sha": "a20f3554f4355869",
+   "date": "2026-10-09"
+  },
+  {
+   "path": "docs/gap_matrix/gap_matrix_2026-10-16.json",
+   "sha": "9c009b312dd7afcd",
+   "date": "2026-10-16"
+  },
+  {
+   "path": "docs/gap_matrix/gap_matrix_2026-10-17.json",
+   "sha": "da7bc641995b1d36",
+   "date": "2026-10-17"
+  },
+  {
+   "path": "docs/gap_matrix/gap_matrix_2026-10-18.json",
+   "sha": "6879ea62de6d37cc",
+   "date": "2026-10-19"
+  },
+  {
+   "path": "docs/gap_matrix/gap_matrix_2026-10-19.json",
+   "sha": "713bb14ca8d6847d",
+   "date": "2026-10-19"
+  },
+  {
+   "path": "docs/gap_matrix/gap_matrix_2026-10-20.json",
+   "sha": "b2c564d4b73b2918",
+   "date": "2026-10-20"
+  },
+  {
+   "path": "docs/gap_matrix/gap_matrix_2026-10-21.json",
+   "sha": "90c3e7cad907f878",
+   "date": "2026-10-21"
+  },
+  {
+   "path": "docs/gap_matrix/gap_matrix_2026-10-22.json",
+   "sha": "54c132af6fbd1149",
+   "date": "2026-10-22"
+  },
+  {
+   "path": "docs/gap_matrix/gap_matrix_2026-10-23.json",
+   "sha": "d34a8f9a5d8727b0",
+   "date": "2026-10-23"
+  },
+  {
+   "path": "docs/gap_matrix/gap_matrix_2026-10-24.json",
+   "sha": "0e63df8a7792956b",
+   "date": "2026-10-24"
+  },
+  {
+   "path": "docs/gap_matrix/gap_matrix_2026-10-28.json",
+   "sha": "45bddf0d13bb66b2",
+   "date": "2026-10-28"
+  },
+  {
+   "path": "docs/gap_matrix/gap_matrix_2026-11-03.json",
+   "sha": "a35fa4541a9e2841",
+   "date": "2026-11-03"
+  },
+  {
+   "path": "docs/gap_matrix/gap_matrix_2026-11-04.json",
+   "sha": "e8bf42e1386d7d5a",
+   "date": "2026-11-04"
+  },
+  {
+   "path": "docs/gap_matrix/county_signal_coverage_2026-11-04.csv",
+   "sha": "c9b6b3990746a005",
+   "date": "2026-11-04 17:02 (file time)"
+  }
+ ],
+ "run_meta": {
+  "source": "https://highwaymarketingco-wq.github.io/foreclosure-scraper/run_meta.json",
+  "run_time": "2026-10-07T17:09:03.605738Z"
+ }
+}

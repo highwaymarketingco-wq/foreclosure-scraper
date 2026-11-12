@@ -1,0 +1,1597 @@
+{
+ "batch": "nc_batch2",
+ "generated": "2026-10-07",
+ "counties": [
+  {
+   "county": "franklin",
+   "state": "NC",
+   "rod": {
+    "platform": "Courthouse Computer Systems (CCHS) classic-ASP online search",
+    "url": "https://us4.courthousecomputersystems.com/franklinnc/",
+    "free_name_search": "yes",
+    "access": "disclaimer_click",
+    "index_online_back_to_year": 1950,
+    "images_free": "yes",
+    "legal_description_in_index": "yes",
+    "plat_books_or_maps_online": "yes",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: GET landing page (200) shows accuracy/liability disclaimer and a click-to-enter link; GET FranklinNCNW/realestatesearch.asp (200) shows the search form with a Description field and the 'What's Available' text: Consolidated Real Property Verified Index 01/02/1950 to present, real estate deeds from Book 100 and consecutive books 650 to current, Maps C1-C3 and 1-14, 1989-2026, an 'Images as PDF' option and 'Log In To Print'. GET FranklinNCNW/application.asp returned a Cloudflare 'Just a moment' 403 challenge.",
+    "notes": "Images view on screen; printing needs a print-session login. Same CCHS app family where the repo verified free TIFF images (Burke, Lincoln, Henderson). The application window is behind an intermittent Cloudflare JS challenge for non-browser clients. Older deed books (below Book 650, other than the Book 100 series) may not be imaged online."
+   },
+   "probate": {
+    "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
+    "url": "https://portal-nc.tylertech.cloud/Portal/",
+    "free_search": "yes",
+    "access": "captcha",
+    "notes": "No fee, but the portal home page says a CAPTCHA challenge is required every ten minutes for anonymous users, and a plain GET of Smart Search returned 'Human Verification' (HTTP 405) on 2026-10-07. A person can search free after the CAPTCHA; estate files that predate the county's eCourts conversion may need the Clerk of Superior Court estates division."
+   },
+   "tax": {
+    "url": "https://www.franklincountytax.us/search/commonsearch.aspx?mode=parid",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "unknown",
+    "access": "open",
+    "notes": "Tyler iasWorld public access, parcel ID search form loads (200) on 2026-10-07, page also carried a 'system currently unavailable due to maintenance' banner. Bill search at franklin.webtaxpay.com redirected to secure.webtaxpay.com and answered 403 'Verification required' (bot check), so bill history was not reached."
+   },
+   "gis": {
+    "url": "https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1",
+    "legal_description_field": "no",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "County GIS viewer not opened (franklincountync.gov answered a Cloudflare block page). Statewide NC OneMap layer (https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1): 47981 Franklin parcels; legdecfull (assessor short legal) non-blank on 27.8%; sourceref holds 'Deed Book/Page' with a real book/page on 92.4%; ownname = taxpayer of record."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "no",
+    "gis": "partial",
+    "evidence": "parcel_cache.nc_onemap_cfg reads the statewide NC1Map_Parcels layer for any NC county (owner, situs, mailing, value); it does not map legdecfull or sourceref; Franklin appears only in name tables and nc_civicplus_tax_sale (tax-sale notice pages)"
+   },
+   "manual_lane": "If the CCHS window is challenged, a person opens the Franklin ROD site in a browser, accepts the disclaimer, searches by owner name and views deed images on screen; deeds before 1950 or below Book 650 may need the office or an abstractor.",
+   "confidence": "medium"
+  },
+  {
+   "county": "gaston",
+   "state": "NC",
+   "rod": {
+    "platform": "Courthouse Computer Systems LRSearch (MVC/DevExpress), live since 2026-05-28 per repo; old Aumentum host deeds.gastongov.com is dead",
+    "url": "https://gastonnc.courthousecomputersystems.com/",
+    "free_name_search": "yes",
+    "access": "blocked",
+    "index_online_back_to_year": null,
+    "images_free": "no",
+    "legal_description_in_index": "yes",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "unknown",
+    "how_verified": "2026-10-07: plain GET of the root returned HTTP 403 Cloudflare 'Just a moment...' challenge; nothing behind it was read. Repo enrichment_gaston_rod.py (live-verified 2026-06-29) documents a free name index with Date/Kind/Grantor/Grantee/Description/DocNo/Book/Page and states the document image is paid.",
+    "notes": "Index is free for a person in a browser, but today a non-browser client meets a Cloudflare challenge. Images are a paid order per the repo. Coverage start year not read."
+   },
+   "probate": {
+    "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
+    "url": "https://portal-nc.tylertech.cloud/Portal/",
+    "free_search": "yes",
+    "access": "captcha",
+    "notes": "No fee, but the portal home page says a CAPTCHA challenge is required every ten minutes for anonymous users, and a plain GET of Smart Search returned 'Human Verification' (HTTP 405) on 2026-10-07. A person can search free after the CAPTCHA; estate files that predate the county's eCourts conversion may need the Clerk of Superior Court estates division."
+   },
+   "tax": {
+    "url": "https://gastonnc.devnetwedge.com/",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "unknown",
+    "access": "open",
+    "notes": "DEVNET wEdge property tax inquiry with quick and advanced search (200 on 2026-10-07); page loads Google reCAPTCHA script (likely for the payment cart, not tested). Assessor record cards at property.spatialest.com/nc/gaston (200) include a Legal Description field; Spatialest links Schneider software terms."
+   },
+   "gis": {
+    "url": "https://gis.gastoncountync.gov/publicgis/rest/services/PublicGIS/Parcels/MapServer/11",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "Layer JSON read 2026-10-07: LEGDESC_1, DEED_BOOK, DEED_PAGE, DEEDTYPE, PLAT_BOOK, PLAT_PAGE, SALEDATE, SALESAMT, CURR_NAME1/2 and current mailing address. Statewide NC OneMap layer (https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1): 117252 Gaston parcels; legdecfull (assessor short legal) non-blank on 100.0%; sourceref holds 'Deed Book/Page' with a real book/page on 96.3%; ownname = taxpayer of record."
+   },
+   "we_already_read": {
+    "rod": "partial",
+    "tax": "partial",
+    "gis": "yes",
+    "evidence": "enrichment_gaston_rod.py (owner-name index lookup, gated FORECLOSURE_GASTON_ROD=1); gaston_tax_foreclosures / nc_county_tax_foreclosure (tax-sale pages); assessor_cards/gaston_nc.py (Spatialest); parcel_cache + enrichment_arcgis + gaston_vacant.py read the county parcel layer incl. LEGDESC_1 and DEED_BOOK/PAGE"
+   },
+   "manual_lane": "A person opens gastonnc.courthousecomputersystems.com in a browser to search the index; the deed image (for the full legal) is a paid copy, so the attorney's own subscription or a copy order is needed for the deed text.",
+   "confidence": "medium"
+  },
+  {
+   "county": "gates",
+   "state": "NC",
+   "rod": {
+    "platform": "Courthouse Computer Systems (CCHS) classic-ASP online search (gatesrod.net is a frame onto it)",
+    "url": "https://us5.courthousecomputersystems.com/gatesnc/",
+    "free_name_search": "yes",
+    "access": "disclaimer_click",
+    "index_online_back_to_year": null,
+    "images_free": "yes",
+    "legal_description_in_index": "yes",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: gatesrod.net (200) is a frameset pointing at us5.courthousecomputersystems.com/gatesnc/; that landing page (200) has the standard CCHS accuracy disclaimer and Search Online link; GatesNCNW/realestatesearch.asp (200) shows the search form with 'Prior to 1995 / 1995 Forward' index choice, Description field, 'Images as PDF' and 'Log In To Print'. The 'What's Available' panel was empty in the static HTML.",
+    "notes": "Has a separate pre-1995 index; start year not stated in the HTML. Images: the search page offers 'Images as PDF' with no cart, and login is only for printing (same CCHS classic app where the repo verified free images in Burke, Lincoln and Henderson); an image was not opened."
+   },
+   "probate": {
+    "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
+    "url": "https://portal-nc.tylertech.cloud/Portal/",
+    "free_search": "yes",
+    "access": "captcha",
+    "notes": "No fee, but the portal home page says a CAPTCHA challenge is required every ten minutes for anonymous users, and a plain GET of Smart Search returned 'Human Verification' (HTTP 405) on 2026-10-07. A person can search free after the CAPTCHA; estate files that predate the county's eCourts conversion may need the Clerk of Superior Court estates division."
+   },
+   "tax": {
+    "url": "https://www.bttaxpayerportal.com/ITSPublicGT/TaxBillSearch",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "BT/ITS public tax bill search (200), search by parcel number, owner or account, tax years 2016-2026."
+   },
+   "gis": {
+    "url": "https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "No county GIS service located. Statewide NC OneMap layer (https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1): 7997 Gates parcels; legdecfull (assessor short legal) non-blank on 96.6%; sourceref holds 'Deed Book/Page' with a real book/page on 97.8%; ownname = taxpayer of record."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "partial",
+    "gis": "partial",
+    "evidence": "albemarle_observer_tax_lists.py (newspaper delinquent list); parcel_cache.nc_onemap_cfg reads the statewide NC1Map_Parcels layer for any NC county (owner, situs, mailing, value); it does not map legdecfull or sourceref"
+   },
+   "manual_lane": "Index and images reachable free in a browser; records before the pre-1995 index start need the office or an abstractor.",
+   "confidence": "medium"
+  },
+  {
+   "county": "graham",
+   "state": "NC",
+   "rod": {
+    "platform": "Cott Systems eSearch v4 (cotthosting.com), guest user",
+    "url": "https://cotthosting.com/ncgraham/LandRecords/protected/v4/SrchName.aspx",
+    "free_name_search": "yes",
+    "access": "open",
+    "index_online_back_to_year": 1872,
+    "images_free": "unknown",
+    "legal_description_in_index": "yes",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: GET cotthosting.com/ncgraham (200) lands directly on Quick Name Search as Guest User; disclaimer text says real estate records available from 1872 to present and is accuracy/indemnity only; index types CONSOLIDATED REAL PROPERTY and PRE-95 REAL ESTATE; page has a shopping cart and loads reCAPTCHA v3.",
+    "notes": "Cott v4 results carry a short Description column (layout verified in repo rod/aumentum.py on other v4 tenants). Image viewing may be free with watermark or may need cart purchase; not tested."
+   },
+   "probate": {
+    "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
+    "url": "https://portal-nc.tylertech.cloud/Portal/",
+    "free_search": "yes",
+    "access": "captcha",
+    "notes": "No fee, but the portal home page says a CAPTCHA challenge is required every ten minutes for anonymous users, and a plain GET of Smart Search returned 'Human Verification' (HTTP 405) on 2026-10-07. A person can search free after the CAPTCHA; estate files that predate the county's eCourts conversion may need the Clerk of Superior Court estates division."
+   },
+   "tax": {
+    "url": "https://www.bttaxpayerportal.com/ITSPublicGR2.0/TaxBillSearch",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "BT/ITS public tax bill search (200), parcel number search, tax years back to 2016."
+   },
+   "gis": {
+    "url": "https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "No county GIS service located. Statewide NC OneMap layer (https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1): 9840 Graham parcels; legdecfull (assessor short legal) non-blank on 100.0%; sourceref holds 'Deed Book/Page' with a real book/page on 91.4%; ownname = taxpayer of record."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "yes",
+    "gis": "partial",
+    "evidence": "scrapers/counties_nc/nc_its_public_tax.py (Graham ITSPublicGR2.0 tax bills); parcel_cache.nc_onemap_cfg reads the statewide NC1Map_Parcels layer for any NC county (owner, situs, mailing, value); it does not map legdecfull or sourceref"
+   },
+   "manual_lane": "If images need purchase, a person or the attorney's account buys the most recent deed copy from the Cott cart or the office.",
+   "confidence": "medium"
+  },
+  {
+   "county": "granville",
+   "state": "NC",
+   "rod": {
+    "platform": "Cott Systems eSearch v4 (county-hosted), guest user",
+    "url": "http://www.granvillecountydeeds.org/External/LandRecords/protected/v4/SrchName.aspx",
+    "free_name_search": "yes",
+    "access": "open",
+    "index_online_back_to_year": null,
+    "images_free": "unknown",
+    "legal_description_in_index": "yes",
+    "plat_books_or_maps_online": "yes",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: GET SrchName.aspx (200) shows Guest User quick name search; index types CONSOLIDATED REAL PROPERTY, FINANCING STATEMENTS, PRE-1978 PLATS, PRE-95 REAL ESTATE; Terms of Service text is accuracy/indemnity and 'released records' only. County site granvillecounty.org returned a Cloudflare block page; granvillerod.permitium.com is a vital-records order form only.",
+    "notes": "Search-engine snippet of the county page says deeds date back to 1746 (not verified on the portal). Image cost not tested."
+   },
+   "probate": {
+    "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
+    "url": "https://portal-nc.tylertech.cloud/Portal/",
+    "free_search": "yes",
+    "access": "captcha",
+    "notes": "No fee, but the portal home page says a CAPTCHA challenge is required every ten minutes for anonymous users, and a plain GET of Smart Search returned 'Human Verification' (HTTP 405) on 2026-10-07. A person can search free after the CAPTCHA; estate files that predate the county's eCourts conversion may need the Clerk of Superior Court estates division."
+   },
+   "tax": {
+    "url": "https://tax.granvillecounty.org/ITSPublic/TaxBillSearch",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "BT/ITS public tax bill search (200) with real estate search, parcel number and alternate parcel ID, tax years 2017-2026."
+   },
+   "gis": {
+    "url": "https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "County uses an ArcGIS Online web viewer (agdonline.maps.arcgis.com, not opened). Statewide NC OneMap layer (https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1): 34602 Granville parcels; legdecfull (assessor short legal) non-blank on 99.1%; sourceref holds 'Deed Book/Page' with a real book/page on 95.6%; ownname = taxpayer of record."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "no",
+    "gis": "partial",
+    "evidence": "parcel_cache.nc_onemap_cfg reads the statewide NC1Map_Parcels layer for any NC county (owner, situs, mailing, value); it does not map legdecfull or sourceref"
+   },
+   "manual_lane": "If deed images are not free, a person buys the most recent deed copy (or the attorney uses his account); pre-1746/early books and anything not imaged go to the office or an abstractor.",
+   "confidence": "medium"
+  },
+  {
+   "county": "greene",
+   "state": "NC",
+   "rod": {
+    "platform": "Courthouse Computer Systems LRSearch (new MVC land records system); earlier Cott host cotthosting.com/ncgreeneexternal now 404",
+    "url": "https://greenenc.courthousecomputersystems.com/",
+    "free_name_search": "yes",
+    "access": "captcha",
+    "index_online_back_to_year": null,
+    "images_free": "unknown",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: GET root (200 after one connection reset) shows a modal 'Please Verify You are Not a Robot' with a Google reCAPTCHA v2 widget wrapped around the accuracy disclaimer; tabs behind it: Consolidated Index, Vital Index, Old Index Books, View Images. cotthosting.com/ncgreeneexternal returned 404.",
+    "notes": "A search-engine snippet of the county page says the old index ran from 1875; the new system's start year was not read. Disclaimer text has no automation clause, but the reCAPTCHA gate closes it to automation."
+   },
+   "probate": {
+    "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
+    "url": "https://portal-nc.tylertech.cloud/Portal/",
+    "free_search": "yes",
+    "access": "captcha",
+    "notes": "No fee, but the portal home page says a CAPTCHA challenge is required every ten minutes for anonymous users, and a plain GET of Smart Search returned 'Human Verification' (HTTP 405) on 2026-10-07. A person can search free after the CAPTCHA; estate files that predate the county's eCourts conversion may need the Clerk of Superior Court estates division."
+   },
+   "tax": {
+    "url": "https://greenecounty.munisselfservice.com/citizens/RealEstate/Default.aspx?mode=new",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "unknown",
+    "access": "open",
+    "notes": "Tyler Munis Citizen Self Service (200): announcement says the public may inquire on real estate taxes; login is only for accounts/payments. Search itself not run."
+   },
+   "gis": {
+    "url": "https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1",
+    "legal_description_field": "no",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "No county GIS service located; statewide layer has no legal description for Greene. Statewide NC OneMap layer (https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1): 12720 Greene parcels; legdecfull (assessor short legal) non-blank on 0.0%; sourceref holds 'Deed Book/Page' with a real book/page on 91.5%; ownname = taxpayer of record."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "no",
+    "gis": "partial",
+    "evidence": "parcel_cache.nc_onemap_cfg reads the statewide NC1Map_Parcels layer for any NC county (owner, situs, mailing, value); it does not map legdecfull or sourceref"
+   },
+   "manual_lane": "A person opens the Greene ROD site, ticks the reCAPTCHA, then searches by name and views the deed; the legal description must come from the deed image because no free GIS legal exists for Greene.",
+   "confidence": "medium"
+  },
+  {
+   "county": "guilford",
+   "state": "NC",
+   "rod": {
+    "platform": "County-hosted PHP name search (rdlxweb.guilfordcountync.gov, 'Online Record System' style with Accept disclaimer)",
+    "url": "https://rdlxweb.guilfordcountync.gov/guilfordNameSearch.php",
+    "free_name_search": "yes",
+    "access": "disclaimer_click",
+    "index_online_back_to_year": null,
+    "images_free": "unknown",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: guilforddeeds.com redirects to guilfordcountync.gov/government/register-deeds (200, read with curl because the host refused Python's TLS settings), whose 'Search Real Estate Records' link is rdlxweb.guilfordcountync.gov/guilfordNameSearch.php; that page (200) is a legal disclaimer with Accept/Decline buttons (accuracy and liability only). A GET with ?Accept=Accept returned the disclaimer again (the accept is a POST), so the search form was not reached.",
+    "notes": "Separate Guilford slavery-deeds index at rdlxweb.guilfordcountync.gov/gsd/. Coverage years and image cost not read; county 'notices' page link is a 404."
+   },
+   "probate": {
+    "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
+    "url": "https://portal-nc.tylertech.cloud/Portal/",
+    "free_search": "yes",
+    "access": "captcha",
+    "notes": "No fee, but the portal home page says a CAPTCHA challenge is required every ten minutes for anonymous users, and a plain GET of Smart Search returned 'Human Verification' (HTTP 405) on 2026-10-07. A person can search free after the CAPTCHA; estate files that predate the county's eCourts conversion may need the Clerk of Superior Court estates division."
+   },
+   "tax": {
+    "url": "https://bcpwa.ncptscloud.com/Guilford",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "unknown",
+    "access": "open",
+    "notes": "NCPTS cloud: bill PWA at bcpwa.ncptscloud.com/Guilford and real-property PWA at lrcpwa.ncptscloud.com/guilford both load (200, JavaScript apps) with no gate. Repo enrichment_ncpts_lrc.py documents the real-property API returning owner, mailing, deedBook/Page/Date, deedBookUrl and platBookUrl (verified 2026-08-19, 76k parcels)."
+   },
+   "gis": {
+    "url": "https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "no",
+    "owner_field": "yes",
+    "notes": "County GIS online services exist (guilfordcountync.gov) but were not opened. Statewide sourceref holds the deed BOOK only for Guilford (e.g. 'Deed Book/Page 008311'), so book+page comes from NCPTS deedBook/Page. Statewide NC OneMap layer (https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1): 222443 Guilford parcels; legdecfull (assessor short legal) non-blank on 99.8%; sourceref holds 'Deed Book/Page' with a real book/page on 0.0%; ownname = taxpayer of record."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "partial",
+    "gis": "partial",
+    "evidence": "enrichment_ncpts_lrc.py (NCPTS real-property detail incl. deedBook/Page); nc_ptscloud_delinquent_tax.py (delinquent export); parcel_cache.nc_onemap_cfg reads the statewide NC1Map_Parcels layer for any NC county (owner, situs, mailing, value); it does not map legdecfull or sourceref"
+   },
+   "manual_lane": "A person accepts the Guilford ROD disclaimer in a browser and searches by name; if images are not free, the attorney's account or a copy order supplies the deed text.",
+   "confidence": "medium"
+  },
+  {
+   "county": "halifax",
+   "state": "NC",
+   "rod": {
+    "platform": "Cott Systems eSearch (cotthosting.com/NCHALIFAXEXTERNAL), guest sign-in",
+    "url": "https://cotthosting.com/NCHALIFAXEXTERNAL",
+    "free_name_search": "yes",
+    "access": "disclaimer_click",
+    "index_online_back_to_year": null,
+    "images_free": "unknown",
+    "legal_description_in_index": "yes",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "unknown",
+    "how_verified": "2026-10-07: first GET timed out in TLS handshake; retry redirected to User/Login.aspx (200) which says guests no longer need a user ID and offers a 'Sign in as a Guest' button, a Certified Dates page (postback, not opened) and a shopping cart. halifaxrod.permitium.com is an ordering counter, not an index.",
+    "notes": "Search-engine snippet says the index includes a historical pre-1995 database; start year not read. Image cost not tested. Cott results carry a short Description column."
+   },
+   "probate": {
+    "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
+    "url": "https://portal-nc.tylertech.cloud/Portal/",
+    "free_search": "yes",
+    "access": "captcha",
+    "notes": "No fee, but the portal home page says a CAPTCHA challenge is required every ten minutes for anonymous users, and a plain GET of Smart Search returned 'Human Verification' (HTTP 405) on 2026-10-07. A person can search free after the CAPTCHA; estate files that predate the county's eCourts conversion may need the Clerk of Superior Court estates division."
+   },
+   "tax": {
+    "url": "https://halifaxnctax.com/",
+    "free_by_parcel": "unknown",
+    "shows_bill_history": "unknown",
+    "access": "blocked",
+    "notes": "halifaxnctax.com answered a Cloudflare 'Just a moment' 403 to a plain GET on 2026-10-07. Assessor data is on Schneider qPublic (App=HalifaxCountyNC), whose software terms (read 2026-10-07) prohibit robots, screen scraping and data-mining tools; qPublic was not opened."
+   },
+   "gis": {
+    "url": "https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "No open county GIS service located. Statewide NC OneMap layer (https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1): 39403 Halifax parcels; legdecfull (assessor short legal) non-blank on 61.0%; sourceref holds 'Deed Book/Page' with a real book/page on 78.4%; ownname = taxpayer of record."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "no",
+    "gis": "partial",
+    "evidence": "parcel_cache.nc_onemap_cfg reads the statewide NC1Map_Parcels layer for any NC county (owner, situs, mailing, value); it does not map legdecfull or sourceref; registry lists qPublic as in_src but no Halifax tax reader was found"
+   },
+   "manual_lane": "Tax bills and assessor cards need a person in a browser (Cloudflare-gated tax site, qPublic terms bar automation); the ROD index is free as a guest, deed images may need the Cott cart or the attorney's account.",
+   "confidence": "medium"
+  },
+  {
+   "county": "harnett",
+   "state": "NC",
+   "rod": {
+    "platform": "Courthouse Computer Systems LRSearch (MVC) at us6",
+    "url": "https://us6.courthousecomputersystems.com/HarnettNC/",
+    "free_name_search": "yes",
+    "access": "captcha",
+    "index_online_back_to_year": 1973,
+    "images_free": "yes",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "yes",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: harnett.org/deeds 'Online Record Search' page (200) says all recorded documents are online to view/print, the current real estate index goes back to 1973, older entries are in the old index books, and plat cabinets/slides are searchable by book and page; us6.courthousecomputersystems.com/HarnettNC/ (200) opens with a 'Please Verify You are Not a Robot' reCAPTCHA modal over the accuracy disclaimer, with tabs for Consolidated Index, Old Index Books, View Images.",
+    "notes": "Images free per the county's own page (view/print, no fee stated). Pre-1973 is reachable only through scanned old index books (OIB tab)."
+   },
+   "probate": {
+    "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
+    "url": "https://portal-nc.tylertech.cloud/Portal/",
+    "free_search": "yes",
+    "access": "captcha",
+    "notes": "No fee, but the portal home page says a CAPTCHA challenge is required every ten minutes for anonymous users, and a plain GET of Smart Search returned 'Human Verification' (HTTP 405) on 2026-10-07. A person can search free after the CAPTCHA; estate files that predate the county's eCourts conversion may need the Clerk of Superior Court estates division."
+   },
+   "tax": {
+    "url": "https://cama.harnett.org/ITSPublicHT/",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "BT/ITS public access (200): basic search by owner, parcel number, address or map number, plus Tax Bill Search; accuracy disclaimer only."
+   },
+   "gis": {
+    "url": "https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "County GIS viewer at gis.harnett.org (not opened). Statewide NC OneMap layer (https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1): 84508 Harnett parcels; legdecfull (assessor short legal) non-blank on 96.4%; sourceref holds 'Deed Book/Page' with a real book/page on 96.1%; ownname = taxpayer of record."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "no",
+    "gis": "partial",
+    "evidence": "parcel_cache.nc_onemap_cfg reads the statewide NC1Map_Parcels layer for any NC county (owner, situs, mailing, value); it does not map legdecfull or sourceref; Harnett appears only in name tables and tax-sale notice configs"
+   },
+   "manual_lane": "A person ticks the reCAPTCHA on the Harnett ROD site, searches by name, and views/prints deed images free; pre-1973 chains use the scanned old index books, and older gaps go to an abstractor.",
+   "confidence": "medium"
+  },
+  {
+   "county": "haywood",
+   "state": "NC",
+   "rod": {
+    "platform": "'The Lookup' PHP index (search.haywooddeeds.com)",
+    "url": "https://search.haywooddeeds.com/index.php?Accept=Accept",
+    "free_name_search": "yes",
+    "access": "disclaimer_click",
+    "index_online_back_to_year": 1986,
+    "images_free": "yes",
+    "legal_description_in_index": "yes",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: GET index.php (200) shows the disclaimer (public service, accuracy only, 'Real property data index is verified only from January 1, 1986'). Repo docs/ROD_PORTAL_ACCESS.md (live 2026-08-12) documents GET ?Accept=Accept, name browse and name search returning rows with Date, Book, Doc Type, Property Desc, parties and TIFF/PDF image links.",
+    "notes": "1986 is the verified-from date; older entries may exist unverified. Index rows carry TIFF/PDF image links with no login or cart (repo 2026-08-12), and the same Logan Lookup app serves free images in McDowell and Mitchell (repo rod/doc_images.py); a Haywood image itself was not opened."
+   },
+   "probate": {
+    "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
+    "url": "https://portal-nc.tylertech.cloud/Portal/",
+    "free_search": "yes",
+    "access": "captcha",
+    "notes": "No fee, but the portal home page says a CAPTCHA challenge is required every ten minutes for anonymous users, and a plain GET of Smart Search returned 'Human Verification' (HTTP 405) on 2026-10-07. A person can search free after the CAPTCHA; estate files that predate the county's eCourts conversion may need the Clerk of Superior Court estates division."
+   },
+   "tax": {
+    "url": "https://taxes.haywoodcountync.gov/ITSForPublic",
+    "free_by_parcel": "unknown",
+    "shows_bill_history": "unknown",
+    "access": "unknown",
+    "notes": "Linked from haywoodcountync.gov/922/Public-Tax-System-Access (200); the ITS public site itself was not opened."
+   },
+   "gis": {
+    "url": "https://maps.haywoodcountync.gov/",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "County GIS (200) has a terms-of-use acceptance page (data free, as-is; no automation clause seen), a data download page and an ArcGIS Hub open-data site; it warns records are lagging during a software transition. Statewide NC OneMap layer (https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1): 53178 Haywood parcels; legdecfull (assessor short legal) non-blank on 99.9%; sourceref holds 'Deed Book/Page' with a real book/page on 99.9%; ownname = taxpayer of record."
+   },
+   "we_already_read": {
+    "rod": "yes",
+    "tax": "partial",
+    "gis": "partial",
+    "evidence": "enrichment_rod_lookup.py + wnc_rod_foreclosure_starts.py (The Lookup); haywood_tax_foreclosures.py (tax-sale page); parcel_cache.nc_onemap_cfg reads the statewide NC1Map_Parcels layer for any NC county (owner, situs, mailing, value); it does not map legdecfull or sourceref"
+   },
+   "manual_lane": "Pre-1986 chains need the office's older books or an abstractor; if image links turn out to cost, a person orders the deed copy.",
+   "confidence": "high"
+  },
+  {
+   "county": "henderson",
+   "state": "NC",
+   "rod": {
+    "platform": "Courthouse Computer Systems (CCHS) classic-ASP online search",
+    "url": "https://us4.courthousecomputersystems.com/hendersonnc/",
+    "free_name_search": "yes",
+    "access": "disclaimer_click",
+    "index_online_back_to_year": 1966,
+    "images_free": "yes",
+    "legal_description_in_index": "yes",
+    "plat_books_or_maps_online": "yes",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: landing page (200) has the CCHS accuracy disclaimer and click-to-enter; HendersonNCNW/realestatesearch.asp (200) 'What's Available': verified date range 11/22/1966 to 10/02/2026, deed images books 200-1692, deed of trust images 173-2912, plat images 1-1491, condo plats, highway right-of-way. Repo rod/doc_images.py records Henderson CCHS images as free.",
+    "notes": "Note hendersondeeds.com is Henderson County KENTUCKY (repo trap). SearchService.asp sits behind an intermittent Cloudflare check for non-browser clients (repo rod/cchs.py). Deeds older than book 200 are not imaged online."
+   },
+   "probate": {
+    "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
+    "url": "https://portal-nc.tylertech.cloud/Portal/",
+    "free_search": "yes",
+    "access": "captcha",
+    "notes": "No fee, but the portal home page says a CAPTCHA challenge is required every ten minutes for anonymous users, and a plain GET of Smart Search returned 'Human Verification' (HTTP 405) on 2026-10-07. A person can search free after the CAPTCHA; estate files that predate the county's eCourts conversion may need the Clerk of Superior Court estates division."
+   },
+   "tax": {
+    "url": "https://bcpwa.ncptscloud.com/Henderson",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "unknown",
+    "access": "open",
+    "notes": "NCPTS bill PWA loads (200, JavaScript app). Assessor cards at property.spatialest.com/nc/henderson are Schneider-hosted; Schneider software terms (read 2026-10-07) prohibit robots and scraping."
+   },
+   "gis": {
+    "url": "https://gisweb.hendersoncountync.gov/arcgis/rest/services/Parcels/FeatureServer/0",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "Layer JSON read 2026-10-07: PROPERTY_DESCR, DEED_BOOK, DEED_PAGE, DEED_DATE, DEED_URL (link to the deed image), PLAT_BOOK, PLAT_PAGE, PLAT_URL, PROPERTY_OWNER and owner mailing fields. Statewide NC OneMap layer (https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1): 75373 Henderson parcels; legdecfull (assessor short legal) non-blank on 99.1%; sourceref holds 'Deed Book/Page' with a real book/page on 99.9%; ownname = taxpayer of record."
+   },
+   "we_already_read": {
+    "rod": "yes",
+    "tax": "partial",
+    "gis": "yes",
+    "evidence": "rod/cchs.py (CCHS_COUNTIES Henderson), nc_rod_substitute_trustee.py, rod/doc_images.py; henderson_tax.py (tax-sale page), nc_ptscloud_delinquent_tax.py, assessor_cards/henderson_nc.py; parcel_cache + enrichment_arcgis + henderson_foreclosure_parcels.py (DEED_BOOK/PAGE)"
+   },
+   "manual_lane": "Deeds before book 200 / 1966 need the office's older books or an abstractor; otherwise free online.",
+   "confidence": "high"
+  },
+  {
+   "county": "hertford",
+   "state": "NC",
+   "rod": {
+    "platform": "Courthouse Computer Systems (CCHS) classic-ASP online search (hertfordrod.net is a frame onto it)",
+    "url": "https://us4.courthousecomputersystems.com/hertfordnc/",
+    "free_name_search": "yes",
+    "access": "open",
+    "index_online_back_to_year": 1901,
+    "images_free": "yes",
+    "legal_description_in_index": "yes",
+    "plat_books_or_maps_online": "yes",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: hertfordrod.net (200) frames us4.courthousecomputersystems.com/hertfordnc/ (200, welcome page with Search Online link, no restriction text); HertfordNCNW/realestatesearch.asp (200) 'What's Available': Verified Deed Index 09/26/1901 to 09/23/2026, Deed Book A-V and 1-874, Map Book 1-13, Corporations Book 1-6; 'Images as PDF' option, 'Log In To Print'.",
+    "notes": "Strong county: verified index and deed books from 1901. Images view free (CCHS classic; printing needs login)."
+   },
+   "probate": {
+    "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
+    "url": "https://portal-nc.tylertech.cloud/Portal/",
+    "free_search": "yes",
+    "access": "captcha",
+    "notes": "No fee, but the portal home page says a CAPTCHA challenge is required every ten minutes for anonymous users, and a plain GET of Smart Search returned 'Human Verification' (HTTP 405) on 2026-10-07. A person can search free after the CAPTCHA; estate files that predate the county's eCourts conversion may need the Clerk of Superior Court estates division."
+   },
+   "tax": {
+    "url": "http://www.hertfordtax.com/",
+    "free_by_parcel": "unknown",
+    "shows_bill_history": "unknown",
+    "access": "unknown",
+    "notes": "hertfordtax.com (200) is a JavaScript single-page app shell ('Loading...'); content not readable without a browser. Hertford is listed as an NCPTS tenant in repo nc_ptscloud_delinquent_tax.py."
+   },
+   "gis": {
+    "url": "https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "County ArcGIS Online site hertfordcountync.maps.arcgis.com (not opened). Statewide NC OneMap layer (https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1): 16102 Hertford parcels; legdecfull (assessor short legal) non-blank on 99.2%; sourceref holds 'Deed Book/Page' with a real book/page on 99.3%; ownname = taxpayer of record."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "partial",
+    "gis": "partial",
+    "evidence": "nc_ptscloud_delinquent_tax.py tenant list, albemarle_observer_tax_lists.py; parcel_cache.nc_onemap_cfg reads the statewide NC1Map_Parcels layer for any NC county (owner, situs, mailing, value); it does not map legdecfull or sourceref"
+   },
+   "manual_lane": "Little needed: index and images from 1901 are free online; pre-1901 chains go to an abstractor.",
+   "confidence": "high"
+  },
+  {
+   "county": "hoke",
+   "state": "NC",
+   "rod": {
+    "platform": "Logan Systems Public Records (LoganIndexing Blazor Server app) at hokencrod.org",
+    "url": "https://www.hokencrod.org/",
+    "free_name_search": "unknown",
+    "access": null,
+    "index_online_back_to_year": null,
+    "images_free": "unknown",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "unknown",
+    "how_verified": "2026-10-07: GET hokencrod.org (200) returned only a DevExpress Blazor Server shell ('An unhandled error has occurred') that needs a live browser connection; no search form, disclaimer or coverage text in the HTML. URL found via NETR Online directory (county site link not opened).",
+    "notes": "Different from the older Logan 'search.<county>deeds.com' PHP app the repo reads (rod/logan.py); a plain HTTP reader will not work here."
+   },
+   "probate": {
+    "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
+    "url": "https://portal-nc.tylertech.cloud/Portal/",
+    "free_search": "yes",
+    "access": "captcha",
+    "notes": "No fee, but the portal home page says a CAPTCHA challenge is required every ten minutes for anonymous users, and a plain GET of Smart Search returned 'Human Verification' (HTTP 405) on 2026-10-07. A person can search free after the CAPTCHA; estate files that predate the county's eCourts conversion may need the Clerk of Superior Court estates division."
+   },
+   "tax": {
+    "url": "https://www.hokecounty.net/209/Taxes",
+    "free_by_parcel": "unknown",
+    "shows_bill_history": "unknown",
+    "access": "unknown",
+    "notes": "County tax page (200) links property search through the GIS site maps.hokecounty.org/maps/ and a 2025 delinquent tax list; no bill-search portal located."
+   },
+   "gis": {
+    "url": "https://maps.hokecounty.org/maps/",
+    "legal_description_field": "no",
+    "deed_book_page_field": "no",
+    "owner_field": "yes",
+    "notes": "County GIS viewer not opened. Statewide layer has NO legal description and NO deed book/page for Hoke. Statewide NC OneMap layer (https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1): 30524 Hoke parcels; legdecfull (assessor short legal) non-blank on 0.0%; sourceref holds 'Deed Book/Page' with a real book/page on 0.0%; ownname = taxpayer of record."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "no",
+    "gis": "partial",
+    "evidence": "parcel_cache.nc_onemap_cfg reads the statewide NC1Map_Parcels layer for any NC county (owner, situs, mailing, value); it does not map legdecfull or sourceref"
+   },
+   "manual_lane": "A person must open hokencrod.org in a browser to find the vesting deed (no free legal or deed reference exists in the statewide GIS for Hoke); if that portal will not serve images, the attorney's subscription or the office supplies the deed.",
+   "confidence": "low"
+  },
+  {
+   "county": "hyde",
+   "state": "NC",
+   "rod": {
+    "platform": "Courthouse Computer Systems (CCHS) classic-ASP online search (hyderod.net is a frame onto it)",
+    "url": "https://us4.courthousecomputersystems.com/Hydenc/",
+    "free_name_search": "yes",
+    "access": "open",
+    "index_online_back_to_year": 1991,
+    "images_free": "yes",
+    "legal_description_in_index": "yes",
+    "plat_books_or_maps_online": "yes",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: hyderod.net (200) frames us4.courthousecomputersystems.com/Hydenc/ (200, home page with Search Online and Plat Cross References); HydeNCNW/realestatesearch.asp (200) 'What's Available': verified date range 01/24/1991 to 10/02/2026, deed images books 40-41, 81-84, 95, 102-314, plat images, land book images 1-7, land title maps.",
+    "notes": "Index verified only from 1991 although older deed books are imaged; pre-1991 chains may need the imaged books browsed by book/page."
+   },
+   "probate": {
+    "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
+    "url": "https://portal-nc.tylertech.cloud/Portal/",
+    "free_search": "yes",
+    "access": "captcha",
+    "notes": "No fee, but the portal home page says a CAPTCHA challenge is required every ten minutes for anonymous users, and a plain GET of Smart Search returned 'Human Verification' (HTTP 405) on 2026-10-07. A person can search free after the CAPTCHA; estate files that predate the county's eCourts conversion may need the Clerk of Superior Court estates division."
+   },
+   "tax": {
+    "url": "https://bcpwa.ncptscloud.com/Hyde",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "unknown",
+    "access": "open",
+    "notes": "NCPTS bill PWA loads (200, JavaScript app). Hyde has a delinquent export used by the repo."
+   },
+   "gis": {
+    "url": "http://hydecountygis.com/nc/hyde/",
+    "legal_description_field": "no",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "County GIS site not opened. Statewide NC OneMap layer (https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1): 7698 Hyde parcels; legdecfull (assessor short legal) non-blank on 10.6%; sourceref holds 'Deed Book/Page' with a real book/page on 63.3%; ownname = taxpayer of record."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "partial",
+    "gis": "partial",
+    "evidence": "nc_ptscloud_delinquent_tax.py (Hyde export), albemarle_observer_tax_lists.py; enrichment_lrcpwa_parcel.py (Hyde tenant); parcel_cache.nc_onemap_cfg reads the statewide NC1Map_Parcels layer for any NC county (owner, situs, mailing, value); it does not map legdecfull or sourceref"
+   },
+   "manual_lane": "The legal description must come from the deed image (statewide GIS legal is mostly blank for Hyde); pre-1991 index gaps need book-by-book browsing or an abstractor.",
+   "confidence": "high"
+  },
+  {
+   "county": "iredell",
+   "state": "NC",
+   "rod": {
+    "platform": "Courthouse Computer Systems LRSearch (new, since 2026-07-09) plus the previous Cott eSearch (cotthosting.com/NCIredellExternal) for records before 1964",
+    "url": "https://iredellnc.courthousecomputersystems.com/",
+    "free_name_search": "yes",
+    "access": "captcha",
+    "index_online_back_to_year": null,
+    "images_free": "unknown",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "unknown",
+    "how_verified": "2026-10-07: GET iredellnc.courthousecomputersystems.com (200) shows 'Please complete the CAPTCHA to enter this site' and a notice that from July 9, 2026 records before 1964 must still be searched in the previous Cott database, and both systems should be searched until migration is verified; tabs include Real Property Index, Online Index Books, View Images. cotthosting.com/NCIredellExternal/User/Login.aspx (200) offers 'Sign in as a Guest' and a shopping cart.",
+    "notes": "Two systems during migration: new one is CAPTCHA-gated; the old Cott guest login is a click. Start years not read."
+   },
+   "probate": {
+    "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
+    "url": "https://portal-nc.tylertech.cloud/Portal/",
+    "free_search": "yes",
+    "access": "captcha",
+    "notes": "No fee, but the portal home page says a CAPTCHA challenge is required every ten minutes for anonymous users, and a plain GET of Smart Search returned 'Human Verification' (HTTP 405) on 2026-10-07. A person can search free after the CAPTCHA; estate files that predate the county's eCourts conversion may need the Clerk of Superior Court estates division."
+   },
+   "tax": {
+    "url": "https://taxweb.iredellcountync.gov/PublicAccess/",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "Public access site (200) with Basic Search by owner/parcel, Real Estate Search, Tax Bill Search and Sales Search."
+   },
+   "gis": {
+    "url": "https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "County GIS (iredellcountync.gov/554/GIS-Mapping) not opened. Statewide NC OneMap layer (https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1): 109254 Iredell parcels; legdecfull (assessor short legal) non-blank on 100.0%; sourceref holds 'Deed Book/Page' with a real book/page on 100.0%; ownname = taxpayer of record."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "no",
+    "gis": "partial",
+    "evidence": "parcel_cache.nc_onemap_cfg reads the statewide NC1Map_Parcels layer for any NC county (owner, situs, mailing, value); it does not map legdecfull or sourceref; nc_heir_estate_parcels.py mentions Iredell decedent-titled parcels"
+   },
+   "manual_lane": "A person passes the CAPTCHA on the new Iredell ROD site and also checks the old Cott guest site for pre-1964 records; image cost unverified, so the attorney's account may be needed for deed copies.",
+   "confidence": "medium"
+  },
+  {
+   "county": "jackson",
+   "state": "NC",
+   "rod": {
+    "platform": "Cott Systems eSearch v4 (county-hosted deeds.jacksonnc.org), guest user",
+    "url": "http://deeds.jacksonnc.org/External/LandRecords/protected/v4/SrchName.aspx",
+    "free_name_search": "yes",
+    "access": "open",
+    "index_online_back_to_year": 1851,
+    "images_free": "unknown",
+    "legal_description_in_index": "yes",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: GET deeds.jacksonnc.org/external (200) redirects to v4 Quick Name Search as Guest User; disclaimer says real estate records available from 1851 to present, accuracy/indemnity/released-records text only; shopping cart present.",
+    "notes": "Cott v4 results carry a short Description column. Image cost not tested."
+   },
+   "probate": {
+    "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
+    "url": "https://portal-nc.tylertech.cloud/Portal/",
+    "free_search": "yes",
+    "access": "captcha",
+    "notes": "No fee, but the portal home page says a CAPTCHA challenge is required every ten minutes for anonymous users, and a plain GET of Smart Search returned 'Human Verification' (HTTP 405) on 2026-10-07. A person can search free after the CAPTCHA; estate files that predate the county's eCourts conversion may need the Clerk of Superior Court estates division."
+   },
+   "tax": {
+    "url": "https://www.jacksonnctax.com/taxes.html",
+    "free_by_parcel": "unknown",
+    "shows_bill_history": "unknown",
+    "access": "unreachable",
+    "notes": "URL from NETR Online directory; both www.jacksonnctax.com and jacksonnctax.com failed DNS on 2026-10-07. Current county tax portal not located."
+   },
+   "gis": {
+    "url": "https://gis.jacksonnc.org/rpv/",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "County real-property viewer gis.jacksonnc.org/rpv (not opened). Statewide NC OneMap layer (https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1): 41375 Jackson parcels; legdecfull (assessor short legal) non-blank on 99.3%; sourceref holds 'Deed Book/Page' with a real book/page on 99.3%; ownname = taxpayer of record."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "no",
+    "gis": "partial",
+    "evidence": "parcel_cache.nc_onemap_cfg reads the statewide NC1Map_Parcels layer for any NC county (owner, situs, mailing, value); it does not map legdecfull or sourceref; 'Jackson' hits in rod/cchs.py are a personal name, not the county"
+   },
+   "manual_lane": "Index from 1851 is free as guest; if images need purchase, the attorney's account or a copy order supplies the deed; a person finds the current tax bill on the county site.",
+   "confidence": "medium"
+  },
+  {
+   "county": "johnston",
+   "state": "NC",
+   "rod": {
+    "platform": "Tyler EagleWeb (erec.johnstonnc.com/recorder/web)",
+    "url": "https://erec.johnstonnc.com/recorder/web/",
+    "free_name_search": "yes",
+    "access": "disclaimer_click",
+    "index_online_back_to_year": null,
+    "images_free": "unknown",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: GET recorder/web/ (200) shows the county disclaimer (accuracy, spelling-variation advice; no automation clause) with an 'I Acknowledge' button posting guest=true, plus a Login link for account holders; text says images download as PDF. about.jsp (200) had no coverage dates.",
+    "notes": "Guest access after acknowledging; whether guest image downloads are free was not tested. Coverage start not stated on the pages read."
+   },
+   "probate": {
+    "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
+    "url": "https://portal-nc.tylertech.cloud/Portal/",
+    "free_search": "yes",
+    "access": "captcha",
+    "notes": "No fee, but the portal home page says a CAPTCHA challenge is required every ten minutes for anonymous users, and a plain GET of Smart Search returned 'Human Verification' (HTTP 405) on 2026-10-07. A person can search free after the CAPTCHA; estate files that predate the county's eCourts conversion may need the Clerk of Superior Court estates division."
+   },
+   "tax": {
+    "url": "https://www.johnstonnc.gov/tax2/",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "unknown",
+    "access": "open",
+    "notes": "Tax Administration page (200) links property search (/tax2/tcontent.cfm?pid=search) and appraisal cards (/tax2/taxcards); those were not opened."
+   },
+   "gis": {
+    "url": "https://www.johnstonnc.com/gis2/",
+    "legal_description_field": "no",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "County GIS site not opened. Statewide layer has no legal description for Johnston. Statewide NC OneMap layer (https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1): 125583 Johnston parcels; legdecfull (assessor short legal) non-blank on 0.0%; sourceref holds 'Deed Book/Page' with a real book/page on 97.9%; ownname = taxpayer of record."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "no",
+    "gis": "partial",
+    "evidence": "parcel_cache.nc_onemap_cfg reads the statewide NC1Map_Parcels layer for any NC county (owner, situs, mailing, value); it does not map legdecfull or sourceref"
+   },
+   "manual_lane": "A person acknowledges the EagleWeb disclaimer as guest and reads the deed; the legal description must come from the deed image (no free GIS legal for Johnston).",
+   "confidence": "medium"
+  },
+  {
+   "county": "jones",
+   "state": "NC",
+   "rod": {
+    "platform": "Cott Systems eSearch v4 (cotthosting.com/ncjones) for current records; Courthouse Computer Systems (us5 jonesnc) for real estate prior to 1978",
+    "url": "https://cotthosting.com/ncjones/LandRecords/protected/v4/SrchName.aspx",
+    "free_name_search": "yes",
+    "access": "open",
+    "index_online_back_to_year": null,
+    "images_free": "unknown",
+    "legal_description_in_index": "yes",
+    "plat_books_or_maps_online": "yes",
+    "terms_forbid_automation": "unknown",
+    "how_verified": "2026-10-07: county ROD page (200, read with curl because of a TLS protocol mismatch) links 'Current Real Estate Search' to cotthosting.com/ncjones and 'Real Estate Prior to 1978' to us5.courthousecomputersystems.com/jonesnc/. The Cott page (200) opens as Guest User with index types CONSOLIDATED REAL PROPERTY, MAP\\PLATS, PRE 95 REAL ESTATE. The pre-1978 CCHS search page JonesNCNW/realestatesearch.asp returned HTTP 500.",
+    "notes": "Pre-1978 CCHS system answered 500 on the day checked. No disclaimer text was shown on the Cott page."
+   },
+   "probate": {
+    "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
+    "url": "https://portal-nc.tylertech.cloud/Portal/",
+    "free_search": "yes",
+    "access": "captcha",
+    "notes": "No fee, but the portal home page says a CAPTCHA challenge is required every ten minutes for anonymous users, and a plain GET of Smart Search returned 'Human Verification' (HTTP 405) on 2026-10-07. A person can search free after the CAPTCHA; estate files that predate the county's eCourts conversion may need the Clerk of Superior Court estates division."
+   },
+   "tax": {
+    "url": "https://www.bttaxpayerportal.com/ITSPublicJN2.0/TaxBillSearch",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "BT/ITS tax bill search (200), parcel number search, tax years 2016-2026. Repo nc_its_public_tax.py notes an earlier empty-body response from this tenant."
+   },
+   "gis": {
+    "url": "http://jonescountygis.com/nc/jones/",
+    "legal_description_field": "no",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "County GIS site not opened. Statewide layer has no legal description for Jones. Statewide NC OneMap layer (https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1): 9451 Jones parcels; legdecfull (assessor short legal) non-blank on 0.0%; sourceref holds 'Deed Book/Page' with a real book/page on 90.0%; ownname = taxpayer of record."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "partial",
+    "gis": "partial",
+    "evidence": "nc_its_public_tax.py (Jones tenant tried, empty body noted); parcel_cache.nc_onemap_cfg reads the statewide NC1Map_Parcels layer for any NC county (owner, situs, mailing, value); it does not map legdecfull or sourceref"
+   },
+   "manual_lane": "Pre-1978 deeds need the CCHS site when it is up, otherwise the office or an abstractor; the legal must come from the deed image (no free GIS legal for Jones).",
+   "confidence": "medium"
+  },
+  {
+   "county": "lee",
+   "state": "NC",
+   "rod": {
+    "platform": "Logan Systems Public Records (LoganIndexing Blazor Server app) at leencrod.org",
+    "url": "https://www.leencrod.org/",
+    "free_name_search": "unknown",
+    "access": null,
+    "index_online_back_to_year": null,
+    "images_free": "unknown",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "unknown",
+    "how_verified": "2026-10-07: GET leencrod.org (200) returned only a DevExpress Blazor Server shell ('An unhandled error has occurred'); no search form, disclaimer or coverage text without a live browser. Older directory link leencrod.org/Opening.asp suggests the prior 'Remote Access' system was replaced.",
+    "notes": "Same new Logan platform as Hoke; needs a real browser session."
+   },
+   "probate": {
+    "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
+    "url": "https://portal-nc.tylertech.cloud/Portal/",
+    "free_search": "yes",
+    "access": "captcha",
+    "notes": "No fee, but the portal home page says a CAPTCHA challenge is required every ten minutes for anonymous users, and a plain GET of Smart Search returned 'Human Verification' (HTTP 405) on 2026-10-07. A person can search free after the CAPTCHA; estate files that predate the county's eCourts conversion may need the Clerk of Superior Court estates division."
+   },
+   "tax": {
+    "url": "https://taxaccess.leecountync.gov/PT/search/commonsearch.aspx?mode=realprop",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "unknown",
+    "access": "disclaimer_click",
+    "notes": "Tyler iasWorld real estate search (200) with Parcel ID, Owner and Legal 1/2/3 search fields, sales and map search; page carries an I-agree terms panel and a 'system unavailable due to maintenance' banner text."
+   },
+   "gis": {
+    "url": "https://leecountync.maps.arcgis.com/apps/webappviewer/index.html?id=a253370dfbff416bbffee626143242ab",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "County ArcGIS Online viewer not opened. Lee sourceref has no 'Deed Book/Page' prefix and mixes deed and will references. Statewide NC OneMap layer (https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1): 35303 Lee parcels; legdecfull (assessor short legal) non-blank on 100.0%; sourceref holds 'Deed Book/Page' with a real book/page on 82.3%; ownname = taxpayer of record."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "no",
+    "gis": "partial",
+    "evidence": "parcel_cache.nc_onemap_cfg reads the statewide NC1Map_Parcels layer for any NC county (owner, situs, mailing, value); it does not map legdecfull or sourceref; 'Lee' hits are mostly Lee County SC"
+   },
+   "manual_lane": "A person opens leencrod.org in a browser to search the index and view the deed; the assessor's legal fields and the statewide GIS give a short legal and the deed reference for free.",
+   "confidence": "low"
+  },
+  {
+   "county": "lenoir",
+   "state": "NC",
+   "rod": {
+    "platform": "Cott Systems eSearch (county-hosted cottweb.co.lenoir.nc.us), guest sign-in",
+    "url": "http://cottweb.co.lenoir.nc.us/external/LandRecords/protected/SrchQuickName.aspx",
+    "free_name_search": "yes",
+    "access": "disclaimer_click",
+    "index_online_back_to_year": null,
+    "images_free": "unknown",
+    "legal_description_in_index": "yes",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "unknown",
+    "how_verified": "2026-10-07: GET SrchQuickName.aspx (200) redirects to User/Login.aspx, which offers 'Sign in as a Guest', a Certified Dates page (postback, not opened) and a shopping cart.",
+    "notes": "Older (non-v4) Cott eSearch. Coverage and image cost not read."
+   },
+   "probate": {
+    "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
+    "url": "https://portal-nc.tylertech.cloud/Portal/",
+    "free_search": "yes",
+    "access": "captcha",
+    "notes": "No fee, but the portal home page says a CAPTCHA challenge is required every ten minutes for anonymous users, and a plain GET of Smart Search returned 'Human Verification' (HTTP 405) on 2026-10-07. A person can search free after the CAPTCHA; estate files that predate the county's eCourts conversion may need the Clerk of Superior Court estates division."
+   },
+   "tax": {
+    "url": "https://www.lenoircountytaxes.com/taxes.html#/",
+    "free_by_parcel": "unknown",
+    "shows_bill_history": "unknown",
+    "access": "unknown",
+    "notes": "Tax portal URL from NETR and the county directory; not opened."
+   },
+   "gis": {
+    "url": "https://lenoirco.maps.arcgis.com/apps/webappviewer/index.html?id=68c0618065d04f1182fb86cb5b6647de",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "County ArcGIS Online viewer not opened. Statewide NC OneMap layer (https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1): 36463 Lenoir parcels; legdecfull (assessor short legal) non-blank on 99.0%; sourceref holds 'Deed Book/Page' with a real book/page on 95.4%; ownname = taxpayer of record."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "no",
+    "gis": "partial",
+    "evidence": "parcel_cache.nc_onemap_cfg reads the statewide NC1Map_Parcels layer for any NC county (owner, situs, mailing, value); it does not map legdecfull or sourceref"
+   },
+   "manual_lane": "Guest index search is free; if images cost, the attorney's account or a copy order supplies the deed text.",
+   "confidence": "medium"
+  },
+  {
+   "county": "lincoln",
+   "state": "NC",
+   "rod": {
+    "platform": "Courthouse Computer Systems (CCHS) classic-ASP online search (lincolnrod.com is the office site)",
+    "url": "https://us4.courthousecomputersystems.com/LincolnNCNW/realestatesearch.asp",
+    "free_name_search": "yes",
+    "access": "disclaimer_click",
+    "index_online_back_to_year": null,
+    "images_free": "yes",
+    "legal_description_in_index": "yes",
+    "plat_books_or_maps_online": "yes",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: lincolnrod.com (200) office site; LincolnNCNW/realestatesearch.asp (200) 'What's Available': verified date range printed as '12/01/0992 - 07/15/2026' (start year is a data-entry error), deed images from book 0 upward, plat images, articles of incorporation, chattel mortgages, 'Deed 1779-1783' and grant images; 'Log In To Print' only. Repo rod/doc_images.py lists Lincoln CCHS images as free.",
+    "notes": "Old deed and grant books are imaged, but the verified-index start year cannot be read from the page. SearchService.asp has an intermittent Cloudflare check for non-browser clients (repo rod/cchs.py)."
+   },
+   "probate": {
+    "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
+    "url": "https://portal-nc.tylertech.cloud/Portal/",
+    "free_search": "yes",
+    "access": "captcha",
+    "notes": "No fee, but the portal home page says a CAPTCHA challenge is required every ten minutes for anonymous users, and a plain GET of Smart Search returned 'Human Verification' (HTTP 405) on 2026-10-07. A person can search free after the CAPTCHA; estate files that predate the county's eCourts conversion may need the Clerk of Superior Court estates division."
+   },
+   "tax": {
+    "url": "https://www.lincolncountytax.com/",
+    "free_by_parcel": "unknown",
+    "shows_bill_history": "unknown",
+    "access": "unknown",
+    "notes": "lincolncountytax.com (200) is a CivicPlus JavaScript shell; content not readable without a browser. County parcel viewer arcgisserver.lincolncountync.gov/taxparcelviewer/ (not opened)."
+   },
+   "gis": {
+    "url": "https://arcgisserver.lincolncountync.gov/arcgis/rest/services/Server_TaxParcelViewerSP/MapServer/0",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "County layer JSON read 2026-10-07: DEEDBK, DEEDPG, DEEDYR, PLATBK, PLATPG, SBDIVN, NAME1/NAME2, mailing ADDRESS1/2, SALEPRICE, SDATE; no legal-description field in the county layer (the legal is from the statewide layer). Statewide NC OneMap layer (https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1): 56862 Lincoln parcels; legdecfull (assessor short legal) non-blank on 100.0%; sourceref holds 'Deed Book/Page' with a real book/page on 98.1%; ownname = taxpayer of record."
+   },
+   "we_already_read": {
+    "rod": "yes",
+    "tax": "partial",
+    "gis": "yes",
+    "evidence": "rod/cchs.py (Lincoln), nc_rod_substitute_trustee.py, rod/doc_images.py; nc_county_pdf_delinquent_tax.py; parcel_cache + enrichment_arcgis + lincoln_vacant.py (DEEDBK/DEEDPG), nc_lincoln_bulk.py"
+   },
+   "manual_lane": "Rarely needed: index and deed images are free; very old books are imaged but the verified index start is unclear, so pre-1990s chains may need book-by-book browsing or an abstractor.",
+   "confidence": "high"
+  },
+  {
+   "county": "macon",
+   "state": "NC",
+   "rod": {
+    "platform": "Logan Systems 'The Lookup' PHP index (search.macondeeds.com)",
+    "url": "https://search.macondeeds.com/",
+    "free_name_search": "yes",
+    "access": "disclaimer_click",
+    "index_online_back_to_year": null,
+    "images_free": "unknown",
+    "legal_description_in_index": "yes",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: GET search.macondeeds.com (200) shows the disclaimer form (POST Accept): only Consolidated Real Property records are online, updated every 24 hours, accuracy/liability text only, no automation clause. Search page not opened (accept is a POST). Logan Lookup rows carry a Legal Desc column (repo rod/logan.py).",
+    "notes": "Repo registry's CAPTCHA flag for macondeeds.com was not seen on search.macondeeds.com. Coverage years and image cost not read."
+   },
+   "probate": {
+    "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
+    "url": "https://portal-nc.tylertech.cloud/Portal/",
+    "free_search": "yes",
+    "access": "captcha",
+    "notes": "No fee, but the portal home page says a CAPTCHA challenge is required every ten minutes for anonymous users, and a plain GET of Smart Search returned 'Human Verification' (HTTP 405) on 2026-10-07. A person can search free after the CAPTCHA; estate files that predate the county's eCourts conversion may need the Clerk of Superior Court estates division."
+   },
+   "tax": {
+    "url": "https://www.maconnc.org/Tax.html",
+    "free_by_parcel": "unknown",
+    "shows_bill_history": "unknown",
+    "access": "unknown",
+    "notes": "Tax office URL from NETR; not opened. County GIS at gis.maconnc.org/Maps/default.htm (not opened)."
+   },
+   "gis": {
+    "url": "https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "County GIS viewer gis.maconnc.org not opened. Statewide NC OneMap layer (https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1): 44699 Macon parcels; legdecfull (assessor short legal) non-blank on 99.5%; sourceref holds 'Deed Book/Page' with a real book/page on 99.3%; ownname = taxpayer of record."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "no",
+    "gis": "partial",
+    "evidence": "parcel_cache.nc_onemap_cfg reads the statewide NC1Map_Parcels layer for any NC county (owner, situs, mailing, value); it does not map legdecfull or sourceref"
+   },
+   "manual_lane": "A person accepts the Macon disclaimer and searches by name; if images cost or are missing, a copy order or the attorney's account supplies the deed.",
+   "confidence": "medium"
+  },
+  {
+   "county": "madison",
+   "state": "NC",
+   "rod": {
+    "platform": "Courthouse Computer Systems (CCHS) classic-ASP online search",
+    "url": "https://us4.courthousecomputersystems.com/MadisonNCNW/realestatesearch.asp",
+    "free_name_search": "yes",
+    "access": "disclaimer_click",
+    "index_online_back_to_year": 1987,
+    "images_free": "yes",
+    "legal_description_in_index": "yes",
+    "plat_books_or_maps_online": "yes",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: MadisonNCNW/realestatesearch.asp (200) 'What's Available': Pre-1995 Real Property Index 07/01/1987-12/31/1994, Consolidated Real Property Verified Index 01/01/1995 to 10/06/2026, Consolidated Book 0 and 298-842, Deed Book 0-297, Plat 0-11; 'Images as PDF', 'Log In To Print' only.",
+    "notes": "All deed books (0-842) are listed as imaged, but the name index only reaches 1987; earlier chains mean browsing imaged books by book/page from the deed references."
+   },
+   "probate": {
+    "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
+    "url": "https://portal-nc.tylertech.cloud/Portal/",
+    "free_search": "yes",
+    "access": "captcha",
+    "notes": "No fee, but the portal home page says a CAPTCHA challenge is required every ten minutes for anonymous users, and a plain GET of Smart Search returned 'Human Verification' (HTTP 405) on 2026-10-07. A person can search free after the CAPTCHA; estate files that predate the county's eCourts conversion may need the Clerk of Superior Court estates division."
+   },
+   "tax": {
+    "url": "https://lrcpwa.ncptscloud.com/Madison/",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "unknown",
+    "access": "open",
+    "notes": "NCPTS real-property PWA (listed as both assessor and tax collector link in NETR); repo nc_ptscloud_delinquent_tax.py has a Madison delinquent export and enrichment_lrcpwa_parcel.py a Madison tenant. Not opened today."
+   },
+   "gis": {
+    "url": "https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1",
+    "legal_description_field": "no",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "The repo's Madison layer (services1.arcgis.com/SIYkiqjmENweC50g/.../Parcels_NC/FeatureServer/0, enrichment_arcgis.py) answered 'layer not found' on 2026-10-07. Statewide legal is mostly blank for Madison. Statewide NC OneMap layer (https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1): 21381 Madison parcels; legdecfull (assessor short legal) non-blank on 13.3%; sourceref holds 'Deed Book/Page' with a real book/page on 90.0%; ownname = taxpayer of record."
+   },
+   "we_already_read": {
+    "rod": "partial",
+    "tax": "partial",
+    "gis": "partial",
+    "evidence": "rod/cchs.py CCHS_COUNTIES includes Madison but nc_rod_substitute_trustee.py keeps it out of SOURCES (scope rollback); enrichment_cchs_rod.py; nc_ptscloud_delinquent_tax.py; enrichment_lrcpwa_parcel.py; parcel_cache.nc_onemap_cfg reads the statewide NC1Map_Parcels layer for any NC county (owner, situs, mailing, value); it does not map legdecfull or sourceref"
+   },
+   "manual_lane": "Pre-1987 links in the chain require reading the imaged deed books by book/page (free) or an abstractor when the reference is missing.",
+   "confidence": "high"
+  },
+  {
+   "county": "martin",
+   "state": "NC",
+   "rod": {
+    "platform": "County 'Register Of Deeds Remote Access Site' (classic ASP, martinrod.org)",
+    "url": "https://www.martinrod.org/",
+    "free_name_search": "yes",
+    "access": "disclaimer_click",
+    "index_online_back_to_year": null,
+    "images_free": "yes",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: martinrod.org (200) welcome page: site serves PDF-format images, disclaimer is accuracy/liability only ('Use of this site is an acknowledgement of the disclaimer'), 'Acknowledge Disclaimer to Begin Searching Records' links welcome.asp; a cookieless GET of welcome.asp redirected back to Opening.asp, so the search screens were not reached. Instructions PDF linked, not opened.",
+    "notes": "No fee or cart language on the public pages; images described as PDF on the site. Coverage years not read."
+   },
+   "probate": {
+    "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
+    "url": "https://portal-nc.tylertech.cloud/Portal/",
+    "free_search": "yes",
+    "access": "captcha",
+    "notes": "No fee, but the portal home page says a CAPTCHA challenge is required every ten minutes for anonymous users, and a plain GET of Smart Search returned 'Human Verification' (HTTP 405) on 2026-10-07. A person can search free after the CAPTCHA; estate files that predate the county's eCourts conversion may need the Clerk of Superior Court estates division."
+   },
+   "tax": {
+    "url": "https://tax.martincountyncgov.com/taxSearch",
+    "free_by_parcel": "unknown",
+    "shows_bill_history": "unknown",
+    "access": "unknown",
+    "notes": "Page (200) is a JavaScript shell; content not readable without a browser. Property record cards are PDFs under gis.martincountyncgov.com/PropertyCards/ (seen in a directory link)."
+   },
+   "gis": {
+    "url": "https://gis.martincountyncgov.com/",
+    "legal_description_field": "no",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "County GIS not opened. Statewide layer has no legal description for Martin. Statewide NC OneMap layer (https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1): 17415 Martin parcels; legdecfull (assessor short legal) non-blank on 0.0%; sourceref holds 'Deed Book/Page' with a real book/page on 92.6%; ownname = taxpayer of record."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "no",
+    "gis": "partial",
+    "evidence": "parcel_cache.nc_onemap_cfg reads the statewide NC1Map_Parcels layer for any NC county (owner, situs, mailing, value); it does not map legdecfull or sourceref"
+   },
+   "manual_lane": "A person acknowledges the Martin disclaimer in a browser and reads the deed for the legal (no free GIS legal for Martin).",
+   "confidence": "medium"
+  },
+  {
+   "county": "mcdowell",
+   "state": "NC",
+   "rod": {
+    "platform": "Logan Systems 'The Lookup' PHP index (search.mcdowelldeeds.com)",
+    "url": "https://search.mcdowelldeeds.com/index.php",
+    "free_name_search": "yes",
+    "access": "disclaimer_click",
+    "index_online_back_to_year": null,
+    "images_free": "yes",
+    "legal_description_in_index": "yes",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: GET index.php (200) disclaimer: index and document information, accuracy/liability, warns that modifying records is punishable; no automation clause. Repo rod/logan.py documents rows with Book Info, Doc Type, Legal Desc and parties; rod/doc_images.py lists McDowell images as free.",
+    "notes": "Coverage start not read today."
+   },
+   "probate": {
+    "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
+    "url": "https://portal-nc.tylertech.cloud/Portal/",
+    "free_search": "yes",
+    "access": "captcha",
+    "notes": "No fee, but the portal home page says a CAPTCHA challenge is required every ten minutes for anonymous users, and a plain GET of Smart Search returned 'Human Verification' (HTTP 405) on 2026-10-07. A person can search free after the CAPTCHA; estate files that predate the county's eCourts conversion may need the Clerk of Superior Court estates division."
+   },
+   "tax": {
+    "url": "https://www.bttaxpayerportal.com/ITSPublicMD/",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "unknown",
+    "access": "open",
+    "notes": "BT/ITS public basic search (200) by owner, parcel number or address. Collector site mcdowellnctax.com not opened."
+   },
+   "gis": {
+    "url": "https://services9.arcgis.com/ETP7IuCigkUz7iI9/arcgis/rest/services/McDowell_Parcels/FeatureServer/0",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "County layer JSON read 2026-10-07 uses the NC OneMap schema (legdecfull, sourceref, ownname, mailadd). Statewide NC OneMap layer (https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1): 33449 McDowell parcels; legdecfull (assessor short legal) non-blank on 83.0%; sourceref holds 'Deed Book/Page' with a real book/page on 98.2%; ownname = taxpayer of record."
+   },
+   "we_already_read": {
+    "rod": "yes",
+    "tax": "partial",
+    "gis": "yes",
+    "evidence": "rod/logan.py + nc_rod_logan.py + rod/doc_images.py; mcdowell_tax_foreclosure.py, nc_county_pdf_delinquent_tax.py; parcel_cache + mcdowell_probate.py (reads legdecfull and sourceref)"
+   },
+   "manual_lane": "Rarely needed; older gaps go to an abstractor.",
+   "confidence": "high"
+  },
+  {
+   "county": "mecklenburg",
+   "state": "NC",
+   "rod": {
+    "platform": "Aumentum Recorder web access (meckrod.manatron.com) for March 1990 onward; separate 'Remote Access Site' (meckrodhistorical.com) with scanned index books and images 1763-1990",
+    "url": "https://meckrod.manatron.com/",
+    "free_name_search": "yes",
+    "access": "disclaimer_click",
+    "index_online_back_to_year": 1763,
+    "images_free": "no",
+    "legal_description_in_index": "yes",
+    "plat_books_or_maps_online": "yes",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: deeds.mecknc.gov real-estate-records page (200): modern online database covers March 1990 to today; historical land records and images 1763 through February 1990 at meckrodhistorical.com. meckrod.manatron.com (200) welcome page: click-to-acknowledge disclaimer, accuracy only, no automation clause; robots.txt is 'Disallow: /'. meckrodhistorical.com (200): imaged index books 1763-1990 plus image-by-book/page for deed books 1-6219, old deed books 1-26, map books, condo and satisfaction books, served as PDF with no fee language.",
+    "notes": "Repo rod/doc_images.py records modern Aumentum images as paywalled (cart) and the robots Disallow. Historic (pre-1990) images look free; the most recent deed for most parcels is post-1990 and so is a paid image. Pre-1990 search is by scanned index book, not a typed name search."
+   },
+   "probate": {
+    "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
+    "url": "https://portal-nc.tylertech.cloud/Portal/",
+    "free_search": "yes",
+    "access": "captcha",
+    "notes": "No fee, but the portal home page says a CAPTCHA challenge is required every ten minutes for anonymous users, and a plain GET of Smart Search returned 'Human Verification' (HTTP 405) on 2026-10-07. A person can search free after the CAPTCHA; estate files that predate the county's eCourts conversion may need the Clerk of Superior Court estates division."
+   },
+   "tax": {
+    "url": "https://taxbill.co.mecklenburg.nc.us/publicwebaccess/",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "Bill search (200) by parcel number, owner, bill number; tax years 2018-2026; special-assessment and delinquent searches. Assessor at cao.mecknc.gov / Polaris (not opened)."
+   },
+   "gis": {
+    "url": "https://meckgis.mecklenburgcountync.gov/server/rest/services/TaxParcel_Camaownershipvalues/FeatureServer/0",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "Layer JSON read 2026-10-07: txt_legaldesc, txt_deedbook, txt_deedpage, dte_dateofsale, amt_price, full_owner_name and mailing fields. Statewide NC OneMap layer (https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1): 442287 Mecklenburg parcels; legdecfull (assessor short legal) non-blank on 100.0%; sourceref holds 'Deed Book/Page' with a real book/page on 98.7%; ownname = taxpayer of record."
+   },
+   "we_already_read": {
+    "rod": "partial",
+    "tax": "no",
+    "gis": "yes",
+    "evidence": "rod/aumentum.py (Meck tenant, name/date index) and rod/doc_images.py (marked paywalled); enrichment_arcgis.py reads the Meck CAMA ownership layer; Meck is outside the owner's build scope per MASTER_GAPS doc"
+   },
+   "manual_lane": "For deeds after Feb 1990 the image is a paid copy: the attorney's account or a copy order supplies the legal; the GIS legal and deed book/page are free. Older chains use the free historic image site by book/page.",
+   "confidence": "high"
+  },
+  {
+   "county": "mitchell",
+   "state": "NC",
+   "rod": {
+    "platform": "Logan Systems 'The Lookup' PHP index (search.mitchelldeeds.com)",
+    "url": "https://search.mitchelldeeds.com/index.php",
+    "free_name_search": "yes",
+    "access": "disclaimer_click",
+    "index_online_back_to_year": null,
+    "images_free": "yes",
+    "legal_description_in_index": "yes",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: GET index.php (200) shows the Logan disclaimer (index and document information, accuracy/liability; no automation clause). Repo rod/logan.py documents Legal Desc in rows; rod/doc_images.py lists Mitchell images as free. The registry's CAPTCHA flag (on mitchelldeeds.com) was not seen on the search host.",
+    "notes": "Coverage start not read."
+   },
+   "probate": {
+    "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
+    "url": "https://portal-nc.tylertech.cloud/Portal/",
+    "free_search": "yes",
+    "access": "captcha",
+    "notes": "No fee, but the portal home page says a CAPTCHA challenge is required every ten minutes for anonymous users, and a plain GET of Smart Search returned 'Human Verification' (HTTP 405) on 2026-10-07. A person can search free after the CAPTCHA; estate files that predate the county's eCourts conversion may need the Clerk of Superior Court estates division."
+   },
+   "tax": {
+    "url": "http://mitchell.webtaxpay.com/index.php",
+    "free_by_parcel": "unknown",
+    "shows_bill_history": "unknown",
+    "access": "unknown",
+    "notes": "Tax collector link from NETR (webtaxpay; Franklin's webtaxpay answered a 403 bot check today); not opened. GovernMax assessor nc-mitchell-assessor.governmax.com timed out."
+   },
+   "gis": {
+    "url": "https://mapping.mitchellcountync.gov/arcgis/rest/services/WebMapNew/MapServer/12",
+    "legal_description_field": "no",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "Layer JSON read 2026-10-07: DeedBook, DeedPage, Deed_Ref, Deed_Date, Grantor, PlatBook, PlatPage, Owner1/2, mailing; only LegalAc (legal acres), no legal text. Statewide NC OneMap layer (https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1): 17671 Mitchell parcels; legdecfull (assessor short legal) non-blank on 0.0%; sourceref holds 'Deed Book/Page' with a real book/page on 97.4%; ownname = taxpayer of record."
+   },
+   "we_already_read": {
+    "rod": "yes",
+    "tax": "no",
+    "gis": "yes",
+    "evidence": "rod/logan.py + nc_rod_logan.py + rod/doc_images.py; parcel_cache Mitchell layer + enrichment_arcgis"
+   },
+   "manual_lane": "Legal description must be read off the free deed image (no GIS legal text for Mitchell).",
+   "confidence": "high"
+  },
+  {
+   "county": "montgomery",
+   "state": "NC",
+   "rod": {
+    "platform": "Courthouse Computer Systems (CCHS) classic-ASP online search (montgomeryrod.net is a frame onto it)",
+    "url": "https://us4.courthousecomputersystems.com/montgomerync/",
+    "free_name_search": "yes",
+    "access": "open",
+    "index_online_back_to_year": 1792,
+    "images_free": "yes",
+    "legal_description_in_index": "yes",
+    "plat_books_or_maps_online": "yes",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: montgomeryrod.net (200) frames us4.courthousecomputersystems.com/montgomerync/; MontgomeryNCNW/realestatesearch.asp (200) 'What's Available': verified date range 06/15/1792 to 10/06/2026, deed images across old and modern books, map images, condo, highway maps; 'Images as PDF', 'Log In To Print' only.",
+    "notes": "Strongest index depth in the batch (verified from 1792)."
+   },
+   "probate": {
+    "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
+    "url": "https://portal-nc.tylertech.cloud/Portal/",
+    "free_search": "yes",
+    "access": "captcha",
+    "notes": "No fee, but the portal home page says a CAPTCHA challenge is required every ten minutes for anonymous users, and a plain GET of Smart Search returned 'Human Verification' (HTTP 405) on 2026-10-07. A person can search free after the CAPTCHA; estate files that predate the county's eCourts conversion may need the Clerk of Superior Court estates division."
+   },
+   "tax": {
+    "url": "https://www.webgis.net/nc/montgomery/",
+    "free_by_parcel": "unknown",
+    "shows_bill_history": "unknown",
+    "access": "disclaimer_click",
+    "notes": "NETR lists webgis.net as both assessor and GIS; page (200) opens with a data disclaimer. No separate bill-search portal located."
+   },
+   "gis": {
+    "url": "https://www.webgis.net/nc/montgomery/",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "County WebGIS (200) with disclaimer; layer fields not read. Statewide NC OneMap layer (https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1): 30283 Montgomery parcels; legdecfull (assessor short legal) non-blank on 99.2%; sourceref holds 'Deed Book/Page' with a real book/page on 98.1%; ownname = taxpayer of record."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "no",
+    "gis": "partial",
+    "evidence": "parcel_cache.nc_onemap_cfg reads the statewide NC1Map_Parcels layer for any NC county (owner, situs, mailing, value); it does not map legdecfull or sourceref"
+   },
+   "manual_lane": "Little needed: free index from 1792 and free images; a person only steps in when a book is missing from the image list.",
+   "confidence": "high"
+  },
+  {
+   "county": "moore",
+   "state": "NC",
+   "rod": {
+    "platform": "Aumentum Recorder web access (Harris Recording Solutions) at rod.moorecountync.gov",
+    "url": "https://rod.moorecountync.gov/",
+    "free_name_search": "yes",
+    "access": "disclaimer_click",
+    "index_online_back_to_year": null,
+    "images_free": "yes",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: GET rod.moorecountync.gov (200) welcome page: click-to-acknowledge disclaimer (accuracy only); notice that the office is back-filing index entries for 1/1/1888-6/30/1988 so older parties may be missing; notice that all recorded document images viewed or downloaded through the online search now carry a watermark and that this does not restrict public access. Optional account login exists.",
+    "notes": "Images are free to view/download with a watermark per the county's notice. Index for 1888-1988 is incomplete while back-filing; the office says to also search the index books in person."
+   },
+   "probate": {
+    "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
+    "url": "https://portal-nc.tylertech.cloud/Portal/",
+    "free_search": "yes",
+    "access": "captcha",
+    "notes": "No fee, but the portal home page says a CAPTCHA challenge is required every ten minutes for anonymous users, and a plain GET of Smart Search returned 'Human Verification' (HTTP 405) on 2026-10-07. A person can search free after the CAPTCHA; estate files that predate the county's eCourts conversion may need the Clerk of Superior Court estates division."
+   },
+   "tax": {
+    "url": "https://bttaxpayerportal.com/ITSPublicMO/TaxBillSearch",
+    "free_by_parcel": "unknown",
+    "shows_bill_history": "unknown",
+    "access": "unknown",
+    "notes": "Linked from moorecountync.gov/202/Tax (200); BT/ITS bill search not opened. County GIS on ArcGIS Experience."
+   },
+   "gis": {
+    "url": "https://experience.arcgis.com/experience/ff9f91954c4747b2a2d91d83dfaf8c74",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "County ArcGIS Experience viewer not opened. Statewide NC OneMap layer (https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1): 76657 Moore parcels; legdecfull (assessor short legal) non-blank on 99.9%; sourceref holds 'Deed Book/Page' with a real book/page on 99.8%; ownname = taxpayer of record."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "no",
+    "gis": "partial",
+    "evidence": "parcel_cache.nc_onemap_cfg reads the statewide NC1Map_Parcels layer for any NC county (owner, situs, mailing, value); it does not map legdecfull or sourceref"
+   },
+   "manual_lane": "For pre-1988 chain links a person checks the index books at the office (online back-fill incomplete) or uses an abstractor.",
+   "confidence": "medium"
+  },
+  {
+   "county": "nash",
+   "state": "NC",
+   "rod": {
+    "platform": "Cott Systems eSearch v4 (cotthosting.com/NCNashExternal), guest user",
+    "url": "https://cotthosting.com/NCNashExternal/LandRecords/protected/v4/SrchName.aspx",
+    "free_name_search": "yes",
+    "access": "open",
+    "index_online_back_to_year": null,
+    "images_free": "unknown",
+    "legal_description_in_index": "yes",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "unknown",
+    "how_verified": "2026-10-07: GET SrchName.aspx (200) opens as Guest User with index types CONSOLIDATED REAL PROPERTY, FIXTURE FILINGS, REAL ESTATE and a shopping cart; no disclaimer or coverage text in the HTML. nashrod.com (registry) not opened.",
+    "notes": "Image cost not tested; coverage not stated."
+   },
+   "probate": {
+    "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
+    "url": "https://portal-nc.tylertech.cloud/Portal/",
+    "free_search": "yes",
+    "access": "captcha",
+    "notes": "No fee, but the portal home page says a CAPTCHA challenge is required every ten minutes for anonymous users, and a plain GET of Smart Search returned 'Human Verification' (HTTP 405) on 2026-10-07. A person can search free after the CAPTCHA; estate files that predate the county's eCourts conversion may need the Clerk of Superior Court estates division."
+   },
+   "tax": {
+    "url": "https://taxdata.nashcountync.gov/forms/htmlframe.aspx?mode=content/home.htm",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "unknown",
+    "access": "open",
+    "notes": "Tyler iasWorld-style tax search (200) with maintenance banner text; collections on Munis self service (nashcountync.munisselfservice.com, not opened)."
+   },
+   "gis": {
+    "url": "https://gis.nashcountync.gov/mapviewer/",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "County map viewer not opened. Statewide NC OneMap layer (https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1): 55717 Nash parcels; legdecfull (assessor short legal) non-blank on 100.0%; sourceref holds 'Deed Book/Page' with a real book/page on 92.3%; ownname = taxpayer of record."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "no",
+    "gis": "partial",
+    "evidence": "parcel_cache.nc_onemap_cfg reads the statewide NC1Map_Parcels layer for any NC county (owner, situs, mailing, value); it does not map legdecfull or sourceref; nc_coastal_tax_foreclosure.py only mentions Nash parcel-number collisions"
+   },
+   "manual_lane": "Guest index search is free; if images cost, the attorney's account or a copy order supplies the deed text.",
+   "confidence": "medium"
+  },
+  {
+   "county": "new-hanover",
+   "state": "NC",
+   "rod": {
+    "platform": "'Online Record System' PHP name index (search.newhanoverdeeds.com, NameSearch.php)",
+    "url": "https://search.newhanoverdeeds.com/NameSearch.php?Accept=Accept",
+    "free_name_search": "yes",
+    "access": "disclaimer_click",
+    "index_online_back_to_year": null,
+    "images_free": "yes",
+    "legal_description_in_index": "yes",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: nhcgov.com/436/Records-Search (200) shows the official-records disclaimer (accuracy, spelling variants, redaction; no automation clause) and links the search with ?Accept=Accept; that GET (200, 349 KB) opened the search form directly: 'Instruments Verified Through: October 01, 2026', name search, a Property Description search (subdivision, lot, block, section, map) and a TIFF image-viewer note; no cart or fee text.",
+    "notes": "Images appear viewable free (viewer instructions, no payment flow); not opened. Index start year not shown. Same platform family as the repo's SC 'Online Record System' reader (enrichment_rod_name_index.py)."
+   },
+   "probate": {
+    "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
+    "url": "https://portal-nc.tylertech.cloud/Portal/",
+    "free_search": "yes",
+    "access": "captcha",
+    "notes": "No fee, but the portal home page says a CAPTCHA challenge is required every ten minutes for anonymous users, and a plain GET of Smart Search returned 'Human Verification' (HTTP 405) on 2026-10-07. A person can search free after the CAPTCHA; estate files that predate the county's eCourts conversion may need the Clerk of Superior Court estates division."
+   },
+   "tax": {
+    "url": "https://etax.nhcgov.com/pt/Search/Disclaimer.aspx?FromUrl=../search/commonsearch.aspx?mode=owner",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "unknown",
+    "access": "disclaimer_click",
+    "notes": "Tyler iasWorld public access (200) behind an accept disclaimer; search by owner, address, parcel ID; page also carries a 'system unavailable due to maintenance' banner text."
+   },
+   "gis": {
+    "url": "https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "The repo's county layer (gis.nhcgov.com/.../IASTAX/MapServer/0) carries only PID/PIN/MAPID geometry fields, no owner, legal or deed fields (read 2026-10-07). New Hanover sourceref is labelled 'Sale Book/Page'. Statewide NC OneMap layer (https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1): 103489 New Hanover parcels; legdecfull (assessor short legal) non-blank on 99.8%; sourceref holds 'Deed Book/Page' with a real book/page on 99.5%; ownname = taxpayer of record."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "partial",
+    "gis": "partial",
+    "evidence": "nc_county_csv_delinquent_tax.py and new_hanover_foreclosures.py (lists); enrichment_arcgis.py New Hanover IASTAX layer; parcel_cache.nc_onemap_cfg reads the statewide NC1Map_Parcels layer for any NC county (owner, situs, mailing, value); it does not map legdecfull or sourceref; nc_rod_substitute_trustee.py lists New Hanover as ROD not covered"
+   },
+   "manual_lane": "Little needed: index, property-description search and images appear free; older chains beyond the online index go to an abstractor.",
+   "confidence": "medium"
+  },
+  {
+   "county": "northampton",
+   "state": "NC",
+   "rod": {
+    "platform": "County 'Register Of Deeds Remote Access Site' (classic ASP, northamptonrod.org): Full System index from 1991 plus scanned index books and images back to 1741",
+    "url": "https://northamptonrod.org/",
+    "free_name_search": "yes",
+    "access": "disclaimer_click",
+    "index_online_back_to_year": 1741,
+    "images_free": "yes",
+    "legal_description_in_index": "unknown",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: northamptonrod.org (200) welcome text: scanned historical index books for land records back to 1741 with matching images ('Imaged Index'), image lookup by book/page ('Imaging System Only'), and a searchable index from 1991 ('Full System'); acknowledge-disclaimer link to welcome.asp; accuracy-only disclaimer; no fee language for land-record images. northamptonrod.permitium.com is a vital-records order site.",
+    "notes": "Typed name search only from 1991; earlier is by scanned index book. Search screens not opened."
+   },
+   "probate": {
+    "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
+    "url": "https://portal-nc.tylertech.cloud/Portal/",
+    "free_search": "yes",
+    "access": "captcha",
+    "notes": "No fee, but the portal home page says a CAPTCHA challenge is required every ten minutes for anonymous users, and a plain GET of Smart Search returned 'Human Verification' (HTTP 405) on 2026-10-07. A person can search free after the CAPTCHA; estate files that predate the county's eCourts conversion may need the Clerk of Superior Court estates division."
+   },
+   "tax": {
+    "url": "http://www.northamptonnctax.com/default.aspx",
+    "free_by_parcel": "unknown",
+    "shows_bill_history": "unknown",
+    "access": "unknown",
+    "notes": "Page (200) is a JavaScript shell; content not readable without a browser. County GIS at webapp.agdmaps.com/nc/northampton (not opened)."
+   },
+   "gis": {
+    "url": "https://webapp.agdmaps.com/nc/northampton/",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "County AGD web map not opened. Northampton sourceref has no 'Deed Book/Page' prefix. Statewide NC OneMap layer (https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1): 20504 Northampton parcels; legdecfull (assessor short legal) non-blank on 98.8%; sourceref holds 'Deed Book/Page' with a real book/page on 94.6%; ownname = taxpayer of record."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "no",
+    "gis": "partial",
+    "evidence": "parcel_cache.nc_onemap_cfg reads the statewide NC1Map_Parcels layer for any NC county (owner, situs, mailing, value); it does not map legdecfull or sourceref"
+   },
+   "manual_lane": "Pre-1991 chain links are found by browsing scanned index books online (free) or by an abstractor; the tax bill needs a person in a browser.",
+   "confidence": "medium"
+  },
+  {
+   "county": "onslow",
+   "state": "NC",
+   "rod": {
+    "platform": "Cott Systems eSearch (deeds.onslowcountync.gov), guest sign-in or paid account",
+    "url": "https://deeds.onslowcountync.gov/External/User/Login.aspx",
+    "free_name_search": "yes",
+    "access": "disclaimer_click",
+    "index_online_back_to_year": null,
+    "images_free": "unknown",
+    "legal_description_in_index": "yes",
+    "plat_books_or_maps_online": "unknown",
+    "terms_forbid_automation": "unknown",
+    "how_verified": "2026-10-07: GET deeds.onslowcountync.gov (200) redirects to the Cott sign-in page: temporary/guest users click 'Sign in as a Guest'; new account holders 'select and pay for desired subscription, if required'; Certified Dates page and shopping cart present.",
+    "notes": "Guest index search is free; what the paid subscription adds (likely images/printing) was not read."
+   },
+   "probate": {
+    "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
+    "url": "https://portal-nc.tylertech.cloud/Portal/",
+    "free_search": "yes",
+    "access": "captcha",
+    "notes": "No fee, but the portal home page says a CAPTCHA challenge is required every ten minutes for anonymous users, and a plain GET of Smart Search returned 'Human Verification' (HTTP 405) on 2026-10-07. A person can search free after the CAPTCHA; estate files that predate the county's eCourts conversion may need the Clerk of Superior Court estates division."
+   },
+   "tax": {
+    "url": "https://tax.onslowcountync.gov/ITSPublicON/TaxBillSearch",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "yes",
+    "access": "open",
+    "notes": "BT/ITS tax bill and property record search (200) by owner, account, parcel ID or bill number."
+   },
+   "gis": {
+    "url": "https://maps.onslowcountync.gov/arcgis/rest/services/GISWebsite/GISWebsiteLayers/MapServer/7",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "Layer JSON read 2026-10-07: LEGAL1/LEGAL2/LEGAL3, BOOK, PAGE, SALEBOOK, SALEPAGE, SALEDATE, PLATBOOKPAGE, DeedLinkSuffix, OWNER1/2 and mailing. Statewide NC OneMap layer (https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1): 95297 Onslow parcels; legdecfull (assessor short legal) non-blank on 100.0%; sourceref holds 'Deed Book/Page' with a real book/page on 99.9%; ownname = taxpayer of record."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "yes",
+    "gis": "yes",
+    "evidence": "nc_its_public_tax.py (Onslow ITSPublicON bills), nc_coastal_tax_foreclosure.py; enrichment_arcgis.py Onslow layer 7; nc_rod_substitute_trustee.py lists Onslow ROD as not covered"
+   },
+   "manual_lane": "If deed images need the paid subscription, the attorney's account or a copy order supplies the deed; GIS legal and book/page are free.",
+   "confidence": "medium"
+  },
+  {
+   "county": "orange",
+   "state": "NC",
+   "rod": {
+    "platform": "Courthouse Computer Systems (CCHS) classic-ASP online search, county-hosted at rod.orangecountync.gov",
+    "url": "https://rod.orangecountync.gov/orangenc/",
+    "free_name_search": "yes",
+    "access": "disclaimer_click",
+    "index_online_back_to_year": 1932,
+    "images_free": "yes",
+    "legal_description_in_index": "yes",
+    "plat_books_or_maps_online": "yes",
+    "terms_forbid_automation": "no",
+    "how_verified": "2026-10-07: landing page (200) has the CCHS accuracy disclaimer and click-to-enter; OrangeNCNW/realestatesearch.asp (200) 'What's Available': verified date range 09/01/1932 to 9/24/2026, Records Book 1-59, Deed of Trust Book A and 1-212, Plat Book 1-128, highway maps; search has a 'Description / PIN' field; 'Log In To Print' only.",
+    "notes": "Images view free (CCHS classic; printing needs login)."
+   },
+   "probate": {
+    "system": "NC estates run through the statewide eCourts Portal (Tyler Odyssey Smart Search, Estates case category); no county-specific online estate index found",
+    "url": "https://portal-nc.tylertech.cloud/Portal/",
+    "free_search": "yes",
+    "access": "captcha",
+    "notes": "No fee, but the portal home page says a CAPTCHA challenge is required every ten minutes for anonymous users, and a plain GET of Smart Search returned 'Human Verification' (HTTP 405) on 2026-10-07. A person can search free after the CAPTCHA; estate files that predate the county's eCourts conversion may need the Clerk of Superior Court estates division."
+   },
+   "tax": {
+    "url": "https://property.spatialest.com/nc/orange/#/",
+    "free_by_parcel": "yes",
+    "shows_bill_history": "unknown",
+    "access": "open",
+    "notes": "Assessor on Schneider Spatialest (not opened; Schneider software terms read 2026-10-07 prohibit robots and scraping). Tax payment page co.orange.nc.us/859 not opened. Orange has an NCPTS delinquent export used by the repo."
+   },
+   "gis": {
+    "url": "https://gis.orangecountync.gov/orangeNCGIS/default.htm",
+    "legal_description_field": "yes",
+    "deed_book_page_field": "yes",
+    "owner_field": "yes",
+    "notes": "County GIS viewer not opened. Statewide NC OneMap layer (https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1): 59366 Orange parcels; legdecfull (assessor short legal) non-blank on 99.6%; sourceref holds 'Deed Book/Page' with a real book/page on 95.5%; ownname = taxpayer of record."
+   },
+   "we_already_read": {
+    "rod": "no",
+    "tax": "partial",
+    "gis": "partial",
+    "evidence": "nc_ptscloud_delinquent_tax.py (Orange export); parcel_cache.nc_onemap_cfg reads the statewide NC1Map_Parcels layer for any NC county (owner, situs, mailing, value); it does not map legdecfull or sourceref"
+   },
+   "manual_lane": "Pre-1932 chain links need the office's older books or an abstractor.",
+   "confidence": "high"
+  }
+ ],
+ "summary": {
+  "rod_open_free": 28,
+  "rod_walled": 4,
+  "rod_unreachable": 0,
+  "images_free": 17,
+  "legal_description_online": 31,
+  "index_back_to_before_1980": 10
+ },
+ "notes": {
+  "counties_done": 34,
+  "counties_expected": 34,
+  "missing": [],
+  "definitions": {
+   "rod_open_free": "free_name_search=yes AND access is open or disclaimer_click (reached with no login, CAPTCHA, fee or block)",
+   "rod_walled": "rod.access is login, captcha, payment or blocked; 'blocked' includes a Cloudflare 'Just a moment' / bot challenge served to a plain browser-UA GET",
+   "images_free": "yes = deed images viewable on screen at no charge, either seen on the portal or verified by the repo on the same vendor app; printing may still need a paid session",
+   "legal_description_in_index": "yes = the ROD index exposes a property/legal description column or search field (usually brief: lot, subdivision, acreage, or a PD: book/page reference); the full metes-and-bounds legal is only on the deed image",
+   "legal_description_online": "counties where at least one free online route shows some legal description: free ROD images, a description column in the ROD index, or a legal-description field in a public GIS parcel layer (county layer or statewide NC OneMap legdecfull, which is the assessor's short legal)",
+   "index_back_to_before_1980": "ROD online index start year stated on the portal is before 1980 (null years are not counted)"
+  },
+  "statewide": {
+   "nc_onemap_parcels": "https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1 is public (no token) for all 100 NC counties: ownname (taxpayer of record), mailadd, siteadd, legdecfull (assessor short legal), sourceref ('Deed Book/Page 1234/567' = the vesting deed reference), saledate, parval. Per-county fill of legdecfull and of a real book/page in sourceref was measured 2026-10-07 with count-only statistics queries and is quoted in each county's gis.notes. The repo's parcel_cache.nc_onemap_cfg reads this layer but does not map legdecfull or sourceref.",
+   "repo_broken_endpoint": "src/foreclosure_scraper/enrichment_nc_onemap.py points PARCEL_URL at services.nconemap.gov/arcgis/rest/services/NC_Parcels/MapServer/0, which returned HTTP 404 on 2026-10-07.",
+   "probate": "All NC estates are on the statewide eCourts Portal (Tyler Odyssey). Its home page states a CAPTCHA challenge every ten minutes for anonymous users; a plain GET of Smart Search returned 'Human Verification' (HTTP 405) on 2026-10-07. Free for a person, walled for automation. Note: repo scrapers/counties_nc/nc_ecourts_estates.py contains a WAF-CAPTCHA solve path (_solve_waf), which conflicts with the no-bypass rule.",
+   "county_websites": "Several CivicPlus-hosted county websites (franklincountync.gov, granvillecounty.org, others noted per county) answered a Cloudflare 'you have been blocked' page to a plain GET; those pages were not read and search-engine snippets were used only to find portal URLs."
+  }
+ }
+}

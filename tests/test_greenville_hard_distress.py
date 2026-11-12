@@ -1,0 +1,606 @@
+"""Greenville County SC hard-distress scraper (flag-gated, default OFF).
+
+Fixtures are REAL slices of the live sources captured 2026-08-03:
+  * greenville_delinquent_parcels.json — layer-52 features incl. one polygon,
+    one government owner, one out-of-state mailing, one blank house number.
+  * greenville_tax_sale.html           — roster rows incl. the real blank-Map#
+    mobile-home items the county interleaves.
+  * greenville_probate_results.html    — a real "Deceased Person" result page.
+"""
+from __future__ import annotations
+
+import asyncio
+import json
+import pathlib
+
+
+from foreclosure_scraper.models import ListingType, PropertyKind, _normalize_parcel
+from foreclosure_scraper.scrapers.counties_sc import greenville_hard_distress as gv
+from foreclosure_scraper.scrapers.counties_sc.greenville_hard_distress import (
+    GreenvilleHardDistress, TaxSaleRow, build_listing, parse_probate_rows,
+    parse_tax_sale, probate_match, _situs, _is_absentee,
+)
+
+FX = pathlib.Path(__file__).parent / "fixtures"
+
+PIN_BOTH = "0032000200610"      # delinquent AND on the tax-sale roster
+PIN_VACANT = "0001000100208"    # blank house number, out-of-state (GA) mailing
+PIN_ABSENTEE = "0053000501500"  # FL mailing
+PIN_GOV = "0091010802300"       # CITY OF GREENVILLE — never a lead
+PIN_MOBILE = "0135000601300"    # MOBILE HOME proptype
+
+
+def _parcels():
+    return json.loads((FX / "greenville_delinquent_parcels.json").read_text())["features"]
+
+
+def _by_pin():
+    return {f["attributes"]["PIN"]: f for f in _parcels()}
+
+
+# ------------------------------------------------------------ the flag ------
+def test_scraper_is_armed_by_default(monkeypatch):
+    # CHANGED 2026-09-21: was dormant without the flag. The owner's 2026-09-15 rule puts distressed
+    # leads in all 146 counties, so Greenville is on unless FORECLOSURE_INCLUDE_GREENVILLE=0.
+    monkeypatch.delenv(gv.ENV_ON, raising=False)
+    assert GreenvilleHardDistress().disabled is False
+
+
+def test_flag_off_reports_dormant_not_a_suspicious_zero(monkeypatch):
+    """A county that is deliberately off must never look like a broken source
+    in the run report."""
+    monkeypatch.setenv(gv.ENV_ON, "0")
+    s = GreenvilleHardDistress()
+    assert s.disabled is True and gv.ENV_ON in s.disabled_reason
+    asyncio.run(s.safe_run())
+    assert s.last_outcome == "DORMANT"
+
+
+def test_flag_on_arms_the_scraper(monkeypatch):
+    monkeypatch.setenv(gv.ENV_ON, "1")
+    assert GreenvilleHardDistress().disabled is False
+
+
+def test_fetch_returns_nothing_when_the_flag_is_off(monkeypatch):
+    monkeypatch.setenv(gv.ENV_ON, "0")
+    s = GreenvilleHardDistress()
+    s.disabled = False                     # bypass the base-class short-circuit
+    assert list(asyncio.run(s.fetch())) == []
+
+
+def test_greenville_is_not_added_to_the_scope_config():
+    """The operator has not decided to expand the narrow FLIP footprint.
+    Building the source must not quietly widen THAT list."""
+    from foreclosure_scraper.config import (
+        SC_COUNTIES, SCOPE_DENY_COUNTIES_NORMALIZED, in_scope,
+    )
+    assert not any(c.name == "Greenville" for c in SC_COUNTIES)
+    assert ("Greenville", "SC") in SCOPE_DENY_COUNTIES_NORMALIZED
+    assert in_scope("Greenville", "SC") is False
+
+
+def test_but_the_distressed_scope_gate_admits_it_and_that_is_the_real_gate():
+    """This module's own ListingType.TAX_LIEN is not a flip type, so the
+    narrow ``config.in_scope`` test above is NOT what actually gates its rows
+    in production — ``main._county_in_scope`` routes non-flip listing types
+    through ``config.in_scope_distressed`` instead, which has no deny list
+    (see that function's docstring: "if its a distressed property its
+    anywhere in nc and sc"). Both facts are true at once and this test exists
+    so nobody "fixes" the scope config believing the module above proves this
+    source is blocked -- verified live 2026-09-23 that it is not (see the
+    module's ZERO-NET-NEW AUDIT docstring for the real cause)."""
+    from foreclosure_scraper import main as m
+    from foreclosure_scraper.config import in_scope_distressed
+
+    assert in_scope_distressed("Greenville", "SC") is True
+
+    f = _by_pin()[PIN_BOTH]
+    li = build_listing(_normalize_parcel(PIN_BOTH), f["attributes"], f["geometry"])
+    assert m._is_flip(li) is False
+    assert m._county_in_scope(li) is True
+    assert m._in_scope(li) is True
+
+
+# ---------------------------------------------------------- tax sale --------
+def test_parse_tax_sale_reads_the_roster():
+    p = parse_tax_sale((FX / "greenville_tax_sale.html").read_text())
+    assert p.rows
+    first = p.rows[0]
+    assert first.pin == _normalize_parcel(PIN_BOTH)
+    assert first.map_number == PIN_BOTH
+    assert first.owner == "MASS MEDIA INC"
+    assert first.amount == 5987.69
+    assert all(r.pin for r in p.rows)
+
+
+def test_parse_tax_sale_counts_the_unmapped_mobile_home_items():
+    """~229 roster items are mobile-home/personal-property rows with a BLANK
+    Map #. They are not real-property leads, but the drop must be visible."""
+    p = parse_tax_sale((FX / "greenville_tax_sale.html").read_text())
+    assert p.unmapped == 2
+    assert all(r.map_number.strip() for r in p.rows)
+
+
+def test_parse_tax_sale_skips_the_header_row():
+    p = parse_tax_sale((FX / "greenville_tax_sale.html").read_text())
+    assert not any((r.item or "").lower().startswith("item") for r in p.rows)
+
+
+def test_parse_tax_sale_on_junk_is_empty():
+    assert parse_tax_sale("").rows == []
+    assert parse_tax_sale("<html><body>no table</body></html>").rows == []
+
+
+# ------------------------------------------------------------- probate ------
+def test_parse_probate_rows():
+    rows = parse_probate_rows((FX / "greenville_probate_results.html").read_text())
+    assert len(rows) == 10
+    assert all(r["party"] == "Deceased Person" for r in rows)
+    assert {"case", "name", "party"} == set(rows[0])
+
+
+def test_probate_match_needs_surname_and_first_name():
+    rows = parse_probate_rows((FX / "greenville_probate_results.html").read_text())
+    # 2026ES2300916 ABERNATHY , RANDALL DALE
+    hit = probate_match("ABERNATHY RANDALL DALE", rows)
+    assert hit and hit["case"] == "2026ES2300916" and hit["year"] == 2026
+    assert hit["confidence"] == "high"          # middle name agrees too
+    # A different Abernathy must NOT match on surname alone.
+    assert probate_match("ABERNATHY WILLIAM T", rows) is None
+    # Surname-only owner strings can never match.
+    assert probate_match("ABERNATHY", rows) is None
+
+
+def test_probate_match_is_positional_not_a_token_soup():
+    """Real false positives this rule exists to stop. Each pair below was
+    produced by the live index under a looser 'tokens appear anywhere' match."""
+    def rows(name):
+        return [{"case": "2025ES2300001", "name": name, "party": "Deceased Person"}]
+
+    # middle name read as a first name
+    assert probate_match("SMITH WILLIAM R", rows("SMITH , ELRAMA WILLIAM JR")) is None
+    assert probate_match("SMITH TODD A", rows("SMITH , ELOISE TODD")) is None
+    assert probate_match("JONES ROY", rows("JONES , BOBBY ROY")) is None
+    assert probate_match("ASHMORE ANDREW S", rows("ASHMORE , LORRAINE ANDREW")) is None
+    # first + last agree -> a real match, medium confidence (middles differ)
+    m = probate_match("SMITH CARL K", rows("SMITH , CARL HENRY"))
+    assert m and m["confidence"] == "medium"
+    # first + last + middle agree -> high
+    h = probate_match("ALLISON MALINDA MAE", rows("ALLISON , MALINDA MAE JONES"))
+    assert h and h["confidence"] == "high"
+
+
+def test_probate_match_ignores_generational_suffixes():
+    rows = [{"case": "2025ES2300002", "name": "JONES , DAVID DANIEL JR",
+             "party": "Deceased Person"}]
+    assert probate_match("JONES DAVID", rows)["confidence"] == "medium"
+    assert probate_match("JONES JR", rows) is None      # suffix is not a name
+
+
+def test_probate_match_requires_a_given_name_on_the_decedent_record():
+    rows = [{"case": "2025ES2300003", "name": "JONES", "party": "Deceased Person"}]
+    assert probate_match("JONES DAVID", rows) is None
+
+
+def test_probate_match_ignores_estates_older_than_the_cutoff():
+    rows = parse_probate_rows((FX / "greenville_probate_results.html").read_text())
+    # 1988ES2300124 ABERNATHY , JAMES HARRY — real, but far too old to act on.
+    assert probate_match("ABERNATHY JAMES HARRY", rows) is None
+    # 2021ES2301806 ABERNATHY , MARY ANN — inside the window.
+    assert probate_match("ABERNATHY MARY ANN", rows)["year"] == 2021
+
+
+def test_probate_match_ignores_undated_apt_case_numbers():
+    rows = parse_probate_rows((FX / "greenville_probate_results.html").read_text())
+    # 'APT448F12' carries no year — it cannot be shown to be recent.
+    assert probate_match("ABERNATHY J L", rows) is None
+
+
+def test_probate_match_ignores_non_deceased_parties():
+    rows = [{"case": "2025ES2300001", "name": "SMITH , JOHN A",
+             "party": "Personal Representative"}]
+    assert probate_match("SMITH JOHN A", rows) is None
+
+
+def test_only_the_deceased_party_type_is_ever_requested():
+    """PRIVACY: the same form exposes Incapacitated Person / Patient / Minor /
+    guardian types. This module must never request them."""
+    assert gv.PROBATE_PARTY_DECEASED == "EST"
+    src = pathlib.Path(gv.__file__).read_text()
+    for banned in ('"NCM"', '"PAT"', '"MIN"', '"MN2"', '"GDN"', '"GAL"'):
+        assert banned not in src
+
+
+# ---------------------------------------------------------- build_listing ---
+def test_delinquent_parcel_becomes_a_lead_with_the_full_spine():
+    f = _by_pin()[PIN_BOTH]
+    li = build_listing(_normalize_parcel(PIN_BOTH), f["attributes"], f["geometry"])
+    assert li is not None
+    assert li.state == "SC" and li.county == "Greenville"
+    assert li.listing_type == ListingType.TAX_LIEN
+    assert li.owner_name == "MASS MEDIA INC"
+    assert li.street_address == "200 MAIN"
+    assert li.latitude is not None and li.longitude is not None
+    d = li.raw["greenville_distress"]
+    assert d["lanes"] == ["delinquent_tax"]
+    assert d["amount_owed"] == 5567.69
+    assert li.raw["owner_mailing"]["state"] == "SC"
+
+
+def test_the_unpaid_balance_never_lands_in_a_value_field():
+    """A $5,567 tax bill must not become the property's value — that is how
+    calc.py ends up pricing a building off a tax bill."""
+    f = _by_pin()[PIN_BOTH]
+    li = build_listing(_normalize_parcel(PIN_BOTH), f["attributes"], f["geometry"])
+    assert li.tax_value == f["attributes"]["TAXMKTVAL"]
+    assert li.market_value == f["attributes"]["FAIRMKTVAL"]
+    assert li.tax_value != 5567.69 and li.market_value != 5567.69
+
+
+def test_deed_book_page_and_value_breakdown_captured():
+    """AUDITED 2026-10-04: CUBOOK/CUPAGE/LANDVAL/BLDGVAL/ACCTNO are real,
+    100%-filled fields on the live layer (verified against a 20-row live
+    sample of currently-delinquent parcels) that were never requested.
+    Values here mirror a real live row (PIN 0012000101200, 2026-10-04)."""
+    f = _by_pin()[PIN_BOTH]
+    attrs = dict(f["attributes"], CUBOOK="2516", CUPAGE=5913,
+                 LANDVAL=2760, BLDGVAL=0, ACCTNO="202500002758577001")
+    li = build_listing(_normalize_parcel(PIN_BOTH), attrs, f["geometry"])
+    d = li.raw["greenville_distress"]
+    assert d["deed_book"] == "2516"
+    assert d["deed_page"] == "5913"
+    assert d["land_value"] == 2760.0
+    assert d["tax_account_number"] == "202500002758577001"
+
+
+def test_zero_building_value_is_kept_not_collapsed_to_none():
+    """The core correctness property: BLDGVAL=0 is a real signal (a
+    structure with no recorded value, live on 1,280/2,306 = 55.5% of a real
+    2026-10-04 run) -- the generic _money() helper would silently turn that
+    0 into None (it treats 0 as "nothing billed", right for TOTTAX, wrong
+    here), so a dedicated _num_or_zero() is used instead."""
+    f = _by_pin()[PIN_BOTH]
+    attrs = dict(f["attributes"], LANDVAL=2760, BLDGVAL=0)
+    li = build_listing(_normalize_parcel(PIN_BOTH), attrs, f["geometry"])
+    d = li.raw["greenville_distress"]
+    assert d["building_value"] == 0.0
+    assert d["building_value"] is not None
+
+
+def test_missing_deed_or_value_fields_are_none_not_crashes():
+    f = _by_pin()[PIN_BOTH]
+    attrs = dict(f["attributes"])
+    for k in ("CUBOOK", "CUPAGE", "LANDVAL", "BLDGVAL", "ACCTNO"):
+        attrs.pop(k, None)
+    li = build_listing(_normalize_parcel(PIN_BOTH), attrs, f["geometry"])
+    d = li.raw["greenville_distress"]
+    assert d["deed_book"] is None
+    assert d["deed_page"] is None
+    assert d["land_value"] is None
+    assert d["building_value"] is None
+    assert d["tax_account_number"] is None
+
+
+def test_government_owners_are_never_leads():
+    f = _by_pin()[PIN_GOV]
+    assert build_listing(_normalize_parcel(PIN_GOV), f["attributes"], None) is None
+
+
+def test_a_paid_bill_is_not_the_delinquent_lane():
+    """TOTTAX is the BILLED amount whether or not it was paid. Only a NULL
+    PAIDDATE means delinquent — the tax-sale-only parcels backfilled by PIN do
+    carry a PAIDDATE and must not inflate the delinquent count."""
+    f = _by_pin()[PIN_BOTH]
+    paid = dict(f["attributes"], PAIDDATE=1_700_000_000_000)
+    ts = TaxSaleRow(item="99", pin=_normalize_parcel(PIN_BOTH),
+                    map_number=PIN_BOTH, owner="MASS MEDIA INC", amount=5987.69)
+    li = build_listing(_normalize_parcel(PIN_BOTH), paid, None, tax_sale=ts)
+    d = li.raw["greenville_distress"]
+    assert d["lanes"] == ["tax_sale_roster"]
+    assert d["tax_billed_unpaid"] is None
+    assert d["tax_billed"] == 5567.69
+    assert d["amount_owed"] == 5987.69
+
+
+def test_a_paid_bill_with_no_tax_sale_row_is_not_a_lead_at_all():
+    f = _by_pin()[PIN_BOTH]
+    paid = dict(f["attributes"], PAIDDATE=1_700_000_000_000)
+    assert build_listing(_normalize_parcel(PIN_BOTH), paid, None) is None
+
+
+def test_both_lanes_merge_into_one_parcel_keyed_lead():
+    f = _by_pin()[PIN_BOTH]
+    ts = TaxSaleRow(item="11724", pin=_normalize_parcel(PIN_BOTH),
+                    map_number=PIN_BOTH, owner="MASS MEDIA INC", amount=5987.69)
+    li = build_listing(_normalize_parcel(PIN_BOTH), f["attributes"], f["geometry"],
+                       tax_sale=ts)
+    d = li.raw["greenville_distress"]
+    assert d["lanes"] == ["delinquent_tax", "tax_sale_roster"]
+    assert d["tax_sale"]["item"] == "11724"
+    # 2026-09-30 fix: a tax-sale-with-balance fact is FINANCIAL evidence (already carried by
+    # listing_type=TAX_LIEN + the recorded_debt signal once enrichment_tax_owed normalizes
+    # amount_owed), not physical-condition evidence. It used to also stamp raw['distressed'] =
+    # True, which distress_score.py reads as a PROPERTY tell -- fabricating a second category
+    # (a fake stack of 2) from this one tax fact, the same false-positive class already fixed
+    # for pickens_delinquent_parcels.py's chronic-delinquency flag (F5, 2026-09-21 audit).
+    assert "distressed" not in li.raw
+    assert li.parcel_id == _normalize_parcel(PIN_BOTH)
+
+
+def test_probate_match_adds_a_lane_and_never_leaks_extra_personal_data():
+    f = _by_pin()[PIN_MOBILE]
+    pro = {"case": "2025ES2301111", "name": "HARVLEY , JULIE MARIE", "year": 2025,
+           "confidence": "high"}
+    li = build_listing(_normalize_parcel(PIN_MOBILE), f["attributes"], None, probate=pro)
+    d = li.raw["greenville_distress"]
+    assert "probate_decedent_owner" in d["lanes"]
+    assert set(d["probate"]) == {"case", "name", "year", "confidence", "party_type", "note"}
+    # 2026-09-30 fix: a probate/decedent-name match is LIFE_EVENT evidence, not physical-
+    # condition evidence. It used to stamp the generic raw['distressed'] PROPERTY flag instead
+    # (the same false-positive class already fixed for Pickens' chronic-delinquency flag, F5) --
+    # now it's routed to raw['probate'] (the field distress_score.py actually reads for
+    # LIFE_EVENT credit, same shape sc_public_notices.py / nc_notices_counties.py use).
+    assert "distressed" not in li.raw
+    assert li.raw["probate"] == {"case_number": "2025ES2301111", "decedent": "HARVLEY , JULIE MARIE",
+                                 "match_confidence": "high"}
+
+
+def test_probate_only_parcel_never_sets_the_generic_distressed_flag():
+    """Belt-and-suspenders: a parcel whose ONLY lane is probate (no tax_sale, no
+    delinquent balance) must still never carry raw['distressed'] -- confirms the fix
+    isn't accidentally order- or lane-dependent."""
+    f = _by_pin()[PIN_MOBILE]
+    attrs = dict(f["attributes"], TOTTAX=0, PAIDDATE=None)
+    pro = {"case": "2025ES2301111", "name": "HARVLEY , JULIE MARIE", "year": 2025,
+           "confidence": "medium"}
+    ts = TaxSaleRow(item="1", pin=_normalize_parcel(PIN_MOBILE),
+                    map_number=PIN_MOBILE, owner="HARVLEY JULIE MARIE", amount=500.0)
+    li = build_listing(_normalize_parcel(PIN_MOBILE), attrs, None, tax_sale=ts, probate=pro)
+    assert "distressed" not in li.raw
+
+
+# ------------------------------------------- scoring (distress_score.py) ----
+#
+# The real point of the fix: confirm distress_score.py no longer fabricates a PROPERTY
+# category for these rows. Before the fix, `raw['distressed'] = True` gave every
+# tax-sale-with-balance row a free PROPERTY category on top of its real FINANCIAL one
+# (a fake stack of 2 from a single tax fact), and every probate-match row a PROPERTY
+# category instead of its real LIFE_EVENT one -- the same false-positive class already
+# fixed for pickens_delinquent_parcels.py (F5, 2026-09-21 audit; see
+# tests/test_context_only_distressed.py for that established pattern, mirrored here).
+
+def test_tax_sale_lane_scores_financial_only_no_fake_property_category():
+    from foreclosure_scraper.distress_score import _signals_for
+
+    f = _by_pin()[PIN_BOTH]
+    ts = TaxSaleRow(item="11724", pin=_normalize_parcel(PIN_BOTH),
+                    map_number=PIN_BOTH, owner="MASS MEDIA INC", amount=5987.69)
+    li = build_listing(_normalize_parcel(PIN_BOTH), f["attributes"], f["geometry"], tax_sale=ts)
+    cats = {c for _n, c, _w in _signals_for(li)}
+    assert "PROPERTY" not in cats
+    assert "FINANCIAL" in cats           # listing_type=TAX_LIEN alone is still real evidence
+
+
+def test_probate_lane_scores_life_event_not_property():
+    from foreclosure_scraper.distress_score import _signals_for
+
+    f = _by_pin()[PIN_MOBILE]
+    pro = {"case": "2025ES2301111", "name": "HARVLEY , JULIE MARIE", "year": 2025,
+           "confidence": "high"}
+    li = build_listing(_normalize_parcel(PIN_MOBILE), f["attributes"], None, probate=pro)
+    cats = {c for _n, c, _w in _signals_for(li)}
+    assert "PROPERTY" not in cats
+    assert "LIFE_EVENT" in cats          # the probate match is now correctly credited
+    assert li.raw["probate"]["decedent"] == "HARVLEY , JULIE MARIE"
+
+
+def test_absentee_is_an_attribute_and_never_a_lane():
+    """The absentee figure was previously over-counted as leads. It must never
+    appear in `lanes`, and must never on its own produce a lead."""
+    f = _by_pin()[PIN_ABSENTEE]
+    li = build_listing(_normalize_parcel(PIN_ABSENTEE), f["attributes"], None)
+    assert li.raw["absentee_owner"] is True
+    # 2026-10-04 audit: enrichment_lead_signals.py / distress_score.py read
+    # raw['owner_mailing']['absentee'] (mailing_shape.mailing_of), never the
+    # bare raw['absentee_owner'] key above -- both must agree.
+    assert li.raw["owner_mailing"]["absentee"] is True
+    assert "absentee" not in " ".join(li.raw["greenville_distress"]["lanes"])
+    assert li.raw["greenville_distress"]["lanes"] == ["delinquent_tax"]
+
+
+def test_is_absentee_rules():
+    assert _is_absentee("100 PEACHTREE ST", "GA", "12 MAIN ST") is True
+    assert _is_absentee("PO BOX 26928", "SC", "506 WILTON ST") is True
+    assert _is_absentee("506 WILTON ST", "SC", "506 WILTON ST") is False
+
+
+def test_vacant_land_kind_and_blank_house_number():
+    f = _by_pin()[PIN_VACANT]
+    li = build_listing(_normalize_parcel(PIN_VACANT), f["attributes"], None)
+    assert li.street_address == "LAURENS"          # no invented house number
+    assert li.raw["greenville_distress"]["improved"] == "NO"
+
+
+def test_mobile_home_property_kind():
+    f = _by_pin()[PIN_MOBILE]
+    li = build_listing(_normalize_parcel(PIN_MOBILE), f["attributes"], None)
+    assert li.property_kind == PropertyKind.MOBILE
+
+
+def test_situs_drops_the_county_zero_filler_and_takes_the_type_from_layer_5():
+    assert _situs("00000", "PARK") == "PARK"
+    assert _situs("506", "WILTON", "ST") == "506 WILTON ST"
+    assert _situs("", "LAURENS") == "LAURENS"
+    assert _situs("506", "") is None
+
+
+def test_last_sale_join_marks_arms_length():
+    f = _by_pin()[PIN_BOTH]
+    sale = {"SALEPRICE": 195000, "SALEDATE": 1525824000000,
+            "SALETYPE": "WARRANTY DEED", "TRUESALE": "YES", "STRTYP": "ST"}
+    li = build_listing(_normalize_parcel(PIN_BOTH), f["attributes"], None, sale=sale)
+    ls = li.raw["greenville_distress"]["last_sale"]
+    assert ls["arms_length"] is True and ls["price"] == 195000.0
+    assert ls["date"] == "2018-05-09"
+    assert li.street_address == "200 MAIN ST"
+
+
+def test_non_arms_length_sale_is_marked_false():
+    f = _by_pin()[PIN_BOTH]
+    sale = {"SALEPRICE": 1, "SALEDATE": 1555027200000,
+            "SALETYPE": "CASH (LAND)", "TRUESALE": "NO"}
+    li = build_listing(_normalize_parcel(PIN_BOTH), f["attributes"], None, sale=sale)
+    assert li.raw["greenville_distress"]["last_sale"]["arms_length"] is False
+
+
+# ------------------------------------------------------------ compliance ----
+def test_slug_lets_enrichment_tax_owed_pick_up_the_balance():
+    """enrichment_tax_owed's generic scan only fires for slugs containing one of
+    tax/flc/forfeited/delinquent/lien. The slug carries 'tax' on purpose — with
+    a slug like 'greenville_hard_distress' the owed balance is silently dropped
+    and every lead ships with no tax_owed."""
+    from foreclosure_scraper.enrichment_tax_owed import _TAXISH, enrich_tax_owed
+    assert any(k in GreenvilleHardDistress.slug for k in _TAXISH)
+    f = _by_pin()[PIN_BOTH]
+    li = build_listing(_normalize_parcel(PIN_BOTH), f["attributes"], f["geometry"])
+    enrich_tax_owed([li])
+    assert li.raw["tax_owed"]["balance"] == 5567.69
+    assert li.raw["tax_owed"]["kind"] == "delinquent_tax"
+
+
+def test_out_fields_are_enumerated_never_star():
+    for fields in (gv.PARCEL_FIELDS, gv.SALES_FIELDS):
+        assert "*" not in fields
+        low = fields.lower()
+        for banned in ("ssn", "dob", "birth", "phone", "email", "license", "driver"):
+            assert banned not in low
+
+
+def _code_body() -> str:
+    """Module source with the docstring stripped — the docstring deliberately
+    NAMES the walled hosts to record that they are off limits."""
+    return pathlib.Path(gv.__file__).read_text().split('"""', 2)[2]
+
+
+def test_no_walled_greenville_host_is_referenced():
+    """www2. and app. greenvillecounty.org are Incapsula-walled and are out of
+    bounds. No code in this module may point at them."""
+    body = _code_body()
+    assert "www2.greenvillecounty.org" not in body
+    assert "app.greenvillecounty.org" not in body
+    for url in (gv.TAXSALE_URL, gv.PROBATE_BASE, gv.PAGE_URL):
+        assert url.startswith("https://www.greenvillecounty.org/")
+    assert gv.GIS.startswith("https://www.gcgis.org/")
+
+
+def test_the_252mb_unfiltered_probate_page_is_never_fetched():
+    assert "SearchResults.aspx" not in _code_body(), \
+        "probate must be queried by POSTing Default.aspx, not by pulling the index"
+
+
+def test_no_captcha_or_waf_bypass_machinery():
+    body = _code_body().lower()
+    for banned in ("capsolver", "captcha", "2captcha", "cf_clearance",
+                   "curl_cffi", "impersonate", "undetected"):
+        assert banned not in body
+
+
+def test_pin_chunks_are_validated_before_going_into_a_where_clause():
+    """PINs are spliced into a SQL WHERE. Anything non-alphanumeric is dropped
+    rather than escaped."""
+    import re as _re
+    assert _re.fullmatch(r"[A-Za-z0-9]+", "0032000200610")
+    assert not _re.fullmatch(r"[A-Za-z0-9]+", "0032' OR '1'='1")
+
+
+# ------------------------- ZERO-NET-NEW AUDIT (2026-09-23) ------------------
+# See the module's own docstring, "ZERO-NET-NEW AUDIT", for the full writeup.
+# This module reports 2,600-2,700 successful rows every run and lands ~0 of
+# them under its own slug on the published board -- confirmed NOT a scope bug
+# (test_but_the_distressed_scope_gate_admits_it_and_that_is_the_real_gate
+# above) and NOT a self-collision bug (isolated-fetch dedupe test below).
+# The two tests here pin down the two OTHER sources this module's rows
+# collide with, so a future change that breaks the (currently intentional)
+# shared-feed relationship is caught instead of silently changing who wins
+# the merge.
+def test_isolated_fetch_keeps_its_own_slug_when_nothing_competes():
+    """Proves the ~0-net-new outcome is a CROSS-source dedupe effect, not
+    something wrong with this module's own parcel_id/dedupe_key generation.
+    Uses the same fixture parcels this file already trusts elsewhere."""
+    from foreclosure_scraper.dedupe import dedupe
+
+    parcels = _parcels()
+    listings = []
+    for f in parcels:
+        li = build_listing(_normalize_parcel(f["attributes"].get("PIN") or ""),
+                           f["attributes"], f.get("geometry"))
+        if li:
+            listings.append(li)
+    assert listings, "fixture must contain at least one buildable lead"
+    out = dedupe(listings)
+    assert out
+    assert all(li.source == GreenvilleHardDistress.slug for li in out)
+
+
+def test_delinquent_tax_lane_shares_the_exact_gis_feed_with_arcgis_distress_layers():
+    """counties_generic.arcgis_distress_layers has an independently-added
+    ``greenville_unpaid_tax_parcels`` Layer entry querying the SAME endpoint
+    with the SAME where-clause off the SAME PIN field as this module's own
+    delinquent-tax lane. That is WHY this lane's rows collide in
+    Listing.dedupe_key() and (per the module docstring) almost always lose
+    the merge race to that simpler/faster scraper instead of landing as
+    their own board rows. If this test ever fails, the coverage
+    relationship documented in the module docstring has silently changed and
+    that section needs re-auditing, not just updating."""
+    from foreclosure_scraper.scrapers.counties_generic.arcgis_distress_layers import LAYERS
+
+    layer = next((lay for lay in LAYERS if lay.slug == "greenville_unpaid_tax_parcels"), None)
+    assert layer is not None, "arcgis_distress_layers no longer has a Greenville layer"
+    assert layer.url == gv.PARCEL_LAYER
+    assert layer.where == gv.DELINQUENT_WHERE
+    assert layer.parcel == "PIN"
+    assert (layer.state, layer.county) == ("SC", "Greenville")
+
+
+def test_tax_sale_lane_shares_the_exact_roster_url_with_greenville_delinquent_tax():
+    """counties_sc.greenville_delinquent_tax scrapes this exact same tax-sale
+    roster page and keys its rows off the same Map# column this module reads
+    as PIN -- the second collision source in the ZERO-NET-NEW AUDIT."""
+    from foreclosure_scraper.scrapers.counties_sc import greenville_delinquent_tax as gdt
+
+    assert gv.TAXSALE_URL == gdt.PAGE_URL
+
+
+def test_raw_payload_survives_publish_to_the_board():
+    """CONFIRMED BUG (2026-09-23), fix belongs in web_artifact.py, NOT here.
+
+    web_artifact.RAW_KEEP (the publish-time raw-payload whitelist) has
+    entries for sibling keys "greenville_mie" and "greenville_delinquent_tax"
+    but none for "greenville_distress" -- the one raw sub-key
+    build_listing() writes this module's ENTIRE payload into (lanes,
+    tax_sale echo, probate match, situs/absentee provenance). Verified by
+    grepping the full 2026-09-23 04:43 published board (docs/listings.json +
+    docs/listings_detail.json.gz + every docs/listings_part_*.json.gz): zero
+    occurrences of the string "greenville_distress" anywhere, even on rows
+    that carry this module in raw["also_seen_in"]. This means even a merge
+    this module WINS currently ships none of its value.
+
+    Marked xfail (not a hard failure) because the one-line fix -- adding
+    `"greenville_distress": "*",` next to the neighboring Greenville entries
+    in RAW_KEEP -- is a shared-module change out of this scraper's scope.
+    Once that line lands, this test should start passing; if it doesn't,
+    the RAW_KEEP audit needs to be redone."""
+    import pytest
+    from foreclosure_scraper import web_artifact
+
+    if "greenville_distress" not in web_artifact.RAW_KEEP:
+        pytest.xfail(
+            "web_artifact.RAW_KEEP is missing a 'greenville_distress' entry -- "
+            "add `\"greenville_distress\": \"*\",` there (see this module's "
+            "ZERO-NET-NEW AUDIT docstring, point 4)"
+        )
+    f = _by_pin()[PIN_BOTH]
+    li = build_listing(_normalize_parcel(PIN_BOTH), f["attributes"], f["geometry"])
+    published = web_artifact._to_dict(li)
+    assert "greenville_distress" in published["raw"]
+    assert published["raw"]["greenville_distress"]["amount_owed"] == 5567.69

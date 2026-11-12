@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- SC delinquent-tax family merge (audit O2). Tue and Fri 01:30.
+     TEMPLATE: the two double-underscore placeholders in the paths are filled in by scripts/install_launchd.sh. Nothing here
+     is installed or loaded until that script is run with its apply option. -->
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.highway.foreclosure.family-sc-tax</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/zsh</string>
+		<string>__ROOT__/scripts/run_family_sc_tax.sh</string>
+	</array>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>__HOME__/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+		<key>BOARD_MEM_GATE</key>
+		<string>warn</string>
+	</dict>
+	<key>StartCalendarInterval</key>
+	<array>
+		<dict>
+			<key>Weekday</key>
+			<integer>2</integer>
+			<key>Hour</key>
+			<integer>1</integer>
+			<key>Minute</key>
+			<integer>30</integer>
+		</dict>
+		<dict>
+			<key>Weekday</key>
+			<integer>5</integer>
+			<key>Hour</key>
+			<integer>1</integer>
+			<key>Minute</key>
+			<integer>30</integer>
+		</dict>
+	</array>
+	<key>RunAtLoad</key>
+	<false/>
+	<key>StandardOutPath</key>
+	<string>__ROOT__/logs/family-sc-tax.launchd.log</string>
+	<key>StandardErrorPath</key>
+	<string>__ROOT__/logs/family-sc-tax.launchd.log</string>
+	<key>WorkingDirectory</key>
+	<string>__ROOT__</string>
+</dict>
+</plist>

@@ -1,0 +1,177 @@
+"""Oconee SC Forfeited Land Commission (Assignment_Availability FeatureServer).
+
+Covers the silent-degradation guard on this source specifically. It reads a
+DIFFERENT service from counties_sc.oconee_flc_assignment (Assignment_Availability
+vs Assignment_FLC) on the same county GIS org, and both declare two layers
+(FLC + Assignment), so both must fail rather than shrink when one layer dies.
+
+Before the guard this source did two things that hid a dead layer:
+  * ``except (httpx.HTTPError, ValueError): continue`` around the per-layer fetch
+  * a hand-rolled paginator that logged ``oconee_forfeited_land.arcgis_error``
+    and ``break``-ed on an HTTP-200-with-error-body, returning its partial pages
+
+It also requested ``outFields="*"``, which is now enumerated per layer.
+"""
+from __future__ import annotations
+
+import pytest
+
+# --------------------------------------------------------------------------- #
+# silent-degradation guard (see foreclosure_scraper/layer_guard.py)
+# --------------------------------------------------------------------------- #
+
+def test_out_fields_are_enumerated_per_layer_never_star():
+    """PRIVACY + the two layers do not share a schema.
+
+    This source used to request outFields="*", which both broke the
+    enumerate-only rule and pulled the entire tax-arithmetic block nothing
+    reads. query_features now hard-rejects "*", so this asserts the field lists
+    stayed explicit and layer-specific.
+    """
+    from foreclosure_scraper.scrapers.counties_sc import oconee_forfeited_land as mod
+
+    by_label = {label: fields for _id, label, fields in mod._LAYERS}
+    assert set(by_label) == {"FLC", "Assignment"}
+    for fields in by_label.values():
+        assert fields and "*" not in fields
+        assert "TMS" in fields and "OBJECTID" in fields
+    # Layer-specific columns must NOT be requested from the layer that lacks
+    # them — ArcGIS 400s the whole query on an unknown field name.
+    assert "Sale_Date" in by_label["FLC"] and "Sale_Date" not in by_label["Assignment"]
+    assert "Redeem_Assign" in by_label["Assignment"]
+    assert "Redeem_Assign" not in by_label["FLC"]
+
+
+def test_departed_parcels_are_filtered_out():
+    """2026-10-01 fix: a SOLD/REDEEMED/ASSIGNED/CANCELED parcel has left the
+    buyable FLC inventory and must not ship as a live "available" lead.
+
+    Live-verified the same day: layer 1 ("FLC") was 76 features but 52 (68%)
+    were already Status=SOLD; layer 0 ("Assignment") had 3 REDEEMED + 26
+    ASSIGNED + 1 REMOVED among 948. Before this fix the module emitted every
+    feature with no status filter at all.
+    """
+    import asyncio
+
+    from foreclosure_scraper.scrapers.counties_sc import oconee_forfeited_land as mod
+
+    from tests._arcgis_fakes import FakeHttp
+
+    class _ctx:
+        def __init__(self, http):
+            self.http = http
+
+        async def __aenter__(self):
+            return self.http
+
+        async def __aexit__(self, *a):
+            return False
+
+    flc_feats = [
+        {"attributes": {"OBJECTID": 1, "TMS": "AAA", "Status": "SOLD"}, "geometry": None},
+        {"attributes": {"OBJECTID": 2, "TMS": "BBB", "Status": None}, "geometry": None},
+    ]
+    assign_feats = [
+        {"attributes": {"OBJECTID": 3, "TMS": "CCC", "Redeem_Assign": "ASSIGNED"}, "geometry": None},
+        {"attributes": {"OBJECTID": 4, "TMS": "DDD", "Redeem_Assign": "REDEEMED"}, "geometry": None},
+        {"attributes": {"OBJECTID": 5, "TMS": "EEE", "Redeem_Assign": "REMOVED"}, "geometry": None},
+        {"attributes": {"OBJECTID": 6, "TMS": "FFF", "Redeem_Assign": None}, "geometry": None},
+    ]
+    http = FakeHttp(routes={
+        "FeatureServer/1": {"features": flc_feats, "exceededTransferLimit": False},
+        "FeatureServer/0": {"features": assign_feats, "exceededTransferLimit": False},
+    })
+    original = mod.client
+    mod.client = lambda *a, **kw: _ctx(http)      # noqa: E731
+    try:
+        rows = asyncio.run(mod.OconeeForfeitedLand().fetch())
+    finally:
+        mod.client = original
+
+    tms_out = {li.parcel_id for li in rows}
+    assert tms_out == {"BBB", "FFF"}
+
+
+def test_money_breakdown_and_comment_are_captured_on_flc_layer():
+    """2026-10-04 extraction-completeness fix.
+
+    Live schema/data check found DT_Cost/Abated_Tax/Proc_Fee (the breakdown
+    behind the already-captured FLC_Price/Bid totals, populated on 10/76 live
+    rows) and Comment (real operator notes on 23/76 live rows, e.g. a HOLD
+    parcel's "not for sale at this time- nv" -- HOLD is not in _DEPARTED, so
+    it still ships as a lead with no caveat before this fix) were requested
+    from neither layer's outFields. Total_Tax was checked too and is
+    genuinely 0/76 populated on this service, so it is correctly left out.
+    """
+    from foreclosure_scraper.scrapers.counties_sc import oconee_forfeited_land as mod
+
+    fields = dict((label, f) for _id, label, f in mod._LAYERS)
+    assert "DT_Cost" in fields["FLC"]
+    assert "Abated_Tax" in fields["FLC"]
+    assert "Proc_Fee" in fields["FLC"]
+    assert "Comment" in fields["FLC"]
+    assert "Total_Tax" not in fields["FLC"]  # verified live: always null here
+
+    attrs = {
+        "OBJECTID": 99,
+        "TMS": "316-06-01-070",
+        "Owner": "SOME OWNER",
+        "Status": "HOLD",
+        "FLC_Price": 500.0,
+        "Bid": 450.0,
+        "DT_Cost": 300.0,
+        "Abated_Tax": 15.0,
+        "Proc_Fee": 20.0,
+        "Comment": "HOLD FOR FOXWOOD HILLS POA",
+    }
+    li = mod._feature_to_listing(attrs, {}, "FLC")
+    assert li is not None
+    assert li.raw["oconee_forfeited_land"]["dt_cost"] == 300.0
+    assert li.raw["oconee_forfeited_land"]["abated_tax"] == 15.0
+    assert li.raw["oconee_forfeited_land"]["processing_fee"] == 20.0
+    assert li.raw["oconee_forfeited_land"]["comment"] == "HOLD FOR FOXWOOD HILLS POA"
+    assert "HOLD FOR FOXWOOD HILLS POA" in li.description
+    # HOLD is not in _DEPARTED -- this parcel still ships, which is exactly
+    # why the comment context matters.
+    from foreclosure_scraper.scrapers.counties_sc.oconee_flc_assignment import is_departed
+    assert not is_departed(li.auction_status)
+
+
+def test_a_dead_layer_fails_the_run_instead_of_halving_the_inventory():
+    """Half the FLC roll is a believable number, so it must not be shippable.
+
+    The old code logged oconee_forfeited_land.layer_failed and continued; the
+    hand-rolled paginator additionally broke out on an HTTP-200-with-error-body
+    and returned its partial page set.
+    """
+    import asyncio
+
+    from foreclosure_scraper.layer_guard import PartialHarvest
+    from foreclosure_scraper.scrapers.counties_sc import oconee_forfeited_land as mod
+
+    from tests._arcgis_fakes import FakeHttp
+
+    class _ctx:
+        def __init__(self, http):
+            self.http = http
+
+        async def __aenter__(self):
+            return self.http
+
+        async def __aexit__(self, *a):
+            return False
+
+    # Layer 1 alive, layer 0 retired (200 + error body, no features key).
+    http = FakeHttp(routes={
+        "FeatureServer/1": {"features": [], "exceededTransferLimit": False},
+        "FeatureServer/0": {"error": {"code": 400, "message": "Invalid URL"}},
+    })
+    original = mod.client
+    mod.client = lambda *a, **kw: _ctx(http)      # noqa: E731
+    try:
+        with pytest.raises(PartialHarvest) as ei:
+            asyncio.run(mod.OconeeForfeitedLand().fetch())
+    finally:
+        mod.client = original
+    assert "Assignment" in str(ei.value)
+    assert "1/2 declared layers alive" in str(ei.value)

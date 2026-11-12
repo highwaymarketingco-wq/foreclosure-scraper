@@ -1,0 +1,5395 @@
+"""Orchestrator: run all scrapers, dedupe, validate, enrich, write Sheet, email."""
+from __future__ import annotations
+
+import asyncio
+import logging
+import os
+import re
+import sys
+import traceback
+from collections import Counter
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any, Optional
+
+import structlog
+
+# Load .env early so all enrichers (ACPASS, GEMINI_API_KEY, etc.) see credentials.
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
+from .config import (
+    RuntimeConfig,
+    SCOPE_DENY_COUNTIES_NORMALIZED,
+    SCOPE_ZIP_PREFIXES,
+    in_scope,
+    in_scope_distressed,
+)
+from .oceanfront import OCEANFRONT_DISTANCE_M, flip_near_beach, is_oceanfront
+from .dedupe import dedupe
+from .email_sender import send_digest
+from .enrichment import enrich
+from .enrichment_foreclosure_sold_comps import (
+    in_upset_window,
+    sc_tax_redemption_open,
+    state_upset_window_days,
+)
+from .enrichment_arcgis import enrich as enrich_gis
+from .enrichment_owner_mailing import enrich_owner_mailing
+from .enrichment_courts import discover_lis_pendens, enrich_with_court_records
+from .enrichment_geocode import enrich as enrich_geocode
+from .flags import compute_flags
+from . import checkpoint
+from . import log_redact
+from .link_validator import validate
+from .models import Listing, ListingType, PropertyKind, TERMINAL_AUCTION_STATUSES
+from .scrapers._registry import all_scrapers
+from .sheets import write_listings
+from .valuation import calc as valuation_calc
+from .valuation import grading as valuation_grading
+from .valuation import location as valuation_location
+from .valuation import rentcast as valuation_rentcast
+from .web_artifact import write_artifact
+
+
+def _setup_logging() -> None:
+    level = os.environ.get("LOG_LEVEL", "INFO").upper()
+    logging.basicConfig(
+        level=getattr(logging, level, logging.INFO),
+        format="%(message)s",
+        stream=sys.stdout,
+    )
+    log_redact.install()
+    structlog.configure(
+        processors=[
+            structlog.processors.add_log_level,
+            structlog.processors.TimeStamper(fmt="iso"),
+            log_redact.structlog_processor,
+            structlog.processors.JSONRenderer(),
+        ],
+        wrapper_class=structlog.make_filtering_bound_logger(getattr(logging, level, logging.INFO)),
+    )
+
+
+log = structlog.get_logger()
+
+
+async def _await_capped(coro, name: str, default_s: int = 900):
+    """Run an awaitable enrichment phase under a wall-clock cap so a wedged socket (e.g. a
+    mid-run wifi drop hitting a non-hardened HTTP session) can't stall the whole run before
+    the board write. On timeout/error, log and return None — the phase's partial in-place
+    fills persist. Env ENRICH_PHASE_MAX_SECONDS overrides the per-phase default."""
+    _budget = float(default_s)
+    try:
+        # an explicit per-phase budget (default_s other than the 900 s default) wins over the
+        # global ENRICH_PHASE_MAX_SECONDS override: dot_ocr, rod_chain and nc_rod_render size their
+        # own budgets (audit 2026-10-09 W5)
+        _env = os.environ.get("ENRICH_PHASE_MAX_SECONDS")
+        _budget = float(default_s) if (default_s != 900 or not _env) else float(_env)
+        # ENRICH_PHASE_CAP_ALL: a hard ceiling on EVERY phase, for the canary only (it proves each
+        # enricher runs end to end on a few counties; a real run never sets it)
+        _cap_all = os.environ.get("ENRICH_PHASE_CAP_ALL")
+        if _cap_all:
+            _budget = min(_budget, float(_cap_all))
+        return await asyncio.wait_for(coro, timeout=_budget)
+    except asyncio.TimeoutError:
+        log.warning("enrich.time_capped", phase=name, budget_s=_budget)
+    except Exception:
+        log.error(f"{name}.failed", traceback=traceback.format_exc())
+    return None
+
+
+async def _gather_phases(phases: dict, default_s: int = 900):
+    """Run multiple independent enrichment phases concurrently under individual
+    wall-clock caps.  Each phase runs under its own ENRICH_PHASE_MAX_SECONDS
+    timeout; on timeout/error the phase's partial in-place fills persist.
+
+    ``phases`` is a ``{name: coro}`` dict.  Returns ``{name: result_or_None}``.
+    """
+    if not phases:
+        return {}
+
+    # Same escape hatch _await_capped already has (main.py:90): an explicit per-phase
+    # budget (default_s other than the 900s default) wins over the global env override --
+    # a caller that sizes its own budget (see the divorce fix, 2026-10-16) must not be
+    # silently capped back down to the global default.
+    _env = os.environ.get("ENRICH_PHASE_MAX_SECONDS")
+    budget = float(default_s) if (default_s != 900 or not _env) else float(_env)
+
+    async def _wrap(name: str, coro):
+        try:
+            return name, await asyncio.wait_for(coro, timeout=budget)
+        except asyncio.TimeoutError:
+            log.warning("enrich.time_capped", phase=name, budget_s=budget)
+        except Exception:
+            log.error(f"{name}.failed", traceback=traceback.format_exc())
+        return name, None
+
+    results = await asyncio.gather(*[_wrap(n, c) for n, c in phases.items()])
+    return dict(results)
+
+
+# NC + SC ocean-facing counties. Listings in these counties are denied by
+# default (they're east of Charlotte / outside the upstate footprint). A DISTRESS lead
+# is admitted anywhere in NC+SC regardless (in_scope_distressed); the oceanfront
+# override tags the true-beachfront ones. A FLIP here is admitted only by the owner's
+# beach-drive rule of 2026-10-06 (_flip_beach_check: a trusted point within
+# oceanfront.FLIP_COASTAL_MAX_M of the ocean, a "5 minute drive"), see _in_scope.
+OCEANFRONT_COASTAL_COUNTIES: frozenset[tuple[str, str]] = frozenset({
+    ("Currituck", "NC"), ("Dare", "NC"), ("Hyde", "NC"), ("Carteret", "NC"),
+    ("Onslow", "NC"), ("Pender", "NC"), ("New Hanover", "NC"), ("Brunswick", "NC"),
+    ("Beaufort", "NC"), ("Craven", "NC"), ("Pamlico", "NC"),
+    # Horry SC (Myrtle Beach) intentionally excluded per user direction 2026-08-12.
+    ("Georgetown", "SC"), ("Charleston", "SC"),
+    ("Beaufort", "SC"), ("Colleton", "SC"),
+})
+
+# TRUE downtown Charleston peninsula (owner direction 2026-06-22 — keep these
+# even though they're harbor-side, not oceanfront; rare but valuable). The
+# historic peninsula south of the Crosstown/Hampton Park, between the Ashley
+# (W) and Cooper (E) rivers. This bbox EXCLUDES North Charleston (lat >32.81),
+# Summerville (~33.0/-80.18), West Ashley (lon <-79.975) and James Island
+# (lat <32.76) — exactly the "not Summerville, not North Charleston" ask.
+DOWNTOWN_CHARLESTON_BBOX = (32.760, 32.808, -79.975, -79.915)  # lat_min,lat_max,lon_min,lon_max
+_DOWNTOWN_CHS_DENY_CITY = {"north charleston", "summerville", "hanahan",
+                           "goose creek", "west ashley", "james island", "ladson"}
+
+
+def _is_downtown_charleston(li: Listing) -> bool:
+    """True for a Charleston-peninsula (true downtown) listing — admitted
+    alongside the oceanfront path, but never North Charleston / Summerville."""
+    if (li.state or "").upper() != "SC":
+        return False
+    if li.county and li.county.replace(" County", "").strip().title() != "Charleston":
+        return False
+    if (li.city or "").strip().lower() in _DOWNTOWN_CHS_DENY_CITY:
+        return False
+    if li.latitude is None or li.longitude is None:
+        return False
+    try:
+        lat, lon = float(li.latitude), float(li.longitude)
+    except (TypeError, ValueError):
+        return False
+    a0, a1, o0, o1 = DOWNTOWN_CHARLESTON_BBOX
+    if a0 <= lat <= a1 and o0 <= lon <= o1:
+        if not isinstance(li.raw, dict):
+            li.raw = {}
+        li.raw["downtown_charleston"] = True
+        return True
+    return False
+
+
+def _check_oceanfront(li: Listing) -> bool:
+    """Run is_oceanfront against the listing's data and, on a pass, tag
+    raw.oceanfront=True with the contributing signals for transparency."""
+    ok, signals = is_oceanfront(
+        description=li.description,
+        street_address=li.street_address,
+        city=li.city,
+        latitude=li.latitude,
+        longitude=li.longitude,
+    )
+    if ok:
+        if not isinstance(li.raw, dict):
+            li.raw = {}
+        li.raw["oceanfront"] = True
+        li.raw["oceanfront_signals"] = signals
+    return ok
+
+
+def _in_oceanfront_county(li: Listing) -> bool:
+    if not (li.county and li.state):
+        return False
+    cs = (li.county.replace(" County", "").strip().title(), li.state.upper())
+    return cs in OCEANFRONT_COASTAL_COUNTIES
+
+
+def _oceanfront_pending(li: Listing) -> bool:
+    """Provisional admission for an oceanfront-county listing that has an
+    ADDRESS but no coordinates yet.
+
+    The near-beach test (``is_oceanfront``) is authoritative on precise lat/lng,
+    but most coastal sources (NC law firms, eCourts, SC court rosters with only
+    a parcel#) emit address/parcel rows with NO coordinates — and the scope gate
+    runs at INGEST, BEFORE the geocode + parcel-lookup enrichers fill lat/lng.
+    Without a carve-out those rows are denied (out-of-footprint county + no
+    coords -> oceanfront 2-of-3 fallback fails) and never reach geocoding.
+
+    So we admit them PROVISIONALLY, tagged ``raw.oceanfront_pending``, and the
+    post-geocode re-pass (_resolve_coastal_pending) re-applies the near-beach test once
+    coordinates exist: a flip is dropped when it lands beyond the beach-drive cutoff
+    (oceanfront.FLIP_COASTAL_MAX_M), a distress lead is kept anywhere in NC/SC.
+
+    Requires a STREET ADDRESS or PARCEL id — something that geocodes to a real
+    point. A bare city/zip is deliberately NOT enough: it only yields a coarse
+    centroid that would unreliably pass/fail the beach-distance gate, and it would punch
+    a hole in the deny-list (a 28461 Brunswick zip-only row must still be denied,
+    not provisionally admitted on a town centroid).
+    """
+    if not _in_oceanfront_county(li):
+        return False
+    if li.latitude is not None and li.longitude is not None:
+        return False  # has coords -> the strict test already decided
+    has_locator = bool((li.street_address or "").strip()
+                       or (li.parcel_id or "").strip())
+    if not has_locator:
+        return False
+    if not isinstance(li.raw, dict):
+        li.raw = {}
+    li.raw["oceanfront_pending"] = True
+    return True
+
+
+def _safe_dedupe_key(li: Listing):
+    """Stable per-lead identity for the grandfather guard; None if unkeyable."""
+    try:
+        return li.dedupe_key()
+    except Exception:  # noqa: BLE001
+        return None
+
+
+#: "Flip" leads — something you could go bid on or buy TODAY (a scheduled
+#: sale or a bank-held property), as opposed to a distress SIGNAL that needs
+#: outreach before any transaction exists. Confirmed directly with the user
+#: 2026-09-15: "if its a flip, its only in the counties we talked about
+#: [the 18-county footprint in config.SC_COUNTIES/NC_COUNTIES]. if its a
+#: distressed property its anywhere in nc and sc." Everything NOT in this
+#: set (tax delinquency, liens, probate, divorce, bankruptcy, elderly/
+#: disabled exemption, tax-sale overage, the generic DISTRESSED type, and
+#: UNKNOWN) gets the broader in_scope_distressed() check below instead of
+#: the narrow 18-county in_scope(). Found the same day this was fixed: the
+#: narrow footprint had silently been the ONLY scope gate for years, while
+#: weeks of actual source-building (Greenville SC, Wake NC, Jasper SC,
+#: Berkeley SC, dozens more) went to counties outside it — never deleted
+#: only because no full pipeline run had executed against the board since
+#: they were added via scoped ingest scripts that never call this function.
+_FLIP_LISTING_TYPES = frozenset({
+    ListingType.FORECLOSURE_SALE,
+    ListingType.AUCTION,
+    ListingType.SHERIFF_SALE,
+    ListingType.HOA_SALE,
+    ListingType.REO,
+})
+
+
+def _is_flip(li: Listing) -> bool:
+    return li.listing_type in _FLIP_LISTING_TYPES
+
+
+def _county_in_scope(li: Listing) -> bool:
+    """The type-aware replacement for a bare `in_scope(li.county, li.state)`
+    call — flip-type listings keep the narrow 18-county footprint (with its
+    deny list), everything else gets the full-NC+SC distressed scope with
+    no deny list (see _FLIP_LISTING_TYPES and config.in_scope_distressed)."""
+    if _is_flip(li):
+        return in_scope(li.county, li.state)
+    return in_scope_distressed(li.county, li.state)
+
+
+def _flip_beach_check(li: Listing, *, tag: bool = False) -> Optional[bool]:
+    """The owner's beach-drive rule for a FLIP in a coastal county (2026-10-06: "nothing more than
+    a 5 minute drive to the beach"): True when the row's point is within FLIP_COASTAL_MAX_M of the
+    open-ocean shore, False when it is farther, None when there is no point to measure (none yet, or
+    a shared fallback point, see oceanfront.flip_near_beach). With a point, distance decides: no
+    keyword or street test.
+
+    tag=True stamps raw.near_beach_drive (the measured distances) on a pass, and raw.oceanfront too
+    when the row is also within OCEANFRONT_DISTANCE_M, so that tag keeps its meaning: true
+    beachfront, never merely "admitted"."""
+    ok, sig = flip_near_beach(li.latitude, li.longitude, li.raw if isinstance(li.raw, dict) else None)
+    if ok and tag:
+        if not isinstance(li.raw, dict):
+            li.raw = {}
+        li.raw["near_beach_drive"] = sig
+        if sig["distance_m"] <= OCEANFRONT_DISTANCE_M:
+            _check_oceanfront(li)
+    return ok
+
+
+def _flip_outside_footprint(li: Listing, *, ingest: bool = False) -> bool:
+    """A flip whose county is KNOWN and is not one of the 18 footprint counties, unless it is a
+    coastal-county flip the beach-drive rule admits.
+
+    The owner's rule of 2026-09-15 ("if its a flip, its only in the counties we talked about. if its
+    a distressed property its anywhere in nc and sc") is enforced here for EVERY admission path. It
+    used to be wired into only two places (_county_in_scope and the deny check further down), while
+    everything that admits a coastal row ran before both and never asked whether the row was a flip:
+    the oceanfront override, the coastal-source bypass, downtown Charleston and their provisional
+    variants, and then _denied_now exempted the same rows a second time in the post-enrichment
+    re-pass. Measured on the 2026-09-21 board: 102 flip rows outside the 18 counties (Charleston 33,
+    Pender 24, Georgetown 15, Dare 11, Onslow 7, Carteret 6 ...), about 56 through the oceanfront
+    override and 41 through the coastal-source bypass. Distressed types are unaffected.
+
+    THE ONE EXCEPTION (owner, 2026-10-06): the coastal rule applies to flips. A flip in an
+    OCEANFRONT_COASTAL_COUNTIES county is wanted when it is "nothing more than a 5 minute drive to the
+    beach", which is _flip_beach_check (a point within oceanfront.FLIP_COASTAL_MAX_M of the ocean).
+    Everything else about a coastal flip stays as the 9/15 rule left it: the coastal-source bypass,
+    the oceanfront tag and downtown Charleston still do not shelter one, and a coastal flip with no
+    usable point is out here. At ingest (ingest=True) a row that has no coordinates YET is let
+    through, because the scope gate runs before geocoding; _in_scope then admits it provisionally and
+    _resolve_coastal_pending decides once geocoding has placed it."""
+    if not (_is_flip(li) and bool((li.county or "").strip()) and bool(li.state)
+            and not in_scope(li.county, li.state)):
+        return False
+    if _in_oceanfront_county(li):
+        if _flip_beach_check(li) is True:
+            return False
+        if ingest and (li.latitude is None or li.longitude is None):
+            return False
+    return True
+
+
+def _admit_coastal_flip(li: Listing) -> bool:
+    """_in_scope for a flip in a coastal county (it is outside the 18-county footprint by
+    construction), decided by the beach-drive rule alone: a trusted point within the cutoff is
+    admitted (tagged raw.near_beach_drive); a point farther out, or a shared fallback point, is not;
+    a row with no point yet but a street or parcel is admitted provisionally
+    (raw.oceanfront_pending) for _resolve_coastal_pending to decide after geocoding."""
+    verdict = _flip_beach_check(li, tag=True)
+    if verdict is not None:
+        return verdict
+    if li.latitude is None or li.longitude is None:
+        return _oceanfront_pending(li)
+    return False
+
+
+def _in_scope(li: Listing) -> bool:
+    # FIRST, before every coastal carve-out below: a flip outside the footprint is out,
+    # however it got its coastal credentials (see _flip_outside_footprint).
+    if _flip_outside_footprint(li, ingest=True):
+        return False
+    # A flip that is still here is in a coastal county (the footprint has none) with a point, or
+    # waiting for one. The owner's beach-drive rule alone decides it (2026-10-06); none of the
+    # carve-outs below (oceanfront tag, coastal-source bypass, downtown Charleston) admits a flip.
+    if _is_flip(li) and _in_oceanfront_county(li):
+        return _admit_coastal_flip(li)
+    # Oceanfront override — runs BEFORE the deny check so the otherwise-
+    # denied coastal counties (New Hanover/Brunswick/Onslow + the SC
+    # coast) can re-enter when a listing passes the strict 2-of-3
+    # oceanfront filter. Listings keep tag raw.oceanfront=True so the
+    # dashboard can sort/filter them.
+    if li.county and li.state:
+        cs = (li.county.replace(" County", "").strip().title(),
+              li.state.upper())
+        if cs in OCEANFRONT_COASTAL_COUNTIES and _check_oceanfront(li):
+            return True
+    # Source-scoped coastal-county admission — coastal foreclosure sources whose
+    # lead value IS the coastal county, even without near-beach coords. Runs before
+    # the deny check so deny-listed coastal counties (Brunswick/Onslow/Pender/New
+    # Hanover) can re-enter for these sources only.
+    #
+    # ORDER MATTERS, and it was wrong until 2026-08-06. This ran AFTER the
+    # provisional oceanfront check below, which matches any coastal row carrying
+    # an address or a parcel_id. Every bypass-source row with either field
+    # therefore took the provisional path instead, got tagged
+    # raw.oceanfront_pending, and was deleted by the publish-time re-pass for
+    # failing a beach-distance test these sources are explicitly exempt from.
+    # It silently cost 450 leads on the 2026-08-06 board: 408 of Georgetown's
+    # 444 (leaving 1), all 23 Horry FLC, 14 Charleston MIE. Georgetown's tax
+    # sale is the ENTIRE point of georgetown_civicengage, so the county looked
+    # dead while the data was being fetched correctly and thrown away.
+    if _coastal_county_source(li):
+        return True
+    # Provisional oceanfront admission — keep coastal-county rows that have an
+    # address/parcel but no coordinates yet, so the geocode + parcel-lookup
+    # enrichers can fill lat/lng. The post-geocode re-pass re-tests them and
+    # drops the inland ones. (Without this, address-only coastal rows from the
+    # NC law firms / eCourts / SC rosters die before they can be geocoded.)
+    # Rows from a declared bypass source never reach here — they are admitted
+    # unconditionally above, which is the whole meaning of that list.
+    if _oceanfront_pending(li):
+        return True
+    # True downtown Charleston peninsula — harbor-side, so it won't pass the
+    # oceanfront distance gate, but the owner wants it kept (not N. Charleston /
+    # Summerville). Also runs before the deny check.
+    if _is_downtown_charleston(li):
+        return True
+    # Downtown-Charleston provisional: a Charleston-county row with an address
+    # but no coords yet — keep it so geocode can place it on the peninsula
+    # bbox; the re-pass drops it if it lands off-peninsula.
+    if (li.state or "").upper() == "SC" and li.county \
+            and li.county.replace(" County", "").strip().title() == "Charleston" \
+            and (li.latitude is None or li.longitude is None) \
+            and (li.city or "").strip().lower() not in _DOWNTOWN_CHS_DENY_CITY \
+            and ((li.street_address or "").strip() or (li.parcel_id or "").strip()):
+        if not isinstance(li.raw, dict):
+            li.raw = {}
+        li.raw["downtown_charleston_pending"] = True
+        return True
+    # LiensNC is a state-wide NC builder-distress signal — ALL NC counties
+    # are in-scope, including deny-listed ones (Wake, Mecklenburg, Forsyth,
+    # Guilford, Durham, etc.). This check MUST run before the deny-set
+    # filter below, otherwise LiensNC leads in those counties get silently
+    # dropped. (2026-08-26: this was the root cause of 128K LiensNC leads
+    # being erased by regenerate_dashboard.py's scope re-filter.)
+    if li.source in ("counties_generic.liensnc", "liensnc") and (li.state or "").upper() == "NC":
+        return True
+    # Deny set takes precedence over EVERY other scope path -- but ONLY for
+    # FLIP-type leads. See _FLIP_LISTING_TYPES: the user's own words are
+    # "if its a flip, its only in the counties we talked about. if its a
+    # distressed property its anywhere in nc and sc" -- the deny entries
+    # (e.g. "Mecklenburg — out of user's flip target") were about that flip
+    # scope specifically, and carry no carve-out for distressed leads.
+    # Without this deny check, a FLIP listing tagged with a denied county
+    # still gets through via the zip-prefix fallback (288/287/296 cover
+    # Haywood NC, Mecklenburg NC, Abbeville SC etc.) or via
+    # SCOPE_BYPASS_SOURCES (CourtListener bankruptcy/civil/adversary).
+    # Explicit deny wins for flips.
+    if _is_flip(li) and li.county and li.state:
+        if (li.county.replace(" County", "").strip().title(),
+                li.state.upper()) in SCOPE_DENY_COUNTIES_NORMALIZED:
+            return False
+    if li.source in SCOPE_BYPASS_SOURCES:
+        # State-level signal (typically CourtListener BK with no county yet).
+        # Tag it so dashboard can group / filter the 'state-only' bucket.
+        if not (li.county and li.county.strip()):
+            if not isinstance(li.raw, dict):
+                li.raw = {}
+            li.raw["geo_attribution"] = "state-only"
+            return True
+        # Has a county — keep it if it's in-footprint (flip) or anywhere in
+        # NC/SC (distressed, e.g. a bankruptcy filing — the common case for
+        # this source bucket). (LiensNC is handled above, before the deny
+        # check.)
+        return _county_in_scope(li)
+    if _county_in_scope(li):
+        return True
+    # ZIP-prefix fallback is a LAST resort for listings with NO county only.
+    # 2026-06-19: previously this rescued rows that already carried an
+    # out-of-scope county (e.g. Fannie in Macon/Jackson/Graham, 287xx) that
+    # in_scope() had just rejected. Guarding on empty-county stops that.
+    if (not (li.county and li.county.strip())) and li.zip_code \
+            and any(li.zip_code.startswith(p) for p in SCOPE_ZIP_PREFIXES):
+        return True
+    return False
+
+
+#: Sources where the listing's `state` is reliable but `county` and `zip` are
+# typically unset at scrape time (CourtListener bankruptcy / civil / adversary
+# only get county after enrichment). Without bypass, ~600 NC + SC bankruptcy
+# listings get filtered before the bk_property enrichment can fill in their
+# county. Investors want full state-wide coverage of distressed-debt signals,
+# not just the 21 in-scope-county footprint.
+SCOPE_BYPASS_SOURCES = {
+    "national.courtlistener_bankruptcy",
+    "national.courtlistener_civil",
+    "national.courtlistener_adversary",
+    # (liensnc bypass removed 2026-08-30: NC liensnc is already handled by the
+    # state-guarded early-return above (~L278); the un-guarded set entries let
+    # county-less non-NC liensnc rows leak in. Guarded handler preserves NC.)
+    # craigslist_fsbo added 2026-09-15 (national.* zero-row audit): state is
+    # set at scrape time but county is always None until geocode enrichment
+    # runs, and _in_scope() runs on the raw listing before that -- so every
+    # single fetch (255 real current FSBO leads that day) was being wiped at
+    # this gate before geocoding ever got a chance. Same bug class as
+    # CourtListener above.
+    "national.craigslist_fsbo",
+    # national.legacy_obituaries was tried here 2026-09-15 and reverted: the search's
+    # `stateId`/`countryId` params were silently ignored (confirmed a garbage emitter, not a
+    # scope-gate bug -- results came from an unfiltered default feed, e.g. Albany NY for an
+    # "Asheville" search). RE-ADDED 2026-10-13: found and fixed the real mechanism (legacy.com
+    # actually scopes on `country`/`state`/`city` as full human-readable names, not abbreviations
+    # or the old params at all -- verified live against all 19 of the scraper's target cities,
+    # plus a server-side contradiction check that drops a row outright if it names a different
+    # state). state is set reliably at scrape time from the _CITIES list; county is never
+    # attached at scrape time -- same bypass-eligible shape as craigslist_fsbo/sc_public_index
+    # above. See legacy_obituaries.py's module docstring for the live-verification evidence.
+    "national.legacy_obituaries",
+    # sc_public_index added 2026-09-15: county is always None (the scraper
+    # never attaches it even though it knows which county it queried) --
+    # same "county arrives late" shape. Real, high-quality SC Common Pleas
+    # case data (9,464 distinct real party names verified live for
+    # Charleston alone), LIS_PENDENS type, distressed-bucket.
+    "national.sc_public_index",
+    # courtlistener.recap added 2026-09-15: found in a board-wide scope-
+    # violation sweep (following the greenville_mie_adverts landmine).
+    # 737 rows, no live scraper module produces this slug anymore --
+    # almost certainly an orphaned pre-rename name for what's now
+    # national.courtlistener_bankruptcy (BANKRUPTCY type both places), but
+    # only 7 of 737 case numbers overlap with that live source's current
+    # output -- 730 are real, unique, non-duplicate filings (genuine
+    # defendant names verified, not garbage). county=None on every row
+    # (never attached, same as the live source). See
+    # scripts/fix_courtlistener_recap.py for the paired sale_date fix
+    # (these rows carry a bankruptcy filing/petition date mislabeled as
+    # sale_date; cleared to None to match how the live scraper already
+    # handles this, so this bypass entry isn't fighting the date-window
+    # check the way an unmodified value would).
+    "courtlistener.recap",
+    # national.fdic_failed_banks added 2026-10-04 (national.* extraction-
+    # completeness audit, batch 15): the FDIC source table has no county
+    # column, only City. The scraper now derives county from city via the
+    # 146-county NC+SC gazetteer (_bankruptcy_city_to_county), but that
+    # gazetteer is not exhaustive (confirmed gaps: Pawleys Island, Myrtle
+    # Beach, Fairfax SC all appear in the real historical NC/SC rows and
+    # don't resolve) -- same "state reliable, county may not resolve" shape
+    # as craigslist_fsbo/sc_public_index above. Also fixed same day:
+    # listing_type REO -> DISTRESSED (a bank failure is a leading indicator,
+    # not a specific flip-able property), which took this source OUT of the
+    # narrow 18-county footprint gate it had always silently zeroed under
+    # before this bypass could even matter -- see fdic_failed_banks.py's
+    # module docstring for the full before/after.
+    "national.fdic_failed_banks",
+}
+
+#: Coastal foreclosure sources whose COUNTY is the whole point of the lead. They
+#: scrape real Brunswick/Pender/Onslow/Carteret/Dare + SC-coastal rows that have
+#: no near-beach coords yet (roster/lien rows are case#- or parcel-only), so they
+#: fail the _check_oceanfront 2-of-3 gate AND _oceanfront_pending (which needs an
+#: address/parcel). The user wants these COASTAL-COUNTY foreclosures surfaced, not
+#: only literal beachfront. A lead is admitted ONLY when BOTH its source is one of
+#: these AND its county is in OCEANFRONT_COASTAL_COUNTIES — a source-scoped coastal
+#: bypass; it does NOT broaden to any other out-of-footprint county.
+COASTAL_COUNTY_BYPASS_SOURCES = {
+    "counties_nc.nc_coastal_tax_foreclosure",
+    "counties_nc.nc_ecourts_lis_pendens",
+    "counties_sc.charleston_mie",
+    "counties_sc.sc_coastal_rosters",
+    # 2026-06 expansion — new coastal sources that must surface FULL coastal-county
+    # inventory (not only literal beachfront), same rationale as above.
+    "counties_nc.nc_govdeals_real_property",   # Pender county-owned real property
+    "counties_nc.new_hanover_foreclosures",    # New Hanover tax-foreclosures (Kania-administered)
+    "counties_nc.nc_county_csv_delinquent_tax",  # New Hanover delinquent-tax CSV (full county)
+    "counties_generic.arcgis_distress.new_hanover_demolition_permits",  # NH demolition permits (full county)
+    "counties_sc.charleston_delinquent_tax",   # Charleston FLC sealed-bid + delinquent tax
+    # counties_sc.horry_flc removed 2026-08-12 — Myrtle Beach/Horry excluded per user direction.
+    "counties_sc.georgetown_civicengage",      # Georgetown FLC + tax-sale + MIE
+    "counties_sc.colleton_tax_sale",           # Colleton delinquent-tax / tax-sale
+    "counties_sc.sc_probate_net",              # SC probate (coastal counties via this gate)
+    "counties_nc.nc_ecourts_estates",          # NC eCourts estates (coastal counties)
+    "counties_nc.nc_ecourts_divorce",          # NC eCourts divorce (coastal counties)
+    "newspapers.coastland_times",              # Dare substitute-trustee sale notices
+    "counties_nc.brunswick_legal_notices",     # Brunswick county legal-notice foreclosure/tax PDFs
+    "counties.column_legal_notices",           # Column legal-notice API — coastal NC foreclosure notices
+    "law_firms.mewborn_deselms",               # Mewborn & DeSelms — Onslow tax foreclosures
+    "law_firms.zacchaeus",                     # ZLS (zls-nc.com) — Onslow/Dare tax foreclosures + upset/redeemed status
+}
+
+
+def _coastal_county_source(li: Listing) -> bool:
+    if _is_flip(li):
+        return False    # the coastal bypass is for distress signals; flips stay in the footprint
+    if li.source not in COASTAL_COUNTY_BYPASS_SOURCES:
+        return False
+    if not (li.county and li.state):
+        return False
+    cs = (li.county.replace(" County", "").strip().title(), li.state.upper())
+    if cs in OCEANFRONT_COASTAL_COUNTIES:
+        if not isinstance(li.raw, dict):
+            li.raw = {}
+        li.raw["coastal_county"] = True   # spares it in the deny re-pass
+        return True
+    return False
+
+
+#: Sources where blank sale_date is acceptable — these list ACTIVELY-FOR-SALE
+# inventory, not historical events. For everything else (court rosters, law-firm
+# trustee calendars, tax-sale lists, public notices) we require a parseable date.
+DATELESS_OK_SOURCES = {
+    "counties_sc.sc_richland_probate",     # Richland Estate Inquiry: a filed estate is a standing condition, no sale date
+    "national.usmarshals_realproperty",   # audit 2026-10-09: federal sale lists carry no filing date
+    "national.tranzon",
+    # 2026-10-07 new sources: standing tax balances, tax-foreclosure parcels and obituary/estate lists carry
+    # no sale date, so they must be whitelisted or _active_only drops every row.
+    "counties_nc.mecklenburg_delinquent_tax",
+    "counties_nc.guilford_tax_foreclosures",
+    "counties_nc.mecklenburg_tax_foreclosures",
+    "public_notices.obituary_feeds",
+    "public_notices.echovita_obituaries",
+    "public_notices.publicnoticesc_estates",
+    "national.bankruptcy_rss_relief_from_stay",   # lender motions to resume foreclosure (debtor + district, no sale date)
+    "counties_sc.horry_probate",                 # Horry estates filed in the last year (no sale date)
+    "counties_sc.york_tax_sale_parcels",         # York tax sale parcels (the sale date is on the row; listed for safety)
+    "counties_nc.rocky_mount_blight_survey",     # condition survey rows: no sale date
+    "city_websites.raleigh_structure_fires",     # fire addresses: no sale date
+    "counties_nc.kinston_proposed_demolition",   # proposed demolition list: no sale date
+    # 2026-10-07 second round of new sources: none of their rows carries a sale date.
+    "counties_sc.charleston_energov_history",    # Charleston County permit/code history (code cases, demolition permits)
+    "counties_nc.nc_metro_demolition_permits",   # Mecklenburg, Durham, Greensboro, Cary demolition permits
+    "counties_nc.rowan_delinquent_tax",
+    "counties_nc.cumberland_delinquent_tax",
+    # polk_tax's slug mixes a dated auction page with a dateless delinquent-tax-search
+    # sub-scraper (added 2026-10-12); the search half's standing tax balances carry no sale
+    # date, so without this entry _active_only() dropped every dateless row on every run
+    # (2026-10-17 audit_suite gap-sweep wave 6, drops-dateless-filtered-source: 1,622 rows).
+    "counties_nc.polk_tax",
+    "counties_nc.iredell_delinquent_tax",
+    "counties_nc.wake_code_cases",
+    "counties_nc.nc_tax_lien_ads",               # Hoke, Lee, Davidson, Randolph tax-lien advertisements
+    # 2026-08-30 new county sources (dateless: vacant / tax-delinquent / probate —
+    # no sale_date, so they must be whitelisted or _active_only drops every row).
+    "counties_nc.gaston_vacant",
+    "counties_nc.lincoln_vacant",
+    "counties_nc.transylvania_vacant",
+    "counties_nc.transylvania_delinquent_tax",
+    "counties_nc.mcdowell_probate",
+    "national.hud_homestore",
+    "national.fannie_homepath",
+    "national.homepath_json",                    # newer Fannie HomePath JSON API (alt to fannie_homepath above); no sale date
+    "national.freddie_homesteps",
+    "national.auction_dot_com",
+    "national.hubzu",
+    "national.xome",
+    "national.foreclosure_dot_com",
+    "national.zillow_foreclosures",
+    "national.zillow_bulk",
+    "national.bid4assets",
+    "national.propwire",       # preforeclosure leads: NOD filed but sale not yet scheduled
+    "national.trulia",
+    "national.realtor_foreclosures",
+    "national.probate_foreclosure_leads",
+    "national.homeharvest",    # actively-listed-with-agent foreclosures (no sale date until auction)
+    "national.distressed",     # motivated-seller / cash-only / estate-sale / as-is hits
+    "counties_sc.sc_public_index_lis_pendens",  # filed but no sale date yet
+    "counties_nc.nc_ecourts_lis_pendens",       # NC Tyler portal civil-side filings
+    "counties.nod_discovery",                   # ROD-discovered NOD recordings
+    "national.courtlistener_bankruptcy",        # Ch 7/11/13 federal bankruptcy filings
+    "courtlistener.recap",                      # orphaned pre-rename slug for the same bankruptcy signal; structured sale_date cleared (was a filing date, not a sale date -- see scripts/fix_courtlistener_recap.py)
+    "nc_ecourts_judgments",                      # NC eCourts lis_pendens/tax_lien judgments; structured sale_date cleared (was the court's judgment/filing date, not a sale date -- see scripts/fix_nc_ecourts_judgments.py). Real counties already set (not a scope-bypass case).
+    "counties_sc.sc_tax_delinquent",            # delinquent property tax / pre-tax-sale
+    "counties_sc.sc_flc",                        # SC Forfeited Land Commission inventory (no sale date)
+    "counties_nc.nc_county_csv_delinquent_tax",  # NC delinquent-tax CSV rolls (New Hanover); no sale date
+    # A delinquent-tax balance is a STANDING condition, not a scheduled event:
+    # this scraper's Listing() never sets sale_date, so without the whitelist
+    # entry _active_only() deletes every row it ever harvests.
+    "counties_sc.fairfield_delinquent_tax",      # Fairfield SC delinquent tax / FLC (dateless)
+    # Same shape as Fairfield: York's Listing() never sets sale_date (a
+    # delinquent-tax balance is a standing condition, not a scheduled event),
+    # so without this entry _active_only() deletes every row it harvests.
+    "counties_sc.york_delinquent_tax",           # York SC delinquent tax / tax-sale roster (dateless)
+    # Overage claims sit unclaimed until someone files -- a standing condition,
+    # not a scheduled event. sale_date is deliberately left unset (see the
+    # scraper's own comment): it would otherwise be the PAST parcel auction
+    # date and _active_only would drop every row as a stale upcoming sale.
+    "counties_sc.york_overage_claims",
+    # Same reasoning as York's overage list, directly above: Orangeburg's
+    # yearly overage rosters carry no per-row sale_date (the claim sits open
+    # until someone files, not a scheduled event).
+    "counties_sc.orangeburg_overage_claims",
+    # Laurens's scanned overage list, same reasoning again: a standing
+    # unclaimed-funds condition, not a scheduled event.
+    "counties_sc.laurens_overage_claims",
+    # Fairfield's overage list, same reasoning again: a standing
+    # unclaimed-funds condition, not a scheduled event.
+    "counties_sc.fairfield_overage_claims",
+    # Calhoun's yearly overage lists, same reasoning again: a standing
+    # unclaimed-funds condition, not a scheduled event.
+    "counties_sc.calhoun_overage_claims",
+    # Greenville's AS/400 tax-sale roster carries no per-row sale_date either
+    # (a standing "who currently owes" list, not a scheduled event) -- same
+    # reasoning as every other county delinquent-tax source in this list.
+    "counties_sc.greenville_delinquent_tax",
+    # Richland's FLC list has no per-parcel date either -- rolling
+    # over-the-counter inventory, same reasoning as every other FLC/
+    # delinquent-tax source in this list.
+    "counties_sc.richland_flc",
+    # Dillon's delinquent-tax export carries no per-parcel date either --
+    # a standing "who currently owes" list, same reasoning as every other
+    # SC county delinquent-tax source in this list.
+    "counties_sc.dillon_delinquent_tax",
+    # Berkeley's paystar.io delinquent-tax roll carries no per-parcel date
+    # either -- a standing "who currently owes" list, same reasoning as
+    # every other SC county delinquent-tax source in this list.
+    "counties_sc.berkeley_paystar_tax",
+    # Union County NC's Granicus delinquent real-estate tax CSV (2026-11-11
+    # bot_wall_inhouse bypass, counties_nc.union_delinquent_tax) is the same
+    # standing "who currently owes" shape -- no per-parcel date either.
+    "counties_nc.union_delinquent_tax",
+    # Most Wake County tax-foreclosure judgments carry "Date of Sale: To Be
+    # Announced" -- a judgment has been entered but no auction date set yet.
+    # Same reasoning as the freshly-filed-summons entries below: filed but
+    # undated is a real early-warning signal, not a data gap.
+    "counties_nc.wake_tax_foreclosure",
+    # Most Edgecombe County rows carry a case-progress STATUS ("Complaint
+    # filed/Settlement pending") with no scheduled sale yet -- same
+    # reasoning as Wake above. A minority of rows DO have a real embedded
+    # sale date ("Sale 9/16/2026" in the status text itself, parsed into
+    # sale_date directly), so this entry only matters for the rest.
+    "counties_nc.edgecombe_tax_foreclosure",
+    # Stokes's rows come from the Kania Law Firm statewide tax-foreclosure
+    # table (fixed 2026-10-01 -- the county's own page carried no data at
+    # all). Most rows there carry the literal "Sale date not yet set" until
+    # the upset-bid clock starts; a filed-but-undated case is still a real
+    # lead (case number + parcel + address are already public), same
+    # reasoning as Wake/Edgecombe above.
+    "counties_nc.stokes_delinquent_tax",
+    # The scanned notice PDF this scraper stamps for doc-OCR carries no
+    # structured sale_date of its own (fixed 2026-10-01 -- see the module
+    # docstring); the lead is "a current notice exists, pending OCR", not a
+    # scheduled event.
+    "counties_nc.swain_tax_foreclosures",
+    # A DSCA compliance-tracking status (active/inactive/closed) is a
+    # standing condition, not a scheduled event -- rebuilt 2026-10-01
+    # against the real Excel source (see the module docstring); same
+    # reasoning as every delinquent-tax roll above.
+    "counties_nc.nc_deq_dsca",
+    # A freshly-filed foreclosure summons has no sale date yet (the case has
+    # only just been filed) -- same reasoning as sc_public_index_lis_pendens
+    # above: filed but no sale date yet is a real, valid early-warning signal,
+    # not a data gap.
+    "newspapers.aiken_standard",
+    # Same reasoning: freshly-filed summonses from these two sibling
+    # Post & Courier network papers have no sale date yet either.
+    "newspapers.journal_scene",
+    "newspapers.berkeley_independent",
+    # Same cookie-cutter scraper as Fairfield above, same dateless Listing(): the
+    # Saluda advertisement carries owner/TMS/description but no per-parcel date,
+    # so without this entry every row it harvests in Nov-Dec is deleted silently.
+    "counties_sc.saluda_delinquent_tax",         # Saluda SC delinquent tax sale (dateless)
+    # 2026-06 expansion — new FLC/tax/probate/estate/lien/surplus sources whose
+    # rows are long-runway (pre-sale) and routinely carry no sale_date.
+    "counties_sc.oconee_forfeited_land",         # Oconee FLC available + assignment lists
+    # 2026-10-01 per-source audit: the published sale-list CSV carries one
+    # county-wide auction date in free text on its own placeholder rows (e.g.
+    # "The 2026 Tax Sale is scheduled for Monday, November 9, 2026"), which the
+    # scraper now parses and stamps onto every real row's sale_date. This entry
+    # is a backstop only -- if that text format ever changes and parsing fails,
+    # sale_date reverts to None and _active_only() would otherwise silently
+    # delete every row the live November sale list produces.
+    "counties_sc.oconee_tax_sale",               # Oconee delinquent-tax sale list (sale_date best-effort)
+    "counties_sc.spartanburg_flc",               # Spartanburg FLC assignable-surplus PDF (dateless)
+    # An FLC holding is a STANDING condition (county owns the parcel until it is
+    # assigned/sold), so this scraper never sets sale_date. Verified 2026-09-10:
+    # _active_only() returned False for a dateless kershaw_flc row and True for an
+    # identically-shaped counties_sc.spartanburg_flc row -- i.e. without this entry
+    # every row this source ever harvests is deleted before dedupe.
+    "counties_sc.kershaw_flc",                   # Kershaw FLC / delinquent-tax holdings (dateless)
+    # An FLC holding is a STANDING condition (county owns the parcel until it is
+    # assigned/sold), never a scheduled event: this scraper's Listing() never sets
+    # sale_date, so without this entry _active_only() deletes every row it harvests.
+    "counties_sc.mccormick_flc",                  # McCormick FLC inventory (dateless)
+    # An FLC holding is a STANDING condition (county owns it until someone offers),
+    # never a scheduled event: this scraper's Listing() never sets sale_date, so
+    # without the whitelist entry _active_only() deletes every row it harvests.
+    "counties_sc.lexington_flc",                 # Lexington FLC inventory (dateless)
+    # counties_sc.horry_flc removed 2026-08-12 — Myrtle Beach/Horry excluded per user direction.
+    "counties_sc.georgetown_civicengage",        # Georgetown FLC (dateless) + tax + MIE
+    "counties_sc.charleston_delinquent_tax",     # Charleston FLC sealed-bid + delinquent tax
+    "counties_sc.colleton_tax_sale",             # Colleton delinquent-tax list
+    # Florence annual delinquent-tax-sale list. Rows normally carry the sale date
+    # parsed off the office page, but if that announcement sentence is reworded the
+    # date goes None and _active_only would delete all ~1,600 rows silently. The
+    # delinquency itself is a standing condition, same as the SC sources above.
+    "counties_sc.florence_delinquent_tax",       # Florence delinquent-tax sale list
+    "counties_sc.sc_probate_net",                # southcarolinaprobate.net estate/marriage filings
+    "counties_sc.greenville_probate",            # Greenville County appsas400 probate filings (no sale date)
+    "counties_nc.gaston_surplus_properties",     # Gaston county-owned surplus (accepting offers)
+    "counties_nc.nc_ecourts_estates",            # NC eCourts estate filings (no sale date)
+    "counties_nc.nc_ecourts_divorce",            # NC eCourts divorce filings (no sale date)
+    "counties_nc.nc_heir_estate_parcels",        # heir/estate owner-of-record parcels (GIS, dateless)
+    # Johnston's static delinquent-tax file crosswalked to NC OneMap PINs -- a delinquent
+    # balance is a standing condition, never a scheduled event; this scraper's Listing() never
+    # sets sale_date, so without this entry _active_only() deletes every row it ever harvests.
+    "counties_nc.johnston_delinquent_tax_crosswalk",
+    "counties_sc.sc_heir_estate_parcel_cache",   # SC heir/estate owner-of-record, parcel_cache-read (dateless)
+    "counties_sc.spartanburg_vacant",            # Spartanburg City vacant registry (absentee+vacant, dateless)
+    "counties_sc.spartanburg_condemned",         # Spartanburg condemned/dilapidated CAMA-condition signal (dateless)
+    "counties_nc.asheville_str_permits",         # Asheville lapsed STR/homestay permits (motivated landlord, dateless)
+    "counties_nc.lincoln_code_violations",       # Lincoln County open code-enforcement violations (address-keyed, dateless)
+    # Prefix match (main._active_only startswith-checks "base.") -- every
+    # arcgis_distress_layers row ships as "counties_generic.arcgis_distress.<layer
+    # slug>", not the class-level "counties_generic.arcgis_distress_layers" slug.
+    # Was whitelisting only new_hanover_demolition_permits by exact string; that
+    # silently dropped the other 16 live layers (6,973 rows: tax liens, code
+    # violations, storm/flood damage, county-owned surplus -- none carry a sale
+    # date) discovered still-zero-row on the 2026-09-15 audit.
+    "counties_generic.arcgis_distress",           # all county ArcGIS distress layers (dateless)
+    # Both dynamic-slug sources (ships as "<base>.<registry/program slug>",
+    # never the class-level scraper slug) -- confirmed live 2026-09-15 audit,
+    # already correctly wired, simply never run before.
+    "counties_generic.state_contamination",       # NC UST/hazardous/dam registries (dateless)
+    "counties_generic.epa_frs",                   # EPA FRS ACRES/SEMS brownfield+superfund sites (dateless)
+    "counties.column_legal_notices",             # Column API SC estate/probate notices (no sale date)
+    "law_firms.zacchaeus",                       # ZLS tax foreclosures (status-driven; upset/pending leads outlive sale date)
+    "national.first_citizens_reo",               # First Citizens bank-owned REO listings
+    "national.usda_properties",                  # USDA Rural Development eligible / REO resales (SC); no sale date
+    "national.gsa_surplus",                       # GSA accelerated-disposition federal properties; negotiated sale, no auction date
+    "national.fema_disasters",                    # FEMA disaster declarations by county; a declaration event, not a sale
+    "national.sc_public_index",                   # SC Common Pleas court filings; case filing date, not a sale date
+    "city_websites.charlotte_open_data",          # open Charlotte/Mecklenburg code enforcement cases; case creation date, not a sale date
+    "counties_sc.greenville_mie_adverts",         # past-sale rows ship as DISTRESSED (judgment-debt value doesn't go stale); upcoming-sale rows still get denied for Greenville by the SCOPE gate regardless
+    "counties_sc.sc_rod_acclaim",                # SC ROD (Acclaim vendor) recorded NOD/deed filings
+    "counties_sc.sc_rod_cott",                   # SC ROD (Cott vendor) recorded NOD/deed filings
+    # 2026-10-14 (date-coverage audit pass2, item #5 verification): found while adding these three
+    # to board_persist.AGE_EXEMPT_SOURCES -- none of them was in this whitelist, and NONE of the
+    # three ever sets sale_date (confirmed by reading every Listing() call site in each file), so
+    # _active_only() was dropping EVERY row from all three sources before it ever reached the
+    # board, independent of the retention fix. Without this, the AGE_EXEMPT_SOURCES addition for
+    # these three is a no-op -- the row never gets far enough to need retaining.
+    "counties_nc.wnc_rod_foreclosure_starts",    # pre-sale substitution-of-trustee lane; no sale date yet
+    "counties_nc.nc_rod_captcha",                # CCS DevExpress NOD/NOS sweep; no sale type captured at all
+    "counties_sc.sc_rod_walled",                 # Beaufort/Clarendon/Jasper ROD lien/probate/foreclosure-start sweep
+    # 2026-05 expansion — new sources added in this PR. Without these
+    # entries, _active_only would drop their listings whenever sale_date
+    # is missing (which is most of the time for monthly/annual cadence).
+    "counties_nc.nc_rod_substitute_trustee",      # ROD substitute-trustee deed filings
+    "counties_sc.terry_howe_flc",                 # current FLC auction catalog (no sale dates)
+    # An FLC holding is a STANDING condition (the FLC owns the parcel until someone
+    # bids), same reasoning as terry_howe_flc/sc_flc above -- this scraper never sets
+    # sale_date either. 2026-09-28 gap sweep (docs/coverage_gap_build_plan_2026-09-23.md
+    # item 7): Beaufort's FLC runs through Meares Property Advisors on Proxibid, a
+    # second multi-county FLC-auctioneer vendor alongside Terry Howe.
+    "counties_sc.beaufort_flc",                   # Beaufort FLC via Meares/Proxibid (dateless)
+    # 2026-09-29 sale-type/no-date audit (docs/extraction_gaps.md): horry_flc's own
+    # docstring already says "DATELESS: the FLC list carries NO auction/sale date --
+    # FLC parcels sell over-the-counter on a rolling basis until redeemed" (same
+    # reasoning as every other _flc source above), but the whitelist entry itself was
+    # never added. distress_score._is_county_owned_inventory() already recognizes the
+    # "horry_flc" slug and scores it correctly (tax_sale signal suppressed, not
+    # penalized), so the scorer was never wrong -- but without this entry,
+    # _active_only() would silently drop every horry_flc row the moment it runs
+    # through the normal pipeline again (the 3 rows currently on the board landed via
+    # a bypass path, not this gate). Verified live 2026-09-29: 3/3 dateless tax_sale
+    # rows on the board are this source.
+    "counties_sc.horry_flc",                      # Horry FLC over-the-counter inventory (dateless)
+    "counties_sc.terry_howe_auctions",            # broad real-estate auction catalog; older/overflow posts dateless
+    "counties_sc.spartan_weekly_legals",          # current Spartanburg legal notices (sale_date best-effort)
+    "counties_nc.nc_rod_logan",                   # recent NOD recordings (date-range limited, current)
+    "reo.usda_rd",                                # USDA Rural Development resale REO
+    "reo.treasury_seized",                        # Treasury seized real property
+    "reo.vrm_va_reo",                             # VRM Properties (VA REO)
+    "national.courtlistener_civil",               # federal civil real-property cases
+    "national.courtlistener_adversary",           # CL bankruptcy lift-stay / 363 sale
+    # ncnotices.com — legal notices in NC newspapers (foreclosure +
+    # divorce + probate categories). Service-by-publication divorces
+    # and Notice-to-Creditors probate notices typically have no sale_date.
+    "public_notices.ncnotices",
+    # scpublicnotices.com — SC legal notices (foreclosure summons, tax sale,
+    # delinquent tax, estate/creditors). The Details.aspx body is CAPTCHA-walled,
+    # so we only get the grid's truncated preview, which rarely reaches the sale
+    # paragraph — 3 of 565 rows carried a parseable sale_date on 2026-07-31.
+    "counties_sc.sc_public_notices",
+    # ncnotices.com county-filtered lane — foreclosure / tax-foreclosure /
+    # NCGS 105-369 tax-lien-ad / estate notices. Full body is CAPTCHA-gated so no
+    # row carries a sale_date; without this entry _active_only drops all of them.
+    "public_notices.nc_notices_counties",
+    "public_notices.nc_heir_notices",
+    # Kania tax-foreclosure filings — filed, then await a scheduled sale date
+    # (37 of 56 rows dateless on 2026-07-31).
+    "law_firms.kania",
+    # Oconee Forfeited Land Commission assignment list. FLC parcels are county-OWNED after
+    # an unsold tax sale and assignable over the counter at the back-taxes figure — the
+    # buy-direct lane. All 585 rows are dateless by nature (there is no scheduled sale; the
+    # county already owns them), so without this entry _active_only drops the entire source.
+    # Observed exactly that on the 2026-08-04 run: "OK with rows but 0 reached the dashboard".
+    "counties_sc.oconee_flc_assignment",
+    # Pickens pre-sale delinquent-tax rolls (2020-2025 GIS layers). A delinquent balance is
+    # a standing debt, not a dated sale. Without this the active filter drops all of them.
+    "counties_sc.pickens_delinquent_parcels",
+    # Pickens POST-sale redemption roster ("TAX SALE RESULTS FOR WEBSITE.pdf"). Measured
+    # 2026-09-10: the scraper returns 160 rows, all Pickens SC, all in-footprint -- and all
+    # with sale_date=None, because it sets `redemption_deadline` (2026-12-31) instead. The
+    # sale already happened; what is live is the statutory redemption window, during which
+    # the defaulting owner still holds title, can still sell, and is facing a hard deadline.
+    # Without this entry _active_only discarded the whole source, which is why a healthy
+    # scraper reported OK(160) and contributed 0 board rows.
+    "counties_sc.pickens_tax_sale",
+    # Lancaster SC delinquent tax / tax sale. Every Listing() this scraper builds
+    # leaves sale_date unset (it takes owner/parcel/address off the advertised list,
+    # never a per-parcel date), so without this entry _active_only() deletes the
+    # whole source the moment the county posts its list. Added 2026-09-10 alongside
+    # the dead-AlertCenter-URL repair.
+    "counties_sc.lancaster_delinquent_tax",
+    # Newberry SC delinquent tax sale. Same shape as Lancaster: the Listing() this
+    # scraper builds never sets sale_date (it takes owner/parcel/address off the
+    # advertised list, no per-parcel date), so the moment the county posts a list
+    # _active_only() would delete every row. Verified dateless 2026-09-10.
+    "counties_sc.newberry_delinquent_tax",
+    # SC probate Notice to Creditors. An estate has no sale date -- SC Probate Code
+    # 62-3-801 requires the notice, the notice is the event. Measured 2026-09-10 the
+    # source returns 880 rows (Pickens 520, Cherokee 225, Laurens 135), every one
+    # with sale_date=None, so _active_only discarded the entire source. These are the
+    # only free SC leads that carry a named, mail-reachable decision-maker.
+    "counties_sc.sc_probate_notices",
+    # SC UST (Underground Storage Tank) registry -- a facility/owner-keyed
+    # environmental-distress signal, no sale date (it's a standing registry
+    # entry, not a scheduled event). Verified live 2026-09-15: 3,331 real
+    # rows across 7 counties (Spartanburg 1,149, Anderson 788, Pickens 409,
+    # Laurens 319, Oconee 315, Cherokee 230, Union 121), including a probate
+    # sub-signal (39 "ESTATE OF..." owner rows). Without this entry
+    # _active_only() silently dropped the entire source.
+    "counties_sc.sc_ust_registry",
+    # Zombie properties (lis-pendens filed >12mo ago, never resolved to a
+    # sale) -- a derived standing-condition signal by definition, no sale
+    # date. Verified live 2026-09-15: 14 real rows. Same missing-whitelist
+    # bug as sc_ust_registry above.
+    "counties_sc.zombie_properties",
+    # SC DES brownfields/cleanup sites -- a standing environmental-
+    # contamination registry entry, no sale date. Verified live 2026-09-15
+    # (after fixing the URL-matching bug that was emitting nav-menu garbage
+    # alongside real sites): 64 clean rows.
+    "counties_sc.sc_des_brownfields",
+    # A delinquent tax BALANCE is a standing condition with no sale date -- SC runs
+    # an administrative sale, so there is no docket date to carry. Without this entry
+    # _active_only() deletes every row this source produces, which is how
+    # pickens_tax_sale lost 160 rows and sc_probate_notices lost 880.
+    "counties_sc.qpaybill_delinquent_roll",
+    # Same reason: a delinquent tax balance is a standing condition with no sale date, so
+    # _active_only() would delete every row this source produces.
+    "counties_sc.sc_catalis_delinquent_roll",
+    # Dorchester SC BillTrax delinquent-tax roll (added 2026-09-29): same shape as
+    # qpaybill/catalis above — a standing unpaid balance, not a scheduled sale.
+    # Without this entry _active_only() deletes every one of its rows, exactly as
+    # qpaybill_delinquent_roll's own comment above already found once.
+    "counties_sc.dorchester_billtrax_delinquent_tax",
+    "counties_nc.nc_its_public_tax",            # Onslow/Graham standing roll, no sale date
+    "counties_sc.horry_delinquent_xlsx",        # Horry delinquent list, pay-by deadline not a sale
+    "counties_nc.albemarle_observer_tax_lists", # NC annual delinquent lists, no sale date
+    "public_notices.funeral_home_rss",          # name-only estate leads, no sale date (resolver attaches the parcel)
+    "counties_sc.greenville_tax_distress",      # unpaid-tax parcels, standing condition
+    # Spartanburg City Master Condemnation List — a condemnation is a standing condition.
+    "counties_sc.spartanburg_city_condemned",
+    # Hendersonville vacant/condemned structures register — same, standing condition.
+    # NOTE: this scraper takes owner + mailing only; the PHONE__/EMAIL columns on that
+    # layer are deliberately excluded (see FORBIDDEN_FIELDS in the module).
+    "counties_nc.hendersonville_vacant_structures",
+    # Henderson foreclosure parcels — the list is a definitionExpression of REIDs
+    # inside an ArcGIS Web Experience, not a page. Parcels in foreclosure carry no
+    # published sale date; the sale posture lives in the county's court file.
+    "counties_nc.henderson_foreclosure_parcels",
+    # Henderson code violations (nuisance, solid waste, vehicle graveyard). A live
+    # violation is a standing condition, not a dated event.
+    "counties_nc.henderson_code_violations",
+    # Gastonia city code-enforcement (CityView locator). Same shape as Henderson's
+    # code violations above: an open case is a standing condition with no sale
+    # date. Without this entry _active_only() deletes every row this source
+    # produces the first time it actually runs.
+    "counties_nc.gastonia_code_enforcement",
+    # Asheville Accela code-enforcement cases (AccelaServicesView). Same shape as
+    # Henderson/Gastonia above: a code case has no sale date. Ships gated off by a
+    # live staleness self-check (the feed is a frozen 2016-2018 snapshot as of
+    # 2026-10-03 — see the module docstring) so it emits 0 rows today, but this
+    # entry is needed the moment it ever starts emitting again.
+    "counties_nc.asheville_code_enforcement",
+    # Multi-year arrears history (Buncombe 2009-2026, Oconee DT2023-25, Pickens).
+    # An arrears record is "owes for N years", which has no sale date by nature.
+    "counties.multi_year_delinquent_tax",
+    # Rutherford Sturgis/Avalon delinquent bills. Currently inert behind a robots
+    # wall (returns 0 either way), but required the moment the vendor relaxes it.
+    "counties_nc.rutherford_wildfire_tax",
+    # Buncombe tax-foreclosure calendar. Trumba's startDateTime is BIDDING-BEGINS,
+    # not the sale, so past-dated rows are still live bids; the scraper withholds
+    # sale_date in that case and keeps it in raw.buncombe_tax.bidding_begins_iso.
+    # Without this line _active_only discarded 33 of 33 fetched parcels.
+    "counties_nc.buncombe_tax",
+    # Relationship-deeds enrichment — derives PROBATE_NOTICE / DIVORCE_NOTICE
+    # listings from ROD recordings (executor's deeds, quitclaim + $0
+    # divorce transfers). These are leads, not auctions — no sale_date.
+    "derived.probate_deed",
+    "derived.divorce_deed",
+    "national.crexi_multifamily",                 # Crexi MF/apartment for-sale listings (no sale date)
+    "counties_sc.sc_coastal_rosters",             # coastal foreclosure rosters (sale_date best-effort)
+    "counties_nc.cleveland_tax",                  # Cleveland NC tax/lis-pendens rows (dateless) — leak fix
+    "counties_sc.sc_state_tax_lien",              # SC DOR state tax-lien registry (dateless) — leak fix
+    "counties_sc.charleston_mie",                 # Charleston MIE roster rows (case#-only, dateless)
+    # 2026-06-30 — built-but-not-landing sources: their leads are dateless distress
+    # signals (elderly owners, storm damage, delinquent tax, obituaries) and were
+    # being SILENTLY DROPPED by _active_only for lack of a sale_date. That's why
+    # they read 0 on the board. Adding them makes them land on every run.
+    "counties_nc.buncombe_elderly",               # elderly long-tenure owners (GIS, dateless)
+    # 2026-11-11 — lt_elderly_disabled gap-sweep: the SC homestead-exemption analog
+    # of buncombe_elderly above. Full-county bulk sweep (every homesteaded parcel is
+    # its own lead), not a duplicate of enrichment_tax_relief.py's existing per-lead
+    # York/Lexington lookup (that one only fires on leads ALREADY resolved to a
+    # parcel from another source). Dateless (a homestead flag has no sale date).
+    "counties_sc.york_homestead",                 # York SC homestead exemption (GIS, dateless)
+    "counties_sc.lexington_homestead",            # Lexington SC homestead exemption (GIS, dateless)
+    "counties_nc.asheville_helene",               # Helene Unsafe/Restricted placards (dateless)
+    "public_notices.gannett_obituaries",          # obituaries -> pre-probate heir leads (dateless)
+    "counties_nc.buncombe_delinquent_tax",        # Buncombe delinquent-tax list (dateless)
+    "counties_nc.nc_ptscloud_delinquent_tax",     # Madison/Henderson/etc PTS Cloud delinquent roll (dateless)
+    "counties_nc.nc_county_pdf_delinquent_tax",   # Lincoln/Catawba/McDowell delinquent-tax PDF (dateless)
+    "counties_sc.spartanburg_delinquent_tax",     # Spartanburg delinquent-tax-sale list (dateless)
+    "counties_sc.cherokee_delinquent_tax",        # Cherokee delinquent-tax list (dateless)
+    "counties_sc.darlington_delinquent_tax",      # Darlington delinquent-tax sale list (dateless)
+    "national.gsa_realproperty",                  # GSA real-property disposal (no auction date until scheduled)
+    "national.servicelink_auction",               # ServiceLink auction inventory (pre-schedule, dateless)
+    "national.hud_reac_inspection",               # HUD REAC failing-inspection multifamily (no sale date)
+    "national.hud_section8_contracts",            # HUD Section-8 contract-expiry multifamily (no sale date)
+    "counties_nc.rutherford_tax",                 # NC tax-foreclosure (dateless in-rem/upset rows) — leak fix
+    "counties_nc.rutherford_foreclosure",         # Rutherford in-office + Kania tax-foreclosure docket (soft/upset dates)
+    "counties_nc.nc_county_tax_foreclosure",      # NC Gaston/McDowell/Rutherford tax-foreclosure + upset-bid
+    "counties_nc.nc_coastal_tax_foreclosure",     # NEW coastal NC (Brunswick/Onslow/Carteret) tax-foreclosure
+    "newspapers.post_and_courier",                # Charleston legal notices (pre-auction, no sale date)
+    "newspapers.carolina_coast",                  # coastal NC/SC legal notices (pre-auction)
+    "counties_nc.brunswick_legal_notices",        # Brunswick legal-notice PDFs (sale_date best-effort, often None)
+    # Manual public-records court/land lane (2026-07-04 ingest of fresh_court_leads.json):
+    # these motivated-seller signals are dateless by nature (a lis-pendens/probate has no
+    # sale date; a land/FSBO listing has no auction date), so without the whitelist a full
+    # run would drop the merged carryover as "dateless historic roster."
+    "counties_sc.sc_public_index",                # SC PublicIndex court cases (foreclosure/lis-pendens/probate)
+    "counties_sc.sc_public_index_export",         # SC PublicIndex manual-export lane (same, operator-saved)
+    "national.landwatch",                         # land-for-sale listings (no auction date)
+    "national.landandfarm",                       # land-for-sale listings (no auction date)
+    "national.cash_buyer_deeds",                  # recorded cash-buyer deeds (dateless)
+    "national.craigslist_fsbo",                   # FSBO listings (dateless)
+    "national.estate_sales",                      # Estate sale events (dateless)
+    "national.sheriff_sales",                     # Sheriff sale listings (dateless)
+    "national.nc_upset_bids",                     # NC upset bid period listings (dateless)
+    # national.williams (REWRITTEN 2026-10-02): most rows carry a real courthouse
+    # sale_date, but a sale that has already happened reports no date at all on
+    # the page -- only a status sentence normalized to auction_status=
+    # "upset_bid_period" (NC's statutory 10-day post-sale window). Without this,
+    # _active_only drops those rows as a "dateless historic roster" even though
+    # the upset-bid window is still open and the lead is still actionable --
+    # same shape as national.nc_upset_bids just above, which is why this sits
+    # right next to it.
+    "national.williams",
+    "national.jail_bookings",                     # County jail booking rosters (dateless)
+    # Meares Property Advisors (SC upstate auctions). Live lots carry an auction
+    # END date, but brokered "real-estate-listings" rows + between-cycle items are
+    # routinely dateless; without this, _active_only would drop those.
+    "counties_sc.meares_auctions",
+    # Anderson SC ACPASS deed-search (POA + COURT ORDER instrument-type codes):
+    # a recorded POA or a judicially-adjudicated heir order is a standing
+    # legal-record event with a FILE date, not a scheduled auction -- same
+    # reasoning as every other court/probate source in this list.
+    "counties_sc.anderson_acpass_deeds",
+    # 2026-10-15 (date-coverage audit pass3): Listing() never sets sale_date at all in either of
+    # these two scrapers, so without this entry _active_only() was deleting EVERY row they harvest,
+    # before the source could even reach the board -- the same shape as the Wayne/apostrophe and
+    # nod_discovery prerequisite bugs this codebase has already found and fixed elsewhere. Both are
+    # also newly added to board_persist.AGE_EXEMPT_SOURCES this same pass (the prerequisite alone
+    # gets a fresh scrape's rows ON the board; the retention fix keeps them there once the source
+    # stops re-finding the same filing).
+    "counties_nc.nc_rowan_cott",    # Rowan NC deed-index sweep (Cott eSearch) -- recorded filing, no sale date
+    "national.nc_unclaimed",        # NC unclaimed-property per-surname search -- standing claim, no sale date
+    # 2026-11-10 zero-row PIPELINE triage: both confirmed live with real in-footprint
+    # rows that never reached the board. Listing() in each scraper is correct --
+    # _active_only() was deleting every row before dedupe for lack of a whitelist
+    # entry, the exact shape as every other entry in this set.
+    #
+    # Henderson NC's page carries ONE free-text sale date/time that applies to
+    # every parcel in the table (DATE_RE on the prose above it) -- but live-verified
+    # 2026-11-10 the current prose is just the standing authorization/location text
+    # ("Sales are conducted on the courthouse steps at 200 North Grove St..."), no
+    # date at all, so sale_date is None for all 15-18 live rows. The docket itself
+    # (a parcel scheduled for tax foreclosure, taxes unpaid) is a standing condition
+    # until a sale date is actually set, same reasoning as every other NC/SC
+    # delinquent-tax source above; a minority of future runs WILL carry a real
+    # parsed sale_date once the county posts one, so this entry only matters for
+    # the (currently 100%) dateless rest -- same shape as Wake/Edgecombe above.
+    "counties_nc.henderson_tax",
+    # scpublicnotices.com's search-results grid only shows a ~300-400 char
+    # TRUNCATED preview per notice (see the module's own "CONSEQUENCE FOR FIELD
+    # COVERAGE" docstring section) -- the actual sale date almost always sits past
+    # the truncation point, so _sale_date() returns None for the large majority of
+    # rows, LIS_PENDENS (filed, no sale date yet -- same reasoning as the already-
+    # whitelisted counties_sc.sc_public_index_lis_pendens / nc_ecourts_lis_pendens)
+    # and FORECLOSURE_SALE alike. NOT covered by the publicnoticesc_estates entry
+    # above -- that is a different sibling module, and the prefix check only
+    # widens matching for slugs starting with "public_notices.publicnoticesc_estates.",
+    # never the bare slug here.
+    "public_notices.publicnoticesc",
+}
+
+
+def _flip_candidate(li: Listing) -> bool:
+    """Filter out listings that aren't realistic flip candidates for upstate
+    SC + WNC investors. Drops:
+      - SFR / condo / townhouse priced > $750k UNLESS lot is >2 acres
+      - Anything priced > $1.5M (excluded outright; super-luxury isn't our scope)
+
+    KEEPS regardless of price:
+      - Multi-family (apartment complexes have their own value calc)
+      - Land (priced by acreage, not size)
+      - Properties without an opening_bid (unknown, don't drop blindly)
+    """
+    bid = li.opening_bid
+    if not bid or bid <= 0:
+        return True  # unknown price; keep
+
+    # Hard cap — nothing > $1.5M
+    if bid > 1_500_000:
+        return False
+
+    # Multi-family + land bypass
+    if li.property_kind in (PropertyKind.MULTI_FAMILY, PropertyKind.LAND):
+        return True
+
+    # SFR/condo/townhouse > $750k requires acreage justification
+    if bid > 750_000:
+        lot = li.lot_size_sqft
+        if lot and lot >= 2 * 43_560:  # 2+ acres
+            return True
+        return False
+
+    # H2 FIX (2026-05-08): default to KEEP for the most common branch
+    # — bid in [1, 750_000] for SFR/condo/townhouse. Previously this
+    # function fell off the end with no return, implicitly returning
+    # None (falsy) → the orchestrator silently dropped every priced-SFR
+    # ≤ $750k listing. The bread-and-butter flip pool. Massive silent
+    # data loss until this fix.
+    return True
+
+
+# Common SC MIE address abbreviations — kept here so the city-splitter
+# resolves them to canonical city names that match Realtor.com.
+_SOLD_POOL_CITY_ALIASES = {
+    "Sptbg.": "Spartanburg", "Sptbg": "Spartanburg", "Sbg.": "Spartanburg",
+    "Greenwd.": "Greenwood", "Greenwd": "Greenwood",
+    "Henderson.": "Hendersonville", "Hendsv.": "Hendersonville",
+    "WS": "Winston-Salem",
+}
+
+
+def _split_embedded_city(listings: list[Listing]) -> None:
+    """Split city out of street_address for sold-pool listings whose
+    city is embedded in the address string ('248 Sweetie Way, Sptbg., SC').
+
+    Mutates listings in place. The MIE PDF parsers carry the full address
+    line from the PDF unsplit; this helper unblocks the downstream
+    HomeHarvest-by-address lookup which requires li.city set.
+    """
+    for li in listings:
+        if li.city or not li.street_address or "," not in li.street_address:
+            continue
+        parts = [p.strip() for p in li.street_address.split(",")]
+        if len(parts) < 2:
+            continue
+        # parts[0] = street, parts[1] = city candidate, parts[2:] = state/zip noise
+        candidate = parts[1]
+        # Skip if it's a 2-letter state code (e.g. "123 Main St, SC")
+        if len(candidate) == 2 and candidate.isupper():
+            continue
+        city = _SOLD_POOL_CITY_ALIASES.get(candidate, candidate)
+        if 2 <= len(city) <= 30:
+            li.street_address = parts[0]
+            li.city = city
+
+    return True
+
+
+# --------------------------------------------------------------------------- #
+# Situs sanity — a street_address must look like a residential SITUS, not a    #
+# business/entity name or a placeholder. Run #20 audit found 157 leaked rows   #
+# whose street_address was a geocoder POI artifact ("Midtown Moter Inn",       #
+# "Haven of Rest Thrift Store", church/thrift/civic-center names) or a         #
+# "Vacant parcel — ..." placeholder. Shipping those as the address misleads    #
+# the investor; we null the address (keeping parcel_id / coords) and flag the  #
+# row data_quality=low instead. Conservative by design: a token-group ending   #
+# in a road suffix is ALWAYS treated as a real street name (so "Glassy         #
+# Mountain Church Road" / "South Academy Street" / "Glenn Church Ln" survive), #
+# and a string that embeds a real "<number> <name> <suffix>" address anywhere  #
+# is left intact (e.g. "STARRWOOD GOLF CO 139 STARRWOOD DR" has a recoverable  #
+# situs).                                                                      #
+_SITUS_VACANT_RE = re.compile(r"^\s*vacant parcel\b", re.I)
+#: A token-group that ENDS in a street/road suffix is a road name, never junk.
+_SITUS_ROAD_SUFFIX_RE = re.compile(
+    r"\b(st|street|rd|road|ave|avenue|dr|drive|ln|lane|blvd|boulevard|ct|court|"
+    r"cir|circle|way|pl|place|pkwy|parkway|hwy|highway|trl|trail|loop|run|path|"
+    r"row|terrace|ter|pike|cove|cv|crossing|xing|bend|ridge|sq|square|alley|aly|"
+    r"walk|connector|extension|ext)\.?$",
+    re.I,
+)
+#: Strong business / institution words — a residential situs never STARTS here.
+_SITUS_ENTITY_RE = re.compile(
+    r"\b(inn|motel|hotel|baptist|methodist|presbyterian|lutheran|episcopal|"
+    r"ministr\w*|temple|tabernacle|chapel|church|synagogue|mosque|llc|l\.l\.c\.?|"
+    r"inc|incorporated|corp|corporation|company|brewing|brewery|winery|distillery|"
+    r"restaurant|cafe|diner|funeral|crematory|club|lodge|academy|university|"
+    r"college|bank|associat\w*|foundation|society|cemetery|photography|holdings|"
+    r"enterprises|outfitters|thrift|store|salon|barber|civic center|senior center|"
+    r"conference center|retreat|golf)\b",
+    re.I,
+)
+#: An embedded "<house#> <words> <road-suffix>" anywhere => a recoverable situs;
+# leave the address alone even if it has a name prefix.
+_SITUS_EMBEDDED_ADDR_RE = re.compile(
+    r"\d+\s+\w[\w .-]*\b(st|street|rd|road|ave|avenue|dr|drive|ln|lane|blvd|ct|"
+    r"court|cir|circle|way|pl|place|hwy|highway|pkwy|trl|trail|loop|run|path|pike)\b",
+    re.I,
+)
+
+
+def _situs_is_junk(address: str | None) -> bool:
+    """True when ``address`` is not a usable residential situs — a 'Vacant
+    parcel' placeholder or a leading business/entity name (geocoder POI
+    artifact). Conservative: real road names and name-prefixed strings that
+    still embed a real street address are NOT flagged."""
+    a = (address or "").strip()
+    if not a:
+        return False
+    if _SITUS_VACANT_RE.match(a):
+        return True
+    first = a.split(",")[0].strip()
+    if not first:
+        return False
+    if first[0].isdigit():
+        return False  # normal house-numbered address
+    if _SITUS_ROAD_SUFFIX_RE.search(first):
+        return False  # a road name (may contain 'church'/'academy' etc.)
+    if _SITUS_EMBEDDED_ADDR_RE.search(a):
+        return False  # name prefix but a real situs is recoverable after it
+    return bool(_SITUS_ENTITY_RE.search(first))
+
+
+from .situs_sanity import situs_is_junk as _situs_is_junk  # noqa: E402,F811 (audit 2026-10-09)
+
+
+def _active_only(li: Listing, horizon_days: int, *, now: datetime | None = None) -> bool:
+    """Drop listings whose sale is too far past or > horizon_days out, and any
+    auction marked withdrawn/cancelled or in a TERMINAL court status (redeemed /
+    dismissed / satisfied / disposed — the lien/case is resolved, not a live
+    lead). Run #20 audit: 2 REDEEMED + 24 dismissed court records were shipping.
+    Pass ``now`` to pin the reference time in tests; in production it defaults
+    to ``datetime.utcnow()``."""
+    if li.auction_status and li.auction_status.lower() in TERMINAL_AUCTION_STATUSES:
+        return False
+    if li.sale_date is None:
+        # For court / law-firm / tax / public-notice sources a missing date almost
+        # always means we scraped a historic roster; drop it.
+        #
+        # Prefix match too, not just exact: found 2026-09-15 that
+        # counties_sc.sc_probate_notices emits each row with a PER-PAPER
+        # dynamic slug ("counties_sc.sc_probate_notices.laurenscountyadvertiser",
+        # ".yourpickenscounty", ".gaffneyledger" — one per newspaper host it
+        # covers), never the bare "counties_sc.sc_probate_notices" string a
+        # 2026-09-10 commit added to DATELESS_OK_SOURCES believing it was
+        # enough. The exact-match check silently dropped every real row from
+        # this source for 5 days despite the commit's own message claiming
+        # "measured 880 rows" verified live -- the scraper really did work,
+        # the whitelist entry just never matched what it actually emits.
+        # This is currently the ONLY source using a "<base>.<suffix>" slug
+        # convention (confirmed via a repo-wide grep before adding this), so
+        # the prefix check only ever widens matching for that one family.
+        src = li.source or ""
+        return src in DATELESS_OK_SOURCES or any(
+            src.startswith(f"{base}.") for base in DATELESS_OK_SOURCES
+        )
+    # Normalize sale_date to naive UTC (some scrapers return offset-aware
+    # datetimes from dateutil parsing; we compare against utcnow() which is naive).
+    sale = li.sale_date
+    if sale.tzinfo is not None:
+        sale = sale.replace(tzinfo=None)
+    # State-aware past cutoff: NC's upset-bid period (NCGS §45-21.27) is
+    # 10 days from the trustee's filing of the report of sale, and §45-21.26
+    # gives 5 days from sale to file the report — so the practical window
+    # from sale_date is up to 15 days. We use 14 as the operational threshold.
+    # Without this grace, we strand the strongest actionable signal an
+    # investor can chase. Default 2-day grace for other states; SC also
+    # gets 14 (its §29-3-680 confirmation window is even longer).
+    #
+    # The window comes from enrichment_foreclosure_sold_comps.state_upset_window_days, the
+    # SAME table the sold-pool partition uses (F8): a lead is active while
+    # now - sale <= window and sold-pool material strictly after it, so a lead can never
+    # fall in the gap between the two.
+    past_grace_days = state_upset_window_days(li.state)
+    ref = now or datetime.utcnow()
+    cutoff_past = ref - timedelta(days=past_grace_days)
+    cutoff_future = ref + timedelta(days=horizon_days)
+    # F8: an SC tax sale is not over on sale day. It conveys a certificate, the owner keeps
+    # title for ~12 months and can redeem, so it stays active while that clock runs.
+    if sale <= cutoff_future and sc_tax_redemption_open(li, ref):
+        return True
+    # A filing-date source (LiensNC, NC SoS UCC) stores the FILING date where an auction would have its
+    # sale date; a filing does not expire after 14 days, so the lower bound is a year, not the upset window.
+    from .distress_score import FILING_DATE_SOURCES
+    if any(part in FILING_DATE_SOURCES for part in (li.source or "").split(".")):
+        return ref - timedelta(days=365) <= sale <= cutoff_future
+    return cutoff_past <= sale <= cutoff_future
+
+
+def _safe_pred(fn, li, default: bool) -> bool:
+    """Evaluate a per-listing predicate defensively. A single malformed lead
+    (e.g. a bare str where a dict was expected — the class of bug that silently
+    killed whole runs before write_artifact) returns `default` instead of
+    raising and discarding a multi-hour run. Only the one bad lead is affected."""
+    try:
+        return bool(fn(li))
+    except Exception:  # noqa: BLE001
+        log.error("orchestrator.predicate_failed",
+                  fn=getattr(fn, "__name__", str(fn)),
+                  source=getattr(li, "source", None),
+                  traceback=traceback.format_exc())
+        return default
+
+
+def _denied_now(li: Listing) -> bool:
+    """POST-ENRICHMENT scope re-pass predicate: True = drop this lead.
+
+    Module level (it was a closure inside run()) so it can be tested. The flip rule comes
+    FIRST: a flip outside the 18 counties is dropped whatever coastal tag it carries, and a
+    flip that still has no county after enrichment is dropped too (it cannot be routed to the
+    footprint; 21 REO rows with no county on the 2026-09-21 board). Only then do the
+    oceanfront / downtown-Charleston / coastal-source carve-outs apply, and they now shelter
+    DISTRESS-type leads only."""
+    if _flip_outside_footprint(li):
+        return True
+    if _is_flip(li) and not (li.county or "").strip():
+        return True
+    if _is_flip(li) and _in_oceanfront_county(li):
+        return False    # past the guard above: the beach-drive rule admitted it (spare it the deny list)
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    if raw.get("oceanfront") or raw.get("downtown_charleston") or raw.get("coastal_county"):
+        return False
+    if not (li.county and li.state):
+        return False
+    key = (li.county.replace(" County", "").strip().title(), li.state.upper())
+    # Deny list is a FLIP-scope concept (see _FLIP_LISTING_TYPES) — a
+    # distressed-type lead in a denied county is not re-dropped here.
+    if _is_flip(li) and key in SCOPE_DENY_COUNTIES_NORMALIZED:
+        return True
+    # Coastal counties are an intentional re-admission track for distress leads — leave
+    # them to the oceanfront / coastal-source paths, never drop on footprint alone.
+    if key in OCEANFRONT_COASTAL_COUNTIES:
+        return False
+    # County resolved to something we don't track at all -> off-footprint leak.
+    # Flip leads: narrow 18-county footprint. Distressed leads: anywhere in
+    # NC/SC (see _county_in_scope / _FLIP_LISTING_TYPES).
+    return not _county_in_scope(li)
+
+
+def _resolve_coastal_pending(li: Listing) -> Optional[bool]:
+    """Publish-time verdict on a row _in_scope() admitted PROVISIONALLY: True = keep, False =
+    drop, None = not a provisional row (left to the other passes).
+
+    _in_scope() tags a coastal-county row that has an address or parcel but no coordinates yet
+    (raw.oceanfront_pending, or raw.downtown_charleston_pending) because the near-beach and
+    downtown-peninsula tests need the coordinates that geocoding fills in later. Here, after
+    geocoding, a row that passes either test gets the confirmed tag (raw.oceanfront /
+    raw.downtown_charleston) and is kept, as before.
+
+    THE BUG (fixed 2026-10-06). A row that FAILED both tests was dropped, whatever its listing
+    type. Every row that could carry the provisional tag then was a DISTRESS lead: _in_scope()
+    rejected a flip outside the 18 footprint counties before it looked at the coast, and no coastal
+    county is in that footprint (a coastal flip can carry the tag since the beach-drive rule, see
+    the end of this docstring). The owner's rule of 2026-09-15 (config.in_scope_distressed) is that a
+    distress lead is in scope in any NC or SC county, with no carve-outs, and _in_scope() admits
+    the very same inland lead when it arrives WITH coordinates (the provisional path is skipped
+    and _county_in_scope() keeps it); _denied_now() never drops a coastal distress lead either.
+    So the outcome depended only on whether the scraper supplied coordinates. The 9/15 change
+    updated _in_scope() and the deny re-pass but not this one. Measured on the 2026-10-05 VM
+    run: this pass dropped 9,840 rows; nc_heir_estate_parcels kept 77 Brunswick, 61 Carteret
+    and 73 Charleston rows at scrape time and the run's checkpoint holds 0 in each (the
+    published board had 77, 61 and 68), and qpaybill Colleton fell from 1,198 published rows
+    to 587 after scraping 11,309 rows there.
+
+    Now a provisional row that fails both tests is kept when it is not a flip and its county
+    is in the distress scope (_county_in_scope); it just does not get the oceanfront or
+    downtown tag.
+
+    A FLIP is decided by the owner's beach-drive rule alone (2026-10-06, "nothing more than a 5
+    minute drive to the beach"): once geocoding has given it a point, it is kept when that point is
+    within oceanfront.FLIP_COASTAL_MAX_M of the ocean (tagged raw.near_beach_drive, and raw.oceanfront
+    too when within OCEANFRONT_DISTANCE_M), and dropped otherwise, including when there is still no
+    point. A flip is never kept as a downtown-Charleston row or by the distress scope. _denied_now()
+    runs next regardless."""
+    if not isinstance(li.raw, dict):
+        li.raw = {}
+    raw = li.raw
+    pend_of = raw.pop("oceanfront_pending", None)
+    pend_dt = raw.pop("downtown_charleston_pending", None)
+    if not (pend_of or pend_dt):
+        return None  # not a pending row — leave to the other passes
+    if _is_flip(li):
+        return bool(_in_oceanfront_county(li) and _flip_beach_check(li, tag=True))
+    if pend_of and _in_oceanfront_county(li) and _check_oceanfront(li):
+        return True  # confirmed near-beach -> tagged raw.oceanfront
+    # Charleston is in OCEANFRONT_COASTAL_COUNTIES, so a peninsula (harbor-
+    # side) row gets oceanfront_pending but will FAIL the ocean-distance
+    # test; fall through to the downtown peninsula test before dropping it.
+    if _is_downtown_charleston(li):
+        return True  # tagged raw.downtown_charleston
+    # Inland: a distress lead stays in scope anywhere in NC/SC (owner rule 2026-09-15).
+    if not _is_flip(li) and _county_in_scope(li):
+        return True
+    return False
+
+
+class ScoreBoardFailed(RuntimeError):
+    """score_board raised and SCORE_BOARD_FAIL_SOFT is not set (audit F17)."""
+
+
+# Process exit codes. run_local.sh keys off these; before 2026-09-21 a failed board
+# write returned 0 and still exported the Sheet and sent the digest email (audit O4).
+EXIT_OK = 0
+EXIT_SCORE_FAILED = 6       # score_board raised (or ran fail-soft)
+EXIT_WRITE_FAILED = 3       # write_artifact raised: nothing was published
+EXIT_LOCK_BUSY = 75         # EX_TEMPFAIL: another board writer holds the lock
+
+
+async def run() -> int:
+    _setup_logging()
+    cfg = RuntimeConfig.from_env()
+    # Per-enrichment stats for the health artifact. Declared HERE (not mid-run)
+    # so the early enrichers that populate it — hud_reac_address, lrcpwa — don't
+    # hit UnboundLocalError (which the surrounding try/except silently swallowed,
+    # losing those stats + logging a false "failed"). One dict for the whole run.
+    enrichment_stats: dict[str, dict] = {}
+    scrapers = all_scrapers()
+    # FORECLOSURE_ONLY_SOURCES=substr,substr — restrict to matching slugs (for a scoped
+    # timing/subset run). Unset = all sources (normal full run).
+    _only = os.environ.get("FORECLOSURE_ONLY_SOURCES")
+    if _only:
+        _keep = [k.strip() for k in _only.split(",") if k.strip()]
+        scrapers = [s for s in scrapers if any(k in s.slug for k in _keep)]
+        log.info("orchestrator.filtered", only=_keep, kept=len(scrapers))
+
+    # FORECLOSURE_SKIP_SOURCES=substr,substr — the mirror of ONLY: drop any slug
+    # matching one of these substrings.
+    _skip = os.environ.get("FORECLOSURE_SKIP_SOURCES")
+    if _skip:
+        _drop = [k.strip() for k in _skip.split(",") if k.strip()]
+        _before = len(scrapers)
+        scrapers = [s for s in scrapers if not any(k in s.slug for k in _drop)]
+        log.info("orchestrator.skip_filtered", skip=_drop,
+                 dropped=_before - len(scrapers), kept=len(scrapers))
+
+    # FORECLOSURE_ROLE — cloud-split shorthand (source_split.py is the source of
+    # truth for which sources are residential-IP-only):
+    #   vm  = datacenter host — drop the residential stealth scrapers; the Mac
+    #         runs those and feeds their leads back via national.stealth_handoff.
+    #   mac = residential host — keep ONLY the stealth scrapers.
+    #   all/unset = normal single-host run (everything).
+    _role = (os.environ.get("FORECLOSURE_ROLE") or "all").strip().lower()
+    if _role in ("vm", "mac"):
+        from .source_split import residential_slugs
+        _res = residential_slugs()
+        _before = len(scrapers)
+        if _role == "vm":
+            scrapers = [s for s in scrapers if s.slug not in _res]
+        else:  # mac
+            scrapers = [s for s in scrapers if s.slug in _res]
+        log.info("orchestrator.role_filtered", role=_role,
+                 kept=len(scrapers), was=_before)
+
+    log.info("orchestrator.start", scrapers=len(scrapers))
+
+    sem = asyncio.Semaphore(cfg.parallel_scrapers)
+
+    async def bounded(s):
+        async with sem:
+            return s.slug, await s.safe_run()
+
+    # WALL-CLOCK BUDGET for the whole scrape phase. Every other long phase in
+    # this orchestrator has one; this did not, and the 2026-08-11 run spent 5.5
+    # hours in it with no log line while a stealth browser retried an AWS-WAF
+    # portal that is documented as permanently walled.
+    #
+    # Per-scraper timeout_s does NOT bound this: 90+ sources at
+    # parallel_scrapers concurrency can legitimately sum to many hours.
+    #
+    # Deliberately NOT wait_for(gather(...)) — that cancels every task on
+    # expiry and throws away sources that already finished. asyncio.wait keeps
+    # the completed ones and cancels only what is still hanging.
+    scrape_budget_s = float(os.environ.get("SCRAPE_PHASE_MAX_SECONDS", "10800"))
+    tasks = [asyncio.create_task(bounded(s), name=s.slug) for s in scrapers]
+    done, pending = await asyncio.wait(tasks, timeout=scrape_budget_s)
+    if pending:
+        stalled = sorted(t.get_name() for t in pending)
+        log.warning("orchestrator.scrape_time_capped",
+                    budget_s=scrape_budget_s, completed=len(done),
+                    cancelled=len(pending), stalled_sources=stalled[:20],
+                    reason="phase budget hit; completed sources are kept")
+        for t in pending:
+            t.cancel()
+        await asyncio.gather(*pending, return_exceptions=True)
+
+    results = []
+    for t in done:
+        try:
+            results.append(t.result())
+        except Exception:  # noqa: BLE001 - safe_run should not raise, but a
+            # task that dies here must not take the whole phase with it.
+            log.error("orchestrator.scraper_task_failed", source=t.get_name(),
+                      traceback=traceback.format_exc())
+    # `done` is a set: put the results back in scraper order so dedupe keeps the same winner on
+    # every run (audit 2026-10-09, regressions).
+    _slug_order = {s.slug: i for i, s in enumerate(scrapers)}
+    results.sort(key=lambda r: _slug_order.get(r[0], len(_slug_order)))
+
+    raw: list[Listing] = []
+    by_source: Counter = Counter()
+    errors: list[str] = []
+    regressions: list[str] = []
+    expected = {s.slug: s.expected_min_count for s in scrapers}
+    # Per-run outcome+reason from base_scraper.safe_run — so a 0-count source is
+    # never ambiguous (code error vs blocked vs timeout vs legit empty).
+    source_outcomes = {s.slug: (getattr(s, "last_outcome", "OK"),
+                                getattr(s, "last_reason", "")) for s in scrapers}
+    for slug, listings in results:
+        n = len(listings)
+        by_source[slug] = n
+        if n == 0:
+            errors.append(slug)
+            continue
+        # Regression detection: source's expected_min_count not met
+        if n < expected.get(slug, 0):
+            regressions.append(f"{slug}: got {n}, expected ≥ {expected[slug]}")
+        for li in listings:
+            if not li.source:
+                li.source = slug
+            raw.append(li)
+
+    if regressions:
+        log.warning("orchestrator.regressions", count=len(regressions), regressions=regressions)
+
+    # Lis pendens discovery — independent search of NC eCourts + SC Public Index
+    # for new foreclosure filings per county (catches early-warning cases that
+    # haven't hit the law-firm trustee calendars yet)
+    try:
+        lp = await asyncio.wait_for(discover_lis_pendens(), timeout=120)
+        for li in lp:
+            raw.append(li)
+        by_source["courts.lis_pendens_discovery"] = len(lp)
+        log.info("orchestrator.lis_pendens_discovered", count=len(lp))
+    except asyncio.TimeoutError:
+        log.warning("orchestrator.lis_pendens_timeout",
+                    reason="discover_lis_pendens exceeded 120s — skipping (scrapers already cover this)")
+    except Exception as exc:  # noqa: BLE001
+        log.warning("orchestrator.lis_pendens_failed", error=str(exc))
+
+    # Last-known-good carryover — for any source that produced ≥3 listings
+    # last week but 0 this week (anti-bot escalation, scheduled maintenance,
+    # transient 5xx), replay the prior listings tagged stale=True so the
+    # dashboard never goes blank. Carryover listings flow through filter +
+    # dedupe normally; if a fresh scrape supersedes them next run, dedupe
+    # picks the fresher record. Carryover skipped for sources whose zero
+    # is acknowledged (paywall/apify/render-blocked).
+    try:
+        from .carryover import carryover_for_zeroed_sources
+        skip_for_carryover = {
+            *(s.slug for s in scrapers if getattr(s, "requires_apify", False)),
+            *(s.slug for s in scrapers if getattr(s, "requires_paywall", False)),
+            *(s.slug for s in scrapers if getattr(s, "requires_render", False)),
+        }
+        carried, carry_stats = carryover_for_zeroed_sources(
+            by_source_now=dict(by_source),
+            expected_min=expected,
+            skip_slugs=skip_for_carryover,
+        )
+        if carried:
+            log.warning(
+                "orchestrator.carryover_applied",
+                listings=len(carried),
+                sources=carry_stats,
+            )
+            for li in carried:
+                raw.append(li)
+                # Track in by_source under a synthetic slug suffix so
+                # source_status can mark them visibly stale in run_health.
+                by_source[li.source or "carryover"] += 1
+    except Exception:
+        log.error("carryover.failed", traceback=traceback.format_exc())
+        carry_stats = {}
+
+    log.info("orchestrator.collected", raw=len(raw))
+
+    # Partition: recently-finished foreclosure sales (180-day past window
+    # from real foreclosure-sale sources — law-firm trustees, county MIE,
+    # county tax, auction.com) are routed to a SEPARATE pool used as
+    # max-bid comp signal. These never appear as listings on the dashboard
+    # main grid; they only surface as nested data on per-listing card
+    # popouts via raw.foreclosure_sold_comps. The active pipeline stays
+    # focused on actionable inventory.
+    from .enrichment_foreclosure_sold_comps import is_sold_pool_candidate
+    sold_pool_raw = [li for li in raw if _safe_pred(is_sold_pool_candidate, li, False)]
+    active_raw = [li for li in raw if not _safe_pred(is_sold_pool_candidate, li, False)]
+    log.info("orchestrator.partitioned",
+             active=len(active_raw), sold_pool=len(sold_pool_raw))
+
+    # Filter to scope (counties we care about) — applies to both partitions
+    in_area = [li for li in active_raw if _safe_pred(_in_scope, li, False)]
+    from .drop_audit import removed_by_source
+    log.info("orchestrator.in_scope", count=len(in_area),
+             pruned=len(active_raw) - len(in_area),
+             removed_by_source=removed_by_source(active_raw, in_area))
+    sold_pool = [li for li in sold_pool_raw if _safe_pred(_in_scope, li, False)]
+    log.info("orchestrator.sold_pool_in_scope",
+             count=len(sold_pool), pruned=len(sold_pool_raw) - len(sold_pool))
+
+    # Active only
+    active = [li for li in in_area
+              if _safe_pred(lambda x: _active_only(x, cfg.sale_horizon_days), li, False)]
+    log.info("orchestrator.active", count=len(active), pruned=len(in_area) - len(active),
+             removed_by_source=removed_by_source(in_area, active))
+
+    # Flip-candidate filter — drop super-luxury SFR (>$750k without 2+ acres,
+    # and anything >$1.5M outright). Multi-family + land bypass. Default keep on
+    # error so a filter crash never silently drops a good lead.
+    flip_able = [li for li in active if _safe_pred(_flip_candidate, li, True)]
+    log.info("orchestrator.flip_filtered", count=len(flip_able),
+             pruned=len(active) - len(flip_able),
+             removed_by_source=removed_by_source(active, flip_able))
+    active = flip_able
+
+    # Silent-drop warning: a source that scraped rows OK (N>0) but where 0
+    # survive the scope/active/flip filters never reaches the dashboard, yet
+    # source_status would still read "OK (N)". Surface it so a misrouted source
+    # (e.g. a DATELESS_OK_SOURCES omission dropping every dateless row) is
+    # caught instead of looking healthy. Compares raw scrape count to survivors.
+    from .drop_audit import all_filtered_sources
+    for slug, scraped_n in all_filtered_sources(results, by_source, active):
+        log.warning("orchestrator.source_all_filtered",
+                    source=slug, scraped=scraped_n,
+                    note="OK with rows but 0 reached the dashboard post-filter")
+
+    # Dedupe across sources — guarded so a merge-key edge case can't discard the
+    # run; on failure ship the un-deduped active set (worse dupes, not a lost run).
+    try:
+        deduped = dedupe(active)
+    except Exception:
+        log.error("orchestrator.dedupe_failed", traceback=traceback.format_exc())
+        deduped = active
+    log.info("orchestrator.deduped", count=len(deduped), pruned=len(active) - len(deduped))
+
+    # ---- Cumulative-board persistence (FULLRUN_PERSIST, default ON) ----------
+    # A full run rebuilds the board from a fresh scrape (~22k). Publishing that
+    # alone REPLACES the ~30k cumulative board: it drops every persisted lead
+    # not re-scraped this run (the non-re-scrapable manual sc_public_index_export
+    # lane + any source that produced fewer rows) — tripping the count-drop guard
+    # so run_local.sh skips the publish — and it re-grades matched leads from
+    # scratch, burning free vision quota on work already done.
+    #
+    # merge_prior_board folds the prior published board (load_board: sidecar +
+    # .gz aware) into the fresh scrape via the SAME dedupe(): fresh scrape fields
+    # win, prior enrichment (vision/images/gis) is carried onto matched fresh
+    # leads (so the now-idempotent vision pass skips them), and prior-only leads
+    # are kept but AGED through the existing raw["pulled_sale"] miss counter
+    # (dropped when terminal or after N misses). This is the additive equivalent
+    # of scripts/merge_today_sources.py, run inline in the full pipeline.
+    #
+    # CRITICAL PHASE: merge_prior_board folds the prior published board (~94k)
+    # into the fresh scrape (~22k). If this fails, the pipeline would continue
+    # with only 22k records — silently dropping 72k+ listings and publishing
+    # that as the full board (exit 0). This happened 5 times before we caught
+    # it. The fix: this is a critical phase. A failure MUST halt the pipeline
+    # with a non-zero exit, not log-and-continue.
+    persist_applied = False
+    if os.environ.get("FULLRUN_PERSIST", "1") != "0":
+        try:
+            from .board_persist import merge_prior_board
+            deduped, persist_stats = merge_prior_board(deduped)
+            log.info("orchestrator.board_persist",
+                     **{k: v for k, v in persist_stats.items() if k != "folded_prior_keys"})
+            # If load_board found no prior board (first run), fall through to the
+            # pulled-sales enricher below — nothing was persisted/aged here.
+            persist_applied = persist_stats.get("prior_count", 0) > 0
+        except Exception:
+            log.critical("board_persist.failed", traceback=traceback.format_exc())
+            raise  # HALT: do not publish a fresh-only board as the full board
+
+    # GRANDFATHER guard (opt-in via GRANDFATHER_CARRIED=1 — for the datacenter/VM
+    # host): snapshot the merged board so no lead already IN it can be evicted by
+    # a downstream filter that can't re-verify it from this IP (scope_repass,
+    # reo_freshness, countyless, etc.). Restored right before the write. Left OFF
+    # on the Mac, where full residential resolution makes those filters correct.
+    _grandfather: list = []
+    # Rows removed on purpose because they are NOT IN THE BUY BOX (resolved to an
+    # off-footprint county, or a national/REO row that never resolved to one).
+    # These are tallied separately from data loss because the count guard in
+    # web_artifact treats any large shrink as "a source broke" -- and on
+    # 2026-09-08 that misread killed a good 15h run: scope_repass correctly
+    # removed 30,509 off-footprint rows, the board landed at 39,088 against a
+    # high-water mark of 94,384 set while those same rows were still unresolved,
+    # and the guard refused the write. The high-water only ever moves UP, so that
+    # was a permanent deadlock: every honest run from then on was blocked and the
+    # published board stayed frozen at a stale, inflated 94,384.
+    _off_footprint_removed = 0
+    if persist_applied and os.environ.get("GRANDFATHER_CARRIED") == "1":
+        from .board_persist import drop_folded_prior
+        # Snapshot the PRIOR PUBLISHED board (pre-merge) as a ROW LIST, not a
+        # key-dict: the board keeps rows the simple dedupe_key() would collapse
+        # (it dedupes with a fuzzier matcher), so a dict silently loses ~10k
+        # rows. A list preserves every published row. A datacenter/VM run can't
+        # re-scrape residential sources, so the merge's miss-counter would age
+        # those leads out over repeated runs (what shrank 94,384 -> 80,283);
+        # restoring the prior rows keeps every already-published lead. The Mac's
+        # residential runs still do the real aging.
+        try:
+            import json as _gj
+            _pp = Path(__file__).resolve().parents[2] / "docs" / "listings.json"
+            _praw = _gj.loads(_pp.read_text()) if _pp.exists() else []
+            _gf_malformed = 0
+            for _r in (_praw if isinstance(_praw, list) else []):
+                try:
+                    _grandfather.append(Listing.model_validate(_r))
+                except Exception:  # noqa: BLE001 - skip a malformed prior row
+                    _gf_malformed += 1
+            if _gf_malformed:
+                log.warning("grandfather.malformed_prior_rows", count=_gf_malformed)
+            # Leave out the prior rows merge_prior_board folded into a row of ANOTHER key (a
+            # condominium's bare-pin row into its unit's row): each is on the board under the new
+            # key already, and restoring it would publish it twice.
+            _grandfather = drop_folded_prior(_grandfather, persist_stats)
+            log.info("orchestrator.grandfather_captured",
+                     count=len(_grandfather), source="prior_board")
+        except Exception:  # noqa: BLE001 - never let the snapshot fail the run
+            log.error("grandfather_capture.failed", traceback=traceback.format_exc())
+
+    # Correct bad data the prior board carried in (docs/HANDOFF.md item 71): parcels resolved at
+    # a geocoder fallback point and what was copied from them, the owner's mailing address shown
+    # as the property address, and the superseded aged copies of such rows. HERE, right after the
+    # merge and before any enricher and dedupe2, so the fixed enrichers refill what is withdrawn
+    # and dedupe2 never merges on it. Owner-mailing needs data/parcel_cache (a county without one
+    # is skipped and logged). Never fails the run; FULLRUN_PRIOR_CORRECTION=0 turns it off.
+    if persist_applied and os.environ.get("FULLRUN_PRIOR_CORRECTION", "1") != "0":
+        try:
+            from .enrichment_prior_correction import CacheReader, correct_prior_rows
+            _pc_cache = CacheReader()
+            log.info("orchestrator.prior_correction", **correct_prior_rows(deduped, cache=_pc_cache))
+            if _grandfather:
+                # the restore re-adds a snapshot row whose key the final board lacks: correct the
+                # snapshot the same way, or a withdrawn parcel's old key would bring the row back
+                log.info("orchestrator.prior_correction_grandfather",
+                         **correct_prior_rows(_grandfather, cache=_pc_cache))
+        except Exception:  # noqa: BLE001 - a correction pass must never cost the run
+            log.error("prior_correction.failed", traceback=traceback.format_exc())
+
+    # A county tax debt stays on a row only when it is that row's own parcel's record (tax_binding):
+    # copies from the 9/9 checkpoint recovery and old cross-county merges ride the prior board
+    # otherwise. enrich_tax_owed repeats this for the enriched rows; this covers the rows the
+    # enrich tail never touches (the grandfathered snapshot). Never costs the run.
+    try:
+        from .tax_binding import scrub_unbound_tax
+        log.info("orchestrator.tax_unbound", **scrub_unbound_tax(deduped))
+        if _grandfather:
+            log.info("orchestrator.tax_unbound_grandfather", **scrub_unbound_tax(_grandfather))
+    except Exception:  # noqa: BLE001
+        log.error("tax_unbound.failed", traceback=traceback.format_exc())
+
+    # Same rule for every other property and person block (owner contact, mailing, GIS attributes,
+    # liens, rosters, images): a block stays only when it is this row's own record (block_binding).
+    try:
+        from .block_binding import scrub_unbound_blocks
+        log.info("orchestrator.blocks_unbound", **scrub_unbound_blocks(deduped))
+        if _grandfather:
+            log.info("orchestrator.blocks_unbound_grandfather", **scrub_unbound_blocks(_grandfather))
+    except Exception:  # noqa: BLE001
+        log.error("blocks_unbound.failed", traceback=traceback.format_exc())
+
+    # Pulled-sale detection (dad's #6): listings that existed last week
+    # but didn't show up this run get tagged raw['pulled_sale'] with
+    # presumed_withdrawn=True and kept on the dashboard for up to 4
+    # consecutive misses before being dropped. NC + SC trustees PULL
+    # ~half of all scheduled foreclosure sales before they auction
+    # (BK, settlement, refinance, postponement). Without this, those
+    # silently disappear from the dashboard.
+    #
+    # SKIPPED when board-persist ran: merge_prior_board subsumes this — it ages
+    # prior-only leads through the SAME pulled_sale counter, off the fuller
+    # load_board() snapshot. Running both would double-increment the miss count.
+    if not persist_applied:
+        try:
+            from .enrichment_pulled_sales import enrich_with_pulled_sales
+            deduped, pulled_stats = enrich_with_pulled_sales(deduped)
+            log.info("orchestrator.pulled_sales", **pulled_stats)
+        except Exception:
+            log.error("pulled_sales.failed", traceback=traceback.format_exc())
+
+    # Link reachability — drop any listing whose URL is dead. HARD wall-clock cap:
+    # on a 90k+ board this HEAD-checks every URL and ran ~3h uncapped — the single
+    # biggest enrichment time sink measured on the Oracle VM run. On timeout keep
+    # everything unvalidated: a stale link beats a 3h stall that starves the
+    # grading phases (vision/ARV) downstream. Env LINK_VALIDATE_MAX_SECONDS.
+    _link_budget_s = float(os.environ.get("LINK_VALIDATE_MAX_SECONDS", "600"))
+    try:
+        valid = await asyncio.wait_for(
+            validate(deduped, workers=cfg.link_check_workers), timeout=_link_budget_s)
+    except asyncio.TimeoutError:
+        log.warning("orchestrator.link_validate_time_capped",
+                    budget_s=_link_budget_s, count=len(deduped))
+        valid = deduped
+    log.info("orchestrator.valid_links", count=len(valid))
+    checkpoint.save(valid, "link_validation")
+
+    # County GIS enrichment (free, pure HTTP) — fills parcel ID, owner, zoning,
+    # year built, beds/baths, sqft, tax value, last-sale book/page from county
+    # ArcGIS REST. Covers 23 of 25 counties.
+    # Guarded like the court/Zillow phases: a malformed county GIS JSON must not
+    # raise out of the whole run before the artifact write. On failure keep the
+    # validated (un-GIS-enriched) leads and press on — downstream enrichers +
+    # the write still run.
+    # HARD wall-clock cap — this phase runs one live GIS query per address-having lead and
+    # ran ~6.8h UNCAPPED on the 2026-08-14 run (the single biggest time sink). enrich_gis
+    # mutates each Listing IN PLACE and returns the same list, so on a timeout `valid` still
+    # holds every partial fill — set enriched=valid and press on. The parcel-cache fast path
+    # (above, in enrich) skips the network for cached-county leads, so this budget is ample.
+    _gis_budget_s = float(os.environ.get("GIS_PHASE_MAX_SECONDS",
+                                         os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "3000")))
+    try:
+        await asyncio.wait_for(enrich_gis(valid), timeout=_gis_budget_s)
+        enriched = valid
+        log.info("orchestrator.gis_enriched", count=len(enriched))
+        checkpoint.save(enriched, "gis")
+    except asyncio.TimeoutError:
+        enriched = valid
+        log.warning("gis_enrich.time_capped", budget_s=_gis_budget_s, count=len(enriched))
+        checkpoint.save(enriched, "gis")
+    except Exception:
+        log.error("gis_enrich.failed", traceback=traceback.format_exc())
+        enriched = valid
+
+    # Court-records enrichment. NC now uses Tyler's working JSON search API in
+    # BATCH (fast, compliant) + matches by case number — replacing the broken
+    # per-case WorkspaceMode render. SC uses the per-case Public Index render
+    # (operator's legal call; breaker-protected). Off switch: COURT_RECORDS_OFF=1.
+    if not os.environ.get("COURT_RECORDS_OFF"):
+        # HARD wall-clock cap (like the Vision guard): a stuck court phase —
+        # hung stealth renders / a degraded headless browser — must not discard
+        # the late-stage tail (grade/equity/lien_stack/sc_cama/footprint/
+        # assessor/distress + the artifact write). Time-box it and ALWAYS proceed;
+        # listings it doesn't reach just keep whatever fields they had.
+        court_phase_budget_s = float(os.environ.get("COURT_PHASE_MAX_SECONDS", "1800"))
+        try:
+            await asyncio.wait_for(
+                enrich_with_court_records(enriched),
+                timeout=court_phase_budget_s,
+            )
+            log.info("orchestrator.courts_enriched", count=len(enriched))
+        except asyncio.TimeoutError:
+            log.warning("orchestrator.courts_time_capped", budget_s=court_phase_budget_s,
+                        note="proceeding; unenriched listings keep prior fields")
+        except Exception as exc:  # noqa: BLE001
+            log.warning("orchestrator.courts_failed", error=str(exc))
+
+    # Zillow per-address detail enrichment (Apify) — fills photos, zestimate,
+    # description, plus anything county GIS missed.
+    # Wrap in try/except so a Zillow enrichment crash doesn't lose the listings
+    # we already collected + GIS-enriched (the artifact write is downstream).
+    try:
+        enriched = await enrich(enriched)
+        log.info("orchestrator.zillow_enriched", count=len(enriched))
+    except Exception:
+        log.error("zillow_enrich.failed", traceback=traceback.format_exc())
+
+    # NOTE: compute_flags() was moved DOWN to after owner_mailing + lien_stack +
+    # equity enrichment so the absentee/equity flags compute on enriched data
+    # (mailing address for absentee, ARV−payoff−liens for equity) instead of the
+    # empty fields present here. See the compute_flags call after the equity engine.
+
+    # HUD REAC address backfill — the multifamily REAC-inspection leads carry only
+    # a complex NAME + REMS id (no street). Join the REMS id to HUD's public
+    # Multifamily-Assisted layer to fill a real street_address + lat/lng (~82% hit),
+    # which then flows through geocode/parcel_from_geo/GIS/comps like any address.
+    # Runs BEFORE geocode + parcel_from_geo so the filled geo unlocks the GIS chain.
+    try:
+        from .enrichment_hud_reac_address import enrich_hud_reac_address
+        s = await _await_capped(enrich_hud_reac_address(enriched), "hud_reac_address")
+        if s:
+            enrichment_stats["hud_reac_address"] = s
+    except Exception:
+        log.error("hud_reac_address.failed", traceback=traceback.format_exc())
+
+    # Lincoln bulk assessor dumps (sqft/beds/baths/year) + Burke WPCOG parcel spine
+    # (PIN -> REID + owner/mailing/situs/value). Order is load-bearing: Burke must precede
+    # the lrcpwa resolver below, because Burke leads carry the 10-digit map PIN while lrcpwa
+    # searches on REID — which is exactly why that tenant sat at 0.6% coverage. Both
+    # enrich() are SYNC; do not await them.
+    try:
+        from .nc_lincoln_bulk import enrich as enrich_lincoln_bulk
+        s = enrich_lincoln_bulk(enriched)
+        if s:
+            enrichment_stats["lincoln_bulk"] = s
+    except Exception:
+        log.error("lincoln_bulk.failed", traceback=traceback.format_exc())
+
+    try:
+        from .nc_burke_spine import enrich as enrich_burke_spine
+        s = enrich_burke_spine(enriched)
+        if s:
+            enrichment_stats["burke_spine"] = s
+    except Exception:
+        log.error("burke_spine.failed", traceback=traceback.format_exc())
+
+    # NC PTS Cloud land-records resolver — parcel# -> situs address + assessed
+    # value + owner + mailing for Henderson/Madison/Rutherford/Burke (the
+    # delinquent-tax leads land with a parcel but no address). Runs BEFORE geocode
+    # so the recovered street addresses get lat/lng (and then an aerial).
+    try:
+        from .enrichment_lrcpwa_parcel import enrich_lrcpwa_parcel
+        s = await _await_capped(enrich_lrcpwa_parcel(enriched), "lrcpwa_parcel")
+        if s:
+            enrichment_stats["lrcpwa"] = s
+    except Exception:
+        log.error("lrcpwa.failed", traceback=traceback.format_exc())
+
+    # Geocoding fallback — fills lat/lng for any listing the county GIS didn't
+    # return geometry for. Rate-limited per Nominatim's policy.
+    try:
+        await _await_capped(enrich_geocode(enriched), "geocode")
+    except Exception:
+        log.error("geocode.failed", traceback=traceback.format_exc())
+
+    # Parcel-from-geo — point-in-polygon resolve a parcel_id for every
+    # geo-bearing lead that still has none. SC -> SCDOT SC_Parcels point query;
+    # NC -> NC OneMap NC1Map_Parcels point query. ~52% of leads carry a parcel;
+    # ~2050 of the rest have lat/lng but no parcel, and a parcel unlocks the
+    # value/owner/sqft GIS-attrs track. Runs AFTER the geocode fallback (so
+    # lat/lng is maximally populated) and BEFORE parcel_lookup / owner_mailing /
+    # assessor_card (which all consume parcel_id). Writes only li.parcel_id +
+    # raw.parcel_from_geo provenance; free, pure-HTTP, idempotent.
+    _resolver_budget_s = float(os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "3000"))
+    try:
+        from .enrichment_parcel_from_geo import enrich_parcel_from_geo
+        await asyncio.wait_for(enrich_parcel_from_geo(enriched), timeout=_resolver_budget_s)
+    except asyncio.TimeoutError:
+        log.warning("parcel_from_geo.time_capped", budget_s=_resolver_budget_s,
+                    note="proceeding; unresolved leads keep prior fields")
+    except Exception:
+        log.error("parcel_from_geo.failed", traceback=traceback.format_exc())
+
+    # Census ACS location enrichment (free, dedup'd by ZIP) — fills neighborhood
+    # signals for the location grade (median HH income, home value, owner pct).
+    try:
+        await valuation_location.enrich(enriched)
+    except Exception:
+        log.error("location.failed", traceback=traceback.format_exc())
+
+    # Per-county Register of Deeds enrichment — recorded mortgage history,
+    # lis pendens, satisfactions, lien-position computation. Free, pure-HTTP
+    # for the 4 vendors I've adapted (CCHS / Aumentum / Cott / Kofile).
+    # ROD deed enrichment: the CCHS/Aumentum/Cott/Kofile vendor portals
+    # migrated to iframe apps and currently match 0 (verified: 27 min for
+    # 0 hits on the 2026-06-16 run). Gated off by default so it doesn't
+    # burn wall-clock; set ROD_ENRICH_ON=1 to re-enable after adapters are
+    # rebuilt.
+    if os.environ.get("ROD_ENRICH_ON") == "1":
+        try:
+            from .rod import enrich as rod_enrich
+            await rod_enrich.enrich_all(enriched)
+        except Exception:
+            log.error("rod.failed", traceback=traceback.format_exc())
+    else:
+        log.info("rod.skipped", reason="adapters_broken_set_ROD_ENRICH_ON=1")
+
+    # Address backfill — for listings that have defendant + county but no
+    # street_address (SC Public Index lis pendens, NC eCourts, courthouse
+    # rolls without address columns), look the property up by owner name
+    # in the same county GIS we use for address-based enrichment. Free,
+    # pure-HTTP. Only writes when the match is confident (single result
+    # OR a unique multi-token match).
+    try:
+        from .enrichment_address_backfill import enrich_addresses_from_owner
+        await asyncio.wait_for(
+            enrich_addresses_from_owner(enriched),
+            timeout=float(os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "3000")))
+    except asyncio.TimeoutError:
+        log.warning("address_backfill.time_capped",
+                    note="proceeding; unenriched leads keep prior fields")
+    except Exception:
+        log.error("address_backfill.failed", traceback=traceback.format_exc())
+
+    # Bankruptcy property lookup — for every CourtListener bankruptcy listing,
+    # search the county GIS by debtor name across all counties in the BK
+    # court's footprint to recover address + property specs. Without this,
+    # bankruptcy listings have only a debtor name + court + chapter and
+    # nothing flows downstream (no photos, no comps, no ARV).
+    try:
+        from .enrichment_bankruptcy_property import enrich_bankruptcy_property
+        await _await_capped(enrich_bankruptcy_property(enriched), "bk_property", default_s=1800)
+    except Exception:
+        log.error("bk_property.failed", traceback=traceback.format_exc())
+
+    # Parcel-id / PIN / REID lookup — for tax foreclosures that publish parcel
+    # numbers but not street addresses. Queries the same county GIS we already
+    # use, but matches by parcel field. Falls back to subdivision+lot synthesis
+    # when the GIS has "0 NO ADDRESS ASSIGNED" (undeveloped lots).
+    try:
+        from .enrichment_parcel_lookup import enrich_with_parcel_lookup
+        # WALL-CLOCK CAP like every sibling resolver phase — this was a bare await and ran
+        # ~2h uncapped on the 2026-08-14 run (per-lead live GIS). wait_for bounds it; partial
+        # work persists in-place and converges over runs.
+        await asyncio.wait_for(enrich_with_parcel_lookup(enriched),
+                               timeout=float(os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "3000")))
+    except asyncio.TimeoutError:
+        log.warning("parcel_lookup.time_capped",
+                    budget_s=float(os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "3000")))
+    except Exception:
+        log.error("parcel_lookup.failed", traceback=traceback.format_exc())
+
+    # GIS attribute backfill — one point-in-polygon (or parcel) query per lead
+    # backfills assessed_value + market_value + owner_name + living_sqft +
+    # year_built + acreage + land_use from the county GIS feature. Runs after
+    # parcel_from_geo + parcel_lookup (so parcel_id/lat-lng are maximally
+    # populated) and BEFORE sc_cama/calc/grade so fresh value+sqft feed ARV +
+    # grading + equity. Missing-only; rejects denormalized-float/out-of-range
+    # junk. Lifts value ~6%->~30% and owner_name 0%->~80%.
+    try:
+        from .enrichment_gis_attrs import enrich_gis_attrs
+        await asyncio.wait_for(
+            enrich_gis_attrs(enriched),
+            timeout=float(os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "3000")))
+    except asyncio.TimeoutError:
+        log.warning("gis_attrs.time_capped",
+                    note="proceeding; unenriched leads keep prior fields")
+    except Exception:
+        log.error("gis_attrs.failed", traceback=traceback.format_exc())
+
+    # County GIS deed book/page and legal-description fill (gis_fill; audit 2026-10-09, top-80 fill group).
+    try:
+        from .gis_fill import enrich_gis_fill
+        s = await _await_capped(enrich_gis_fill(enriched), "gis_fill",
+                                default_s=int(float(os.environ.get("FORECLOSURE_GIS_FILL_BUDGET_S", "2400")) + 180))
+        if s and "skipped" not in s: enrichment_stats["gis_fill"] = s
+    except Exception:
+        log.error("gis_fill.failed", traceback=traceback.format_exc())
+
+    # Richland SC map-viewer reader (the county's parcel viewer shows owner mailing, value and sale facts
+    # that no layer we read carries; its disclaimer is a click-through). Capped like every resolver phase.
+    try:
+        from .enrichment_richland_parcel import enrich_richland_parcel
+        s = await asyncio.wait_for(
+            enrich_richland_parcel(enriched),
+            timeout=float(os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "3000")))
+        if s:
+            enrichment_stats["richland_parcel"] = s
+    except asyncio.TimeoutError:
+        log.warning("richland_parcel.time_capped")
+    except Exception:
+        log.error("richland_parcel.failed", traceback=traceback.format_exc())
+
+    # CAMA per-parcel condition/grade/year (open ArcGIS) — near-universal free
+    # condition layer; backfills year_built + a distressed-condition signal.
+    try:
+        from .enrichment_cama_condition import enrich_cama_condition
+        s = await asyncio.wait_for(
+            enrich_cama_condition(enriched),
+            timeout=float(os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "3000")))
+        if s:
+            enrichment_stats["cama_condition"] = s
+    except asyncio.TimeoutError:
+        log.warning("cama_condition.time_capped",
+                    note="proceeding; unenriched leads keep prior fields")
+    except Exception:
+        log.error("cama_condition.failed", traceback=traceback.format_exc())
+
+    # Mine raw['gis_attrs_full'] for last-sale (amount/date/book/page) + deed-age +
+    # owner-occupancy. Runs RIGHT AFTER gis_attrs (bag in memory) and BEFORE equity so
+    # the recorded sale price feeds the last-sale-amortized payoff instead of opening-bid.
+    try:
+        from .enrichment_gis_derived import enrich_gis_derived
+        s = enrich_gis_derived(enriched)
+        if s: enrichment_stats["gis_derived"] = s
+    except Exception:
+        log.error("gis_derived.failed", traceback=traceback.format_exc())
+
+    # Situs-address writer — for leads still missing a street_address but holding a
+    # parcel_id/lat-lng, write the property situs (PHYSSTRADD/SITE_ADDR/...) from the
+    # GIS feature (reuses raw['gis_attrs_full'] where present). Runs AFTER gis_attrs
+    # so the bag exists, and BEFORE geocode/images so the new address feeds map
+    # markers + photo lookup. The address->photo unlock.
+    try:
+        from .enrichment_situs_address import enrich_situs_address
+        await asyncio.wait_for(
+            enrich_situs_address(enriched),
+            timeout=float(os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "3000")))
+    except asyncio.TimeoutError:
+        log.warning("situs_address.time_capped",
+                    note="proceeding; unenriched leads keep prior fields")
+    except Exception:
+        log.error("situs_address.failed", traceback=traceback.format_exc())
+
+    # Aggressive cross-county owner-name search — last resort for listings
+    # still without an address. Tries every county GIS in the state + a
+    # fuzzy partial-token match in the stated county.
+    try:
+        from .enrichment_aggressive_address import enrich_with_aggressive_address
+        await _await_capped(enrich_with_aggressive_address(enriched), "aggressive_address")
+    except Exception:
+        log.error("aggressive_address.failed", traceback=traceback.format_exc())
+
+    # (enrichment_stats is declared at the top of run() so the earlier
+    # hud_reac_address / lrcpwa enrichers can populate it without UnboundLocalError.)
+
+    # SC lis-pendens GIS resolver — for any SC lis-pendens still on a
+    # placeholder address, decode the authoritative venue county from the
+    # case-number prefix (SC Code §15-11-10 venue rule) and confidently
+    # match against SCDOT GIS by defendant name. Also re-tags county
+    # whenever case# disagrees with current tag (defense-in-depth against
+    # any source that mistags SC lis pendens). Free, pure-HTTP, idempotent.
+    try:
+        from .enrichment_lis_pendens_resolver import enrich_lis_pendens_addresses
+        s = await _await_capped(enrich_lis_pendens_addresses(enriched), "lis_pendens_addresses")
+        if s: enrichment_stats["lis_pendens_resolver"] = s
+    except Exception:
+        log.error("lis_pendens_resolver.failed", traceback=traceback.format_exc())
+
+    # Parcel-centroid reverse-geocode — for listings that confidently
+    # matched a parcel via owner-name search but the county GIS has no
+    # situs field (Cleveland NC, Cherokee SC, etc.), reverse-geocode the
+    # centroid via Nominatim and annotate raw.parcel_resolution. Result is
+    # APPROXIMATE (nearest-road snap) — never written to street_address,
+    # only to raw blob for human review.
+    try:
+        from .enrichment_parcel_reverse_geo import enrich_parcel_reverse_geo
+        s = await _await_capped(enrich_parcel_reverse_geo(enriched), "parcel_reverse_geo")
+        if s: enrichment_stats["parcel_reverse_geo"] = s
+    except Exception:
+        log.error("parcel_reverse_geo.failed", traceback=traceback.format_exc())
+
+    # SC/NC case-detail scrape — for lis pendens listings whose address is
+    # still a synthesized "Lis Pendens" placeholder, render the case detail
+    # page on the public court portal and extract the real property address.
+    # Scrapling stealth, ~20-40s per case. Disable via CASE_DETAIL_OFF=1.
+    if not os.environ.get("CASE_DETAIL_OFF"):
+        # Same wall-clock cap as the court-records phase: per-case Scrapling
+        # renders can hang and strand the late-stage tail. Time-box + proceed.
+        case_detail_budget_s = float(os.environ.get("COURT_PHASE_MAX_SECONDS", "1800"))
+        try:
+            from .enrichment_case_detail import enrich_case_detail_addresses
+            await asyncio.wait_for(
+                enrich_case_detail_addresses(enriched),
+                timeout=case_detail_budget_s,
+            )
+        except asyncio.TimeoutError:
+            log.warning("case_detail.time_capped", budget_s=case_detail_budget_s,
+                        note="proceeding; unenriched listings keep prior fields")
+        except Exception:
+            log.error("case_detail.failed", traceback=traceback.format_exc())
+
+    # FINAL synthesis pass — for listings still without an address, build
+    # the best-available identifier from case#/defendant/description. The
+    # dashboard never shows "(address pending)" for a real listing.
+    try:
+        from .enrichment_address_final import enrich_with_address_synthesis
+        enrich_with_address_synthesis(enriched)
+    except Exception:
+        log.error("address_synth.failed", traceback=traceback.format_exc())
+
+    # Enforce case-pinned county AFTER all address-finding enrichments.
+    # NC + SC venue rules require foreclosure cases to be filed in the
+    # county where the property is located (NCGS §45-21.2, SC Code §15-11-10),
+    # so the case# encodes the authoritative county. Cross-county defendant-
+    # name GIS matches earlier in the chain can overwrite county AND fill
+    # a wrong-county street_address — Run #16 forensics found 15 NC eCourts
+    # listings tagged with the wrong county. This module re-tags county and
+    # nulls a real-looking but wrong-county street_address so investors don't
+    # drive to the wrong property.
+    try:
+        from .enrichment_county_pin import enforce_case_pinned_county
+        s = enforce_case_pinned_county(enriched)
+        if s:
+            enrichment_stats["county_pin"] = s
+    except Exception:
+        log.error("county_pin.failed", traceback=traceback.format_exc())
+
+    # Final county normalization: late enrichments (reverse-geo, parcel-pin,
+    # aggressive-address) assign li.county AFTER validate() ran, and some use
+    # str.title() which mangles 'MCDOWELL' -> 'Mcdowell'. Canonicalize here so
+    # the board doesn't split one county across casings and dedupe sees a
+    # consistent county in its signatures.
+    from .validation import normalize_county as _norm_county
+    _county_fixed = 0
+    for _li in enriched:
+        try:
+            if _li.county:
+                _canon = _norm_county(_li.county)
+                if _canon != _li.county:
+                    _li.county = _canon
+                    _county_fixed += 1
+        except Exception:
+            log.error("county_normalize.failed", source=getattr(_li, "source", None),
+                      traceback=traceback.format_exc())
+    if _county_fixed:
+        log.info("orchestrator.county_normalized", fixed=_county_fixed)
+        checkpoint.save(enriched, "county_normalized")
+
+    # H1 FIX (post-enrich dedupe): the initial dedupe() at line 369 ran
+    # before parcel_id / zip_code / street_address / county were filled
+    # by the enrichment chain above. Cross-source duplicates (same
+    # property scraped by nc_ecourts + brock_scott + ROD) all missed
+    # their merge because dedupe_key() fell through to the 'url:' branch.
+    # Re-running dedupe now — after county_pin nailed the county, after
+    # parcel_lookup filled parcel_id, after lis_pendens_resolver filled
+    # street_address — gives the key the data it needs to actually merge.
+    pre_dedupe2_count = len(enriched)
+    try:
+        enriched = dedupe(enriched)
+    except Exception:
+        log.error("orchestrator.dedupe2_failed", traceback=traceback.format_exc())
+    log.info(
+        "orchestrator.dedupe2",
+        before=pre_dedupe2_count,
+        after=len(enriched),
+        collapsed=pre_dedupe2_count - len(enriched),
+    )
+
+    # 2026-06-24 COASTAL fix — re-test PROVISIONAL oceanfront / downtown rows
+    # now that geocode + parcel-lookup have filled lat/lng. At ingest these were
+    # admitted address-only (raw.oceanfront_pending / downtown_charleston_pending)
+    # because the scope gate runs before geocoding. Apply the strict near-beach /
+    # peninsula test on the now-final coordinates; rows that pass get the confirmed
+    # tag. A row that resolved inland used to be DROPPED here; since 2026-10-06 a
+    # distress row is kept (in scope anywhere in NC/SC), see _resolve_coastal_pending.
+    # 2026-10-06: the verdict is _resolve_coastal_pending() (module level, tested); a provisional
+    # DISTRESS row that resolves inland is now kept (owner rule of 2026-09-15), only flips drop.
+    _pre_pending = len(enriched)
+    _kept = []
+    for li in enriched:
+        try:
+            verdict = _resolve_coastal_pending(li)
+        except Exception:
+            log.error("oceanfront_repass.failed", source=getattr(li, "source", None),
+                      traceback=traceback.format_exc())
+            verdict = None  # keep the lead on error
+        if verdict is None or verdict:
+            _kept.append(li)
+    enriched = _kept
+    if _pre_pending != len(enriched):
+        log.info("orchestrator.oceanfront_repass",
+                 dropped=_pre_pending - len(enriched))
+
+    # 2026-06-19 QA fix — POST-ENRICHMENT SCOPE RE-PASS. _in_scope() runs once
+    # at ingest, BEFORE the enrichment chain fills county on 'state-only'
+    # bankruptcy rows (and others). A row admitted with an empty county can be
+    # enriched to a DENIED county (e.g. Mecklenburg) and then ship, because the
+    # deny-check never re-runs. Re-apply the deny-list on the now-final county so
+    # denied counties can never appear regardless of how they were admitted.
+    # EXCEPTION: confirmed oceanfront / downtown-Charleston rows are intentional
+    # re-admissions of otherwise-denied coastal counties — never drop those.
+    #
+    # 2026-06 (Run #20) — also drop OUT-OF-FOOTPRINT counties that are neither
+    # in the deny set NOR the allow list. A coastal-source row admitted at ingest
+    # with a null/coastal county can be geocoded to a county we simply don't
+    # track (e.g. georgetown_civicengage rows that resolved to AIKEN SC, well
+    # inland of Georgetown). The deny set never listed Aiken, so the old re-pass
+    # let it ship. The OCEANFRONT_COASTAL_COUNTIES carve-out below keeps the
+    # legitimate coastal track (Brunswick / Onslow / Georgetown / Charleston ...)
+    # untouched — only genuinely off-footprint counties are dropped.
+    try:
+        from .drop_audit import fill_county_from_city
+        _cf = fill_county_from_city(enriched)
+        if _cf["filled"]:
+            log.info("orchestrator.countyless_national_placed", **_cf)
+    except Exception:
+        log.error("countyless_fill.failed", traceback=traceback.format_exc())
+    _pre_scope = len(enriched)
+    enriched = [li for li in enriched if not _safe_pred(_denied_now, li, False)]
+    if _pre_scope != len(enriched):
+        _off_footprint_removed += _pre_scope - len(enriched)
+        log.info("orchestrator.scope_repass", dropped=_pre_scope - len(enriched))
+
+    # Drop national / REO records that never resolved to a county — without one
+    # they can't be routed or actioned for the 18-county focus, so they're noise
+    # in the export. Covers CourtListener bankruptcy/civil (national.*) AND the
+    # federal REO feeds (reo.* — VRM VA-REO, USDA, Treasury) whose city-only rows
+    # (e.g. VRM 'mooresville'/'greenwood' with no county) leaked in Run #20.
+    # County-resolved records (e.g. bankruptcy debtors geocoded via OneMap) keep.
+    # Uses drop_audit.is_countyless_national (not a local blank-only copy) so a
+    # source's own non-blank placeholder county (audit 2026-10-18: bankruptcy_rss_
+    # relief_from_stay's "Statewide") is caught HERE too, not just once validate()
+    # nulls the placeholder much later — that let 14 unjoined rows ship with no
+    # county anyway, just un-dropped (pipeline-countyless-national).
+    from .drop_audit import count_by_source, is_countyless_national
+    _natl_by_src = count_by_source(enriched, is_countyless_national)
+    _pre_natl = len(enriched)
+    enriched = [li for li in enriched if not _safe_pred(is_countyless_national, li, False)]
+    if _pre_natl != len(enriched):
+        _off_footprint_removed += _pre_natl - len(enriched)
+        log.info("orchestrator.drop_countyless_national", dropped=_pre_natl - len(enriched),
+                 by_source=dict(list(_natl_by_src.items())[:15]))
+
+    # SITUS SANITY guard — a street_address that is a business/entity name or a
+    # 'Vacant parcel' placeholder is a geocoder POI artifact, not a real situs.
+    # Null it (the parcel_id / coords / county still locate the property) and tag
+    # the row so the downstream data_quality pass surfaces it as low-confidence
+    # 'no_address' rather than shipping a fake street. Run #20 audit: 157 such
+    # rows ('Midtown Moter Inn', 'Vacant parcel — ...', church / thrift / civic
+    # names). Conservative — real road names + recoverable embedded addresses are
+    # left intact (see _situs_is_junk).
+    _situs_nulled = 0
+    for li in enriched:
+        try:
+            if _situs_is_junk(li.street_address):
+                if not isinstance(li.raw, dict):
+                    li.raw = {}
+                li.raw["situs_nulled"] = li.street_address  # keep original for audit
+                li.raw["situs_quality"] = "low"
+                li.street_address = None
+                _situs_nulled += 1
+        except Exception:
+            log.error("situs_sanity.failed", source=getattr(li, "source", None),
+                      traceback=traceback.format_exc())
+    if _situs_nulled:
+        log.info("orchestrator.situs_sanity_nulled", count=_situs_nulled)
+
+    # #0 contactability spine: owner name + MAILING address + absentee/
+    # out-of-state flags from county GIS (free ArcGIS REST). Runs on every
+    # crawl so contactability is automatic — no manual backfill needed.
+    if not os.environ.get("OWNER_MAILING_OFF"):
+        try:
+            om = await asyncio.wait_for(
+                enrich_owner_mailing(enriched),
+                timeout=float(os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "3000")))
+            enrichment_stats["owner_mailing"] = om
+            checkpoint.save(enriched, "owner_mailing")
+        except asyncio.TimeoutError:
+            log.warning("owner_mailing.time_capped",
+                        note="proceeding; unenriched leads keep prior fields")
+        except Exception:
+            log.error("owner_mailing.failed", traceback=traceback.format_exc())
+
+    # County sales rolls: the comps spine plus sqft/year/acreage. Runs after
+    # owner_mailing so parcel_id is as populated as it will get — the join is
+    # by parcel and a lead without one cannot be reached.
+    try:
+        from .enrichment_county_sales import enrich_county_sales
+        enrichment_stats["county_sales"] = await _await_capped(enrich_county_sales(enriched), "county_sales")
+    except Exception:  # noqa: BLE001
+        log.error("county_sales.failed", traceback=traceback.format_exc())
+
+    # Incarceration distress (NC DAC name-match against owners from #0). Low-
+    # confidence name-only stack signal; runs after owner_mailing fills names.
+    if not os.environ.get("INCARCERATION_OFF"):
+        try:
+            from .enrichment_incarceration import enrich_incarceration
+            enrichment_stats["incarceration"] = await _await_capped(enrich_incarceration(enriched), "incarceration")
+        except Exception:
+            log.error("incarceration.failed", traceback=traceback.format_exc())
+        # County-jail bookings (pre-trial/local holds the state rosters miss).
+        try:
+            from .enrichment_jail_bookings import enrich_jail_bookings
+            enrichment_stats["jail_bookings"] = await _await_capped(enrich_jail_bookings(enriched), "jail_bookings")
+        except Exception:
+            log.error("jail_bookings.failed", traceback=traceback.format_exc())
+        # Federal incarceration (BOP.gov Inmate Locator) — the third lane the
+        # state (above) and county-jail rosters both miss entirely.
+        if not os.environ.get("BOP_OFF"):
+            try:
+                from .enrichment_bop_federal import enrich_bop_federal
+                enrichment_stats["bop_federal"] = await _await_capped(enrich_bop_federal(enriched), "bop_federal")
+            except Exception:
+                log.error("bop_federal.failed", traceback=traceback.format_exc())
+
+    # NC case-status: two-stage dispatch.
+    #   Stage 1 (when NC_ECOURTS_USERNAME/PASSWORD set): authenticated
+    #     Tyler portal scrape via WS-Fed login. Up to NC_ECOURTS_AUTH_CAP
+    #     cases (default 50). Tags raw.nc_case_status with full docket
+    #     detail (status, last_event, sold_price, in_upset_bid_window).
+    #   Stage 2 (always runs): heuristic sale-date math + Trustee's Deed
+    #     cross-ref. Fills any listings Tyler didn't tag. Pure compute.
+    # Disable both with NC_CASE_STATUS_OFF=1.
+    if not os.environ.get("NC_CASE_STATUS_OFF"):
+        # The authenticated Tyler path is count-capped (NC_ECOURTS_AUTH_CAP) and
+        # the no-creds path is pure compute, but the authenticated WS-Fed login +
+        # portal scrape can still hang on a degraded session — so it gets the same
+        # COURT_PHASE_MAX_SECONDS wall-clock cap as the other court phases to
+        # protect the late-stage tail. Time-box + proceed.
+        nc_status_budget_s = float(os.environ.get("COURT_PHASE_MAX_SECONDS", "1800"))
+        try:
+            from .enrichment_nc_case_status import (
+                enrich_with_nc_case_status_dispatched,
+            )
+            await asyncio.wait_for(
+                enrich_with_nc_case_status_dispatched(enriched, sold_pool=sold_pool),
+                timeout=nc_status_budget_s,
+            )
+        except asyncio.TimeoutError:
+            log.warning("nc_case_status.time_capped", budget_s=nc_status_budget_s,
+                        note="proceeding; unenriched listings keep prior fields")
+        except Exception:
+            log.error("nc_case_status.failed", traceback=traceback.format_exc())
+
+    # Foreclosure docket history (Dirty Deeds Tier B #37) — persists this
+    # run's NC eCourts lis-pendens / SC Public Index cases into a sidecar and
+    # flags an owner whose county history already shows 2+ directly-observed
+    # Dismissed/Terminated/Withdrawn cases: a lender filed and failed against
+    # them before. See enrichment_foreclosure_docket_history.py for why this
+    # never infers a dismissal from a case merely disappearing from a later
+    # scrape (two of the four sources are rolling filed-date windows that age
+    # cases out long before a real court dismissal is usually entered).
+    try:
+        from .enrichment_foreclosure_docket_history import (
+            enrich_foreclosure_docket_history,
+        )
+        s = await _await_capped(
+            enrich_foreclosure_docket_history(enriched), "foreclosure_docket_history")
+        if s:
+            enrichment_stats["foreclosure_docket_history"] = s
+    except Exception:
+        log.error("foreclosure_docket_history.failed", traceback=traceback.format_exc())
+
+    # Bankruptcy cross-reference — for every existing listing whose defendant
+    # matches a recent NC/SC bankruptcy filing, tag raw.bankruptcy with the
+    # chapter/court/date/docket. Free with CourtListener token. Strong pre-
+    # foreclosure signal: Ch.13 = trying to stop the sale, Ch.7 = liquidation.
+    try:
+        from .enrichment_bankruptcy import enrich_with_bankruptcy
+        await _await_capped(enrich_with_bankruptcy(enriched), "with_bankruptcy")
+    except Exception:
+        log.error("bankruptcy.failed", traceback=traceback.format_exc())
+
+    # Bankruptcy STAY derivation — a matched foreclosure is PAUSED by the automatic stay, not
+    # gone; flag it stayed + resume-risk so it stays a high-motivation lead (pure-local, no net).
+    try:
+        from .enrichment_bankruptcy_stay import enrich_bankruptcy_stay
+        s = enrich_bankruptcy_stay(enriched)
+        if s and s.get("stayed"):
+            enrichment_stats["bankruptcy_stay"] = s
+    except Exception:
+        log.error("bankruptcy_stay.failed", traceback=traceback.format_exc())
+
+    # Relationship-deed detection — scan ROD pool (active + sold) for
+    # executor's-deed / quitclaim-divorce patterns. Emits new
+    # PROBATE_NOTICE / DIVORCE_NOTICE listings into the active pool.
+    # Free derivation from existing ROD scrapes.
+    try:
+        from .enrichment_relationship_deeds import enrich_with_relationship_deeds
+        derived_leads = enrich_with_relationship_deeds(
+            enriched, sold_pool=sold_pool,
+        )
+        if derived_leads:
+            enriched = enriched + derived_leads
+            log.info("relationship_deeds.added_to_active",
+                     count=len(derived_leads))
+    except Exception:
+        log.error("relationship_deeds.failed",
+                  traceback=traceback.format_exc())
+
+    # Skip-trace (dad's #7): homeowner contact info for short-sale outreach.
+    # Provider-pluggable via SKIP_TRACE_PROVIDER env:
+    #   - "none" (default): disabled, no API calls
+    #   - "tax_records_only": FREE, reads GIS mailing address (absentee detector)
+    #   - "batchskiptracing" / etc.: PAID, $0.05-0.20/lead
+    # Cap via SKIP_TRACE_MAX_PER_RUN (default 100), prioritized by sale_date
+    # proximity so the imminent-sale leads always get traced first.
+    #
+    # WALL-CLOCK BUDGET. The 2026-08-11 run spent 10.5 hours here with no log
+    # line, grinding through fastpeoplesearch 403s. Every other long phase in
+    # this orchestrator is already wrapped in wait_for; this one was not, so a
+    # provider that starts refusing turns a 7-hour run into a 23-hour one and
+    # says nothing while it happens.
+    skip_trace_budget_s = float(os.environ.get("SKIP_TRACE_MAX_SECONDS", "900"))
+    try:
+        from .enrichment_skip_trace import enrich_with_skip_trace
+        await asyncio.wait_for(enrich_with_skip_trace(enriched),
+                               timeout=skip_trace_budget_s)
+    except asyncio.TimeoutError:
+        log.warning("skip_trace.time_capped", budget_s=skip_trace_budget_s,
+                    reason="provider slow or refusing; leads keep prior contact data")
+    except Exception:
+        log.error("skip_trace.failed", traceback=traceback.format_exc())
+
+    # RECORDED-SALES comps (Tier 0) — query each county GIS for REAL nearby
+    # arms-length recorded sales (distance-matched to the subject's coordinates)
+    # and attach a median $/sqft. This is the comp-accuracy fix: real recorded
+    # transactions outrank scraped listings in valuation/calc.py. Free, polite
+    # (shared rate-limited client). Runs before the listing-comp fallback so the
+    # valuation tier order is recorded > scraped > zestimate > tax.
+    try:
+        from .enrichment_recorded_comps import enrich as enrich_recorded_comps
+        await asyncio.wait_for(
+            enrich_recorded_comps(enriched),
+            timeout=float(os.environ.get("COMPS_PHASE_MAX_SECONDS", "3600")))
+    except asyncio.TimeoutError:
+        log.warning("recorded_comps.time_capped",
+                    note="proceeding; uncomped leads keep prior comps")
+    except Exception:
+        log.error("recorded_comps.failed", traceback=traceback.format_exc())
+
+    # ASSESSOR-CARD QUALIFIED-sale Tier-0 fallback — for the comp-thin counties
+    # the GIS recorded-comps pass doesn't cover, seed raw['recorded_comps'] from
+    # the subject parcel's OWN QUALIFIED arms-length sale(s) on its assessor card
+    # (price / subject sqft). MEDIUM confidence, never clobbers a real GIS basket.
+    # Runs after the GIS pass (gap-fill only) and before valuation.
+    try:
+        from .enrichment_assessor_comps import enrich_assessor_comps
+        enrich_assessor_comps(enriched)
+    except Exception:
+        log.error("assessor_comps.failed", traceback=traceback.format_exc())
+
+    # Comp finder + property-spec backfill — pulls 180-day sold pool per county
+    # from HomeHarvest (free), backfills missing sqft/beds/baths/year, attaches
+    # 3 comparable sales per listing matched by zip + sqft + beds.
+    try:
+        from .enrichment_comps import enrich_with_comps
+        await asyncio.wait_for(
+            enrich_with_comps(enriched),
+            timeout=float(os.environ.get("COMPS_PHASE_MAX_SECONDS", "3600")))
+    except asyncio.TimeoutError:
+        log.warning("comps.time_capped", note="proceeding; uncomped leads keep prior comps")
+    except Exception:
+        log.error("comps.failed", traceback=traceback.format_exc())
+
+    # Comps the fresh lookup did not reach (phase cap, changed parcel id) come forward from the
+    # prior board inside a 365-day window, with their age shown (audit 2026-10-09, valuation).
+    try:
+        from .enrichment_comps import age_comps, carry_forward_from_board
+        enrichment_stats["comps_age"] = age_comps(enriched)
+        enrichment_stats["comps_carry_forward"] = carry_forward_from_board(enriched)
+    except Exception:
+        log.error("comps_carry.failed", traceback=traceback.format_exc())
+
+    # FREE COMP SPINE from county sales rolls (Buncombe 388k, Cleveland). These publish a
+    # recorded price but no sqft, so they gap-fill only: land $/acre into raw['comps'], and
+    # sale-to-assessed ratio into raw['recorded_ratio_comps'] (Tier 1b in valuation/calc.py).
+    # MUST run after enrich_with_comps so HomeHarvest's sqft-matched comps win. Anderson SC
+    # contributes 0 — its Parcel_Sales layer returns "Unable to complete operation".
+    try:
+        from .enrichment_recorded_sales import enrich as enrich_recorded_sales
+        await asyncio.wait_for(
+            enrich_recorded_sales(enriched),
+            timeout=float(os.environ.get("COMPS_PHASE_MAX_SECONDS", "3600")))
+    except asyncio.TimeoutError:
+        log.warning("recorded_sales.time_capped",
+                    note="proceeding; uncomped leads keep prior comps")
+    except Exception:
+        log.error("recorded_sales.failed", traceback=traceback.format_exc())
+
+    # enrich_recorded_sales (just above) runs AFTER age_comps() in this same pass, so any
+    # raw['comps'] it just wrote (land $/acre comps, stamped 'recorded': True but never
+    # 'picked_on') never got this run's age/carry stamp -- age_comps() already swept
+    # `enriched` before these comps existed. Left alone, an old recorded sale (routinely
+    # years old on these sales-roll counties) sits in raw['comps'] forever with no
+    # 'carried'/'age_days', which is exactly what audit 2026-10-18's valuation-comps-age (2
+    # rows: Cleveland/Buncombe national.courtlistener_bankruptcy) live-confirmed. Re-run
+    # age_comps() scoped to just the rows carrying an unstamped comp -- not a full-board
+    # pass -- mirroring the GRANDFATHER restore's scoped re-run (a95e4cb5). This is the
+    # correct outcome either way: a comp still inside the carry window gets its stamp: one
+    # already past COMPS_CARRY_MAX_AGE_DAYS gets pruned, same as age_comps does for every
+    # other comp on the board.
+    try:
+        from .enrichment_comps import age_comps as _age_comps_recorded_sales
+        _needs_age = [li for li in enriched
+                      if isinstance(li.raw, dict)
+                      and isinstance(li.raw.get("comps"), list)
+                      and any(isinstance(c, dict) and c.get("age_days") is None
+                              for c in li.raw["comps"])]
+        if _needs_age:
+            enrichment_stats["comps_age_recorded_sales"] = _age_comps_recorded_sales(_needs_age)
+    except Exception:
+        log.error("comps_age_recorded_sales.failed", traceback=traceback.format_exc())
+
+    # FREE Zillow zestimate enrichment via stealth-browser address search.
+    # The board had 0% zestimate coverage despite 77% having Zillow photos.
+    # This hits Zillow's search page (StealthyFetcher bypasses PerimeterX),
+    # extracts __NEXT_DATA__ JSON for zestimate, rentZestimate, beds, baths,
+    # sqft, tax assessed value. Capped at ZESTIMATE_MAX_PER_RUN (500) and
+    # wall-clock bounded at ZESTIMATE_MAX_SECONDS (900s). Idempotent.
+    try:
+        from .enrichment_zestimate import enrich_zestimates
+        s = await asyncio.wait_for(
+            enrich_zestimates(enriched),
+            timeout=float(os.environ.get("ZESTIMATE_MAX_SECONDS", "900")))
+        if s:
+            enrichment_stats["zestimate"] = s
+    except asyncio.TimeoutError:
+        log.warning("zestimate.time_capped",
+                    note="proceeding; leads keep prior valuation data")
+    except Exception:
+        log.error("zestimate.failed", traceback=traceback.format_exc())
+
+    # Per-address photo gallery enrichment — for listings that came from
+    # courthouse / law-firm / sitemap sources WITHOUT photos, look up the
+    # same address on HomeHarvest's for_sale/pending/sold endpoints to pull
+    # rich Realtor.com galleries (primary + up to 5 alts). Free.
+    # MUST run before Vision so the condition assessment sees all photos —
+    # otherwise Vision sees only the primary, returns more pessimistic tiers
+    # (Marietta St case: 1-photo Vision = 'gut' / $161k rehab vs 6-photo
+    #  Vision = 'major' / $63k rehab).
+    try:
+        from .enrichment_photos import enrich_with_address_photos
+        await _await_capped(enrich_with_address_photos(enriched), "with_address_photos",
+                            default_s=int(float(os.environ.get("FORECLOSURE_PHOTO_MAX_SECONDS") or "2400") + 120))
+    except Exception:
+        log.error("photos.failed", traceback=traceback.format_exc())
+
+    # County assessor / CAMA drive-by photo — FREE, no API key. Works for
+    # PARCEL-ONLY leads that have no street address, which Street View can never
+    # reach, so it runs first and Street View only pays for what it misses.
+    # Gated by FORECLOSURE_ASSESSOR_PHOTO; capped + wall-clock bounded.
+    try:
+        from .enrichment_assessor_photo import enrich_assessor_photo
+        s = await _await_capped(enrich_assessor_photo(enriched), "assessor_photo")
+        if s:
+            enrichment_stats["assessor_photo"] = s
+    except Exception:
+        log.error("assessor_photo.failed", traceback=traceback.format_exc())
+
+    # Google Street View Static — a real street-level shot of the ACTUAL house,
+    # which is the image the Vision grader actually needs. PAID API, so it is OFF
+    # unless FORECLOSURE_STREETVIEW=1 AND a key is present; it calls the FREE
+    # metadata endpoint first, reuses cached photos, and is fenced by per-run,
+    # per-month and cross-process spend caps. Runs after the free photo sources
+    # so it never buys an image we already have.
+    try:
+        from .enrichment_streetview import enrich_streetview
+        s = await _await_capped(enrich_streetview(enriched), "streetview")
+        if s:
+            enrichment_stats["streetview"] = s
+    except Exception:
+        log.error("streetview.failed", traceback=traceback.format_exc())
+
+    # Image fallback — ensure 100% have at least an OSM static-map of the address
+    # (free, no API key). Real Zillow/Realtor photos win when present.
+    # Runs before Vision so raw.images.real (the list Vision reads from) is
+    # populated with the full Realtor gallery, not just the primary.
+    try:
+        from .enrichment_images import enrich_with_images
+        await _await_capped(enrich_with_images(enriched, use_mapillary=False), "with_images")
+    except Exception:
+        log.error("images.failed", traceback=traceback.format_exc())
+
+    # Claude Vision condition assessment — overrides regex/age tier with
+    # actual photo evidence when ANTHROPIC_API_KEY is set. Costs ~$0.01-0.03
+    # per listing depending on photo count. Skipped silently when no key.
+    # Runs AFTER photos+images so it sees the full 5-6 photo gallery.
+    #
+    # ---- MAIN BOARD vision pass (the one the operator sees on the dashboard).
+    #
+    # Budget guard: VISION_MAX_LISTINGS caps the number of API calls; the
+    # 600 default dated from the paid-Anthropic era (600 ≈ $12-18/run on
+    # Sonnet 4.5). The pool is now FREE and much wider — 9 Gemini keys +
+    # GitHub Models + Groq + Mistral + Cloudflare + 13 NVIDIA NIM lanes = 26
+    # parallel backends. Measured drain rate on that pool is ~90 listings/min
+    # (logs/daily-vision-*: 1500 targets consumed in 800-1000s, every run
+    # ending unscored_remaining=0), so 600 was leaving most of the free
+    # capacity — and most of the board's ~5.9k photo-bearing leads — on the
+    # table. Default is now 2500.
+    #
+    # TRADEOFF: a higher cap = more condition coverage but a longer phase.
+    # 2500 listings ≈ 28 min at the measured rate (vs ~13 min for 800). The
+    # wall-clock budget below is what makes that safe: it is the real stop,
+    # the count cap only decides how much we *try*.
+    #
+    # HARD wall-clock cap: a rate-limited (429) API key can otherwise stall
+    # Vision for hours and hang the whole run before it ever writes the Sheet
+    # (observed 2026-06-17: 47/250 scored in 18h on a throttled key). Vision
+    # is best-effort condition scoring — listings it doesn't reach fall back
+    # to the regex/age condition tier. So we time-box it and ALWAYS proceed.
+    # Raised 900s -> 1800s so the bigger cap can actually be realized; a
+    # partially-finished pass still keeps every result it applied (results
+    # are written onto each listing as they land, not at the end).
+    try:
+        from .enrichment_vision import enrich_with_vision
+        vision_cap = int(os.environ.get("VISION_MAX_LISTINGS", "2500"))
+        vision_budget_s = float(os.environ.get("VISION_MAX_SECONDS", "1800"))  # 30 min
+        try:
+            await asyncio.wait_for(
+                enrich_with_vision(enriched, max_listings=vision_cap),
+                timeout=vision_budget_s,
+            )
+        except asyncio.TimeoutError:
+            log.warning("vision.time_capped", budget_s=vision_budget_s,
+                        note="proceeding; unscored listings use regex/age condition")
+    except Exception:
+        log.error("vision.failed", traceback=traceback.format_exc())
+
+    # Document OCR — lift the buried owner name + property address (+ debt $)
+    # out of scanned/legacy legal-notice & recorded-instrument documents. FREE,
+    # Gemini-first with GitHub/Groq fallback; text-layer PDFs parse locally.
+    # Only touches leads that carry a document URL and are missing those fields.
+    try:
+        from .enrichment_doc_ocr import enrich_doc_ocr
+        s = await _await_capped(enrich_doc_ocr(enriched), "doc_ocr",
+                                default_s=int(float(os.environ.get("DOC_OCR_BUDGET_S", "2400")) + 300))
+        if s is None:                      # capped or failed: the phase's own counters still say what it read
+            from . import enrichment_doc_ocr as _doc_ocr_mod
+            s = getattr(_doc_ocr_mod, "LAST_STATS", None)
+        if s:
+            enrichment_stats["doc_ocr"] = s
+            checkpoint.save(enriched, "doc_ocr")
+    except Exception:
+        log.error("doc_ocr.failed", traceback=traceback.format_exc())
+
+    # ---- Sold-comp pool enrichment (parallel mini-pipeline) ----
+    # The sold pool runs through a STRIPPED pipeline: address-backfill
+    # so we know the property, photos+images so Vision has something to
+    # see, Vision (capped) so each comp shows current condition. We
+    # skip flood/EPA/permits/RentCast/HomeHarvest-comps-of-comps —
+    # diminishing returns for a comp signal.
+    if sold_pool:
+        try:
+            log.info("sold_pool.enrich_start", count=len(sold_pool))
+            # Address backfill so we know which property each sold comp is.
+            try:
+                from .enrichment_address_backfill import (
+                    enrich_addresses_from_owner,
+                )
+                await _await_capped(enrich_addresses_from_owner(sold_pool), "sold_addr")
+            except Exception:
+                log.error("sold_pool.addr_backfill_failed",
+                          traceback=traceback.format_exc())
+            # County GIS — fills sqft/beds/baths/year/parcel by parcel or
+            # address. Free (no API key). Without this, comp_dict's
+            # beds/baths/sqft fields stay empty for many SC results-PDF
+            # listings since SC MIE PDFs don't carry property specs.
+            try:
+                await _await_capped(enrich_gis(sold_pool), "sold_gis")
+            except Exception:
+                log.error("sold_pool.gis_failed",
+                          traceback=traceback.format_exc())
+            # SC MIE PDFs put city inside street_address ("248 Sweetie Way,
+            # Sptbg., SC") with li.city=None — that blocks HomeHarvest's
+            # by-address lookup which requires city + state. Split it out
+            # before photos.
+            try:
+                _split_embedded_city(sold_pool)
+            except Exception:
+                log.error("sold_pool.city_split_failed",
+                          traceback=traceback.format_exc())
+            # Pull a Realtor.com gallery for each sold comp's address.
+            try:
+                from .enrichment_photos import enrich_with_address_photos
+                await _await_capped(enrich_with_address_photos(sold_pool), "sold_photos")
+            except Exception:
+                log.error("sold_pool.photos_failed",
+                          traceback=traceback.format_exc())
+            # OSM map fallback.
+            try:
+                from .enrichment_images import enrich_with_images
+                await _await_capped(enrich_with_images(sold_pool, use_mapillary=False), "sold_images")
+            except Exception:
+                log.error("sold_pool.images_failed",
+                          traceback=traceback.format_exc())
+            # ---- SOLD-COMP POOL vision pass. Separate (smaller) cap from the
+            # active pipeline so sold-comp Vision can't cannibalize active-
+            # listing Vision budget. 100 was below the pool's own size on a
+            # good week (the pool runs a few hundred recent sales), so comps
+            # showed condition for only the first 100. 400 covers a normal
+            # pool; at the measured ~90 listings/min drain that is ~5 min.
+            # TRADEOFF: more comps carry a condition read (better like-for-
+            # like matching) at the cost of a few minutes of phase time.
+            # This call previously had NO wall-clock wrapper of its own — it
+            # relied on enrich_with_vision's internal VISION_MAX_SECONDS,
+            # which is unset (= unlimited) outside run_local.sh. Raising the
+            # count cap without a time bound is exactly what hangs a run, so
+            # it is now time-boxed like the main pass.
+            try:
+                from .enrichment_vision import enrich_with_vision as _ev
+                sold_vision_cap = int(os.environ.get(
+                    "SOLD_POOL_VISION_MAX_LISTINGS", "400"
+                ))
+                sold_vision_budget_s = float(os.environ.get(
+                    "SOLD_POOL_VISION_MAX_SECONDS", "600"
+                ))
+                try:
+                    await asyncio.wait_for(
+                        _ev(sold_pool, max_listings=sold_vision_cap),
+                        timeout=sold_vision_budget_s,
+                    )
+                except asyncio.TimeoutError:
+                    log.warning("sold_pool.vision_time_capped",
+                                budget_s=sold_vision_budget_s,
+                                note="proceeding; unscored comps keep regex/age condition")
+            except Exception:
+                log.error("sold_pool.vision_failed",
+                          traceback=traceback.format_exc())
+            # Validate (county/parcel hygiene), county_pin (case# auth),
+            # property_kind (so kind-group matching works downstream).
+            try:
+                from .validation import validate as _vl
+                _vl(sold_pool)
+            except Exception:
+                log.error("sold_pool.validate_failed", traceback=traceback.format_exc())
+            try:
+                from .enrichment_county_pin import enforce_case_pinned_county
+                enforce_case_pinned_county(sold_pool)
+            except Exception:
+                log.error("sold_pool.county_pin_failed", traceback=traceback.format_exc())
+            try:
+                from .enrichment_property_kind import enrich_property_kind
+                enrich_property_kind(sold_pool)
+            except Exception:
+                log.error("sold_pool.property_kind_failed", traceback=traceback.format_exc())
+            log.info("sold_pool.enrich_done", count=len(sold_pool))
+        except Exception:
+            log.error("sold_pool.enrich_outer_failed",
+                      traceback=traceback.format_exc())
+
+    # Match active listings to sold-pool comps (per-county, like-for-like
+    # by property_kind / beds / sqft). Each matched listing gets
+    # raw.foreclosure_sold_comps + raw.foreclosure_sold_comp_summary.
+    # Promote-to-sold-pool pass: any active listing whose enrichment
+    # surfaced raw.actual_sold_price (e.g. NC eCourts case-status detected
+    # an Order Confirming Sale with hammer price) should move from the
+    # active pipeline into the sold-comp pool BEFORE the matcher runs.
+    # Without this pass, those listings would carry an actual_sold_price
+    # that nothing else uses since they're still in `enriched`.
+    try:
+        promoted = []
+        kept_enriched = []
+        for li in enriched:
+            raw = li.raw if isinstance(li.raw, dict) else {}
+            # F8: a hammer price inside the upset window is not a final sale yet (the
+            # court status can read "upset_bid"); the lead stays actionable until it closes.
+            if isinstance(raw.get("actual_sold_price"), (int, float)) \
+                    and raw.get("nc_case_status", {}).get("promoted_to_sold_comp") \
+                    and not in_upset_window(li):
+                promoted.append(li)
+            else:
+                kept_enriched.append(li)
+        if promoted:
+            log.info("orchestrator.promoted_to_sold_pool",
+                     count=len(promoted),
+                     reason="nc_case_status surfaced hammer price on Order Confirming Sale")
+            enriched = kept_enriched
+            sold_pool = sold_pool + promoted
+    except Exception:
+        log.error("promote_to_sold_pool.failed",
+                  traceback=traceback.format_exc())
+
+    try:
+        from .enrichment_foreclosure_sold_comps import (
+            enrich_foreclosure_sold_comps,
+        )
+        s = enrich_foreclosure_sold_comps(enriched, sold_pool)
+        if s:
+            enrichment_stats["foreclosure_sold_comps"] = s
+    except Exception:
+        log.error("foreclosure_sold_comps.failed",
+                  traceback=traceback.format_exc())
+
+    # ---- Hazard / environmental enrichment group (concurrent) ----
+    # These 6 enrichers all read lat/lng and write INDEPENDENT raw keys
+    # (flood, environmental, fema_repetitive_loss, helene_damage,
+    # code_enforcement, building_permits). No data dependency between
+    # them, so they run concurrently via _gather_phases instead of
+    # sequentially — turns 6 serial network round-trips into 1.
+    _hazard_phases: dict = {}
+    try:
+        from .enrichment_flood import enrich_with_flood
+        _hazard_phases["flood"] = enrich_with_flood(enriched)
+    except Exception:
+        log.error("flood.failed", traceback=traceback.format_exc())
+    try:
+        from .enrichment_environmental import enrich_with_environmental
+        _hazard_phases["environmental"] = enrich_with_environmental(enriched)
+    except Exception:
+        log.error("environmental.failed", traceback=traceback.format_exc())
+    try:
+        from .enrichment_fema_repetitive_loss import enrich_with_fema_repetitive_loss
+        _hazard_phases["fema_repetitive_loss"] = enrich_with_fema_repetitive_loss(enriched)
+    except Exception:
+        log.error("fema_repetitive_loss.failed", traceback=traceback.format_exc())
+    try:
+        from .enrichment_helene_damage import enrich_with_helene_damage
+        _hazard_phases["helene_damage"] = enrich_with_helene_damage(enriched)
+    except Exception:
+        log.error("helene_damage.failed", traceback=traceback.format_exc())
+    try:
+        from .enrichment_code_enforcement import enrich_with_code_enforcement
+        _hazard_phases["code_enforcement"] = enrich_with_code_enforcement(enriched)
+    except Exception:
+        log.error("code_enforcement.failed", traceback=traceback.format_exc())
+    try:
+        from .enrichment_building_permits import enrich_with_building_permits
+        _hazard_phases["building_permits"] = enrich_with_building_permits(enriched)
+    except Exception:
+        log.error("building_permits.failed", traceback=traceback.format_exc())
+    _hazard_results = await _gather_phases(_hazard_phases)
+    _hd = _hazard_results.get("helene_damage")
+    if _hd and _hd.get("matched"):
+        enrichment_stats["helene_damage"] = _hd
+
+    # RE-ENABLED 2026-10-02 per owner direction.
+    if not os.environ.get("SOS_DISSOLUTION_OFF"):
+        try:
+            from .enrichment_sos_dissolution import enrich_with_sos_dissolution
+            await _await_capped(enrich_with_sos_dissolution(enriched), "with_sos_dissolution")
+        except Exception:
+            log.error("sos_dissolution.failed", traceback=traceback.format_exc())
+
+    # NC SOS registered-agent HAND-OFF (2026-10-05): the Mac's daily lookup job
+    # (scripts/sos_agent_refresh.sh) can no longer write the board, so it pushes its
+    # answers to docs/handoff/sos_agent_results.json and THIS step attaches them:
+    # no network, every NC row owned by a resolved entity that has no raw['sos_agent']
+    # yet gets the profile, through enrichment_sos_agent.propagate_profiles() (the
+    # module's own matching/propagation). Runs for every FORECLOSURE_ROLE (vm, all);
+    # a missing/stale/unreadable file is logged and skipped inside, never fatal.
+    # SOS_AGENT_HANDOFF_APPLY=0 turns it off. See src/foreclosure_scraper/sos_agent_handoff.py.
+    try:
+        from .sos_agent_handoff import apply_sos_agent_handoff
+        s = apply_sos_agent_handoff(enriched)
+        if s:
+            enrichment_stats["sos_agent_handoff"] = s
+    except Exception:
+        log.error("sos_agent_handoff.failed", traceback=traceback.format_exc())
+
+    # NC SOS registered-agent + officer enrichment — for entity-owned NC leads,
+    # pull the free public registered agent / officers so a contact-less LLC lead
+    # gets a real mailable contact without a paid skip-trace. Stealth + slow, so
+    # gated OFF by default (SOS_AGENT=1) and kept OFF on the VM: the live lookups
+    # run on the Mac and arrive through the hand-off step above.
+    try:
+        from .enrichment_sos_agent import enrich_with_sos_agent
+        s = await _await_capped(enrich_with_sos_agent(enriched), "with_sos_agent")
+        if s:
+            enrichment_stats["sos_agent"] = s
+    except Exception:
+        log.error("sos_agent.failed", traceback=traceback.format_exc())
+
+    # SC SOS business entity status — for SC LLC-owned listings, look up
+    # dissolution/revocation status on businessfilings.sc.gov via patchright +
+    # Groq Whisper audio-CAPTCHA solver. ONE browser session per run, all names
+    # loop through it. Gated OFF by default (SC_SOS_ENTITY=1). Mac-only: residential
+    # IP gives much better reCAPTCHA solve rates than datacenter IPs.
+    if os.environ.get("SC_SOS_ENTITY") == "1":
+        try:
+            from .scrapers.national.sc_sos_entity import enrich_sc_sos_entity
+            s = await _await_capped(
+                enrich_sc_sos_entity(enriched), "sc_sos_entity", default_s=2400
+            )
+            if s:
+                enrichment_stats["sc_sos_entity"] = s
+        except Exception:
+            log.error("sc_sos_entity.failed", traceback=traceback.format_exc())
+
+    # qPayBill county tax portal — fills the per-parcel delinquent tax BALANCE the
+    # tax-sale-LIST scrapers can't (SC Spartanburg etc. publish parcel+owner but no
+    # amount). Network-heavy per-surname query, so self-gates on QPAYBILL_TAX=1;
+    # runs in a scheduled/opt-in pass, not the weekly crawl.
+    try:
+        from .enrichment_qpaybill_tax import enrich_qpaybill_tax
+        s = await _await_capped(enrich_qpaybill_tax(enriched), "qpaybill_tax")
+        if s:
+            enrichment_stats["qpaybill_tax"] = s
+    except Exception:
+        log.error("qpaybill_tax.failed", traceback=traceback.format_exc())
+
+    # Expanded rent comps — for listings without strict like-for-like comps,
+    # broaden to zip-level for-rent pool. Free via HomeHarvest.
+    try:
+        from .enrichment_rent_comps_extra import enrich_with_extra_rent_comps
+        # WALL-CLOCK CAP — this HomeHarvest phase was a bare await and WEDGED for 3.2h when
+        # wifi dropped mid-run 2026-08-15 (HomeHarvest uses its own requests session, not the
+        # hardened client, so a dead socket hung it). Bound it so a network blip can't stall
+        # the whole run before the write; uncomped leads just keep prior comps.
+        await asyncio.wait_for(
+            enrich_with_extra_rent_comps(enriched),
+            timeout=float(os.environ.get("RENT_COMPS_PHASE_MAX_SECONDS", "1200")))
+    except asyncio.TimeoutError:
+        log.warning("rent_comps_extra.time_capped", budget_s=1200)
+    except Exception:
+        log.error("rent_comps_extra.failed", traceback=traceback.format_exc())
+
+    # Census ACS rent estimate — free, keyless fallback for listings still
+    # missing rent data after HomeHarvest comps. Fills the 85% gap using
+    # ACS 5-year median gross rent by ZIP (ZCTA5). Needs CENSUS_API_KEY
+    # in .env (free at api.census.gov/data/key_signup.html).
+    try:
+        from .enrichment_census_rent import enrich_census_rent
+        s = enrich_census_rent(enriched)
+        if s and s.get("filled"):
+            enrichment_stats["census_rent"] = s
+    except Exception:
+        log.error("census_rent.failed", traceback=traceback.format_exc())
+
+    # Census ACS demographics — same free/keyless ZCTA pattern as census_rent
+    # above, one extra request's worth of variables: median household income,
+    # median home value, owner-occupied %, vacancy %, median year built.
+    # docs/rei_operator_playbook.md Tier 1 #2 (buy-box + motivation scoring
+    # layer we didn't have).
+    try:
+        from .enrichment_census_demographics import enrich_census_demographics
+        s = enrich_census_demographics(enriched)
+        if s and s.get("filled"):
+            enrichment_stats["census_demographics"] = s
+    except Exception:
+        log.error("census_demographics.failed", traceback=traceback.format_exc())
+
+    # Land-value share of total appraised value (Dirty Deeds Tier A #11).
+    # Offline; only rows whose county GIS exposes a land vs improvement split
+    # (~5% of the board) get a block. No network.
+    try:
+        from .enrichment_land_ratio import enrich_land_ratio
+        s = enrich_land_ratio(enriched)
+        if s and s.get("tagged"):
+            enrichment_stats["land_ratio"] = s
+    except Exception:
+        log.error("land_ratio.failed", traceback=traceback.format_exc())
+
+    # Multifamily classifier — promote mislabeled apartment / multi-unit
+    # distressed properties to MULTI_FAMILY using precise party/owner/title +
+    # description + structure signals. MUST run BEFORE enrich_property_kind:
+    # property_kind runs last and force-defaults UNKNOWN->SINGLE_FAMILY, which
+    # would otherwise mask these. Running first means property_kind sees the MF
+    # tag as already-classified and leaves it intact.
+    try:
+        from .enrichment_multifamily_class import enrich_multifamily_class
+        s = enrich_multifamily_class(enriched)
+        if s:
+            enrichment_stats["multifamily_class"] = {
+                k: v for k, v in s.items()
+                if k not in ("examples", "skipped_examples")
+            }
+    except Exception:
+        log.error("multifamily_class.failed", traceback=traceback.format_exc())
+
+    # Property kind backfill — guarantee 100% non-UNKNOWN coverage. Runs
+    # LAST so it can use every other signal (description, structure data,
+    # GIS, etc.). Cascade: description → structure → listing_type → source.
+    try:
+        from .enrichment_property_kind import enrich_property_kind
+        enrich_property_kind(enriched)
+    except Exception:
+        log.error("property_kind.failed", traceback=traceback.format_exc())
+
+    # Commercial land-use reclassifier — property_kind is set by whichever
+    # scraper found the lead and was never reconciled against the county's own
+    # land_use code: 189 leads carry a plainly commercial land_use while typed as
+    # something else (84 "Eating & Drinking Estab" filed as land, service
+    # stations filed as land). A former station at $159k as-is sitting in the
+    # land bucket is an environmental-liability property valued as a vacant lot,
+    # so fuel/solvent sites are additionally stamped raw.environmental_risk.
+    #
+    # MUST run HERE, beside enrich_property_kind and BEFORE valuation. Placing it
+    # later (next to the vacant-land-use classifier) meant ARV, rehab tier and
+    # comps were all computed treating these as LAND and only then relabelled —
+    # exactly what test_no_enrichment_runs_after_valuation_that_changes_property_kind
+    # exists to catch, and it did. land_use is populated upstream by
+    # enrichment_gis_attrs, so it is available at this point.
+    try:
+        from .enrichment_commercial_landuse import enrich_commercial_landuse
+        _cs = enrich_commercial_landuse(enriched)
+        if _cs:
+            enrichment_stats["commercial_landuse"] = _cs
+    except Exception:
+        log.error("commercial_landuse.failed", traceback=traceback.format_exc())
+
+    # Land buildability layer (Dirty Deeds Tier B #35) — landlocked-candidate
+    # flag (NC statewide, parcel-boundary-to-road-centerline distance) and
+    # cemetery proximity (small per-county registry: Buncombe, Gaston). Runs
+    # HERE, after the LAND classification is final (property_kind reclassifiers
+    # above) and before valuation, since it only reads property_kind/lat/lng —
+    # never touches it. Free, pure-HTTP, capped per run (LAND_BUILDABILITY_CAP)
+    # and idempotent, so an interrupted run resumes rather than re-querying.
+    try:
+        from .enrichment_land_buildability import enrich_land_buildability
+        s = await _await_capped(enrich_land_buildability(enriched), "land_buildability")
+        if s: enrichment_stats["land_buildability"] = s
+    except Exception:
+        log.error("land_buildability.failed", traceback=traceback.format_exc())
+
+    # RECAP document body fetch — pull the actual motion PDFs (plain text)
+    # from CourtListener for adversary-proceeding listings (lift-stay,
+    # §363 sale). Adds raw.recap.plain_text which the judgment_amount
+    # enrichment text-mines for property address + lender balance.
+    try:
+        from .enrichment_recap_document import enrich_recap_documents
+        s = await _await_capped(enrich_recap_documents(enriched), "recap_documents")
+        if s: enrichment_stats["recap_documents"] = s
+    except Exception:
+        log.error("recap_documents.failed", traceback=traceback.format_exc())
+
+    # Judgment-amount text mining — extract the lender's judgment dollar
+    # figure from notice text we already scraped. Investor uses this as
+    # a "mortgage balance remaining" proxy. Pure-Python, no I/O.
+    try:
+        from .enrichment_judgment_amount import enrich_judgment_amount
+        s = enrich_judgment_amount(enriched)
+        if s: enrichment_stats["judgment_amount"] = s
+    except Exception:
+        log.error("judgment_amount.failed", traceback=traceback.format_exc())
+
+    # Detail-page fetcher for judgment_amount (dad's #5, follow-up to
+    # patch run #11 diagnostic showing text_no_match=717/717). Pure
+    # text-mining can't find the judgment amount because law-firm
+    # scrapers only capture table-cell summaries, not the full Notice
+    # of Sale text. This step fetches the detail page (URL already
+    # in source_url) for listings still missing judgment_amount and
+    # re-runs the extractor on the fetched text. Capped at 200
+    # fetches/run, prioritized by imminent sale_date.
+    try:
+        from .enrichment_judgment_detail import (
+            enrich_judgment_amount_via_detail_pages,
+        )
+        s = await _await_capped(enrich_judgment_amount_via_detail_pages(enriched), "judgment_detail")
+        if s: enrichment_stats["judgment_amount_detail"] = s
+    except Exception:
+        log.error("judgment_detail.failed", traceback=traceback.format_exc())
+
+    # Cross-source "amount owed" waterfall — fills a single, honestly-labeled
+    # debt figure (judgment → opening-bid proxy → assessed value) so the
+    # dashboard always shows something with clear provenance. Runs AFTER
+    # judgment enrichment so explicit judgments win.
+    try:
+        from .enrichment_amount_owed import enrich_amount_owed
+        s = enrich_amount_owed(enriched)
+        if s: enrichment_stats["amount_owed"] = s
+    except Exception:
+        log.error("amount_owed.failed", traceback=traceback.format_exc())
+
+    # Pre-write data validation gate — runs BEFORE valuation so the
+    # calculator sees validated inputs. Catches recurring data-quality
+    # bugs at a single chokepoint: state/county mismatch, casing fixes
+    # (Mcdowell → McDowell), invalid parcel_id formats, opening_bid=0,
+    # tax_value < $5k for non-land, sqft / year / beds / baths out of
+    # range, and comps with bad sold_price or wrong property_kind.
+    try:
+        from .validation import validate as validate_listings
+        validation_stats = validate_listings(enriched)
+        if validation_stats:
+            enrichment_stats["validation"] = validation_stats
+        log.info("orchestrator.validated", **validation_stats)
+    except Exception:
+        log.error("validation.failed", traceback=traceback.format_exc())
+
+    # NOTE: enrich_data_quality USED TO RUN HERE, immediately after validation.
+    # It cannot: every ARV caveat it publishes is read out of raw['calc'], and
+    # the valuation that writes raw['calc'] is ~550 lines below this point. Here
+    # it saw the PREVIOUS run's calc (or, for a brand-new lead, none at all) and
+    # captioned the board off it. Measured on the live 38,500-lead board by
+    # replaying both orders through the shipping code: from this position it
+    # emitted arv_unreliable/arv_bid_and_roi_withheld/arv_sanity_flag/
+    # arv_no_independent_check 0/0/0/0 times, against 3,049/3,049/20,443/16,310
+    # from after the valuation — 2,001 leads that should carry the loud warning
+    # rendered quiet and 161 carried a false one. It also never saw
+    # raw['footprint'] (written at footprint_sqft, below) so `sqft_estimated`
+    # could not fire, and never saw court_owner_verify's stripped addresses.
+    # It now runs after the LAST writer of raw['calc'] (the RentCast re-grade);
+    # tests/test_enrichment_order.py fails if anything moves it back.
+
+    # Promote a recoverable tax/GIS owner into any empty owner_name (unblocks mailing/phone/ROD
+    # downstream). Runs BEFORE voter_phone + gaston_rod so they consume the promoted names.
+    try:
+        from .enrichment_promote_owner import enrich_promote_owner
+        s = enrich_promote_owner(enriched)
+        if s: enrichment_stats["promote_owner"] = s
+    except Exception:
+        log.error("promote_owner.failed", traceback=traceback.format_exc())
+
+    # Free NC owner-phone from the NCSBE voter file (name+address / name+county-unique);
+    # no-op if data/ncvoter/ absent. DNC-gated downstream.
+    try:
+        from .enrichment_voter_phone import enrich_voter_phone
+        s = enrich_voter_phone(enriched)
+        if s: enrichment_stats["voter_phone"] = s
+    except Exception:
+        log.error("voter_phone.failed", traceback=traceback.format_exc())
+
+    # County-PUBLISHED owner phone + mailing, joined on parcel id (Buncombe Accela
+    # ParcelOwner = 73,965 numbers; Lincoln taxpayer table). Runs AFTER voter_phone so it
+    # never clobbers a voter match (identical number -> corroborated_by, different number ->
+    # alternates), and BEFORE line_type so the new numbers get classified in the same pass.
+    # These are county-published, NOT consented: every record carries
+    # county_published/consent="none"/needs_dnc_scrub=True. No dialing is built.
+    try:
+        from .enrichment_county_phone import enrich_county_phone
+        s = await _await_capped(enrich_county_phone(enriched), "county_phone")
+        if s and "skipped" not in s: enrichment_stats["county_phone"] = s
+    except Exception:
+        log.error("county_phone.failed", traceback=traceback.format_exc())
+
+    # Classify each owner_phone (free LERG lookup) -> line_type + tcpa_class so landlines become a
+    # compliant call lane; runs AFTER voter_phone so it sees the numbers it just set.
+    try:
+        from .enrichment_line_type import enrich_line_type
+        s = await _await_capped(enrich_line_type(enriched), "line_type")
+        if s: enrichment_stats["line_type"] = s
+    except Exception:
+        log.error("line_type.failed", traceback=traceback.format_exc())
+
+    # ---- ROD lien-existence group (concurrent) ----
+    # 4 independent county ROD enrichers: gaston (NC), cchs (Burke+Cleveland NC),
+    # aumentum (Buncombe NC), spartanburg (SC). Each reads owner_name and writes
+    # raw['rod'] for DIFFERENT counties — no cross-dependency. dot_ocr runs AFTER
+    # this group because it reads raw['rod'] that spartanburg_rod writes.
+    _rod_phases: dict = {}
+    try:
+        from .enrichment_gaston_rod import enrich_gaston_rod
+        _rod_phases["gaston_rod"] = enrich_gaston_rod(enriched)
+    except Exception:
+        log.error("gaston_rod.failed", traceback=traceback.format_exc())
+    try:
+        from .enrichment_cchs_rod import enrich_cchs_rod
+        _rod_phases["cchs_rod"] = enrich_cchs_rod(enriched)
+    except Exception:
+        log.error("cchs_rod.failed", traceback=traceback.format_exc())
+    try:
+        from .enrichment_aumentum_rod import enrich_aumentum_rod
+        _rod_phases["aumentum_rod"] = enrich_aumentum_rod(enriched)
+    except Exception:
+        log.error("aumentum_rod.failed", traceback=traceback.format_exc())
+    try:
+        from .enrichment_spartanburg_rod import enrich_spartanburg_rod
+        _rod_phases["spartanburg_rod"] = enrich_spartanburg_rod(enriched)
+    except Exception:
+        log.error("spartanburg_rod.failed", traceback=traceback.format_exc())
+    # 2026-10-07: the platform adapters for the other NC/SC counties whose register of deeds a plain
+    # script can read (rod/nc_cott_v4, nc_lookup, nc_ors, nc_cchs_classic ...): each platform is OFF
+    # until its FORECLOSURE_NC_*_ROD env flag is 1 (enrichment_generic_rod's platform registry).
+    # generic_rod sizes its own wall-clock budget (it walks counties side by side), so it runs beside
+    # the per-county phases under its own cap instead of sharing their 900 s (audit 2026-10-09).
+    _generic_rod_coro = None
+    try:
+        from .enrichment_generic_rod import enrich_generic_rod
+        _generic_rod_coro = _await_capped(
+            enrich_generic_rod(enriched), "generic_rod",
+            default_s=int(float(os.environ.get("FORECLOSURE_GENERIC_ROD_BUDGET_S", "840")) + 120))
+    except Exception:
+        log.error("generic_rod.failed", traceback=traceback.format_exc())
+    _rod_results, _generic_rod_stats = await asyncio.gather(
+        _gather_phases(_rod_phases),
+        _generic_rod_coro if _generic_rod_coro is not None else asyncio.sleep(0))
+    _rod_results["generic_rod"] = _generic_rod_stats
+    for _rod_name in ("gaston_rod", "cchs_rod", "aumentum_rod", "spartanburg_rod", "generic_rod"):
+        _rs = _rod_results.get(_rod_name)
+        if _rs and "skipped" not in _rs:
+            enrichment_stats[_rod_name] = _rs
+
+    # County-wide register sweeps and name-index checks stamped as "screened, none found" (top-80 register group).
+    try:
+        from .enrichment_register_checks import enrich_register_checks
+        s = await _await_capped(
+            enrich_register_checks(enriched), "register_checks",
+            default_s=int(float(os.environ.get("FORECLOSURE_REGISTER_SWEEP_BUDGET_S", "1800"))
+                          + float(os.environ.get("FORECLOSURE_REGISTER_CHECKS_BUDGET_S", "900")) + 180))
+        if s and "skipped" not in s: enrichment_stats["register_checks"] = s
+    except Exception:
+        log.error("register_checks.failed", traceback=traceback.format_exc())
+
+    # Register-of-deeds counties whose search only runs in a browser (Harris: Mecklenburg, Carteret;
+    # Logan Blazor and Remote Access: Catawba, Cumberland, Union, Vance, Davie, Yadkin ...). Capped per
+    # platform per run and by FORECLOSURE_NC_ROD_RENDER_BUDGET_S; every platform OFF until its env flag is 1.
+    try:
+        from .enrichment_nc_rod_render import enrich_nc_rod_render
+        _render_budget_s = float(os.environ.get("FORECLOSURE_NC_ROD_RENDER_BUDGET_S", "3600")) + 120
+        s = await _await_capped(enrich_nc_rod_render(enriched), "nc_rod_render", default_s=_render_budget_s)
+        if s and "skipped" not in s: enrichment_stats["nc_rod_render"] = s
+    except Exception:
+        log.error("nc_rod_render.failed", traceback=traceback.format_exc())
+
+    # Logan / Harris browser-register lien sweep (top-80), then the county-run CCHS / Kofile sweeps.
+    try:
+        from .enrichment_register_lien_sweep import enrich_register_lien_sweep
+        s = await _await_capped(
+            enrich_register_lien_sweep(enriched), "register_lien_sweep",
+            default_s=int(float(os.environ.get("FORECLOSURE_LIEN_SWEEP_BUDGET_S", "600")) + 180))
+        if s and "skipped" not in s: enrichment_stats["register_lien_sweep"] = s
+    except Exception:
+        log.error("register_lien_sweep.failed", traceback=traceback.format_exc())
+    try:
+        from .enrichment_county_lien_sweep import enrich_county_lien_sweep
+        s = await _await_capped(
+            enrich_county_lien_sweep(enriched), "county_lien_sweep",
+            default_s=int(float(os.environ.get("FORECLOSURE_COUNTY_SWEEP_BUDGET_S", "900")) + 240))
+        if s and "skipped" not in s: enrichment_stats["county_lien_sweep"] = s
+    except Exception:
+        log.error("county_lien_sweep.failed", traceback=traceback.format_exc())
+
+    # Deed chain per lead (last deed + up to 3 prior instruments, liens, substitutions of trustee) for the
+    # counties whose register adapters expose chain(): the attorney's title-check input. Runs on its own
+    # (one lookup at a time per county, capped); OFF unless FORECLOSURE_ROD_CHAIN=1.
+    try:
+        from .enrichment_rod_chain import enrich_rod_chain
+        _chain_budget_s = float(os.environ.get("FORECLOSURE_ROD_CHAIN_BUDGET_S", "1800")) + 120
+        s = await _await_capped(enrich_rod_chain(enriched), "rod_chain", default_s=_chain_budget_s)
+        if s and "skipped" not in s: enrichment_stats["rod_chain"] = s
+    except Exception:
+        log.error("rod_chain.failed", traceback=traceback.format_exc())
+
+    # Spartanburg DOT loan-amount OCR — turns raw['rod'] mortgage EXISTENCE into a
+    # dollar figure (free view_image PDF -> Gemini OCR) so the equity engine has a
+    # real payoff basis. HOT/WARM-first, capped, idempotent, budget-bailed.
+    try:
+        from .enrichment_dot_ocr import enrich_dot_ocr
+        # 2026-09-23: _await_capped's own default (900s) is HALF of enrich_dot_ocr's own
+        # internal budget (FORECLOSURE_DOT_OCR_BUDGET_S, default 1800s), so the outer wait_for
+        # always cancelled it before its own graceful-stop logic could run or log a single
+        # stat -- every full run has been silently getting zero visibility into this
+        # enricher. Read the same env var so the outer cap tracks the inner one, plus the
+        # same +120s grace the vision job uses so the inner deadline fires first.
+        _dot_budget_s = float(os.environ.get("FORECLOSURE_DOT_OCR_BUDGET_S", "1800")) + 120
+        s = await _await_capped(enrich_dot_ocr(enriched), "dot_ocr", default_s=_dot_budget_s)
+        if s and "skipped" not in s: enrichment_stats["dot_ocr"] = s
+        checkpoint.save(enriched, "dot_ocr")
+    except Exception:
+        log.error("dot_ocr.failed", traceback=traceback.format_exc())
+
+    # The tail from here to the end of the run is shared with the checkpoint resume
+    # (scripts/resume_from_checkpoint.py) so both run the same steps in the same order.
+    _tail = TailState(
+        enriched=enriched, enrichment_stats=enrichment_stats, errors=errors, cfg=cfg,
+        scrapers=scrapers, by_source=by_source, expected=expected,
+        source_outcomes=source_outcomes, carry_stats=carry_stats, regressions=regressions,
+        grandfather=_grandfather, off_footprint_removed=_off_footprint_removed,
+        sold_pool=sold_pool,
+    )
+    summary = await run_enrich_tail(_tail)
+    if os.environ.get(STOP_BEFORE_PUBLISH_ENV, "").strip().lower() in ("1", "true", "yes", "on"):
+        return stop_before_publish(_tail, summary)
+    return publish_tail(_tail, summary)
+
+
+@dataclass
+class TailState:
+    """What the post-``dot_ocr``-checkpoint tail of :func:`run` reads from the scrape/merge half.
+
+    The tail (every step from the divorce group through the board write, the run_health file,
+    the Sheet export and the digest email) lives in :func:`run_enrich_tail` +
+    :func:`publish_tail` so that :func:`run` and ``scripts/resume_from_checkpoint.py`` run the
+    SAME code in the SAME order. Before 2026-10-05 the only way to finish a run that died after
+    the checkpoint was ``recover_from_checkpoint.py``, which published the checkpoint as-is,
+    unscored -- so a resume had to either re-list the tail by hand (and rot) or skip it.
+
+    ``run()`` fills every field from its own locals; the resume path has no scrape, so it passes
+    empty scrape-time state and turns off the four side effects that would otherwise write a
+    misleading file (``update_source_health`` already ran for the failed run with the real
+    per-source counts; ``write_sold_pool`` would write ``[]``; ``write_run_health`` would report
+    no sources; ``export_and_email`` would mail a digest with no source status in it).
+    """
+    enriched: list
+    enrichment_stats: dict
+    errors: list
+    cfg: Any
+    scrapers: list = field(default_factory=list)
+    by_source: Any = field(default_factory=Counter)
+    expected: dict = field(default_factory=dict)
+    source_outcomes: dict = field(default_factory=dict)
+    carry_stats: Optional[dict] = None
+    regressions: list = field(default_factory=list)
+    grandfather: list = field(default_factory=list)
+    off_footprint_removed: int = 0
+    sold_pool: list = field(default_factory=list)
+    update_source_health: bool = True
+    write_sold_pool: bool = True
+    write_run_health: bool = True
+    export_and_email: bool = True
+    scoring_failed: Optional[str] = None
+    #: extra keyword arguments for write_artifact(); empty for every run. The placeholder-twin
+    #: collapse of a checkpoint resume sets its prior-detail exclusions here
+    #: (no_prior_detail_rows / no_prior_detail_keys, see web_artifact.write_artifact).
+    write_artifact_kwargs: dict = field(default_factory=dict)
+
+
+async def run_enrich_tail(st: TailState) -> dict:
+    """Everything :func:`run` does after the ``dot_ocr`` checkpoint and before the board write:
+    the network enrichers that follow it (divorce, name resolver, ACPASS, resolved-lead
+    catch-up incl. vision, tax_relief, rollback, court_bid, fhfa_value, dew_liens,
+    assessor_card, burke history, lrcpwa photos, homepath uuids, ...), valuation, scoring, every
+    post-score derived signal, the board-quality passes and the run summary. Returns the summary
+    :func:`publish_tail` writes. ``st.enriched`` is updated in place (prune_stale_reo rebinds it,
+    the grandfather restore extends it) and ``st.scoring_failed`` is set when scoring ran
+    fail-soft. Raises ScoreBoardFailed exactly as the inline code did."""
+    enriched = st.enriched
+    enrichment_stats = st.enrichment_stats
+    errors = st.errors
+    cfg = st.cfg
+    scrapers = st.scrapers
+    by_source = st.by_source
+    expected = st.expected
+    source_outcomes = st.source_outcomes
+    carry_stats = st.carry_stats
+    regressions = st.regressions
+    _grandfather = st.grandfather
+    _off_footprint_removed = st.off_footprint_removed
+    _scoring_failed: str | None = None
+    if _grandfather:
+        # a checkpoint written before tax_binding existed carries the snapshot's copied tax debts
+        try:
+            from .tax_binding import scrub_unbound_tax
+            log.info("orchestrator.tax_unbound_grandfather", **scrub_unbound_tax(_grandfather))
+            from .block_binding import scrub_unbound_blocks as _sub
+            log.info("orchestrator.blocks_unbound_grandfather", **_sub(_grandfather))
+        except Exception:  # noqa: BLE001
+            log.error("tax_unbound.failed", traceback=traceback.format_exc())
+
+    # ---- County-jail stamps, re-read (2026-10-06) ----
+    # enrich_jail_bookings also runs BEFORE the dot_ocr checkpoint, and a resume from that checkpoint
+    # (scripts/resume_from_checkpoint.py --enrich-only, or --run) starts here, so it would keep a stamp
+    # the old rule had ended: a person still on the roster under a respelled name, or a stay of 60 days
+    # or more that may be a transfer to state prison (jail_matching, HANDOFF item 79). Re-stamping is
+    # idempotent and costs one fetch per roster, and it must precede verification and scoring, which
+    # read the stamp through signal_freshness.incarceration_active().
+    try:
+        from .enrichment_jail_bookings import enrich_jail_bookings
+        enrichment_stats["jail_bookings_tail"] = await _await_capped(
+            enrich_jail_bookings(enriched), "jail_bookings_tail")
+    except Exception:
+        log.error("jail_bookings_tail.failed", traceback=traceback.format_exc())
+
+    # ---- Divorce enrichment group (concurrent) ----
+    # NC and SC divorce enrichers hit different court portals and write the
+    # same raw['divorce'] key, but for DISJOINT sets of leads (NC owners vs
+    # SC owners). Safe to run concurrently.
+    _divorce_phases: dict = {}
+    try:
+        from .enrichment_nc_divorce import enrich_nc_divorce
+        _divorce_phases["nc_divorce"] = enrich_nc_divorce(enriched)
+    except Exception:
+        log.error("nc_divorce.failed", traceback=traceback.format_exc())
+    # RE-ENABLED 2026-10-02 per owner direction.
+    try:
+        from .enrichment_sc_divorce import enrich_sc_divorce
+        _divorce_phases["sc_divorce"] = enrich_sc_divorce(enriched)
+    except Exception:
+        log.error("sc_divorce.failed", traceback=traceback.format_exc())
+    # enrichment_sc_divorce.py sizes its own budget at FORECLOSURE_SC_DIVORCE_BUDGET_S
+    # (1800s default) -- the orchestrator's un-overridden 900s default was hard-cancelling
+    # it at exactly half that every run, before it ever logged its own completion (audit
+    # 2026-10-16; same "orchestrator cap < module's own budget" bug already fixed for
+    # dot_ocr/rod_chain/nc_rod_render, main.py:88-90). 1800 + the same ~120s margin
+    # convention those three use.
+    _divorce_results = await _gather_phases(_divorce_phases, default_s=1920)
+    for _dv_name in ("nc_divorce", "sc_divorce"):
+        _ds = _divorce_results.get(_dv_name)
+        if _ds and "skipped" not in _ds:
+            enrichment_stats[_dv_name] = _ds
+
+    # NAME -> PROPERTY resolver — the backbone that turns name-indexed leads
+    # (SC Public Index civil/criminal, SC/NC divorce, NC court ingest, probate
+    # notices) with owner_name/defendant but NO address/parcel into real property
+    # leads, via the county GIS owner-name index. Runs AFTER the court/divorce
+    # enrichers (so those name-only leads exist) and BEFORE the calc/grade/equity
+    # pass (so the resolved parcel's value/sqft feed them). Gated
+    # FORECLOSURE_NAME_RESOLVE (default on), per-run cap + budget, core counties.
+    try:
+        from .enrichment_resolve_name_to_property import enrich_resolve_name_to_property
+        s = await _await_capped(enrich_resolve_name_to_property(enriched), "resolve_name")
+        if s: enrichment_stats["name_resolve"] = s
+    except Exception:
+        log.error("name_resolve.failed", traceback=traceback.format_exc())
+
+    # ACPASS: Anderson County SC login-walled property search. Fills the gap
+    # left by the GIS resolver (Anderson public GIS has no owner-name column).
+    # Credentials in .env (ACPASS_EMAIL / ACPASS_PASSWORD). Budget-capped.
+    try:
+        from .enrichment_acpass import enrich as acpass_enrich
+        s = await _await_capped(acpass_enrich(enriched), "acpass")
+        if s: enrichment_stats["acpass"] = s
+    except Exception:
+        log.error("acpass.failed", traceback=traceback.format_exc())
+
+    # SAME-RUN catch-up for freshly-resolved leads. The resolver (above) just gave
+    # a name-only court/probate lead its address+parcel — but the address-gated deep
+    # enrichers (recorded comps, assessor comps, HomeHarvest comps, photos, Vision)
+    # all ran hundreds of lines earlier and never saw it. Without this, a just-
+    # resolved lead would wait a full weekly cycle for comps/condition. Re-run those
+    # enrichers on ONLY the newly-resolved subset (small + idempotent) so the
+    # valuation/grade pass below scores them on real comps + photo condition THIS run.
+    # The _resolved_deep_enriched flag (persisted via RAW_KEEP) stops re-sweeping
+    # leads a later full run already covered through the global enricher passes.
+    try:
+        reenrich = [
+            li for li in enriched
+            if isinstance(li.raw, dict)
+            and (li.raw.get("resolved_from_name") or {}).get("confidence") == "unique_match"
+            and (li.street_address or li.parcel_id)
+            and not li.raw.get("_resolved_deep_enriched")
+        ]
+        if reenrich:
+            log.info("resolved_catchup.start", count=len(reenrich))
+            from .enrichment_recorded_comps import enrich as _rc_enrich
+            from .enrichment_assessor_comps import enrich_assessor_comps as _ac_enrich
+            from .enrichment_comps import enrich_with_comps as _hc_enrich
+            from .enrichment_photos import enrich_with_address_photos as _ph_enrich
+            from .enrichment_images import enrich_with_images as _img_enrich
+            from .enrichment_vision import enrich_with_vision as _vis_enrich
+            for _fn, _is_async in ((_rc_enrich, True), (_ac_enrich, False),
+                                   (_hc_enrich, True), (_ph_enrich, True),
+                                   (_img_enrich, True)):
+                try:
+                    _r = _fn(reenrich)
+                    if _is_async:
+                        await _r
+                except Exception:
+                    log.error("resolved_catchup.enricher_failed",
+                              fn=getattr(_fn, "__name__", "?"),
+                              traceback=traceback.format_exc())
+            # ---- CATCH-UP vision pass (freshly name-resolved leads only).
+            # Vision is API-metered — cap + time-box exactly like the main
+            # pass, but with its OWN knobs: this subset can be thousands of
+            # leads after a big resolver run (~4k in the 2026-07 _parcel_
+            # variants fix), and sharing VISION_MAX_LISTINGS meant the main
+            # pass's cap silently governed here too. The real limiter was the
+            # hardcoded 300s (≈450 listings at the measured ~90/min drain),
+            # so the budget goes to 900s and the count cap gets its own env.
+            # TRADEOFF: up to +10 min on runs where the resolver unlocked a
+            # large batch; 0 extra when it resolved nothing (list is empty).
+            try:
+                _vcap = int(os.environ.get(
+                    "VISION_CATCHUP_MAX_LISTINGS",
+                    os.environ.get("VISION_MAX_LISTINGS", "1500")))
+                _vbudget = float(os.environ.get("VISION_CATCHUP_MAX_SECONDS", "900"))
+                await asyncio.wait_for(
+                    _vis_enrich(reenrich, max_listings=_vcap), timeout=_vbudget)
+            except Exception:
+                log.error("resolved_catchup.vision_failed",
+                          traceback=traceback.format_exc())
+            for li in reenrich:
+                li.raw["_resolved_deep_enriched"] = True
+            enrichment_stats["resolved_catchup"] = {"count": len(reenrich)}
+            log.info("resolved_catchup.done", count=len(reenrich))
+    except Exception:
+        log.error("resolved_catchup.failed", traceback=traceback.format_exc())
+
+    # ustaxdata.com per-parcel tax search: multi-year paid/unpaid bill history, keyed by the
+    # board's own parcel_id for Robeson NC, or (2026-10-16, commit ae2ca7df) by owner name +
+    # address confirmation for Alexander/Rockingham NC, whose parcel_id doesn't match this
+    # vendor's own account numbering. Must run BEFORE enrich_tax_owed just below, which picks up
+    # raw['ustaxdata_delinquent_tax'] generically (tax-ish block name + years_unpaid) the same
+    # way qpaybill_roll's are. See enrichment_ustaxdata_tax_search.py's docstring for the name-
+    # search mechanism. Gate off with FORECLOSURE_USTAXDATA=0.
+    if os.environ.get("FORECLOSURE_USTAXDATA", "1") != "0":
+        try:
+            from .enrichment_ustaxdata_tax_search import enrich_ustaxdata
+            s = await _await_capped(enrich_ustaxdata(enriched), "ustaxdata")
+            if s:
+                enrichment_stats["ustaxdata"] = s
+        except Exception:
+            log.error("ustaxdata.failed", traceback=traceback.format_exc())
+
+    # Pure restatement of raw["ustaxdata_delinquent_tax"] (just fetched above) into
+    # multi_year_delinquent_tax/two_year_delinquent -- no network call. Must run AFTER
+    # ustaxdata just above (needs its output) and BEFORE enrich_tax_owed below (same reason as
+    # ustaxdata itself). See enrichment_ustaxdata_multiyear_tax.py's own docstring.
+    try:
+        from .enrichment_ustaxdata_multiyear_tax import enrich_ustaxdata_multiyear_tax
+        s = enrich_ustaxdata_multiyear_tax(enriched)
+        if s:
+            enrichment_stats["ustaxdata_multiyear_tax"] = s
+    except Exception:
+        log.error("ustaxdata_multiyear_tax.failed", traceback=traceback.format_exc())
+
+    # Alamance NC delinquent-tax search (property.spatialest.com/nc/alamance-tax, a DIFFERENT
+    # tenant from the assessor-card host) -- live name+address-confirmed search, writes
+    # raw["alamance_tax_bills"] (picked up by enrich_tax_owed's generic Pass B below) plus
+    # multi_year_delinquent_tax/two_year_delinquent directly. Must run BEFORE enrich_tax_owed,
+    # same reason as ustaxdata above. Gate off with FORECLOSURE_ALAMANCE_TAX=0.
+    try:
+        from .enrichment_alamance_tax_search import enrich_alamance_tax
+        s = await _await_capped(enrich_alamance_tax(enriched), "alamance_tax")
+        if s:
+            enrichment_stats["alamance_tax"] = s
+    except Exception:
+        log.error("alamance_tax.failed", traceback=traceback.format_exc())
+
+    # Gaston NC per-parcel tax search (DevNetWedge): multi-year unpaid-bill history, keyed by
+    # the board's own parcel_id. Same reason as ustaxdata just above: must run BEFORE
+    # enrich_tax_owed, which reads raw['multi_year_delinquent_tax']['total_due'] by exact key.
+    # Capped/budgeted per run (module docstring); gate off with FORECLOSURE_GASTON_MYDT=0.
+    try:
+        from .enrichment_gaston_multiyear_tax import enrich_with_gaston_multiyear_tax
+        s = await _await_capped(enrich_with_gaston_multiyear_tax(enriched), "gaston_mydt")
+        if s:
+            enrichment_stats["gaston_mydt"] = s
+    except Exception:
+        log.error("gaston_mydt.failed", traceback=traceback.format_exc())
+
+    # Nash NC per-parcel tax search (Munis Citizen Self Service, nashcountync.munisselfservice.com):
+    # multi-year unpaid-bill history, keyed by the board's own parcel_id (realistic ceiling ~612 of
+    # 2,090 rows -- see enrichment_nash_multiyear_tax.py's own docstring for the parcel_id-shape
+    # finding). Must run BEFORE enrich_tax_owed, same reason as gaston_mydt above. Gate off with
+    # FORECLOSURE_NASH_MYDT=0.
+    try:
+        from .enrichment_nash_multiyear_tax import enrich_with_nash_multiyear_tax
+        s = await _await_capped(enrich_with_nash_multiyear_tax(enriched), "nash_mydt")
+        if s:
+            enrichment_stats["nash_mydt"] = s
+    except Exception:
+        log.error("nash_mydt.failed", traceback=traceback.format_exc())
+
+    # Pender NC per-parcel tax search (Munis Citizen Self Service, mss.pendercountync.gov/css --
+    # already a registered Portal in verification/verifiers/tax_lien_munis.py's own PORTALS dict,
+    # added 2026-10-29): multi-year unpaid-bill history, keyed by the board's own parcel_id (a
+    # prior "needs stealth-browser, AJAX-rendered" diagnosis was wrong -- see tax_lien_munis.py's
+    # PORTALS note; a plain modern-UA fetch works unchanged). Must run BEFORE enrich_tax_owed,
+    # same reason as nash_mydt above. Gate off with FORECLOSURE_PENDER_MYDT=0.
+    try:
+        from .enrichment_pender_multiyear_tax import enrich_with_pender_multiyear_tax
+        s = await _await_capped(enrich_with_pender_multiyear_tax(enriched), "pender_mydt")
+        if s:
+            enrichment_stats["pender_mydt"] = s
+    except Exception:
+        log.error("pender_mydt.failed", traceback=traceback.format_exc())
+
+    # Iredell NC per-parcel tax search (classic ITS.NET TaxBill.aspx, same vendor tax_lien_itsnet.py
+    # already drives for Iredell/Chowan tax-lien verification): multi-year unpaid-bill history.
+    # Must run BEFORE enrich_tax_owed, same reason as nash_mydt/gaston_mydt above. Gate off with
+    # FORECLOSURE_IREDELL_MYDT=0.
+    try:
+        from .enrichment_iredell_multiyear_tax import enrich_with_iredell_multiyear_tax
+        s = await _await_capped(enrich_with_iredell_multiyear_tax(enriched), "iredell_mydt")
+        if s:
+            enrichment_stats["iredell_mydt"] = s
+    except Exception:
+        log.error("iredell_mydt.failed", traceback=traceback.format_exc())
+
+    # Johnston NC two_year_delinquent: pure restatement of raw['johnston_delinquent_tax_crosswalk']
+    # (scrapers/counties_nc/johnston_delinquent_tax_crosswalk.py, landed 2026-10-20) -- no network
+    # call, the crosswalk's own ingest already did the one real fetch.
+    try:
+        from .enrichment_johnston_two_year_delinquent import enrich_johnston_two_year_delinquent
+        s = enrich_johnston_two_year_delinquent(enriched)
+        if s:
+            enrichment_stats["johnston_two_year_delinquent"] = s
+    except Exception:
+        log.error("johnston_two_year_delinquent.failed", traceback=traceback.format_exc())
+
+    # Johnston NC rollback_exposure. Gate off with FORECLOSURE_JOHNSTON_ROLLBACK=0.
+    try:
+        from .enrichment_johnston_rollback_exposure import enrich_johnston_rollback_exposure
+        s = await _await_capped(enrich_johnston_rollback_exposure(enriched), "johnston_rollback_exposure")
+        if s and s.get("deferred_found"):
+            enrichment_stats["johnston_rollback_exposure"] = s
+    except Exception:
+        log.error("johnston_rollback_exposure.failed", traceback=traceback.format_exc())
+
+    # NC PTS Cloud (bcpwa.ncptscloud.com / Forsyth, Pitt, Beaufort, Henderson, Guilford, Madison,
+    # Hyde, Orange, Cleveland) multi-year unpaid-bill history — a pure, no-network restatement of
+    # the per-year depth counties_nc.nc_ptscloud_delinquent_tax already fetches into its own raw
+    # key, into the shared raw['multi_year_delinquent_tax'] contract (see that module's own
+    # docstring for why the gap-matrix check needs this exact key, not the source's own one).
+    # Must run BEFORE enrich_tax_owed, same reason as ustaxdata/gaston_mydt above.
+    try:
+        from .enrichment_ptscloud_multiyear_tax import enrich_ptscloud_multiyear_tax
+        s = enrich_ptscloud_multiyear_tax(enriched)
+        if s:
+            enrichment_stats["ptscloud_mydt"] = s
+    except Exception:
+        log.error("ptscloud_mydt.failed", traceback=traceback.format_exc())
+
+    # Same NC PTS Cloud tenants, same already-fetched by_year history, restated into the OTHER
+    # shared tax-gap key (gap-matrix sweep 2026-10-19): raw['two_year_delinquent']. Independent
+    # of ptscloud_mydt above (that one gates on >=2 matured years; this one is unconditional,
+    # matching sc_catalis/qpaybill's own two_year_delinquent write), so it is its own try/except.
+    try:
+        from .enrichment_ptscloud_two_year_delinquent import enrich_ptscloud_two_year_delinquent
+        s = enrich_ptscloud_two_year_delinquent(enriched)
+        if s:
+            enrichment_stats["ptscloud_tyd"] = s
+    except Exception:
+        log.error("ptscloud_tyd.failed", traceback=traceback.format_exc())
+
+    # Berkeley County SC (paystar.io) delinquent roll: counties_sc.berkeley_paystar_tax's own
+    # _merge_invoices() already computes years_delinquent/oldest_year per parcel -- a pure,
+    # no-network restatement into the shared raw['two_year_delinquent'] contract (gap-matrix
+    # sweep 2026-10-19).
+    try:
+        from .enrichment_berkeley_two_year_delinquent import enrich_berkeley_two_year_delinquent
+        s = enrich_berkeley_two_year_delinquent(enriched)
+        if s:
+            enrichment_stats["berkeley_tyd"] = s
+    except Exception:
+        log.error("berkeley_tyd.failed", traceback=traceback.format_exc())
+
+    # Berkeley County SC (paystar.io): the SAME per-invoice assetMetaJson already restated
+    # above for two_year_delinquent also carries a county CAMA structure count
+    # (TotalBuildingCount) -- a pure, no-network restatement into the shared
+    # raw['vacant_lot'] contract (gap-matrix sweep 2026-10-20).
+    try:
+        from .enrichment_berkeley_vacant_lot import enrich_berkeley_vacant_lot
+        s = enrich_berkeley_vacant_lot(enriched)
+        if s:
+            enrichment_stats["berkeley_vacant_lot"] = s
+    except Exception:
+        log.error("berkeley_vacant_lot.failed", traceback=traceback.format_exc())
+
+    # Berkeley County SC (paystar.io): a confirmed REALIZED ag-use rollback tax bill
+    # (RollbackCode=="R") already captured on the row -- a pure, no-network restatement into
+    # the shared raw['rollback_exposure'] contract (gap-matrix sweep 2026-10-20).
+    try:
+        from .enrichment_berkeley_rollback_exposure import enrich_berkeley_rollback_exposure
+        s = enrich_berkeley_rollback_exposure(enriched)
+        if s:
+            enrichment_stats["berkeley_rollback"] = s
+    except Exception:
+        log.error("berkeley_rollback.failed", traceback=traceback.format_exc())
+
+    # Berkeley County SC (paystar.io): _merge_invoices()'s own per-parcel `bills` list
+    # already carries the full multi-year unpaid history -- a pure, no-network restatement
+    # into the shared raw['multi_year_delinquent_tax'] contract (gap-matrix sweep 2026-10-20).
+    try:
+        from .enrichment_berkeley_multiyear_tax import enrich_berkeley_multiyear_tax
+        s = enrich_berkeley_multiyear_tax(enriched)
+        if s:
+            enrichment_stats["berkeley_mydt"] = s
+    except Exception:
+        log.error("berkeley_mydt.failed", traceback=traceback.format_exc())
+
+    # Dorchester County SC (billtrax.com) delinquent roll: counties_sc.dorchester_billtrax_
+    # delinquent_tax already computes is_two_year_plus/years_delinquent per parcel -- a pure,
+    # no-network restatement into the shared raw['two_year_delinquent'] contract (gap-matrix
+    # sweep 2026-10-19).
+    try:
+        from .enrichment_dorchester_two_year_delinquent import enrich_dorchester_two_year_delinquent
+        s = enrich_dorchester_two_year_delinquent(enriched)
+        if s:
+            enrichment_stats["dorchester_tyd"] = s
+    except Exception:
+        log.error("dorchester_tyd.failed", traceback=traceback.format_exc())
+
+    # NC ITSPublic tax-bill portal (BT TaxPayer Portal family: Onslow, Graham, Duplin + 9 more)
+    # multi-year unpaid-bill history — a pure, no-network restatement of the per-year depth
+    # counties_nc.nc_its_public_tax already fetches into its own raw key, into the shared
+    # raw['multi_year_delinquent_tax'] contract (see that module's own docstring). Must run
+    # BEFORE enrich_tax_owed, same reason as ustaxdata/gaston_mydt/ptscloud_mydt above.
+    try:
+        from .enrichment_its_public_multiyear_tax import enrich_its_public_multiyear_tax
+        s = enrich_its_public_multiyear_tax(enriched)
+        if s:
+            enrichment_stats["its_public_mydt"] = s
+    except Exception:
+        log.error("its_public_mydt.failed", traceback=traceback.format_exc())
+
+    # Randolph NC per-parcel tax search (PTS Public Web Access): multi-year unpaid-bill
+    # history, keyed by the board's own parcel_id. Same reason as gaston_mydt above: must run
+    # BEFORE enrich_tax_owed, which reads raw['multi_year_delinquent_tax']['total_due'] by
+    # exact key. Capped/budgeted per run (module docstring); gate off with
+    # FORECLOSURE_RANDOLPH_MYDT=0.
+    try:
+        from .enrichment_randolph_multiyear_tax import enrich_with_randolph_multiyear_tax
+        s = await _await_capped(enrich_with_randolph_multiyear_tax(enriched), "randolph_mydt")
+        if s:
+            enrichment_stats["randolph_mydt"] = s
+    except Exception:
+        log.error("randolph_mydt.failed", traceback=traceback.format_exc())
+
+    # SC qPayBill (29-county treasurer payment portal) multi-year unpaid-bill history — a pure,
+    # no-network restatement of the per-year depth counties_sc.qpaybill_delinquent_roll already
+    # fetches into its own raw['qpaybill_roll'] key, into the shared raw['multi_year_delinquent_tax']
+    # / raw['two_year_delinquent'] contract (see that module's own docstring; same pattern as
+    # gaston_mydt/ptscloud_mydt just above, different vendor). Must run BEFORE enrich_tax_owed,
+    # same reason as those two.
+    try:
+        from .enrichment_qpaybill_multiyear_tax import enrich_qpaybill_multiyear_tax
+        s = enrich_qpaybill_multiyear_tax(enriched)
+        if s:
+            enrichment_stats["qpaybill_mydt"] = s
+    except Exception:
+        log.error("qpaybill_mydt.failed", traceback=traceback.format_exc())
+
+    # Wake NC per-parcel tax search (services.wake.gov, PIN->REID bridged via NC OneMap):
+    # multi-year unpaid-bill history, keyed by the board's own parcel_id. Same reason as
+    # ustaxdata/gaston_mydt above: must run BEFORE enrich_tax_owed, which reads
+    # raw['multi_year_delinquent_tax']['total_due'] by exact key. Capped/budgeted per run
+    # (module docstring); gate off with FORECLOSURE_WAKE_MYDT=0.
+    try:
+        from .enrichment_wake_multiyear_tax import enrich_with_wake_multiyear_tax
+        s = await _await_capped(enrich_with_wake_multiyear_tax(enriched), "wake_mydt")
+        if s:
+            enrichment_stats["wake_mydt"] = s
+    except Exception:
+        log.error("wake_mydt.failed", traceback=traceback.format_exc())
+
+    # Catawba NC per-parcel tax search (taxbill.catawbacountync.gov/ITSPublicCT, board PIN
+    # searches AlternateParcelIdentifier directly, no bridge needed): multi-year unpaid-bill
+    # history, keyed by the board's own parcel_id. Same reason as wake_mydt/randolph_mydt above:
+    # must run BEFORE enrich_tax_owed, which reads raw['multi_year_delinquent_tax']['total_due']
+    # by exact key. Capped/budgeted per run (module docstring); gate off with
+    # FORECLOSURE_CATAWBA_MYDT=0.
+    try:
+        from .enrichment_catawba_multiyear_tax import enrich_with_catawba_multiyear_tax
+        s = await _await_capped(enrich_with_catawba_multiyear_tax(enriched), "catawba_mydt")
+        if s:
+            enrichment_stats["catawba_mydt"] = s
+    except Exception:
+        log.error("catawba_mydt.failed", traceback=traceback.format_exc())
+
+    # Cabarrus NC per-parcel tax search (tax.cabarruscounty.us/TaxBill.aspx, the same classic
+    # ITS.NET vendor as Iredell/Chowan, a new tenant added to tax_lien_itsnet.PORTALS): the
+    # board's own 14-digit PIN searches Sheet+Block+Parcel+Interest directly, no bridge needed.
+    # Writes raw['two_year_delinquent'] unconditionally on a real answer and
+    # raw['multi_year_delinquent_tax'] on a real multi-year gate, same reason as catawba_mydt
+    # above: must run BEFORE enrich_tax_owed, which reads raw['multi_year_delinquent_tax']
+    # ['total_due'] by exact key. Capped/budgeted per run (module docstring); gate off with
+    # FORECLOSURE_CABARRUS_MYDT=0.
+    try:
+        from .enrichment_cabarrus_multiyear_tax import enrich_with_cabarrus_multiyear_tax
+        s = await _await_capped(enrich_with_cabarrus_multiyear_tax(enriched), "cabarrus_mydt")
+        if s:
+            enrichment_stats["cabarrus_mydt"] = s
+    except Exception:
+        log.error("cabarrus_mydt.failed", traceback=traceback.format_exc())
+
+    # Taxes-OWED normalizer — fold each tax source's own amount key (Buncombe
+    # principal_tax_due, SC state-lien balance, Oconee FLC bid) into one
+    # raw['tax_owed'], then cross-reference it onto any same-parcel lead (a court/
+    # probate lead the resolver just pinned to a tax-delinquent parcel inherits the
+    # balance). Runs AFTER the resolver (so resolved parcels exist) and BEFORE
+    # equity/lien-stack so the owed balance can feed them. Free, pure-Python.
+    try:
+        from .enrichment_tax_owed import enrich_tax_owed
+        s = enrich_tax_owed(enriched)
+        if s:
+            enrichment_stats["tax_owed"] = s
+    except Exception:
+        log.error("tax_owed.failed", traceback=traceback.format_exc())
+
+    # Promote the real tax_owed balance into amount_owed now that it exists. Must run
+    # AFTER enrich_tax_owed (whose output it reads) and cannot be folded into the
+    # enrich_amount_owed call above, which runs earlier in this pipeline, before the
+    # resolver/enrich_tax_owed have produced raw['tax_owed'] at all. See
+    # enrichment_amount_owed.promote_tax_owed_amount_owed's docstring for the defect
+    # this closes (measured 2026-09-29: 88,331 of 88,959 real-balance leads were
+    # showing nothing or a mislabeled proxy instead of the real county figure).
+    try:
+        from .enrichment_amount_owed import promote_tax_owed_amount_owed
+        s = promote_tax_owed_amount_owed(enriched)
+        if s:
+            enrichment_stats["amount_owed_tax_owed_promotion"] = s
+    except Exception:
+        log.error("amount_owed_tax_owed_promotion.failed", traceback=traceback.format_exc())
+
+    # Tax-aging surfacing — promotes raw['tax_owed']/raw['nc_ptscloud_delinquent_tax']
+    # into raw['tax_aging_surfaced']/raw['tax_aging_high'], the two fields
+    # fullmer_rank.py's years_delinquent()/delinq_ripeness_points() ramp and
+    # enrichment_equity.py's 0.70-vs-0.60 payoff branch actually read. Previously
+    # only a one-shot script (scripts/surface_tax_aging.py) did this, so it went
+    # stale the moment the board grew past that one snapshot (11/148 counties
+    # credited vs. 49 counties' worth of real raw['tax_owed']['year'] already on
+    # the board, measured 2026-10-03). Must run AFTER enrich_tax_owed (just above),
+    # whose output it reads. Idempotent, no network.
+    try:
+        from .enrichment_tax_aging import enrich_tax_aging
+        s = enrich_tax_aging(enriched)
+        if s:
+            enrichment_stats["tax_aging"] = s
+    except Exception:
+        log.error("tax_aging.failed", traceback=traceback.format_exc())
+
+    # Bankruptcy + large delinquent-tax-balance combo (Dirty Deeds Tier B #28,
+    # second half). Pure join of two signals that both now exist: must run
+    # AFTER both enrich_with_bankruptcy (much earlier above) and enrich_tax_owed
+    # / promote_tax_owed_amount_owed (just above) so raw['bankruptcy'] and
+    # raw['tax_owed'] are both populated by the time it reads them.
+    try:
+        from .enrichment_bankruptcy_tax_combo import enrich_bankruptcy_tax_combo
+        s = enrich_bankruptcy_tax_combo(enriched)
+        if s:
+            enrichment_stats["bankruptcy_tax_combo"] = s
+    except Exception:
+        log.error("bankruptcy_tax_combo.failed", traceback=traceback.format_exc())
+
+    # Tax relief — senior/disabled homestead exclusion (owner-occupant) + present-
+    # use deferral rollback lien. Parcel-keyed, reads the county exemption layer.
+    try:
+        from .enrichment_tax_relief import enrich_tax_relief
+        s = await _await_capped(enrich_tax_relief(enriched), "tax_relief")
+        if s:
+            enrichment_stats["tax_relief"] = s
+    except Exception:
+        log.error("tax_relief.failed", traceback=traceback.format_exc())
+
+    # Present-use / elderly DEFERRAL rollback: deferred tax comes due ON SALE, so it is a
+    # hard constraint on what a seller actually nets. Kill switch FORECLOSURE_ROLLBACK_OFF=1.
+    # Anderson's PDF books are opt-in via ROLLBACK_ANDERSON=1; the default path yields 42
+    # leads (all Buncombe), not the 47 the build reported with Anderson enabled.
+    try:
+        from .enrichment_rollback_deferral import enrich_with_rollback_exposure
+        s = await _await_capped(enrich_with_rollback_exposure(enriched), "with_rollback_exposure")
+        if s and s.get("matched"):
+            enrichment_stats["rollback_exposure"] = s
+    except Exception:
+        log.error("rollback_exposure.failed", traceback=traceback.format_exc())
+
+    # Transylvania NC's own ViewTaxBill detail page already publishes a labelled "Deferred
+    # Value :" line (present-use rollback, same concept as the sibling sources just above) under
+    # its own raw['transylvania_tax'] key — a pure, no-network restatement into the shared
+    # raw['rollback_exposure'] contract. See enrichment_transylvania_rollback_exposure.py's own
+    # docstring for why this is NOT the same trap as qPayBill's/PTS Cloud's look-alike value
+    # pairs (both investigated and correctly left unbuilt, 2026-10-19 gap-matrix sweep).
+    try:
+        from .enrichment_transylvania_rollback_exposure import enrich_transylvania_rollback_exposure
+        s = enrich_transylvania_rollback_exposure(enriched)
+        if s and s.get("matched"):
+            enrichment_stats["transylvania_rollback_exposure"] = s
+    except Exception:
+        log.error("transylvania_rollback_exposure.failed", traceback=traceback.format_exc())
+
+    # Transylvania NC already fetches every parcel's full multi-year bill history into its own
+    # raw['transylvania_tax'] (same source as the rollback block just above) but never restated
+    # it into the shared raw['multi_year_delinquent_tax'] key gap_matrix checks -- a pure,
+    # no-network restatement, same shape as the rollback sibling.
+    try:
+        from .enrichment_transylvania_multiyear_tax import enrich_transylvania_multiyear_tax
+        s = enrich_transylvania_multiyear_tax(enriched)
+        if s and s.get("matched"):
+            enrichment_stats["transylvania_multiyear_tax"] = s
+    except Exception:
+        log.error("transylvania_multiyear_tax.failed", traceback=traceback.format_exc())
+
+    # Mecklenburg NC: taxbill.co.mecklenburg.nc.us's live Bill Search (a genuinely separate
+    # source from the county's NCGS 105-369 advertisement already landed) -- per-year bill
+    # history by exact 8-digit parcel, stamping two_year_delinquent / multi_year_delinquent_tax.
+    try:
+        from .enrichment_mecklenburg_tax import enrich_mecklenburg_tax
+        s = await _await_capped(enrich_mecklenburg_tax(enriched), "mecklenburg_tax")
+        if s and s.get("matched"):
+            enrichment_stats["mecklenburg_tax"] = s
+    except Exception:
+        log.error("mecklenburg_tax.failed", traceback=traceback.format_exc())
+
+    # Rowan NC: tax.rowancountync.gov's iasWorld Datalet tax-bill grid by exact parcel_id.
+    try:
+        from .enrichment_rowan_multiyear_tax import enrich_rowan_multiyear_tax
+        s = await _await_capped(enrich_rowan_multiyear_tax(enriched), "rowan_multiyear_tax")
+        if s and s.get("matched"):
+            enrichment_stats["rowan_multiyear_tax"] = s
+    except Exception:
+        log.error("rowan_multiyear_tax.failed", traceback=traceback.format_exc())
+
+    # Anson NC: the shared bttaxpayerportal.com vendor (already read for TaxBillSearch) also
+    # carries a labelled rollback line, restated into raw['rollback_exposure'].
+    try:
+        from .enrichment_anson_rollback_exposure import enrich_anson_rollback_exposure
+        s = await _await_capped(enrich_anson_rollback_exposure(enriched), "anson_rollback_exposure")
+        if s and s.get("matched"):
+            enrichment_stats["anson_rollback_exposure"] = s
+    except Exception:
+        log.error("anson_rollback_exposure.failed", traceback=traceback.format_exc())
+
+    # Greenville SC's own treasurer "Property Tax Search" (a GET shortcut, separate from the
+    # Tax Sale roster and the broken assessor card) -- per-year bill history back to the
+    # mid-1990s, stamping two_year_delinquent / tax_aging_surfaced.
+    try:
+        from .enrichment_greenville_tax import enrich_greenville_tax
+        s = await _await_capped(enrich_greenville_tax(enriched), "greenville_tax")
+        if s and s.get("matched"):
+            enrichment_stats["greenville_tax"] = s
+    except Exception:
+        log.error("greenville_tax.failed", traceback=traceback.format_exc())
+
+    # Pasquotank NC: the county's own annual NCGS 105-369 delinquent-tax PDF, matched by owner
+    # name (unambiguous matches only).
+    try:
+        from .enrichment_pasquotank_delinquent_tax import enrich_pasquotank_delinquent_tax
+        s = await _await_capped(enrich_pasquotank_delinquent_tax(enriched), "pasquotank_tax")
+        if s and s.get("matched"):
+            enrichment_stats["pasquotank_tax"] = s
+    except Exception:
+        log.error("pasquotank_tax.failed", traceback=traceback.format_exc())
+
+    # Florence + Colleton SC: recovers deed book/page the register-chain adapter already
+    # fetches for these two counties but never restated into the shared atty_deed_ref contract
+    # (county_deed_ref.SC_LAYERS didn't name either county).
+    try:
+        from .enrichment_florence_colleton_deed_ref import enrich_florence_colleton_deed_ref
+        s = await _await_capped(enrich_florence_colleton_deed_ref(enriched), "florence_colleton_deed_ref")
+        if s and s.get("matched"):
+            enrichment_stats["florence_colleton_deed_ref"] = s
+    except Exception:
+        log.error("florence_colleton_deed_ref.failed", traceback=traceback.format_exc())
+
+    # Florence SC: web.florenceco.org's own tax-inquiry CGI (current + prior levy and full
+    # delinquent history), matched by zero-padded Map-Block-Parcel.
+    try:
+        from .enrichment_florence_tax_inquiry import enrich_florence_tax_inquiry
+        s = await _await_capped(enrich_florence_tax_inquiry(enriched), "florence_tax_inquiry")
+        if s and s.get("matched"):
+            enrichment_stats["florence_tax_inquiry"] = s
+    except Exception:
+        log.error("florence_tax_inquiry.failed", traceback=traceback.format_exc())
+
+    # Florence SC: pure, no-network restatement of the tax-inquiry block just above into the
+    # shared raw['two_year_delinquent'] contract (same shape as the Dorchester sibling).
+    try:
+        from .enrichment_florence_two_year_delinquent import enrich_florence_two_year_delinquent
+        s = enrich_florence_two_year_delinquent(enriched)
+        if s and s.get("matched"):
+            enrichment_stats["florence_two_year_delinquent"] = s
+    except Exception:
+        log.error("florence_two_year_delinquent.failed", traceback=traceback.format_exc())
+
+    # Greenville SC's own parcel-CAMA layer carries a county-computed "ROLLBK" ("Total
+    # Rollback:" on the county's own bill page) field this project pulls in bulk via
+    # parcel_cache but never restated -- a pure, no-network restatement into the shared
+    # raw['rollback_exposure'] contract, same shape as the Transylvania block just above. See
+    # enrichment_greenville_rollback_exposure.py's own docstring for the live evidence and for
+    # why Spartanburg/Horry/Brunswick/Pickens were investigated and correctly left unbuilt.
+    try:
+        from .enrichment_greenville_rollback_exposure import enrich_greenville_rollback_exposure
+        s = enrich_greenville_rollback_exposure(enriched)
+        if s and s.get("matched"):
+            enrichment_stats["greenville_rollback_exposure"] = s
+    except Exception:
+        log.error("greenville_rollback_exposure.failed", traceback=traceback.format_exc())
+
+    # Harnett NC's own cama.harnett.org/ITSPublicHT BasicSearch product (the SAME "ITS Public"
+    # vendor already read for this county's TaxBillSearch product) carries a labelled "Deferred"
+    # line in its ViewParcel "Property Values" fieldset -- a bounded, live owner-name+address
+    # search+fetch (same shape as enrichment_bt_parcel_info.py's own 14-county flow), restated
+    # into the shared raw['rollback_exposure'] contract. See
+    # enrichment_harnett_rollback_exposure.py's own docstring for the live evidence and for why
+    # this is NOT the same gap as multi_year_delinquent_tax (a scraper run-depth issue, unrelated,
+    # not fixed here).
+    try:
+        from .enrichment_harnett_rollback_exposure import enrich_harnett_rollback_exposure
+        s = await _await_capped(enrich_harnett_rollback_exposure(enriched), "harnett_rollback_exposure")
+        if s and s.get("deferred_found"):
+            enrichment_stats["harnett_rollback_exposure"] = s
+    except Exception:
+        log.error("harnett_rollback_exposure.failed", traceback=traceback.format_exc())
+
+    # Granville NC's own tax.granvillecounty.org/ITSPublic BasicSearch product -- the SAME "ITS
+    # Public" vendor, same non-bttaxpayerportal.com-host situation as Harnett just above -- carries
+    # the identical labelled "Deferred" line. See enrichment_granville_rollback_exposure.py's own
+    # docstring for the live evidence (2026-10-21) and for why this is NOT the same gap as
+    # multi_year_delinquent_tax (a scraper run-depth issue, fixed separately).
+    try:
+        from .enrichment_granville_rollback_exposure import enrich_granville_rollback_exposure
+        s = await _await_capped(enrich_granville_rollback_exposure(enriched), "granville_rollback_exposure")
+        if s and s.get("deferred_found"):
+            enrichment_stats["granville_rollback_exposure"] = s
+    except Exception:
+        log.error("granville_rollback_exposure.failed", traceback=traceback.format_exc())
+
+    # Hyde NC's lrcpwa.ncptscloud.com parcel-CAMA product carries explicit totalDeferredValue /
+    # useValueDeferred fields (NOT the bcpwa.ncptscloud.com BillPWA tax-roll the gap list named --
+    # that cluster has no present-use value field at all) -- a bounded, parcel-id-confirmed lookup
+    # restated into the shared raw['rollback_exposure'] contract. See
+    # enrichment_hyde_rollback_exposure.py's own docstring for the live evidence and for why the
+    # gap list's own next_action for this county was wrong about the source.
+    try:
+        from .enrichment_hyde_rollback_exposure import enrich_hyde_rollback_exposure
+        s = await _await_capped(enrich_hyde_rollback_exposure(enriched), "hyde_rollback_exposure")
+        if s and s.get("deferred_found"):
+            enrichment_stats["hyde_rollback_exposure"] = s
+    except Exception:
+        log.error("hyde_rollback_exposure.failed", traceback=traceback.format_exc())
+
+    # Madison NC's lrcpwa.ncptscloud.com parcel-CAMA product carries the SAME totalDeferredValue /
+    # useValueDeferred fields Hyde's module above already proved out -- live-verified 2026-10-28
+    # that Madison is also a live lrcpwa tenant with the identical field schema. See
+    # enrichment_madison_rollback_exposure.py's own docstring for the live evidence.
+    try:
+        from .enrichment_madison_rollback_exposure import enrich_madison_rollback_exposure
+        s = await _await_capped(enrich_madison_rollback_exposure(enriched), "madison_rollback_exposure")
+        if s and s.get("deferred_found"):
+            enrichment_stats["madison_rollback_exposure"] = s
+    except Exception:
+        log.error("madison_rollback_exposure.failed", traceback=traceback.format_exc())
+
+    # Rowan NC's tax.rowancountync.gov (iasWorld) already has a live tax_lien reader
+    # (tax_lien_rowan.py) -- the gap list's "add a new tax-roll reader" premise was wrong; the
+    # Datalet's own value_history tab carries an explicit "Deferred Land" column this module
+    # restates into the shared raw['rollback_exposure'] contract, with a rate derived from the
+    # SAME parcel's own tax_bills_int bill (never a hard-coded millage). See
+    # enrichment_rowan_rollback_exposure.py's own docstring for the live evidence.
+    try:
+        from .enrichment_rowan_rollback_exposure import enrich_rowan_rollback_exposure
+        s = await _await_capped(enrich_rowan_rollback_exposure(enriched), "rowan_rollback_exposure")
+        if s and s.get("deferred_found"):
+            enrichment_stats["rowan_rollback_exposure"] = s
+    except Exception:
+        log.error("rowan_rollback_exposure.failed", traceback=traceback.format_exc())
+
+    # Brunswick NC's tax.brunsco.net/ITSNet is the SAME "ITS Public" / BT TaxPayer Portal vendor
+    # enrichment_bt_parcel_info.py's 14 TENANTS counties and Harnett already read (just hosted on
+    # its own domain, like Harnett) -- the gap list's "add a new tax-roll reader" premise was
+    # wrong; its own ViewParcel "Property Values" fieldset carries the same "Deferred" line this
+    # module restates into the shared raw['rollback_exposure'] contract (no rate source exists
+    # for this county yet, so no annual_deferred_tax/estimated_rollback is derived -- the
+    # documented fallback every sibling in this family already uses). See
+    # enrichment_brunswick_rollback_exposure.py's own docstring for the live evidence, including
+    # the tenant's own year-duplicated search rows this module handles that no sibling needed to.
+    try:
+        from .enrichment_brunswick_rollback_exposure import enrich_brunswick_rollback_exposure
+        s = await _await_capped(enrich_brunswick_rollback_exposure(enriched),
+                                "brunswick_rollback_exposure")
+        if s and s.get("deferred_found"):
+            enrichment_stats["brunswick_rollback_exposure"] = s
+    except Exception:
+        log.error("brunswick_rollback_exposure.failed", traceback=traceback.format_exc())
+
+    # Duplin NC is already one of enrichment_bt_appraisal_card.TENANTS (code "DL", the SAME
+    # www.bttaxpayerportal.com host Granville/Harnett/Brunswick's siblings read) -- its ViewParcel
+    # "Property Values" fieldset carries the same "Deferred" line this module restates into the
+    # shared raw['rollback_exposure'] contract. Live-verified 2026-10-21 with a real nonzero hit
+    # (LANIER, JACKIE S: deferred_value 34,800). Duplin's own tenant needs a comma-separated
+    # "LAST, FIRST" search query -- the shared enrichment_bt_parcel_info._search_query's
+    # space-separated form returns zero candidates here (a per-tenant quirk on this vendor, see
+    # module docstring), so this module ships its own query builder. See
+    # enrichment_duplin_rollback_exposure.py's own docstring for the full live evidence.
+    try:
+        from .enrichment_duplin_rollback_exposure import enrich_duplin_rollback_exposure
+        s = await _await_capped(enrich_duplin_rollback_exposure(enriched),
+                                "duplin_rollback_exposure")
+        if s and s.get("deferred_found"):
+            enrichment_stats["duplin_rollback_exposure"] = s
+    except Exception:
+        log.error("duplin_rollback_exposure.failed", traceback=traceback.format_exc())
+
+    # Johnston NC's tax2/taxcards page redirects to www.bttaxpayerportal.com/itspublicjo -- the
+    # SAME BasicSearch/ViewParcel CAMA product already read for Duplin/Granville/Harnett/Rowan/
+    # Brunswick. Live-reverified 2026-10-21: the project's own "dead, replaced by
+    # my.johnstonnc.gov" classification only applies to BILL PAYMENT; the CAMA product (property
+    # cards, deferred value) is still live, confirmed by an owner-name search returning the SAME
+    # parcel my.johnstonnc.gov's guest bill-pay flow resolved on 2026-10-19. Johnston's own tenant
+    # needs the same comma-separated "LAST, FIRST" query Duplin's does. See
+    # enrichment_johnston_rollback_exposure.py's own docstring for the full live evidence.
+    try:
+        from .enrichment_johnston_rollback_exposure import enrich_johnston_rollback_exposure
+        s = await _await_capped(enrich_johnston_rollback_exposure(enriched),
+                                "johnston_rollback_exposure")
+        if s and s.get("deferred_found"):
+            enrichment_stats["johnston_rollback_exposure"] = s
+    except Exception:
+        log.error("johnston_rollback_exposure.failed", traceback=traceback.format_exc())
+
+    # NC OneMap statewide sweeps (never overwrites the tax relief / rollback dollar figures).
+    try:
+        from .enrichment_onemap_sweeps import enrich_onemap_sweeps
+        s = await _await_capped(enrich_onemap_sweeps(enriched), "onemap_sweeps", default_s=900)
+        if s and "skipped" not in s: enrichment_stats["onemap_sweeps"] = s
+    except Exception:
+        log.error("onemap_sweeps.failed", traceback=traceback.format_exc())
+
+    # Elderly/probate life-event tagging on owner_name (after promotion).
+    try:
+        from .enrichment_life_events import enrich_life_events
+        s = enrich_life_events(enriched)
+        if s: enrichment_stats["life_events"] = s
+    except Exception:
+        log.error("life_events.failed", traceback=traceback.format_exc())
+
+    # Spartanburg probate estates (before court owner verify so death_signal_on_roll sees the wording).
+    try:
+        from .enrichment_probate_spartan import enrich_probate_spartan
+        s = await _await_capped(
+            enrich_probate_spartan(enriched), "probate_spartan",
+            default_s=int(float(os.environ.get("FORECLOSURE_PROBATE_SPARTAN_BUDGET_S", "1500")) + 180))
+        if s and "skipped" not in s: enrichment_stats["probate_spartan"] = s
+    except Exception:
+        log.error("probate_spartan.failed", traceback=traceback.format_exc())
+
+    # Upset-bid window tagging (NCGS §45-21.27) — for every NC listing
+    # whose sale_date is in the past 0-10 calendar days, attach
+    # raw.upset_bid + upset_bid_deadline. Pure-Python, idempotent.
+    # Runs AFTER validation so it sees the cleaned-up sale_date, BEFORE
+    # calc/grade so the valuation pass can read the upset-bid signal (e.g.
+    # higher confidence on recent comp matching). data_quality no longer runs
+    # before this point — it reads raw['calc'], so it runs after the valuation.
+    try:
+        from .enrichment_upset_bid import enrich_upset_bid
+        s = enrich_upset_bid(enriched)
+        if s:
+            enrichment_stats["upset_bid"] = s
+    except Exception:
+        log.error("upset_bid.failed", traceback=traceback.format_exc())
+
+    # Foreclosure-process + redemption-clock labels (NC power-of-sale vs SC
+    # judicial vs tax; SC tax = ~12-mo redemption). Pure-Python; runs before
+    # calc/grade so the risk model can read the process timing.
+    try:
+        from .enrichment_process_timing import enrich_process_timing
+        s = enrich_process_timing(enriched)
+        if s:
+            enrichment_stats["process_timing"] = s
+    except Exception:
+        log.error("process_timing.failed", traceback=traceback.format_exc())
+
+    # Lien-stack join — attach an owner's OTHER recorded debts (SC state tax
+    # liens = super-priority) to the subject so calc + equity subtract them.
+    # MUST run before the calc loop so max_bid reflects the senior debt.
+    try:
+        from .enrichment_lien_stack import enrich_lien_stack
+        s = enrich_lien_stack(enriched)
+        if s:
+            enrichment_stats["lien_stack"] = s
+    except Exception:
+        log.error("lien_stack.failed", traceback=traceback.format_exc())
+
+    # SC CAMA backfill — clean appraised value + specs + condition from the county
+    # Assessor CSV (Spartanburg's live SCDOT value is corrupt). Runs before calc so
+    # the value/specs feed ARV + grade. Fills only missing fields.
+    try:
+        from .enrichment_sc_cama import enrich_sc_cama
+        s = enrich_sc_cama(enriched)
+        if s:
+            enrichment_stats["sc_cama"] = s
+    except Exception:
+        log.error("sc_cama.failed", traceback=traceback.format_exc())
+
+    # Footprint-based sqft ESTIMATE for SC leads with no true sqft (Spartanburg
+    # assessor blanks LivingArea). Needs sc_cama's story_height; runs before calc
+    # so the $/sqft ARV path can fire (capped to MEDIUM, flagged estimated).
+    try:
+        from .enrichment_footprint_sqft import enrich_footprint_sqft
+        s = enrich_footprint_sqft(enriched)
+        if s:
+            enrichment_stats["footprint_sqft"] = s
+    except Exception:
+        log.error("footprint_sqft.failed", traceback=traceback.format_exc())
+
+    # Case# -> court record bid/upset-status. For foreclosure leads with a case
+    # number but no posted bid, a PER-CASE public lookup (Rule-610-safe) fills the
+    # recorded sale/upset STATUS (SC Public Index publishes status, not the bid $;
+    # NC SP is gated, skipped). Runs before calc/grade so any filled bid feeds ARV.
+    try:
+        from .enrichment_court_bid import enrich_court_bid
+        s = await _await_capped(enrich_court_bid(enriched), "court_bid")
+        if s:
+            enrichment_stats["court_bid"] = s
+    except Exception:
+        log.error("court_bid.failed", traceback=traceback.format_exc())
+
+    # FHFA-HPI fallback value — coarse trend-rescale of a known last_sale_price to
+    # today's market for the property's MSA (or state). Free cached CSVs. Runs after
+    # the comp/sale-price enrichers and BEFORE calc so it can serve as a last-resort
+    # ARV input when every real comp tier is empty.
+    try:
+        from .enrichment_fhfa_value import enrich_fhfa_value
+        s = await _await_capped(enrich_fhfa_value(enriched), "fhfa_value")
+        if s:
+            enrichment_stats["fhfa_value"] = s
+    except Exception:
+        log.error("fhfa_value.failed", traceback=traceback.format_exc())
+
+    # BT appraisal cards (sqft / value / last sale) before the valuation loop reads them
+    try:
+        from .enrichment_tail_extras import enrich_network_pre_value
+        s = await _await_capped(enrich_network_pre_value(enriched), "tail_extras_network_pre_value", default_s=660)
+        if s:
+            enrichment_stats["tail_extras_network_pre_value"] = s
+    except Exception:
+        log.error("tail_extras_network_pre_value.failed", traceback=traceback.format_exc())
+
+    # Owner tenure — long-held property = high-equity proxy (the "held 7+ years"
+    # filter). Local, from the GIS/CAMA sale year. Feeds grade + outbound segmentation.
+    # MUST run after enrich_sc_cama AND enrich_network_pre_value's BT appraisal-card
+    # fetch (audit 2026-10-18, pipeline-tenure-from-sale): the BT cards are the ONLY
+    # source of raw['gis']['last_sale'] for the 14 BT-portal counties that have no
+    # county GIS sale field of their own — a row whose last-sale year comes ONLY from
+    # that fetch got no tenure at all, forever, once this run's tenure pass ran before
+    # the card did (live-measured on the published board: every one of the 133
+    # "sale year known, no tenure" McDowell rows carries a bt_appraisal_card block
+    # with last_sale_price/year and nothing else usable — no cama, no dated gis sale).
+    try:
+        from .enrichment_tenure import enrich_tenure
+        s = enrich_tenure(enriched)
+        if s:
+            enrichment_stats["tenure"] = s
+    except Exception:
+        log.error("tenure.failed", traceback=traceback.format_exc())
+
+    # SC DEW lien cross-reference — attach UI-tax / benefit-overpayment liens to
+    # matching property owners by name. No standalone board rows (the sc_dew
+    # scraper is disabled); this one-time render fetch is the only DEW touch.
+    try:
+        from .enrichment_dew_liens import enrich_dew_liens
+        s = await _await_capped(enrich_dew_liens(enriched), "dew_liens")
+        if s:
+            enrichment_stats["dew_liens"] = s
+    except Exception:
+        log.error("dew_liens.failed", traceback=traceback.format_exc())
+
+    # Court-lead owner verification — strip the wrong property off any courtlistener/lis-pendens/
+    # bankruptcy lead whose geo-snapped owner surname doesn't match the docket defendant (the
+    # neighbor's-parcel bug). MUST run before valuation so a stripped lead doesn't keep a bogus ARV.
+    try:
+        from .enrichment_court_owner_verify import enrich_court_owner_verify
+        s = enrich_court_owner_verify(enriched)
+        if s:
+            enrichment_stats["court_owner_verify"] = s
+    except Exception:
+        log.error("court_owner_verify.failed", traceback=traceback.format_exc())
+
+    # Owner entity-type classification (individual/entity/trust/estate/government) —
+    # computed ONCE here and persisted to raw['entity_type'] so the ~10 call sites that
+    # used to recompute name_normalize.is_entity() independently can read it instead.
+    # Deliberately placed AFTER every owner_name-mutating phase above (enrich_gis,
+    # enrich_gis_attrs, enrich_lrcpwa_parcel, enrich_promote_owner, and
+    # enrich_court_owner_verify just above, which runs latest of all of them) so the
+    # persisted value reflects the FINAL owner_name for this run. See
+    # enrichment_entity_type.py's module docstring for the full call-site audit.
+    try:
+        from .enrichment_entity_type import enrich_entity_type
+        s = enrich_entity_type(enriched)
+        if s:
+            enrichment_stats["entity_type"] = s
+    except Exception:
+        log.error("entity_type.failed", traceback=traceback.format_exc())
+
+    # Per-listing verification verdicts (docs/HANDOFF.md item 66). The Mac's
+    # scripts/verification_sweep.py checks claims live and pushes the per-signal ledgers
+    # docs/handoff/verification/<signal>.json; this attaches raw['verification'] from them, no
+    # network, BEFORE score_board so a refuted/stale verdict drops the signal it governs on
+    # this same run (nightly and the enrich-only resume both pass through here). Never fails
+    # the run; VERIFICATION_APPLY=0 turns it off.
+    try:
+        from .verification.apply import apply_verification
+        s = apply_verification(enriched)
+        if s:
+            enrichment_stats["verification"] = s
+    except Exception:
+        log.error("verification_apply.failed", traceback=traceback.format_exc())
+
+    # A tax debt the county's own site CONFIRMED for this row's parcel/address becomes the row's
+    # balance (county_site_verified), so scrubbing a copied block never costs a verified lead its
+    # amount. After apply_verification (it reads raw['verification']), before score_board.
+    try:
+        from .tax_binding import restore_verified_tax
+        enrichment_stats["tax_verified_restore"] = restore_verified_tax(enriched)
+    except Exception:
+        log.error("tax_verified_restore.failed", traceback=traceback.format_exc())
+
+    # One row per property, true twins merged, fused rows split, owner conflicts stamped
+    # (identity.py; audit 2026-10-09). After the tax scrub, before the late block scrub.
+    try:
+        from .identity import run_identity_pass
+        enrichment_stats["identity"] = run_identity_pass(enriched)
+    except Exception:
+        log.error("identity_pass.failed", traceback=traceback.format_exc())
+
+    # What the enrichers still without a fallback-point guard re-attached in this run.
+    try:
+        from .block_binding import scrub_unbound_blocks
+        enrichment_stats["blocks_unbound_late"] = scrub_unbound_blocks(enriched)
+    except Exception:
+        log.error("blocks_unbound_late.failed", traceback=traceback.format_exc())
+
+    try:
+        from .enrichment_bankruptcy_tax_combo import enrich_bankruptcy_tax_combo
+        enrichment_stats["bankruptcy_tax_combo_after_restore"] = enrich_bankruptcy_tax_combo(enriched)
+    except Exception:
+        log.error("bankruptcy_tax_combo_after_restore.failed", traceback=traceback.format_exc())
+
+    # Investor calculator + A-F grades per listing.
+    valuation_failures = 0
+    for li in enriched:
+        try:
+            c = valuation_calc.compute(li)
+            g = valuation_grading.grade(li, c)
+            if not isinstance(li.raw, dict):
+                li.raw = {}
+            li.raw["calc"] = valuation_calc.to_dict(c)
+            li.raw["grade"] = valuation_grading.to_dict(g)
+        except Exception:
+            valuation_failures += 1
+            log.warning("valuation.failed", source_url=li.source_url,
+                        traceback=traceback.format_exc())
+    log.info("orchestrator.graded", count=len(enriched), failures=valuation_failures)
+    # A blanket calc/grade break (refactor that throws on every listing) would
+    # otherwise pass as a green run with empty calc/grade — surface it as an alarm.
+    if enriched and valuation_failures >= max(5, len(enriched) // 4):
+        enrichment_stats["valuation_failures"] = valuation_failures
+
+    # ON-DEMAND per-parcel assessor card — graded-B+ leads only (~dozens/run). Fills
+    # the SC bulk gap (heated sqft + recorded sale price) the CAMA/GIS feed omits, at
+    # per-subject volume that sidesteps the bulk/WAF walls. OFF unless ASSESSOR_CARD_ON.
+    # Real card sqft clears the footprint-ESTIMATE cap, so re-calc/re-grade the touched.
+    try:
+        from .enrichment_assessor_card import enrich_assessor_card
+        s = enrich_assessor_card(enriched)
+        if s:
+            enrichment_stats["assessor_card"] = s
+            touched = [li for li in enriched
+                       if isinstance(li.raw, dict) and "assessor_card" in li.raw]
+            for li in touched:
+                try:
+                    c = valuation_calc.compute(li)
+                    g = valuation_grading.grade(li, c)
+                    li.raw["calc"] = valuation_calc.to_dict(c)
+                    li.raw["grade"] = valuation_grading.to_dict(g)
+                except Exception:
+                    log.warning("assessor_card.regrade_failed", source_url=li.source_url,
+                                traceback=traceback.format_exc())
+            log.info("orchestrator.assessor_card", regraded=len(touched), stats=s)
+    except Exception:
+        log.error("assessor_card.failed", traceback=traceback.format_exc())
+
+    # Owner-equity engine — ARV − mortgage payoff − junior liens. Runs after
+    # calc (needs arv_expected) + amount_owed, before distress scoring (which
+    # now gates HOT on real equity, not flip ROI). Pure-Python, free.
+    try:
+        from .enrichment_equity import enrich_equity
+        s = enrich_equity(enriched)
+        if s:
+            enrichment_stats["equity"] = s
+    except Exception:
+        log.error("equity.failed", traceback=traceback.format_exc())
+
+    # calc (max bid payoff) and grade (equity notes, risk points) read raw['equity'], which only now
+    # exists for this run: re-grade once (audit 2026-10-09; ~40 s for 350K rows).
+    _regraded = 0
+    for li in enriched:
+        try:
+            c = valuation_calc.compute(li)
+            g = valuation_grading.grade(li, c)
+            li.raw["calc"] = valuation_calc.to_dict(c)
+            li.raw["grade"] = valuation_grading.to_dict(g)
+            _regraded += 1
+        except Exception:
+            log.warning("valuation.regrade_failed", source_url=li.source_url, traceback=traceback.format_exc())
+    enrichment_stats["valuation_regraded_after_equity"] = {"count": _regraded}
+
+    # Deed chain — chronological ownership timeline synthesised from data other
+    # enrichers already gathered (assessor_card.sales, county_sales,
+    # gis.last_sale, rod_docs, relationship_signal). Pure-Python, offline, no
+    # network, no quota.
+    #
+    # This was NEVER wired into the run: it existed only inside four ad-hoc
+    # scripts (enrich_board / enrich_batch / title_search_pipeline / enrich_gaps),
+    # so deed_chain sat frozen at 17.6% and could not grow as new leads arrived.
+    # Chain data is the core of the buy-light title-curative thesis - chain_breaks
+    # flags quitclaims, $1 sales, inheritance and divorce transfers, i.e. exactly
+    # the "margin lives in the mess" signal - so leaving it out of the pipeline
+    # capped the whole strategy.
+    #
+    # Placed AFTER assessor_card (its richest source) and BEFORE title_risk, which
+    # benefits from a resolved chain.
+    try:
+        from .enrichment_deed_chain import enrich_deed_chain
+        s = enrich_deed_chain(enriched)
+        if s:
+            enrichment_stats["deed_chain"] = s
+            log.info("orchestrator.deed_chain", stats=s)
+    except Exception:
+        log.error("deed_chain.failed", traceback=traceback.format_exc())
+
+    # Title-risk classifier — flag the foreclosing party as senior-lien (sale
+    # clears junior liens) vs junior-lien/HOA/credit-union/individual (a senior
+    # bank mortgage likely SURVIVES the sale = bidding trap). Pure-compute over
+    # party text; runs before distress scoring so HOT can exclude the traps.
+    try:
+        from .enrichment_title_risk import enrich_title_risk
+        s = enrich_title_risk(enriched)
+        if s:
+            enrichment_stats["title_risk"] = s
+    except Exception:
+        log.error("title_risk.failed", traceback=traceback.format_exc())
+
+    # Computed flags from enriched data: absentee_owner, high_equity, vacant,
+    # negative_equity, plus keyword flags from descriptions. MOVED here from
+    # the early pipeline so absentee uses the owner_mailing address and the
+    # equity flags use the equity engine's ARV−payoff−liens result — both of
+    # which were empty when this used to run right after court enrichment.
+    try:
+        compute_flags(enriched)
+        log.info("orchestrator.flagged", count=len(enriched))
+    except Exception:
+        log.error("flags.failed", traceback=traceback.format_exc())
+
+    # Vacant-land-use proxy — free USPS-vacancy substitute. Reads the parcel
+    # cache's land-class field (no network) and stamps a `vacant_lot` signal on
+    # undeveloped lots so it stacks into distress + lead_signals below. No-op for
+    # un-cached counties.
+    try:
+        from .enrichment_vacant_landuse import enrich_vacant_landuse
+        s = enrich_vacant_landuse(enriched)
+        if s and s.get("stamped"):
+            enrichment_stats["vacant_landuse"] = s
+    except Exception:
+        log.error("vacant_landuse.failed", traceback=traceback.format_exc())
+
+    # Latest deed of a bound chain (legal description index entry, doc refs) for the lawyer lane.
+    try:
+        from .lawyer_lane import stamp_deed_latest
+        enrichment_stats["deed_latest"] = stamp_deed_latest(enriched)
+    except Exception:
+        log.error("deed_latest.failed", traceback=traceback.format_exc())
+    # DNC scrub of every phone (enrichment_dnc; audit 2026-10-09 unwired_enrichers): data/dnc_registry.csv
+    # and data/internal_dnc.csv when present, 31-day re-scrub; no file = every phone 'unverified'.
+    try:
+        from .enrichment_dnc import enrich_dnc_scrub
+        enrichment_stats["dnc_scrub"] = enrich_dnc_scrub(enriched)
+    except Exception:
+        log.error("dnc_scrub.failed", traceback=traceback.format_exc())
+    # flood_zone mirror, HUD FMR and Buncombe septic from local tables (no network)
+    try:
+        from .enrichment_tail_extras import enrich_local_pre_gate
+        enrichment_stats["tail_extras_local_pre_gate"] = enrich_local_pre_gate(enriched)
+    except Exception:
+        log.error("tail_extras_local_pre_gate.failed", traceback=traceback.format_exc())
+
+    # Call-ready gate (call_ready.py, docs/call_ready.md): lane, tier, reason and unmet conditions per
+    # row, read off the checks verification.apply attached, restore_verified_tax and the block_binding
+    # scrub above. Pure, no network, never drops a row.
+    try:
+        from .call_ready import stamp_board as _call_ready_stamp
+        enrichment_stats["call_ready"] = _call_ready_stamp(enriched)
+    except Exception:
+        log.error("call_ready.failed", traceback=traceback.format_exc())
+
+    # Stacked-distress score (HOT/WARM/COLD operator board) — runs last so it
+    # can stack every signal + equity + contactability gathered above.
+    def _score_failed(kind: str, detail: str, hist: dict | None = None,
+                      extra: dict | None = None) -> None:
+        """F17 (audit 2026-09-21): a scorer failure used to be log.error and carry on, so the
+        run published a board whose HOT/WARM/COLD tiers were whatever the PRIOR run left on
+        each row (or nothing, for fresh rows): tiers that look current and are not.
+        Record it in the health alarms, then FAIL LOUDLY: everything up to here is
+        checkpointed, so refusing the write costs only the tail of the run, and the board on
+        disk is left untouched. SCORE_BOARD_FAIL_SOFT=1 keeps the publish-anyway behaviour, but
+        the failure stays in run_health/summary errors and the run still exits non-zero."""
+        nonlocal _scoring_failed
+        _scoring_failed = f"{kind}: {detail}"[:240]
+        enrichment_stats["distress_stack"] = hist if hist else {"error": detail[:200], "stale_tiers": True}
+        enrichment_stats["distress_stack_failed"] = {"kind": kind, "detail": detail[:200], **(extra or {})}
+        errors.append(f"score_board FAILED: HOT/WARM/COLD tiers on this board are STALE ({_scoring_failed})")
+        if os.environ.get("SCORE_BOARD_FAIL_SOFT", "").strip().lower() not in ("1", "true", "yes"):
+            try:
+                checkpoint.save(enriched, "score_failed")
+            except Exception:
+                log.error("checkpoint.save_failed_after_score_failure", traceback=traceback.format_exc())
+            raise ScoreBoardFailed(
+                f"score_board failed ({_scoring_failed}); refusing to write a board with stale tiers "
+                f"(SCORE_BOARD_FAIL_SOFT=1 overrides)")
+
+    try:
+        from .distress_score import score_board, ScoreBoardError, LAST_STATS
+        # Explicit absolute path to the PRIOR run's listings.json snapshot. At
+        # this point web_artifact (line ~1698) has not yet overwritten it, so it
+        # still holds the previous run — correct for the price_cut cross-run diff.
+        # Passing the absolute repo path (instead of distress_score's CWD-relative
+        # default) keeps the comparison working regardless of invocation CWD.
+        _prev_listings = Path(__file__).resolve().parent.parent.parent / "docs" / "listings.json"
+        enrichment_stats["distress_stack"] = score_board(enriched, previous_path=_prev_listings)
+        enrichment_stats["distress_stack_detail"] = dict(LAST_STATS)   # lane, stale-capped, stay-capped, errors
+        log.info("orchestrator.distress_scored", tiers=enrichment_stats["distress_stack"],
+                 **{k: v for k, v in LAST_STATS.items() if k != "tiers"})
+        if LAST_STATS.get("price_index_error"):
+            # the prior-run price snapshot could not be read, so price_cut is OFF for this run
+            errors.append(f"score_board price_index_error: price_cut signal is off ({LAST_STATS['price_index_error']})")
+            log.error("distress_score.price_index_error", error=LAST_STATS["price_index_error"])
+    except ScoreBoardError as exc:
+        # Every group that could be scored was; the failed ones are COLD with score_error.
+        log.error("distress_score.failed", groups=exc.failed, first=exc.failures[:3])
+        _score_failed("ScoreBoardError", f"{exc.failed} group(s) failed", hist=exc.hist,
+                      extra={"groups": exc.failed, "first": exc.failures[:3]})
+    except ScoreBoardFailed:
+        raise
+    except Exception as _score_exc:
+        log.error("distress_score.failed", traceback=traceback.format_exc())
+        _score_failed(type(_score_exc).__name__, str(_score_exc))
+
+    # Derived investor signals (LTV, ppsf-vs-comp, equity band, etc.) — consumes equity +
+    # GIS value + distress, so runs LAST among the signal enrichers.
+    try:
+        from .enrichment_derived_signals import enrich_derived_signals
+        s = enrich_derived_signals(enriched)
+        if s: enrichment_stats["derived_signals"] = s
+    except Exception:
+        log.error("derived_signals.failed", traceback=traceback.format_exc())
+
+    # Death / fractured-ownership signal straight off the owner name. Runs before the
+    # Fullmer rank so the rank can see it, and needs no network at all.
+    try:
+        from .enrichment_owner_name_signal import enrich_owner_name_signal
+        s = enrich_owner_name_signal(enriched)
+        if s: enrichment_stats["owner_name_signal"] = s
+    except Exception:
+        log.error("owner_name_signal.failed", traceback=traceback.format_exc())
+
+    # SC judicial-foreclosure co-defendants (second mortgagee / HUD-USDA junior
+    # lien / HOA assessment lien / estate standing in for a dead co-owner) --
+    # already collected by sc_public_index.py / sc_public_index_lis_pendens.py
+    # into raw['court']['co_defendants'] / raw['sc_public_index']['co_defendants']
+    # but never read back out before. No network; reuses
+    # enrichment_owner_name_signal.classify() for the estate-token check, so
+    # runs right after it.
+    try:
+        from .enrichment_co_defendant_signal import enrich_co_defendant_signal
+        s = enrich_co_defendant_signal(enriched)
+        if s: enrichment_stats["co_defendant_signal"] = s
+    except Exception:
+        log.error("co_defendant_signal.failed", traceback=traceback.format_exc())
+
+    # HOA/POA/COA plaintiff signal (2026-10-02 lt_hoa_sale investigation) — the
+    # board's own charleston_mie.py scraper proves real HOA foreclosures exist,
+    # but ListingType.HOA_SALE shows ~0 board-wide because almost every HOA
+    # foreclosure lands under the generic foreclosure_sale/lis_pendens type
+    # instead. No network; reads the SAME plaintiff text already collected by
+    # dozens of scrapers and reuses enrichment_title_risk.classify_hoa_plaintiff()
+    # (its SENIOR-bank-table-wins-ties guard, already proven live), so it can run
+    # anywhere that module is already imported.
+    try:
+        from .enrichment_hoa_plaintiff_signal import enrich_hoa_plaintiff_signal
+        s = enrich_hoa_plaintiff_signal(enriched)
+        if s: enrichment_stats["hoa_plaintiff_signal"] = s
+    except Exception:
+        log.error("hoa_plaintiff_signal.failed", traceback=traceback.format_exc())
+
+    # Same-owner parcel clustering (Dirty Deeds Tier A #2) — one death/owner
+    # touching many parcels is worth more than the same parcels scored alone.
+    # No network; reads owner_name + county/state + parcel_id already on the lead.
+    try:
+        from .enrichment_owner_cluster import enrich_owner_cluster
+        s = enrich_owner_cluster(enriched)
+        if s: enrichment_stats["owner_cluster"] = s
+    except Exception:
+        log.error("owner_cluster.failed", traceback=traceback.format_exc())
+
+    # Repeat tax/foreclosure-sale loser (Dirty Deeds Tier A #34) — an owner
+    # who lost a DIFFERENT board parcel to a tax deed/sheriff's deed/trustee's
+    # deed/Master in Equity sale and still holds this one is a proven
+    # non-payer. Runs after deed_chain (reads its distress_transfers) and
+    # after owner_cluster so both cross-parcel joins have the same enriched
+    # `enriched` list to work from. No network.
+    try:
+        from .enrichment_repeat_tax_loss import enrich_repeat_tax_loss
+        s = enrich_repeat_tax_loss(enriched)
+        if s and s.get("tagged_rows"): enrichment_stats["repeat_tax_loss"] = s
+    except Exception:
+        log.error("repeat_tax_loss.failed", traceback=traceback.format_exc())
+
+    # LiensNC filing-date vs owner-death-date mismatch (Dirty Deeds Tier B
+    # #24) — a third cross-parcel/cross-listing join over the same `enriched`
+    # list, so it runs alongside owner_cluster/repeat_tax_loss rather than
+    # earlier. Reads raw['probate']/raw['sc_probate_notice'] date_of_death
+    # (both already RAW_KEEP'd) and raw['liensnc'] (also RAW_KEEP'd) — no
+    # network, no new scrape.
+    try:
+        from .enrichment_liensnc_posthumous import enrich_liensnc_posthumous
+        s = enrich_liensnc_posthumous(enriched)
+        if s and s.get("tagged"): enrichment_stats["liensnc_posthumous"] = s
+    except Exception:
+        log.error("liensnc_posthumous.failed", traceback=traceback.format_exc())
+
+    # 2026-10-07: dead-owner leads get an obituary match and possible-heir CANDIDATES for the attorney.
+    # Lookups make network calls and are OFF unless OBITUARY_LOOKUPS=<n leads>; the match and the
+    # candidates read what is already on the rows (names go to the private data/heirs/ store, the public
+    # board only gets counts: RAW_KEEP heir_candidates_summary). OBITUARY_MATCH=0 / HEIR_CANDIDATES=0 turn off.
+    try:
+        from .obituary_lookup import enrich_obituary_lookups
+        s = await _await_capped(enrich_obituary_lookups(enriched), "obituary_lookups")
+        if s and "skipped" not in s: enrichment_stats["obituary_lookups"] = s
+    except Exception:
+        log.error("obituary_lookups.failed", traceback=traceback.format_exc())
+    try:
+        from .enrichment_obituary_match import enrich_obituary_match
+        s = enrich_obituary_match(enriched)
+        if s and "skipped" not in s: enrichment_stats["obituary_match"] = s
+    except Exception:
+        log.error("obituary_match.failed", traceback=traceback.format_exc())
+    try:
+        from .enrichment_heir_candidates import enrich_heir_candidates
+        s = enrich_heir_candidates(enriched)
+        if s and "skipped" not in s: enrichment_stats["heir_candidates"] = s
+    except Exception:
+        log.error("heir_candidates.failed", traceback=traceback.format_exc())
+
+    # Fraud-against-an-heir detection (DPA master_sources_and_signals.md item B.20: forged
+    # deeds / fake POA / impersonation at closing) -- cross-references raw['deed_chain'] against
+    # raw['heir_candidates'] and the recorded date of death. MUST run here, not inside
+    # enrich_deed_chain's own per-row pass above: heir_candidates does not exist yet at that
+    # point in the pipeline. Detection only -- not wired into distress_score.py or any ListingType.
+    try:
+        from .enrichment_deed_chain import enrich_fraud_signals
+        s = enrich_fraud_signals(enriched)
+        if s and s.get("stamped"): enrichment_stats["fraud_signals"] = s
+    except Exception:
+        log.error("fraud_signals.failed", traceback=traceback.format_exc())
+
+    # Legal-description multi-lot / deeded-vs-assessor acreage mismatch
+    # (Dirty Deeds Tier A #9) — a regex pass over legal_description/
+    # description (already on the row from ~25 county tax scrapers) plus a
+    # compare against Listing.acreage (assessor/GIS). No network, no new
+    # fields upstream. Independent of the other passes above, so position
+    # relative to them does not matter.
+    try:
+        from .enrichment_platted_lots import enrich_platted_lots
+        s = enrich_platted_lots(enriched)
+        if s and s.get("tagged"): enrichment_stats["platted_lots"] = s
+    except Exception:
+        log.error("platted_lots.failed", traceback=traceback.format_exc())
+
+    # Divorce decree with no subsequent deed (Dirty Deeds Tier B #20) — a
+    # negative join over raw['resolved_from_name'], which the NAME -> PROPERTY
+    # resolver (enrich_resolve_name_to_property, much earlier in this function)
+    # already wrote for every name-indexed lead it queried, including
+    # divorce_notice rows. MUST run after that resolver call or this join has
+    # nothing to read; it does not itself hit any network. NC only (SC family
+    # court is access-restricted).
+    try:
+        from .enrichment_divorce_no_subsequent_deed import enrich_divorce_no_subsequent_deed
+        s = enrich_divorce_no_subsequent_deed(enriched)
+        if s and s.get("tagged"): enrichment_stats["divorce_no_subsequent_deed"] = s
+    except Exception:
+        log.error("divorce_no_subsequent_deed.failed", traceback=traceback.format_exc())
+
+    # Assessor owner-name search used as a notice-defect weapon (Dirty Deeds
+    # Tier B #30) -- a tax-foreclosure defendant served by publication/
+    # alternative service whose name resolves to a real address elsewhere on
+    # the board (raw['owner_mailing'] / raw['resolved_from_name'], both
+    # already populated by the passes above) in the SAME county. Same
+    # dependency as divorce_no_subsequent_deed immediately above: must run
+    # after the name resolver and owner-mailing enrichers, no network of its
+    # own. NC only (SC's tax sale is administrative, no service event).
+    try:
+        from .enrichment_notice_service_defect import enrich_notice_service_defect
+        s = enrich_notice_service_defect(enriched)
+        if s and s.get("tagged"): enrichment_stats["notice_service_defect"] = s
+    except Exception:
+        log.error("notice_service_defect.failed", traceback=traceback.format_exc())
+
+    # Fullmer deal-economics rank — the buy box from Distressed Property Secrets and
+    # the Dirty Deeds interviews, expressed as POINTS. Runs after derived_signals
+    # because it reads calc.est_gross_margin, distress_stack.absentee, deed_chain and
+    # the CAD anchor, all of which the passes above populate.
+    #
+    # It ORDERS the board and never trims it (rank_board asserts the row count is
+    # unchanged). That is deliberate: his CAD>=$200k / won't-touch-<$50k / $50k-margin
+    # floors are Bexar County arithmetic — that county taxes at ~2.7% against NC/SC's
+    # ~0.6-0.9%, so arrears accrue ~3x slower here and the same margin shows up at a
+    # far lower value; a flat floor would delete most of Rutherford, Polk, McDowell,
+    # Cherokee, Union and Abbeville. He does not delete leads either, he ranks them
+    # ("there are hundreds of other people in my CRM right now"). The operator moves
+    # their own bar in the dashboard instead of waiting on a re-run.
+    try:
+        from .fullmer_rank import rank_board
+        enrichment_stats["fullmer_rank"] = rank_board(enriched)
+        log.info("orchestrator.fullmer_ranked", **enrichment_stats["fullmer_rank"]["buckets"])
+    except Exception:
+        log.error("fullmer_rank.failed", traceback=traceback.format_exc())
+
+    # Heir candidates and the Fullmer rank are current only after score_board: stamp the gate again
+    # (idempotent) so lane B / C's heir item and the rank are this run's.
+    try:
+        from .call_ready import stamp_board as _call_ready_stamp
+        enrichment_stats["call_ready_final"] = _call_ready_stamp(enriched)
+    except Exception:
+        log.error("call_ready_final.failed", traceback=traceback.format_exc())
+
+    # Derivation flags — free_and_clear (no mortgage in ROD), tired_landlord
+    # (absentee + 10yr ownership), divorce (from nc_ecourts_divorce scraper).
+    # Pure compute over existing ROD + GIS + court data.
+    try:
+        from .enrichment_derivation_flags import enrich_derivation_flags
+        s = enrich_derivation_flags(enriched)
+        if s:
+            enrichment_stats["derivation_flags"] = s
+    except Exception:
+        log.error("derivation_flags.failed", traceback=traceback.format_exc())
+
+    # Burke County parcel-history diff (ownership changes, structure loss).
+    try:
+        from .enrichment_burke_history import enrich_burke_parcel_history
+        s = await _await_capped(enrich_burke_parcel_history(enriched), "burke_parcel_history")
+        if s:
+            enrichment_stats["burke_history"] = s
+    except Exception:
+        log.error("burke_history.failed", traceback=traceback.format_exc())
+
+    # Land-records PROPERTY PHOTOS — the county's building photo for
+    # Henderson/Madison/Rutherford/Burke leads, downloaded + hosted under
+    # docs/parcel_photos/. Runs AFTER distress scoring so it only spends on the
+    # worked leads (HOT/WARM or graded) that otherwise have no image.
+    try:
+        from .enrichment_lrcpwa_photo import enrich_lrcpwa_photo
+        s = await _await_capped(enrich_lrcpwa_photo(enriched), "lrcpwa_photo")
+        if s and s.get("fetched"):
+            enrichment_stats["lrcpwa_photo"] = s
+    except Exception:
+        log.error("lrcpwa_photo.failed", traceback=traceback.format_exc())
+
+    # Strategy-fit tags — label each lead with the exit strategies it fits
+    # (WHOLESALE / LAND_WHOLESALE / SUBJECT_TO / FIX_FLIP / GATOR) so the operator
+    # can filter the board by how they'd work it. Local, reads existing signals.
+    try:
+        from .enrichment_strategy_fit import enrich_strategy_fit
+        s = enrich_strategy_fit(enriched)
+        if s:
+            enrichment_stats["strategy_fit"] = s
+    except Exception:
+        log.error("strategy_fit.failed", traceback=traceback.format_exc())
+
+    # County eviction-pressure market signal (LSC CCDI) — offline county lookup,
+    # market context for prioritization (aggregate, not a per-case lead).
+    try:
+        from .enrichment_eviction_market import enrich_eviction_market
+        s = enrich_eviction_market(enriched)
+        if s:
+            enrichment_stats["eviction_market"] = s
+    except Exception:
+        log.error("eviction_market.failed", traceback=traceback.format_exc())
+
+    # Corroboration flag — is each lead's distress CONFIRMED by a court/authoritative
+    # filing (public index / eCourts / MIE / law-firm roster / ROD), or only flagged
+    # by a single MLS/aggregator (realtor.com etc.)? Reads li.source + also_seen_in,
+    # stamps raw['corroboration'] {court_confirmed, tier, sources, label}. Local, offline.
+    try:
+        from .enrichment_corroboration import enrich_corroboration
+        s = enrich_corroboration(enriched)
+        if s:
+            enrichment_stats["corroboration"] = s
+    except Exception:
+        log.error("corroboration.failed", traceback=traceback.format_exc())
+
+    # Competition / publication-reach tag — a widely-published trustee sale list
+    # (Hutchens et al.) draws many bidders (more competitive), while a lone quiet
+    # off-market signal (tax-delinquent / code-enforcement / probate, no other
+    # source) is one nobody else is watching (low competition). Transparent tag
+    # only; never changes a grade/tier. Reads li.source + also_seen_in. Offline.
+    try:
+        from .enrichment_competition import enrich_competition
+        s = enrich_competition(enriched)
+        if s:
+            enrichment_stats["competition"] = s
+    except Exception:
+        log.error("competition.failed", traceback=traceback.format_exc())
+
+    # Lead signals — Goliath-parity list-stacking (# distinct distress signals per
+    # property) + a normalized 0-100 intent score. Runs LAST so it sees every signal.
+    try:
+        from .enrichment_lead_signals import enrich_lead_signals
+        s = enrich_lead_signals(enriched)
+        if s:
+            enrichment_stats["lead_signals"] = s
+    except Exception:
+        log.error("lead_signals.failed", traceback=traceback.format_exc())
+
+    # Buyer-match — curated list of buyers wanting property in the lead's county
+    # (land buyers / builders / cash house-buyers), so the card shows who to
+    # assign the deal to. Local; from the buyer registry (no published buy box).
+    try:
+        from .enrichment_buyer_match import enrich_buyer_match
+        s = enrich_buyer_match(enriched)
+        if s:
+            enrichment_stats["buyer_match"] = s
+    except Exception:
+        log.error("buyer_match.failed", traceback=traceback.format_exc())
+
+    # RentCast AVM cross-check on top-N listings (authoritative AVM + comparables).
+    # Only fires when RENTCAST_API_KEY is set.
+    # Free tier (50 calls/mo) → 25 listings × 2 calls each.
+    # Foundation tier ($74/mo, 1000 calls) → 100 listings × ~10 calls each.
+    try:
+        rc_top_n = int(os.environ.get("RENTCAST_TOP_N", "25"))
+        rc_summary = await valuation_rentcast.enrich_top_n(enriched, top_n=rc_top_n)
+        if rc_summary.get("matched", 0) > 0:
+            for li in enriched:
+                valuation_rentcast.update_grade_with_rentcast(li)
+            log.info("orchestrator.rentcast_blended", **rc_summary)
+    except Exception:
+        log.error("rentcast.failed", traceback=traceback.format_exc())
+
+    # Data-quality flag enrichment — investor-facing caveats in raw.data_quality
+    # (address placeholder, missing/estimated sqft, and every ARV trust caveat).
+    #
+    # ORDERING IS THE WHOLE POINT, so it is stated once here and enforced by
+    # tests/test_enrichment_order.py:
+    #
+    #   It MUST run after the LAST thing that writes raw['calc'].
+    #
+    # That is the RentCast blend directly above (update_grade_with_rentcast
+    # re-runs compute+grade and replaces raw['calc'] for the top-N leads), which
+    # comes after the main valuation loop and after the assessor-card re-grade.
+    # Everything this enrichment says about an ARV — arv_unreliable,
+    # arv_bid_and_roi_withheld, arv_no_independent_check, arv_sanity_flag,
+    # arv_outlier, the data_quality.summary prose and the CSV's
+    # data_quality_note — is derived from that block. Computed one line early it
+    # describes a valuation that is no longer on the board, and a stale warning
+    # is worse than none: the operator reads "no caveats" off a number that has
+    # since been flagged.
+    #
+    # Running it here rather than at the old post-validation position also means
+    # it finally sees the resolver's addresses, sc_cama/footprint/assessor_card
+    # sqft, raw['footprint'] (so `sqft_estimated` can fire at all) and
+    # court_owner_verify's stripped street_address. It reads no state that only
+    # existed earlier: nothing between the two positions writes
+    # raw['data_quality'], and the only in-process consumer is write_artifact's
+    # serialization, far below.
+    #
+    # It is still BEFORE board_quality / last_sale / board_qa / write_artifact,
+    # which is the same relative order scripts/regenerate_dashboard.py uses.
+    try:
+        from .enrichment_data_quality import enrich_data_quality
+        s = enrich_data_quality(enriched)
+        if s: enrichment_stats["data_quality"] = s
+    except Exception:
+        log.error("data_quality.failed", traceback=traceback.format_exc())
+
+    # Run summary for Sheet log + email body
+    by_state = Counter(li.state for li in enriched if li.state)
+    by_county = Counter(f"{li.county}, {li.state}" for li in enriched if li.county and li.state)
+    # Build per-source status: working / empty (verified) / regressed /
+    # paywall-blocked / render-required. The blocked / render-required
+    # statuses are acknowledged failure modes (no alert) versus
+    # REGRESSED (alert).
+    paywall_required = {s.slug for s in scrapers if getattr(s, "requires_paywall", False)}
+    render_required = {s.slug for s in scrapers if getattr(s, "requires_render", False)}
+
+    # Per-source SILENT-FAILURE alarm: rolling baselines + consecutive-zero +
+    # sustained-bleed across runs. Catches a source that breaks and STAYS
+    # broken, or quietly bleeds (was ~50/run, now 5/run) — failure modes the
+    # single-run REGRESSED check below cannot see. Surfaced loudly in the email.
+    docs_dir = Path(__file__).resolve().parent.parent.parent / "docs"
+    source_alarms: dict = {}
+    try:
+        from .source_health_tracker import update_source_health
+        if st.update_source_health:
+            source_alarms = update_source_health(by_source, expected, docs_dir)
+    except Exception:
+        log.error("source_health.call_failed", traceback=traceback.format_exc())
+
+    # A hard per-run failure (0 rows WITH a real cause: blocked / errored /
+    # timed out) is an alarm on the FIRST occurrence — the owner wants immediate
+    # notice + the exact reason, not a 2-run-consecutive DEAD detection delay.
+    for slug, (outcome, reason) in source_outcomes.items():
+        if (by_source.get(slug, 0) == 0
+                and outcome in ("BLOCKED", "ERROR", "TIMEOUT")
+                and slug not in source_alarms):
+            source_alarms[slug] = {"reason": f"{outcome}: {reason}", "severity": outcome}
+
+    source_status = {}
+    for slug in expected:
+        n = by_source.get(slug, 0)
+        carried_n = (carry_stats or {}).get(slug, 0)
+        outcome, reason = source_outcomes.get(slug, ("OK", ""))
+        if slug in source_alarms:
+            # Alarm supersedes the normal status so it can't be missed.
+            source_status[slug] = f"🔴 ALARM — {source_alarms[slug]['reason']}"
+        elif carried_n > 0 and n == carried_n:
+            # All "listings" for this slug came from the prior run — fresh
+            # scrape returned zero. Surface it visibly so on-call knows the
+            # data is stale, not real-world dry.
+            source_status[slug] = f"CARRYOVER ({carried_n} stale from prior run)"
+        elif n > 0 and outcome == "PARTIAL":
+            # 2026-10-14 (silent-failure sweep follow-up item 1): a real, nonzero
+            # total that still deserves a visible flag -- e.g. CCHS vendor-wide
+            # wall-blocked (cash_buyer_deeds / nc_rod_substitute_trustee /
+            # nod_discovery) while other, non-CCHS counties in the same scraper
+            # still shipped real rows. Not an ALARM (data IS flowing), but the old
+            # plain "OK (n)" buried exactly the signal this item exists to surface.
+            source_status[slug] = f"⚠️ PARTIAL ({n}) — {reason}"
+        elif n > 0:
+            source_status[slug] = f"OK ({n})"
+        # n == 0 below — say EXACTLY what happened this run, not a static guess.
+        elif outcome == "BLOCKED":
+            source_status[slug] = f"🔴 BLOCKED — {reason}"
+        elif outcome == "TIMEOUT":
+            source_status[slug] = f"🔴 TIMEOUT — {reason}"
+        elif outcome == "ERROR":
+            source_status[slug] = f"🔴 ERROR — {reason}"
+        elif outcome == "DORMANT":
+            source_status[slug] = f"DORMANT — {reason}"
+        elif slug in paywall_required:
+            source_status[slug] = "PAYWALL-BLOCKED"
+        elif slug in render_required:
+            source_status[slug] = "RENDER-REQUIRED (stealth fetch returned nothing)"
+        elif expected[slug] == 0:
+            source_status[slug] = "EMPTY (verified)"
+        else:
+            source_status[slug] = f"REGRESSED (expected ≥ {expected[slug]})"
+
+    # New-this-run detection (early-access / geo-alert capability). Must run
+    # BEFORE web_artifact overwrites the prior listings.json. Tags raw.is_new.
+    new_stats = {"new": 0}
+    try:
+        from .new_listings import mark_new_listings
+        new_stats = mark_new_listings(enriched)
+    except Exception:
+        log.error("new_listings.failed", traceback=traceback.format_exc())
+
+    # Re-resolve stale Fannie HomePath uuids (deep links rotate ~monthly) BEFORE the
+    # freshness prune, so a merely-rotated uuid isn't mistaken for a sold-out lead.
+    try:
+        from .enrichment_homepath_uuid import enrich_homepath_uuids
+        _hp = await _await_capped(enrich_homepath_uuids(enriched), "homepath_uuids")
+        if _hp:
+            enrichment_stats["homepath_uuid"] = _hp
+    except Exception:
+        log.error("homepath_uuid.failed", traceback=traceback.format_exc())
+
+    # Drop sold/removed snapshot-REO (Fannie) whose per-property SPA URL 404s once it
+    # leaves inventory — stale carryover. Fail-safe (keeps list on error).
+    try:
+        from .enrichment_reo_freshness import prune_stale_reo
+        enriched, _reo_stats = await prune_stale_reo(enriched)
+        if _reo_stats: enrichment_stats["reo_freshness"] = _reo_stats
+    except Exception:
+        log.error("reo_freshness.failed", traceback=traceback.format_exc())
+
+    # Data-quality corrections — LAST, after tiers/scoring: bbox/centroid geo guards,
+    # auction_status normalization, presumed-withdrawn stale-case flag + HOT down-rank.
+    try:
+        from .enrichment_board_quality import enrich_board_quality
+        s = enrich_board_quality(enriched)
+        if s: enrichment_stats["board_quality"] = s
+    except Exception:
+        log.error("board_quality.failed", traceback=traceback.format_exc())
+
+    # Automated data-quality VERIFICATION — flags the bugs the operator keeps
+    # catching by hand (cross-source dup address, ARV below as-is value, rehab
+    # tier vs condition contradiction, un-surfaced assessor sale history, missing
+    # sqft/owner) into raw['qa_flags'] and logs the per-flag counts. Pure-Python,
+    # runs LAST so it sees the fully-enriched/deduped board. These are regression
+    # Surface a single display-ready last-sale fact (recorded sale / assessor value) before QA,
+    # so the dashboard shows "when/what it sold" and missing_last_sale reflects it.
+    try:
+        from .enrichment_last_sale import enrich_last_sale
+        s = enrich_last_sale(enriched)
+        if s:
+            enrichment_stats["last_sale"] = s
+    except Exception:
+        log.error("last_sale.failed", traceback=traceback.format_exc())
+
+    # tripwires: a non-zero arv_below_asis / dup_address means a prior fix broke.
+    try:
+        from .enrichment_board_qa import enrich_board_qa
+        qa = enrich_board_qa(enriched)
+        if qa:
+            enrichment_stats["board_qa"] = qa
+            log.info("orchestrator.board_qa", **qa)
+    except Exception:
+        log.error("board_qa.failed", traceback=traceback.format_exc())
+
+    # self-contradiction flags (enrich_board_qa just reassigned qa_flags) and the property category
+    try:
+        from .enrichment_tail_extras import enrich_local_after_qa
+        enrichment_stats["tail_extras_local_after_qa"] = enrich_local_after_qa(enriched)
+    except Exception:
+        log.error("tail_extras_local_after_qa.failed", traceback=traceback.format_exc())
+
+    # Classify source links (record vs search-only) so the dashboard never shows a dead link.
+    try:
+        from .enrichment_source_link import enrich_source_link
+        enrichment_stats["source_link"] = enrich_source_link(enriched)
+    except Exception:
+        log.error("source_link.failed", traceback=traceback.format_exc())
+
+    # ---- Post-board geographic flag group (concurrent) ----
+    # FEMA disaster declarations, Opportunity Zone, and USPS vacancy all
+    # read geographic identifiers (county/lat-lng/zip) and write INDEPENDENT
+    # raw keys. Safe to run concurrently.
+    _geo_flag_phases: dict = {}
+    try:
+        from .enrichment_fema_disaster import fetch_helene_disaster_data
+        _geo_flag_phases["fema_disaster"] = fetch_helene_disaster_data()
+    except Exception:
+        log.error("fema_disaster.failed", traceback=traceback.format_exc())
+    try:
+        from .enrichment_opportunity_zone import enrich_opportunity_zones
+        _geo_flag_phases["opportunity_zone"] = enrich_opportunity_zones(enriched)
+    except Exception:
+        log.error("opportunity_zone.failed", traceback=traceback.format_exc())
+    try:
+        from .enrichment_usps_vacancy import enrich_usps_vacancy
+        _geo_flag_phases["usps_vacancy"] = enrich_usps_vacancy(enriched)
+    except Exception:
+        log.error("usps_vacancy.failed", traceback=traceback.format_exc())
+    try:
+        from .enrichment_tail_extras import enrich_network_geo
+        _geo_flag_phases["tail_extras_geo"] = enrich_network_geo(enriched)
+    except Exception:
+        log.error("tail_extras_geo.failed", traceback=traceback.format_exc())
+    _geo_results = await _gather_phases(_geo_flag_phases)
+    _fd = _geo_results.get("fema_disaster")
+    if _fd:
+        enrichment_stats["fema_disaster"] = {"declarations": len(_fd)}
+        for li in enriched:
+            if not isinstance(li.raw, dict):
+                li.raw = {}
+            li.raw["fema_disaster"] = _fd
+    _oz = _geo_results.get("opportunity_zone")
+    if _oz:
+        enrichment_stats["opportunity_zone"] = _oz
+    _uv = _geo_results.get("usps_vacancy")
+    if _uv:
+        enrichment_stats["usps_vacancy"] = _uv
+    if _geo_results.get("tail_extras_geo"):
+        enrichment_stats["tail_extras_geo"] = _geo_results["tail_extras_geo"]
+
+    # Outreach stack — owner contact actions (letter/email/SMS), a postcard
+    # mail-merge CSV, and persistent CRM status. Runs after skip-trace +
+    # valuation so it has owner contact + deal numbers to work with.
+    outreach_stats = {}
+    try:
+        from .outreach import generate_outreach
+        outreach_stats = generate_outreach(enriched)
+    except Exception:
+        log.error("outreach.failed", traceback=traceback.format_exc())
+
+    summary = {
+        "total": len(enriched),
+        "new_this_week": new_stats.get("new", 0),
+        "new_lis_pendens": new_stats.get("new_lis_pendens", 0),
+        "outreach": outreach_stats,
+        "by_state": dict(by_state),
+        "by_county_top": by_county.most_common(15),
+        "by_source": dict(by_source),
+        "errors": errors,
+        "regressions": regressions,
+        "source_status": source_status,
+        "source_alarms": source_alarms,
+        # Read by web_artifact's count guard: shrink explained by these is a
+        # buy-box correction, not data loss.
+        "off_footprint_removed": _off_footprint_removed,
+        "notes": f"horizon={cfg.sale_horizon_days}d, scrapers={len(scrapers)}, regressions={len(regressions)}",
+    }
+
+    # GRANDFATHER restore: re-add any snapshotted merged lead that a downstream
+    # filter dropped, so the published board is a SUPERSET of the merge and can
+    # never fall below it. Natural aging (pulled_sale / miss-counter) still trims
+    # genuinely-gone leads over subsequent runs.
+    if _grandfather:
+        _final_keys = {k for li in enriched if (k := _safe_dedupe_key(li))}
+        _restored = [li for li in _grandfather
+                     if (_gk := _safe_dedupe_key(li)) and _gk not in _final_keys]
+        if _restored:
+            log.warning("orchestrator.grandfather_restored",
+                        restored=len(_restored), before=len(enriched),
+                        after=len(enriched) + len(_restored))
+            enriched.extend(_restored)
+            # A row restored straight from the prior board's own JSON carries whatever
+            # local-tail/call_ready/valuation/comps state (if any) that board had -- every
+            # stamp above ran BEFORE this restore, so a restored row never got this run's
+            # gate, local tail, valuation loop, comp-aging or validation at all (audit
+            # 2026-10-09, 2026-10-17 live: 9 HomePath leads carried call_ready=missing AND
+            # hud_fmr=missing indefinitely this way -- same root cause, confirmed the
+            # identical 9 rows; 2026-10-18: those same 9 also carry no raw['calc']/raw['grade'],
+            # pipeline-row-valued's identical root cause, never addressed when the other two
+            # were fixed; 2026-10-18 later: valuation-comps-kind-fits/valuation-comps-age/
+            # valuation-hot-arv-supported live-confirmed a 4th leg on a DIFFERENT 17-row set --
+            # every one of those rows' comps carries no 'carried'/'picked_on'/'age_days' stamp
+            # at all, which enrich_with_comps's own picked_on stamp makes impossible to reach
+            # any other way: age_comps()/validate() never ran on them either, across every run
+            # since. The 1 hot-arv-supported row and 2 comps-age rows the same audit pass
+            # flagged do NOT share this fingerprint -- live-checked, the hot-arv row already
+            # carries proper carried/age_days stamps (a genuine unsupported-ARV case, not this
+            # bug) and the 2 comps-age rows carry a 'source' field from enrich_recorded_sales,
+            # which runs AFTER age_comps in the normal pipeline on brand-new (first_seen ==
+            # last_seen) rows -- a separate ordering gap, not the restore, and left to its own
+            # fix). age_comps()/validate() are the same two steps that run right after the
+            # comps phase in a normal pass (enrichment_comps.age_comps, then
+            # validation.validate, both documented pure/per-row/no-network/idempotent -- the
+            # comps-dropped-kind-mismatch branch validate() already runs is exactly
+            # CompsKindFits' check), so re-running them over just `_restored`, in that same
+            # order and BEFORE the calc/grade loop below (which reads the comp_median_ppsf
+            # validate() recomputes), is safe and only fills in the rows that just arrived.
+            try:
+                from .enrichment_comps import age_comps as _age_comps_grandfather
+                enrichment_stats["comps_age_grandfather"] = _age_comps_grandfather(_restored)
+            except Exception:
+                log.error("comps_age_grandfather.failed", traceback=traceback.format_exc())
+            try:
+                from .validation import validate as _validate_grandfather
+                enrichment_stats["validation_grandfather"] = _validate_grandfather(_restored)
+            except Exception:
+                log.error("validation_grandfather.failed", traceback=traceback.format_exc())
+            for _li in _restored:
+                try:
+                    _c = valuation_calc.compute(_li)
+                    _g = valuation_grading.grade(_li, _c)
+                    if not isinstance(_li.raw, dict):
+                        _li.raw = {}
+                    _li.raw["calc"] = valuation_calc.to_dict(_c)
+                    _li.raw["grade"] = valuation_grading.to_dict(_g)
+                except Exception:
+                    log.warning("valuation.grandfather_failed", source_url=_li.source_url,
+                                traceback=traceback.format_exc())
+            try:
+                from .enrichment_tail_extras import enrich_local_pre_gate
+                enrichment_stats["tail_extras_local_pre_gate_grandfather"] = enrich_local_pre_gate(enriched)
+            except Exception:
+                log.error("tail_extras_local_pre_gate_grandfather.failed", traceback=traceback.format_exc())
+            try:
+                from .call_ready import stamp_board as _call_ready_stamp
+                enrichment_stats["call_ready_grandfather"] = _call_ready_stamp(enriched)
+            except Exception:
+                log.error("call_ready_grandfather.failed", traceback=traceback.format_exc())
+            # A restored row's dedupe_key is the SNAPSHOT's (pre-address-synthesis, pre-validation),
+            # which routinely differs from the live row of the same property dedupe2 already placed
+            # in `enriched` (audit 2026-10-18, identity-no-duplicate-properties: a Fannie HomePath
+            # lead keyed 'parcel:...:15876' by its prior short id, restored beside this run's fresh
+            # national.homepath_json re-scrape of the SAME property keyed by address -- dedupe()
+            # merges that exact pair on contact, but nothing re-ran it since the restore only
+            # EXTENDS `enriched`). Re-running dedupe() catches that, the same safety net dedupe2
+            # already gives every other row; _final_keys above already proves no restored row's key
+            # collides with one already in `enriched`, so this can only ever MERGE restored rows
+            # together or into one another by address/case, never re-split anything dedupe2 settled.
+            try:
+                _pre_gf_dedupe = len(enriched)
+                enriched = dedupe(enriched)
+                log.info("orchestrator.dedupe_grandfather", before=_pre_gf_dedupe, after=len(enriched),
+                         collapsed=_pre_gf_dedupe - len(enriched))
+            except Exception:
+                log.error("dedupe_grandfather.failed", traceback=traceback.format_exc())
+
+    # ---- Fail-loud guard: catastrophic week-over-week count drop ----------
+    # A silent drop in total listings is the failure mode that hid for a
+    # month (the pipeline reported "success" while shipping far less data).
+    # Compare against the prior committed listings.json BEFORE we overwrite
+    # it; surface a sharp drop as a regression in the health report + log so
+    # it can never pass unnoticed again. We do NOT abort — a genuinely quiet
+    # week should still publish — but the drop is made impossible to miss.
+    try:
+        prev_path = Path(__file__).resolve().parent.parent.parent / "docs" / "listings.json"
+        if prev_path.exists():
+            # Counted, never materialized: json.loads of the 2.5 GB plain board here held its
+            # text AND its parsed rows on top of the ~270K live Listings, inside the same minute
+            # as mark_new_listings' and write_artifact's own prior-board reads (the 2026-10-05
+            # VM OOM). See web_artifact.plain_board_row_count.
+            from .web_artifact import plain_board_row_count
+            prev_total = plain_board_row_count(prev_path) or 0
+            curr_total = len(enriched)
+            if prev_total >= 100 and curr_total < prev_total * 0.75:
+                pct = round(100 * (1 - curr_total / prev_total))
+                msg = (f"COUNT DROP {pct}%: {prev_total} -> {curr_total} "
+                       f"listings vs last run — investigate before trusting this run")
+                summary.setdefault("regressions", []).append(msg)
+                summary["count_drop_alert"] = {
+                    "prev_total": prev_total, "curr_total": curr_total, "drop_pct": pct,
+                }
+                log.error("orchestrator.count_drop_alert",
+                          prev=prev_total, curr=curr_total, drop_pct=pct)
+    except Exception:
+        log.error("count_drop_guard.failed", traceback=traceback.format_exc())
+
+    # Final scrub, after everything else in this function has had a chance to write or
+    # reintroduce a block (assessor_card/deed_chain/dnc_scrub/board_quality/last_sale, and the
+    # grandfather restore above): the only earlier scrub (~line 3718) runs right after the
+    # identity pass, so blocks written or newly qualified by any later step shipped unscrubbed
+    # (2026-10-17 audit_suite gap-sweep wave 6 — block-binding-family-gis/-deed-sale/-photo,
+    # -fallback-point, -a-shared-copy all traced to this one ordering gap).
+    from .block_binding import scrub_unbound_blocks
+    enrichment_stats["blocks_unbound_final"] = scrub_unbound_blocks(enriched)
+
+    st.enriched = enriched
+    st.scoring_failed = _scoring_failed
+    return summary
+
+
+#: Set (1/true/yes/on) to end the full run with a pre_publish checkpoint instead of publishing:
+#: deploy/oracle/vm_run.sh --stop-before-publish (the gated VM launch, docs/HANDOFF.md item 72).
+STOP_BEFORE_PUBLISH_ENV = "FULLRUN_STOP_BEFORE_PUBLISH"
+
+
+def stop_before_publish(st: TailState, summary: dict) -> int:
+    """End :func:`run` with the scored board checkpointed and NOTHING published.
+
+    Saves the board as phase ``pre_publish`` plus the run's publish inputs, through the same
+    ``checkpoint.save_pre_publish`` the checkpoint resume uses, so
+    ``scripts/resume_from_checkpoint.py --publish-only`` (deploy/oracle/vm_resume.sh
+    --publish-only) later runs :func:`publish_tail` on it: the board write, and, because this is
+    a full run, the sold pool, run_health, the Sheet export and the digest email it would have
+    done now. No board file, run_health or sold pool is written here, and nothing is committed.
+    Exit codes: 0 saved, 6 saved with stale tiers (SCORE_BOARD_FAIL_SOFT), 3 not saved."""
+    if not checkpoint.save_pre_publish(st, summary, extra={"origin": "main.run"}):
+        log.error("orchestrator.pre_publish_checkpoint_failed",
+                  note="stop-before-publish: the scored board was NOT saved and nothing was "
+                       "published; exit 3")
+        return EXIT_WRITE_FAILED
+    log.info("orchestrator.stopped_before_publish", leads=len(st.enriched),
+             checkpoint=str(checkpoint.CHECKPOINT_DIR), scoring_failed=st.scoring_failed,
+             next="review it, then: bash deploy/oracle/vm_resume.sh --publish-only")
+    return EXIT_SCORE_FAILED if st.scoring_failed else EXIT_OK
+
+
+def publish_tail(st: TailState, summary: dict) -> int:
+    """The board write and what follows it (sold pool, run_health, Sheet export, digest
+    email), shared by :func:`run` and the checkpoint resume. Returns the process exit code."""
+    enriched = st.enriched
+    enrichment_stats = st.enrichment_stats
+    cfg = st.cfg
+    sold_pool = st.sold_pool
+    _scoring_failed = st.scoring_failed
+    # Web artifact — always write, even when Sheets/Email secrets are missing.
+    # GitHub Actions then commits docs/ back to the repo, GitHub Pages serves it.
+    _write_ok = False
+    try:
+        write_artifact(enriched, summary, **(getattr(st, "write_artifact_kwargs", None) or {}))
+        # Published successfully — drop the checkpoint so the next run
+        # starts clean instead of resuming onto a board that shipped.
+        checkpoint.clear()
+        _write_ok = True
+    except Exception:
+        log.error("web_artifact.failed", traceback=traceback.format_exc())
+
+    if not _write_ok:
+        # AUDIT O4: this used to log and carry on. On 2026-09-09 a COUNT-GUARD refusal
+        # still wrote run_health.json (describing a board that was never written, and
+        # committed 12 days stale beside the real one), still exported the Google Sheet,
+        # still emailed Greg and Cash a digest, and still returned 0, so run_local.sh
+        # called it a run. None of that is true of a run that published nothing.
+        # The checkpoint is kept so the run can resume; the board on disk is untouched.
+        log.error("orchestrator.aborted_board_not_written",
+                  note="skipping sold pool, run_health, Sheet export and digest email; exit 3")
+        return EXIT_WRITE_FAILED
+
+    if st.write_sold_pool:  # a resume has no sold pool; writing [] would wipe the file
+        # Sold-comp pool — separate file so the dashboard's main grid never
+        # shows past-sale "listings". The card popout still reads
+        # raw.foreclosure_sold_comps which travels with the active listing.
+        # This separate file is for power-users / future analytics.
+        try:
+            import json as _json
+            from .web_artifact import _to_dict as _slim
+            sold_path = Path(__file__).resolve().parent.parent.parent / \
+                "docs" / "foreclosure_sold_pool.json"
+            sold_payload = [_slim(li) for li in sold_pool]
+            sold_path.write_text(
+                _json.dumps(sold_payload, ensure_ascii=False, default=str),
+                encoding="utf-8",
+            )
+            log.info("orchestrator.sold_pool_written",
+                     path=str(sold_path), count=len(sold_payload))
+        except Exception:
+            log.error("sold_pool_write.failed",
+                      traceback=traceback.format_exc())
+
+    if st.write_run_health:  # a resume has no per-source scrape status to report
+        # Per-source health JSON — committed alongside listings.json each run
+        # so an investor (or alerting hook) can see at a glance which sources
+        # are OK, which are blocked, and which actually regressed.
+        try:
+            from .run_health import write_health_artifact
+            health_path = Path(__file__).resolve().parent.parent.parent / "docs" / "run_health.json"
+            write_health_artifact(
+                out_path=health_path,
+                summary=summary,
+                enrichment_stats=enrichment_stats,
+            )
+            log.info("orchestrator.health_artifact", path=str(health_path))
+        except Exception:
+            log.error("run_health.failed", traceback=traceback.format_exc())
+
+    if st.export_and_email:  # a resume does not re-export the Sheet or re-send the digest
+        # Sheets + Email — guarded so a missing secret doesn't kill the rest of the run
+        sheet_url = ""
+        if cfg.sheet_id and cfg.google_service_account_json:
+            try:
+                sheet_url = write_listings(
+                    sheet_id=cfg.sheet_id,
+                    service_account_json=cfg.google_service_account_json,
+                    listings=enriched,
+                    run_summary=summary,
+                )
+            except Exception:
+                log.error("sheets.failed", traceback=traceback.format_exc())
+        else:
+            log.warning("sheets.skipped_no_secret")
+
+        # Send the digest whenever Gmail creds exist — do NOT gate on sheet_url.
+        # Gating on the sheet meant a missing/failed Sheets export silently
+        # suppressed the ENTIRE email, including the source-alarm/failure banner the
+        # owner relies on to learn a source broke. The template already guards the
+        # sheet link with `if sheet_url`, so an empty sheet_url is fine.
+        if cfg.gmail_app_password and cfg.gmail_sender:
+            try:
+                send_digest(
+                    sender=cfg.gmail_sender,
+                    app_password=cfg.gmail_app_password,
+                    recipients=cfg.email_recipients,
+                    sheet_url=sheet_url,
+                    run_summary=summary,
+                )
+            except Exception:
+                log.error("email.failed", traceback=traceback.format_exc())
+        elif summary.get("source_alarms"):
+            # No Gmail creds but sources failed — make sure it can't pass silently.
+            log.error("email.skipped_but_alarms_present", alarms=list(summary["source_alarms"]))
+        else:
+            log.warning("email.skipped_no_secret")
+
+    if _scoring_failed:
+        log.error("orchestrator.done_with_stale_tiers", scoring_failed=_scoring_failed)
+        return EXIT_SCORE_FAILED
+    log.info("orchestrator.done")
+    return EXIT_OK
+
+
+def cli() -> None:
+    """Entry point for `python -m foreclosure_scraper`.
+
+    Takes the board lock for the whole run (reentrant: run_local.sh already holds it),
+    because write_artifact now refuses without it (audit O3) and a multi-hour scrape
+    that is refused at the very end is the worst place to find that out."""
+    from .web_artifact import BoardLockBusy, BoardMemoryPressure, board_lock
+    try:
+        with board_lock(owner="foreclosure_scraper.main",
+                        max_runtime=int(os.environ.get("FULLRUN_LOCK_MAX_RUNTIME", "259200"))):
+            rc = asyncio.run(run())
+    except BoardLockBusy as exc:
+        print(f"foreclosure_scraper: not started: {exc}", file=sys.stderr)
+        sys.exit(EXIT_LOCK_BUSY)
+    except BoardMemoryPressure as exc:
+        print(f"foreclosure_scraper: not started: {exc}", file=sys.stderr)
+        sys.exit(EXIT_LOCK_BUSY)
+    except ScoreBoardFailed as exc:
+        print(f"foreclosure_scraper: {exc}", file=sys.stderr)
+        sys.exit(EXIT_SCORE_FAILED)
+    sys.exit(rc)
+
+
+if __name__ == "__main__":
+    cli()

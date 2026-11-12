@@ -1,0 +1,249 @@
+"""Generic city-website foreclosure / tax sale / code enforcement scraper.
+
+DISABLED 2026-09-15 (national/misc zero-row audit) — confirmed garbage
+emitter. `search_one()` grabs EVERY street-address-shaped string anywhere
+on a `/?s=<keyword>` search-results page (up to 20 per page) and ANY
+date-shaped string anywhere on the page as a "date hint" — with no check
+that either actually belongs to a real notice. Live-verified: a search for
+"foreclosure" AND "tax sale" AND "delinquent tax" on cityofspartanburg.org
+all three "found" the exact same "295 E Main Street" (Spartanburg City
+Hall's own address, from the page footer/header) as a distress listing,
+with a "Date hint: April 29, 1961" fabricated from an unrelated date
+string on the page. Same pattern for Woodruff/Landrum/Duncan/Anderson —
+every hit resolves to the city's own civic address, not a real property.
+This is the exact "generic keyword-search grabs page chrome, not content"
+anti-pattern already found and disabled repeatedly this session
+(nc_deq_dsca, clarendon_tax_auction, marlboro_delinquent_tax, oconee_flc,
+etc — see docs/WEEKEND_LOOP_QUEUE.md).
+
+Currently harmless (every row is dateless and city_websites.* was never
+added to DATELESS_OK_SOURCES, so _active_only() drops all 150 rows/run
+today) but disabled outright rather than left dormant, so a future session
+can't accidentally "fix" the zero-row symptom by whitelisting the prefix
+and start landing fake civic-address leads.
+
+Original design intent, for a future real rebuild: cities across our
+18-county footprint don't all have dedicated foreclosure pages, but most
+publish tax sale notices, code enforcement / nuisance abatement /
+demolition lists, public notice sections, or surplus property auctions.
+A real fix would need to anchor each extracted address to the SAME
+result-snippet/block the keyword match came from (not the whole page),
+the way `newspapers/hendersonville_lightning.py`'s per-notice `<h3>`
+chunking does, rather than harvesting page-wide.
+"""
+from __future__ import annotations
+
+import asyncio
+import re
+from datetime import datetime
+from typing import Iterable
+
+import structlog
+from selectolax.parser import HTMLParser
+
+from ...render import fetch_rendered
+from ...base_scraper import BaseScraper
+from ...http_client import client
+from ...models import Listing, ListingType, PropertyKind
+
+log = structlog.get_logger()
+
+_USER_AGENT = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 "
+    "(KHTML, like Gecko) Version/17.5 Safari/605.1.15"
+)
+
+
+async def _fetch_plain(url: str) -> str:
+    """Plain HTTP GET, returns body text. Used for city sites that don't
+    need JS rendering (most WordPress/CMS sites)."""
+    try:
+        async with client(timeout=15.0) as c:
+            r = await c.get(url, headers={"User-Agent": _USER_AGENT},
+                            follow_redirects=True)
+    except Exception:
+        return ""
+    if r.status_code != 200 or len(r.text) < 200:
+        return ""
+    # Extract text from the HTML to mimic what fetch_rendered would give us.
+    try:
+        tree = HTMLParser(r.text)
+        body = tree.body
+        return body.text(separator="\n") if body is not None else r.text
+    except Exception:
+        return r.text
+
+
+async def _fetch_city_page(url: str) -> str:
+    """Fetch a city-site page. Tries plain HTTP first (fast, free); falls
+    back to the free stealth-browser renderer when plain HTTP returns
+    nothing (JS-rendered city CMS sites)."""
+    text = await _fetch_plain(url)
+    if text:
+        return text
+    return await fetch_rendered(url)
+
+
+# (state, county, city, domain) — covers every city seat plus major suburbs
+CITIES: tuple[tuple[str, str, str, str], ...] = (
+    # Greenville/Greenwood/Newberry/Abbeville removed per scope narrowing 2026-05.
+    # SC
+    ("SC", "Spartanburg", "Spartanburg", "cityofspartanburg.org"),
+    ("SC", "Spartanburg", "Boiling Springs", "boilingspringssc.org"),
+    ("SC", "Spartanburg", "Inman", "cityofinmansc.org"),
+    ("SC", "Spartanburg", "Woodruff", "cityofwoodruff.com"),
+    ("SC", "Spartanburg", "Landrum", "cityoflandrumsc.com"),
+    ("SC", "Spartanburg", "Duncan", "duncansc.gov"),
+    ("SC", "Anderson", "Anderson", "cityofandersonsc.com"),
+    ("SC", "Anderson", "Belton", "cityofbeltonsc.com"),
+    ("SC", "Anderson", "Williamston", "williamstonsc.us"),
+    ("SC", "Pickens", "Easley", "cityofeasley.com"),
+    ("SC", "Pickens", "Pickens", "cityofpickens.com"),
+    ("SC", "Pickens", "Liberty", "cityoflibertysc.com"),
+    ("SC", "Pickens", "Clemson", "cityofclemson.org"),
+    ("SC", "Oconee", "Walhalla", "cityofwalhalla.com"),
+    ("SC", "Oconee", "Seneca", "seneca.sc.us"),
+    ("SC", "Oconee", "Westminster", "cityofwestminstersc.com"),
+    ("SC", "Cherokee", "Gaffney", "cityofgaffneysc.gov"),
+    ("SC", "Cherokee", "Blacksburg", "townofblacksburg.com"),
+    ("SC", "Union", "Union", "cityofunionsc.org"),
+    ("SC", "Laurens", "Laurens", "cityoflaurenssc.com"),
+    ("SC", "Laurens", "Clinton", "cityofclintonsc.com"),
+    # NC
+    # Mecklenburg cities (Charlotte, Davidson, Cornelius, Huntersville,
+    # Matthews, Mint Hill, Pineville) dropped 2026-05-14 per scope tightening
+    # — Mecklenburg is in SCOPE_DENY_COUNTIES so search hits there would
+    # just get filtered downstream. Skip the scrape entirely.
+    ("NC", "Buncombe", "Asheville", "ashevillenc.gov"),
+    ("NC", "Buncombe", "Black Mountain", "townofblackmountain.org"),
+    ("NC", "Buncombe", "Weaverville", "weavervillenc.org"),
+    ("NC", "Buncombe", "Woodfin", "woodfin-nc.gov"),
+    ("NC", "Henderson", "Hendersonville", "hendersonvillenc.gov"),
+    ("NC", "Henderson", "Flat Rock", "villageofflatrock.org"),
+    ("NC", "Henderson", "Fletcher", "fletchernc.org"),
+    ("NC", "Henderson", "Mills River", "millsriver.org"),
+    ("NC", "Rutherford", "Rutherfordton", "rutherfordton.net"),
+    # townoffc.org no longer resolves (DNS failure). The www host is required:
+    # bare townofforestcity.com answers 301 with a 162-byte body, which the
+    # len(content) < 200 guard below silently discards.
+    ("NC", "Rutherford", "Forest City", "www.townofforestcity.com"),
+    ("NC", "Rutherford", "Spindale", "townofspindale.com"),
+    ("NC", "Rutherford", "Lake Lure", "townoflakelure.com"),
+    ("NC", "Cleveland", "Shelby", "cityofshelby.com"),
+    ("NC", "Cleveland", "Kings Mountain", "cityofkm.com"),
+    # boilingspringsnc.com no longer resolves; the town moved to .gov.
+    ("NC", "Cleveland", "Boiling Springs", "boilingspringsnc.gov"),
+    ("NC", "Cleveland", "Grover", "townofgrovernc.com"),
+    ("NC", "Polk", "Columbus", "columbusnc.com"),
+    ("NC", "Polk", "Tryon", "tryon-nc.com"),
+    ("NC", "Gaston", "Gastonia", "gastonianc.gov"),
+    ("NC", "Gaston", "Mount Holly", "mtholly.us"),
+    ("NC", "Gaston", "Belmont", "cityofbelmont.org"),
+    ("NC", "Gaston", "Bessemer City", "bessemercity.com"),
+    ("NC", "Gaston", "Cherryville", "cityofcherryville.com"),
+    ("NC", "Gaston", "Stanley", "townofstanley.org"),
+    ("NC", "Gaston", "Cramerton", "cramerton.org"),
+    ("NC", "Gaston", "Lowell", "lowellnc.com"),
+    ("NC", "Gaston", "Dallas", "dallasnc.net"),
+    ("NC", "Transylvania", "Brevard", "cityofbrevard.com"),
+    ("NC", "McDowell", "Marion", "marionnc.org"),
+    ("NC", "McDowell", "Old Fort", "oldfortnc.gov"),
+    ("NC", "Lincoln", "Lincolnton", "lincolntonnc.org"),
+    ("NC", "Mitchell", "Bakersville", "townofbakersville.com"),
+    ("NC", "Mitchell", "Spruce Pine", "townofsprucepine.org"),
+    ("NC", "Burke", "Morganton", "morgantonnc.gov"),
+    ("NC", "Burke", "Valdese", "townofvaldese.com"),
+    ("NC", "Burke", "Drexel", "townofdrexel.org"),
+    # Rutherford College (Burke) and Chimney Rock (Rutherford) are deliberately
+    # absent: no municipal website resolves for either as of 2026-08-03 (six
+    # candidate domains each, all DNS failures). Do not re-add without a live 200.
+)
+
+QUERIES = (
+    "foreclosure",
+    "tax sale",
+    "delinquent tax",
+    "property auction",
+    "code enforcement",
+    "nuisance abatement",
+    "demolition",
+)
+
+ADDR_RE = re.compile(
+    r"(\b\d{1,6}\s+[A-Z][\w .'\-]{1,80}?\b(?:Road|Rd|Street|St|Drive|Dr|Lane|Ln|"
+    r"Avenue|Ave|Highway|Hwy|Boulevard|Blvd|Circle|Cir|Court|Ct|Way|Place|Pl|"
+    r"Trail|Trl|Parkway|Pkwy)\.?)(?=[\s,.\n]|$)",
+    re.I,
+)
+DATE_RE = re.compile(
+    r"\b(?:\d{1,2}/\d{1,2}/\d{2,4}|"
+    r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4})\b",
+    re.I,
+)
+
+
+class CityWebsites(BaseScraper):
+    slug = "city_websites.search"
+    name = "City government websites (search)"
+    category = "city_government"
+    timeout_s = 600.0
+
+    async def fetch(self) -> Iterable[Listing]:
+        # Disabled — see module docstring. Confirmed garbage emitter
+        # (harvests page-wide addresses/dates with no anchor to the actual
+        # search-result snippet, so every hit resolves to the city's own
+        # civic address).
+        return []
+
+    async def _disabled_fetch(self) -> Iterable[Listing]:
+        out: list[Listing] = []
+        sem = asyncio.Semaphore(4)
+
+        async def search_one(state: str, county: str, city: str, domain: str, query: str) -> None:
+            search_url = f"https://{domain}/?s={query.replace(' ', '+')}"
+            async with sem:
+                content = await _fetch_city_page(search_url)
+                if not content or len(content) < 200:
+                    return
+                # Find all distinct addresses + page mentions
+                addrs = list({m.group(1) for m in ADDR_RE.finditer(content)})[:20]
+                if not addrs:
+                    return
+
+                # Determine listing type from query
+                q = query.lower()
+                ltype = ListingType.UNKNOWN
+                if "tax" in q:
+                    ltype = ListingType.TAX_SALE
+                elif "foreclos" in q:
+                    ltype = ListingType.FORECLOSURE_SALE
+                elif "auction" in q:
+                    ltype = ListingType.AUCTION
+
+                date_m = DATE_RE.search(content)
+                date_hint = date_m.group(0) if date_m else None
+
+                for addr in addrs:
+                    out.append(
+                        Listing(
+                            source=f"city_websites.{domain.replace('.', '_')}",
+                            source_url=search_url,
+                            listing_type=ltype,
+                            property_kind=PropertyKind.UNKNOWN,
+                            street_address=addr,
+                            city=city,
+                            state=state,
+                            county=county,
+                            description=f"{city}, {state} city site '{query}' search hit. Date hint: {date_hint or 'unknown'}",
+                            first_seen=datetime.utcnow(),
+                            last_seen=datetime.utcnow(),
+                        )
+                    )
+
+        # Cap concurrency: searches × cities = ~400 fetches; bound at 4 concurrent
+        tasks = []
+        for state, county, city, domain in CITIES:
+            for q in QUERIES[:3]:  # keep top 3 queries per city — most yield is in foreclosure / tax sale / delinquent
+                tasks.append(search_one(state, county, city, domain, q))
+        await asyncio.gather(*tasks)
+        return out

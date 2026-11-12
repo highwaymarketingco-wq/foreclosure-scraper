@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Foreclosure Listings — Upstate SC + Western NC</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏠</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+
+  <!-- Installable app. manifest.json uses RELATIVE id / start_url / scope ("./"), so
+       it installs from wherever the site lives: the GitHub Pages project subpath
+       today, the root of a private host tomorrow. crossorigin="use-credentials"
+       makes the browser send its cookies when it fetches the manifest. Without
+       it a login gate (Cloudflare Access) answers the manifest request with the
+       sign-in page, and the app stops being installable. -->
+  <link rel="manifest" href="manifest.json" crossorigin="use-credentials">
+
+  <!-- iOS home-screen app. Without apple-mobile-web-app-capable the home-screen
+       icon just opens Safari. status-bar-style is "black" deliberately, NOT
+       "black-translucent": translucent renders content under the status bar and
+       needs env(safe-area-inset-*) padding that is not in place yet. -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Foreclosures">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon-180.png">
+
+  <!-- ONE static theme-color, matching manifest background_color and the surface
+       the page actually paints. MEASURED, not read off style.css: premium.css
+       re-declares :root and :root[data-theme="dark"] and loads second, so
+       premium.css:67 --bg #080b14 wins over style.css:78 #1c1916. Computed
+       body background-color is rgb(8,11,20) dark / rgb(245,247,251) light.
+       Dark is the default theme, and the site switches themes by writing
+       data-theme manually, NOT via prefers-color-scheme, so a media-driven
+       theme-color would desynchronize. The pre-paint script below and the
+       theme-toggle handler at the bottom of this file keep this tag in sync. -->
+  <meta name="theme-color" content="#080b14">
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+  <!-- Default visibility for the two mobile-only shell controls added below
+       (#filter-sheet-toggle, #sort-mobile). Deliberately placed BEFORE
+       style.css/premium.css so those sheets win on equal specificity and the
+       layout owner can restyle both freely. Desktop is untouched: these two
+       elements are new and nothing else targets them. -->
+  <style>
+    #filter-sheet-toggle, #sort-mobile, #sort-dir, .sort-label { display: none; }
+    @media (max-width: 720px) {
+      #filter-sheet-toggle, #sort-mobile, #sort-dir { display: block; }
+    }
+    /* The sort menu was phone-only because the table header does the job on a
+       desktop. The new default sort, Deadline first, is a composite (live
+       deadline, then tier, then grade) with no column of its own, so the menu is
+       shown on desktop too. Scoped to 721px+ so the phone layout in premium.css
+       is not touched. */
+    @media (min-width: 721px) {
+      #sort-mobile, #sort-dir { display: inline-block; }
+      /* .result-bar is a space-between flex row: the auto left margin sends the
+         sort group and the export button to the right, the count stays left. */
+      .sort-label { display: inline-block; margin: 0 6px 0 auto; font-size: 12px; opacity: .75; }
+      #sort-dir { margin-right: 6px; }
+      #export-csv { margin-left: 12px; }
+      #sort-mobile, #sort-dir {
+        font: inherit; font-size: 12.5px; padding: 6px 10px; border-radius: 9px;
+        border: 1px solid var(--border); background: var(--surface); color: var(--text);
+      }
+      #sort-dir { cursor: pointer; }
+    }
+  </style>
+
+  <!-- Bump all three together whenever any of them changes. All three moved
+       this round: style.css and premium.css stopped fighting over the intent
+       badge (the score was rendering at contrast 1.00), and dashboard.js gained
+       the location/owner/rehab gates. A stale ?v on the CSS with a fresh one on
+       the JS ships new markup against old rules, which is how a caveat renders
+       as unstyled body text. -->
+  <link rel="stylesheet" href="style.css?v=20260921a">
+  <link rel="stylesheet" href="premium.css?v=20260921a">
+  <script>
+    // Set theme before paint — avoids flash of wrong theme.
+    (function () {
+      try {
+        var saved = localStorage.getItem('theme');
+        var t = saved || 'dark';
+        document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+      // Same sync as the theme-toggle handler at the bottom of this file, applied
+      // at boot so a saved light theme does not launch with a dark status bar.
+      var mt = document.querySelector('meta[name="theme-color"]');
+      if (mt) {
+        mt.setAttribute('content',
+          document.documentElement.getAttribute('data-theme') === 'dark' ? '#080b14' : '#f5f7fb');
+      }
+    })();
+  </script>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="brand">
+    <span class="brand-logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 4l9 6.5"/><path d="M5 9.5V20h14V9.5"/><path d="M9.5 20v-5h5v5"/></svg></span>
+    <div>
+      <h1 id="dataset-title">Foreclosure Listings</h1>
+      <div class="subtitle">Upstate SC <span class="dot">·</span> Western NC <span class="dot">·</span> <span id="last-updated">loading…</span></div>
+    </div>
+  </div>
+  <div class="dataset-toggle">
+    <button id="ds-foreclosure" class="ds-btn active" data-ds="foreclosure">Foreclosures <span class="ds-count" id="ds-fc-count">—</span></button>
+    <button id="ds-multifamily" class="ds-btn" data-ds="multifamily">Multifamily <span class="ds-count" id="ds-mf-count">—</span></button>
+  </div>
+  <div class="stage-toggle" id="stage-toggle" title="Work these tracks differently: foreclosure leads are time-sensitive (act before the sale); outbound leads are cold prospects to mail/call.">
+    <button class="ds-btn stage-btn active" data-stage="">All <span class="ds-count stage-count" data-c="">—</span></button>
+    <button class="ds-btn stage-btn" data-stage="foreclosure">🔥 In Foreclosure <span class="ds-count stage-count" data-c="foreclosure">—</span></button>
+    <button class="ds-btn stage-btn" data-stage="prefore">⏳ Pre-Foreclosure <span class="ds-count stage-count" data-c="prefore">—</span></button>
+    <button class="ds-btn stage-btn" data-stage="outbound">📬 Outbound <span class="ds-count stage-count" data-c="outbound">—</span></button>
+    <button class="ds-btn stage-btn" data-stage="reo">🏦 REO/Auction <span class="ds-count stage-count" data-c="reo">—</span></button>
+    <button class="ds-btn stage-btn stage-deadline" data-stage="deadline" title="Leads with a legal clock: sale date, upset-bid close, or redemption expiry inside 45 days. Soonest first; the ones you cannot act on yet sink to the bottom.">⏰ Closing Soon <span class="ds-count stage-count" data-c="deadline">—</span></button>
+  </div>
+  <div class="brand-meta">
+    <span class="badge" id="total-badge">— total</span>
+    <span class="badge" id="active-badge">— active</span>
+    <span class="badge grade-A" id="a-grade-badge" style="display:none">— A-grade</span>
+    <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle dark mode" title="Toggle theme">
+      <span class="icon-moon" aria-hidden="true">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </span>
+      <span class="icon-sun" aria-hidden="true">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+      </span>
+    </button>
+  </div>
+</header>
+
+<!-- Data freshness, from run_meta.json (dashboard.js paintFreshness). Hidden until
+     it has something to say; turns red past 48 hours. -->
+<div id="freshness-banner" class="freshness" role="status" aria-live="polite" hidden></div>
+
+<section class="stats">
+  <div class="stat"><div class="stat-num" id="stat-total">—</div><div class="stat-lbl">total listings</div></div>
+  <div class="stat"><div class="stat-num grade-A-text" id="stat-a">—</div><div class="stat-lbl">A grade</div></div>
+  <div class="stat"><div class="stat-num grade-B-text" id="stat-b">—</div><div class="stat-lbl">B grade</div></div>
+  <div class="stat"><div class="stat-num grade-C-text" id="stat-c">—</div><div class="stat-lbl">C grade</div></div>
+  <div class="stat"><div class="stat-num" id="stat-positive-roi">—</div><div class="stat-lbl">positive ROI</div></div>
+  <div class="stat"><div class="stat-num" id="stat-with-bid">—</div><div class="stat-lbl">with opening bid</div></div>
+  <div class="stat"><div class="stat-num" id="stat-sources">—</div><div class="stat-lbl">sources</div></div>
+</section>
+
+<section class="filters" id="filters">
+  <!-- Mobile filter sheet trigger. Hidden above 720px (see the <style> block in
+       <head>); dashboard.js flips .is-collapsed on #filters and maintains the
+       active-count badge. -->
+  <button id="filter-sheet-toggle" type="button" aria-expanded="false" aria-controls="filters">Filters <span id="filter-active-count"></span></button>
+  <div class="filter-group">
+    <label>Search</label>
+    <input type="text" id="search" placeholder="address, county, owner, case #, plaintiff…" />
+  </div>
+  <div class="filter-group">
+    <label>State</label>
+    <select id="filter-state">
+      <option value="">All</option>
+      <option value="SC">SC</option>
+      <option value="NC">NC</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>County</label>
+    <select id="filter-county"><option value="">All counties</option></select>
+  </div>
+  <div class="filter-group">
+    <label>Category</label>
+    <select id="filter-category">
+      <option value="">All categories</option>
+      <option value="foreclosure">Foreclosure</option>
+      <option value="preforeclosure">Pre-foreclosure</option>
+      <option value="tax_delinquency">Tax delinquency</option>
+      <option value="distressed_property">Distressed property</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>Type</label>
+    <select id="filter-type">
+      <option value="">All types</option>
+      <option value="foreclosure_sale">Foreclosure sale</option>
+      <option value="auction">Auction</option>
+      <option value="tax_sale">Tax sale</option>
+      <option value="lis_pendens">Lis pendens</option>
+      <option value="lien_claim">Lien claim (contractor / HOA claim of lien)</option>
+      <option value="bankruptcy">Bankruptcy filing (name signal)</option>
+      <option value="reo">REO / bank-owned</option>
+      <option value="sheriff_sale">Sheriff sale</option>
+      <option value="tax_lien">Tax lien</option>
+      <option value="distressed">Distressed / pre-foreclosure</option>
+      <option value="probate_notice">Probate / estate</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>Contact / Signal</label>
+    <select id="filter-contact">
+      <option value="">All</option>
+      <option value="phone">Has phone</option>
+      <option value="mailing">Has mailing address</option>
+      <option value="contactable">Contactable (phone or mail)</option>
+      <option value="sos_entity">Entity contact (SOS agent/officer)</option>
+      <option value="absentee">Absentee owner</option>
+      <option value="out_of_state">Out-of-state owner</option>
+      <option value="mortgage">ROD: has mortgage (D/T)</option>
+      <option value="estate_elderly">Elderly / probate</option>
+      <option value="helene">Helene damage (all)</option>
+      <option value="helene_severe">Helene: Unsafe placard</option>
+      <option value="hide_stale">Hide stale (presumed-withdrawn)</option>
+      <option value="tax_big_old">Big old tax ($7k+ late, 2+ yrs)</option>
+      <option value="cr_tier_AB">Call-ready: call (tier A or B)</option>
+      <option value="cr_tier_A">Call-ready: call now (tier A)</option>
+      <option value="cr_tier_B">Call-ready: confirm identity first (tier B)</option>
+      <option value="cr_tier_C">Call-ready: mail (tier C)</option>
+      <option value="cr_tier_D">Call-ready: research (tier D, in a lane)</option>
+      <option value="cr_lane_A">Lane A: owner call, delinquent tax</option>
+      <option value="cr_lane_B">Lane B: heir lane, open estate</option>
+      <option value="cr_lane_C">Lane C: quiet-title lawyer lane</option>
+      <option value="cr_lane_D">Lane D: foreclosure flip</option>
+      <option value="cr_lane_E">Lane E: mail only</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>Property</label>
+    <select id="filter-land">
+      <option value="">All</option>
+      <option value="land">Land only</option>
+      <option value="improved">Land + structures</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>Strategy</label>
+    <select id="filter-strategy">
+      <option value="">All strategies</option>
+      <option value="FIX_FLIP">Fix &amp; flip</option>
+      <option value="LAND">Land</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>ARV quality</label>
+    <select id="filter-arv">
+      <option value="">Any ARV</option>
+      <option value="comp">Comp-backed only (HIGH)</option>
+      <option value="noproxy">Exclude proxy (hide LOW)</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>Source</label>
+    <select id="filter-source"><option value="">All sources</option></select>
+  </div>
+  <div class="filter-group">
+    <label>Distress</label>
+    <select id="filter-distress">
+      <option value="">Any</option>
+      <option value="HOT">🔥 HOT only</option>
+      <option value="HOTWARM">HOT + WARM</option>
+      <option value="STACK2">Stacked 2+ signals</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label title="Distinct signal categories from the distress stack (financial, sale, legal, life-event, property), not the number of signal names">Min distress categories 🔥</label>
+    <select id="filter-signals">
+      <option value="">Any</option>
+      <option value="2">2+ categories</option>
+      <option value="3">3+ categories</option>
+      <option value="4">4+ categories</option>
+      <option value="5">5+ categories</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>Min intent <span id="filter-intent-val" class="filter-slider-val">0</span></label>
+    <input type="range" id="filter-intent" min="0" max="100" step="5" value="0" class="filter-slider">
+  </div>
+  <div class="filter-group">
+    <label>Min Grade</label>
+    <select id="filter-grade">
+      <option value="">Any grade</option>
+      <option value="A">A only</option>
+      <option value="B">B and above</option>
+      <option value="C">C and above</option>
+      <option value="D">D and above</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>Sale within</label>
+    <select id="filter-window">
+      <option value="">Any time</option>
+      <option value="14">Next 2 weeks</option>
+      <option value="30">Next 30 days</option>
+      <option value="60">Next 60 days</option>
+      <option value="90">Next 90 days</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>Min ROI</label>
+    <select id="filter-roi">
+      <option value="">Any</option>
+      <option value="40">40%+ (excellent)</option>
+      <option value="25">25%+ (strong)</option>
+      <option value="10">10%+ (decent)</option>
+      <option value="0">Positive only</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>View</label>
+    <div class="view-toggle">
+      <button class="view-btn active" data-view="table">Table</button>
+      <button class="view-btn" data-view="map">Map</button>
+      <button class="view-btn" data-view="cards">Cards</button>
+    </div>
+  </div>
+</section>
+
+<main>
+  <div id="view-table" class="view active">
+    <div class="result-bar">
+      <span id="result-count">Loading…</span>
+      <!-- Mobile sort control. Hidden above 720px (see the <style> block in
+           <head>). The table head is hidden on mobile, which takes the
+           th[data-sort] click targets with it; dashboard.js dispatches a click
+           on the matching th so the existing sort path is reused unchanged.
+           Every option value matches a th[data-sort] value below. -->
+      <label for="sort-mobile" class="sort-label">Sort</label>
+      <button id="sort-dir" type="button" aria-label="Reverse sort order" title="Reverse sort order">↓</button>
+      <select id="sort-mobile" aria-label="Sort listings by">
+        <option value="_deadline">Deadline first</option>
+        <option value="_grade">Grade</option>
+        <option value="_fullmer">Buy Box</option>
+        <option value="sale_date">Sale Date</option>
+        <option value="state">St</option>
+        <option value="county">County</option>
+        <option value="street_address">Address</option>
+        <option value="city">City</option>
+        <option value="listing_type">Type</option>
+        <option value="opening_bid">Bid</option>
+        <option value="_arv">Est. ARV</option>
+        <option value="_rehab">Est. Rehab</option>
+        <option value="_max_bid">Max Bid (70%)</option>
+        <option value="_roi">ROI</option>
+        <option value="bedrooms">Bd</option>
+        <option value="bathrooms">Ba</option>
+        <option value="living_sqft">SqFt</option>
+        <option value="year_built">Year</option>
+        <option value="case_number">Case #</option>
+      </select>
+      <button id="export-csv" class="btn-link">Export filtered as CSV</button>
+    </div>
+    <div class="table-wrap">
+      <table id="listings-table">
+        <thead><tr>
+          <th data-sort="_grade">Grade</th>
+          <th data-sort="_fullmer" class="num" title="Fullmer buy-box rank (0-100)">Buy Box</th>
+          <th data-sort="sale_date" title="Days to go (from the dates, today), then the sale date. For deadline-first order use the Sort menu.">Sale Date</th>
+          <th data-sort="state">St</th>
+          <th data-sort="county">County</th>
+          <th data-sort="street_address">Address</th>
+          <th data-sort="city">City</th>
+          <th data-sort="listing_type">Type</th>
+          <th data-sort="opening_bid" class="num">Bid</th>
+          <th data-sort="_arv" class="num">Est. ARV</th>
+          <th data-sort="_rehab" class="num">Est. Rehab</th>
+          <th data-sort="_max_bid" class="num">Max Bid (70%)</th>
+          <th data-sort="_roi" class="num">ROI</th>
+          <th data-sort="bedrooms" class="num">Bd</th>
+          <th data-sort="bathrooms" class="num">Ba</th>
+          <th data-sort="living_sqft" class="num">SqFt</th>
+          <th data-sort="year_built" class="num">Year</th>
+          <th data-sort="case_number">Case #</th>
+        </tr></thead>
+        <tbody id="listings-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="view-map" class="view">
+    <div id="map"></div>
+  </div>
+
+  <div id="view-cards" class="view">
+    <div id="cards-grid"></div>
+  </div>
+</main>
+
+<!-- Land Buyers view removed — not a wholesale operation -->
+
+<aside id="detail-panel" class="hidden">
+  <div class="detail-header">
+    <button class="close-btn" id="close-detail">×</button>
+    <div class="detail-grade-block" id="d-grade-block"></div>
+    <h2 id="d-title">—</h2>
+    <div class="address-line" id="d-address">—</div>
+    <!-- Top-of-panel quick badges: condition tier + flags + flood + key metrics -->
+    <div class="quick-badges" id="d-quick-badges"></div>
+    <!-- Days to go, upset-bid window, sale date passed, presumed withdrawn, bankruptcy
+         stay: one decision, leadClock() in dashboard.js, computed from the dates. -->
+    <div class="clock-panel" id="d-clock" style="display:none"></div>
+  </div>
+  <div class="detail-body">
+    <!-- CRM-lite: per-lead status + notes + next action (browser localStorage) -->
+    <div class="detail-section crm-block" id="d-crm-section">
+      <h3>📋 Lead CRM <span class="crm-hint">saved in this browser</span></h3>
+      <div class="crm-hint-io">
+        <button type="button" class="btn-link" data-crm-io="export" title="Download every lead's status, notes and next action as a JSON file">Export CRM</button>
+        <button type="button" class="btn-link" data-crm-io="import" title="Merge a CRM export into this browser: newer notes win, nothing is deleted">Import CRM</button>
+        <span class="crm-io-msg" role="status"></span>
+      </div>
+      <div class="crm-status-row" id="d-crm-status">
+        <button class="crm-status-btn" data-status="New">New</button>
+        <button class="crm-status-btn" data-status="Contacted">Contacted</button>
+        <button class="crm-status-btn" data-status="Appointment">Appointment</button>
+        <button class="crm-status-btn" data-status="Dead">Dead</button>
+      </div>
+      <div class="crm-fields">
+        <label class="crm-label">Next action
+          <input type="date" id="d-crm-date" class="crm-date">
+        </label>
+        <label class="crm-label">Notes
+          <textarea id="d-crm-notes" class="crm-notes" rows="3" placeholder="Call notes, offer, follow-up…"></textarea>
+        </label>
+        <div class="crm-saved" id="d-crm-saved"></div>
+      </div>
+    </div>
+
+    <!-- Investor calculator -->
+    <div class="detail-section calc-block">
+      <h3>Investor Calculator</h3>
+      <div id="d-calc"></div>
+    </div>
+
+    <!-- Grade rationale -->
+    <div class="detail-section" id="d-grade-section">
+      <h3>Grade Rationale</h3>
+      <div id="d-grade-rationale"></div>
+    </div>
+
+    <!-- Strategy fit -->
+    <div class="detail-section" id="d-strategy-section" style="display:none">
+      <h3>🎯 Strategy Fit</h3>
+      <div id="d-strategy"></div>
+    </div>
+
+    <div class="detail-section" id="d-buyers-section" style="display:none">
+      <h3>🧑‍💼 Buyers Wanting This</h3>
+      <div id="d-buyers"></div>
+    </div>
+
+    <!-- Property details -->
+    <div class="detail-section">
+      <h3>Property</h3>
+      <div class="detail-grid" id="d-grid"></div>
+    </div>
+
+    <!-- Vision condition report (when Claude Vision ran) -->
+    <div class="detail-section" id="d-vision-section" style="display:none">
+      <h3>👁️ Vision Condition Report (Claude Sonnet)</h3>
+      <div id="d-vision"></div>
+    </div>
+
+    <!-- Photos -->
+    <div id="d-photos" class="photos"></div>
+
+    <!-- Mini map. d-map-note fires when raw.geo_imprecise is set: the pin is a
+         city/county centroid, so the map must say so ABOVE itself, not in a
+         tooltip nobody on a phone can reach. -->
+    <div id="d-map-note" class="geo-note" style="display:none"></div>
+    <div id="d-map" class="mini-map"></div>
+
+    <!-- Sold Comps (3 nearest, zip-matched) -->
+    <div class="detail-section" id="d-comps-section" style="display:none">
+      <h3>3 Sold Comps (zip + sqft + beds matched)</h3>
+      <div id="d-comps"></div>
+    </div>
+
+    <!-- Rent Comps (3 nearest, for cash-flow analysis) -->
+    <div class="detail-section" id="d-rent-section" style="display:none">
+      <h3>3 Rent Comps (cash-flow estimate)</h3>
+      <div id="d-rent"></div>
+    </div>
+
+    <!-- Recently-finished foreclosure sales in same county (max-bid signal) -->
+    <div class="detail-section" id="d-fc-comps-section" style="display:none">
+      <h3>Recent Foreclosure Sales — same county, like-for-like</h3>
+      <div id="d-fc-comps"></div>
+    </div>
+
+    <!-- Source link -->
+    <div class="detail-section">
+      <h3>Source</h3>
+      <a id="d-source-url" target="_blank" rel="noopener">Open original listing →</a>
+    </div>
+
+    <!-- Court -->
+    <div class="detail-section" id="d-court-section" style="display:none">
+      <h3>Court Record</h3>
+      <div id="d-court"></div>
+    </div>
+
+    <!-- County records -->
+    <div class="detail-section" id="d-gis-section" style="display:none">
+      <h3>County Records</h3>
+      <div id="d-gis"></div>
+    </div>
+
+    <!-- Location data -->
+    <div class="detail-section" id="d-location-section" style="display:none">
+      <h3>Neighborhood (Census ACS)</h3>
+      <div id="d-location"></div>
+    </div>
+
+    <!-- Flags -->
+    <div class="detail-section" id="d-flags-section" style="display:none">
+      <h3>Flags</h3>
+      <div id="d-flags"></div>
+    </div>
+
+    <div class="detail-section" id="d-contact-section" style="display:none">
+      <h3>Owner &amp; Contact</h3>
+      <div id="d-contact"></div>
+    </div>
+
+    <!-- raw.heir_candidates, filtered at build time (enrichment_heir_candidates.PUBLISHABLE_HEIR_RELATIONS). -->
+    <div class="detail-section" id="d-heirs-section" style="display:none">
+      <h3>Possible heirs (candidates, from public notices)</h3>
+      <div id="d-heirs"></div>
+    </div>
+
+    <div class="detail-section" id="d-distress-section" style="display:none">
+      <h3>Distress Stack</h3>
+      <div id="d-distress"></div>
+    </div>
+
+    <div class="detail-section" id="d-risk-section" style="display:none">
+      <h3>Risk &amp; Environment</h3>
+      <div id="d-risk"></div>
+    </div>
+
+    <div class="detail-section" id="d-deeds-section" style="display:none">
+      <h3>Deeds, Liens &amp; Life Events</h3>
+      <div id="d-deeds"></div>
+    </div>
+
+    <!-- Everything else this property picked up, from every source that touched it.
+         Nothing gathered is hidden: any raw block not rendered by a section above
+         lands here with its source, so the panel stays complete as sources grow. -->
+    <div class="detail-section" id="d-everything-section" style="display:none">
+      <h3>🔎 Everything We Found <span class="ev-count" id="d-everything-count"></span></h3>
+      <div id="d-everything"></div>
+    </div>
+  </div>
+</aside>
+
+<footer>
+  <div>Updated each month from <strong id="run-source-count">—</strong> public sources. Data is public record.</div>
+  <div>Sources include county Master in Equity, Register of Deeds, NC eCourts, SC Public Index, Auction.com, HUD, law-firm trustee calendars, and newspaper legal notices.</div>
+  <!-- No inline color here: #999 measured 2.85:1 in light theme. Inheriting the
+       footer's var(--muted) measures 4.76:1. -->
+  <div style="margin-top:8px;font-style:italic">Grades are computed from heuristics + public data; not investment advice. Always verify before bidding.</div>
+  <!-- CRM notes live in this browser's localStorage, which belongs to one address.
+       Export before the board moves, import on the other side. -->
+  <div class="crm-io">
+    CRM notes are stored in this browser only.
+    <button type="button" class="btn-link" data-crm-io="export">Export CRM</button>
+    <button type="button" class="btn-link" data-crm-io="import">Import CRM</button>
+    <input type="file" id="crm-import-file" accept="application/json,.json" hidden>
+    <span class="crm-io-msg" role="status"></span>
+  </div>
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="dashboard.js?v=20261007b"></script>
+<script>
+  // Theme toggle wiring (kept separate from dashboard.js so data/render logic stays untouched)
+  (function () {
+    var btn = document.getElementById('theme-toggle');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+      var next = cur === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      // Keep the single static <meta name="theme-color"> in sync with the manual
+      // data-theme write. Values are premium.css --bg for each theme (premium.css
+      // loads after style.css and wins): dark #080b14, light #f5f7fb.
+      var mt = document.querySelector('meta[name="theme-color"]');
+      if (mt) mt.setAttribute('content', next === 'dark' ? '#080b14' : '#f5f7fb');
+      try { localStorage.setItem('theme', next); } catch (e) {}
+    });
+  })();
+</script>
+
+</body>
+</html>

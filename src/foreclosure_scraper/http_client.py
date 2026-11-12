@@ -1,0 +1,844 @@
+"""Shared async HTTP client: sane retries + PER-HOST rate limiting + UA rotation.
+
+Politeness is enforced at the TRANSPORT layer, so every request that goes through
+`client()` (scrapers, enrichments, get_text/get_bytes) is automatically spaced
+per hostname — different hosts stay parallel, same-host bursts get throttled.
+This is the structural fix for IP-ban risk: nothing hammers a single host.
+
+Fetch tiers, cheapest first — `get_text(impersonate=True)` (or
+`get_text_impersonate`) walks them automatically:
+
+1. plain httpx (HTTP/2, gzip) + rotated real-browser UA — for friendly hosts.
+2. curl-cffi `AsyncSession(impersonate="chrome")` — a real Chrome JA3/TLS +
+   HTTP/2 fingerprint with NO browser process. Many Cloudflare/F5-fronted
+   gov + court hosts (e.g. publicindex.sccourts.org) 403/406 plain httpx purely
+   on the TLS handshake and return 200 to a matching fingerprint. This is a
+   fast (~1s) static-content tier that sits BELOW the StealthyFetcher render
+   path: we only escalate to a headless browser when impersonation also fails.
+
+Presenting a real-browser fingerprint is NOT a CAPTCHA/WAF defeat — no solver,
+no login, no token forgery. Hosts that still block (e.g. portal-nc.tylertech,
+403 on both tiers) need the dedicated WAF-token / render path elsewhere.
+"""
+from __future__ import annotations
+
+import asyncio
+import contextlib
+import os
+import random
+import signal
+import time
+from contextlib import asynccontextmanager
+from contextvars import ContextVar
+from typing import AsyncIterator
+
+import httpx
+import structlog
+from tenacity import (
+    AsyncRetrying,
+    retry_if_exception,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
+
+log = structlog.get_logger()
+
+
+def install_hard_sigint_kill(reason: str = "") -> None:
+    """Make Ctrl-C / SIGINT always stop THIS process within a beat, even if it is
+    wedged inside a hung network call.
+
+    Diagnosed 2026-09-30 on ``scripts/resolver_backfill_parcel.py``: a chunk
+    stalled with a TCP connection to an ArcGIS host sitting ESTABLISHED,
+    unchanged, for 4.5+ minutes (see ``enrichment_parcel_from_geo._arc_query``'s
+    ``asyncio.wait_for`` hardening for the matching network-side fix — httpx's
+    per-operation ``read`` timeout resets on every chunk received, so a peer
+    that trickles bytes slowly enough never trips it even though the request
+    never finishes). SIGINT sent to that run did **not** produce a clean
+    ``KeyboardInterrupt``-based shutdown even after 18s; SIGTERM was needed.
+
+    Root cause of the SIGINT gap: Python's default SIGINT handler only raises
+    ``KeyboardInterrupt`` at the next bytecode boundary the interpreter reaches,
+    and unwinding it cleanly out of ``asyncio.run()`` requires cancelling and
+    then AWAITING every in-flight task — including the one stuck on that same
+    hung socket, whose cancellation depends on cooperation from code that, by
+    definition, was not cooperating. SIGTERM worked only because SIGTERM's
+    default disposition terminates the process at the OS level without any of
+    that — it does not need the interpreter's cooperation at all.
+
+    This installs a SIGINT handler that gets the same unconditional effect:
+    skip all Python/asyncio-level cleanup and exit at the OS level immediately
+    (``os._exit`` — no atexit hooks, no exception unwinding, nothing that can
+    itself get stuck). This is safe for a process that holds
+    ``web_artifact.board_lock()``: that lock already treats an abruptly-killed
+    holder as stale via its heartbeat + max_runtime check, the same recovery
+    path a SIGKILL or a laptop losing power already goes through. The only
+    thing lost is whatever progress this run had not yet checkpointed.
+    """
+    def _on_sigint(signum, frame):  # noqa: ARG001 - signal handler signature
+        print(f"\nSIGINT — stopping now{f' ({reason})' if reason else ''}; "
+              "any unwritten checkpoint is not saved.", flush=True)
+        os._exit(130)  # 128 + SIGINT, the conventional shell exit code
+
+    signal.signal(signal.SIGINT, _on_sigint)
+
+
+# A small pool of REAL current desktop browser UAs. One is chosen per process
+# (so a run looks like a single consistent browser) and varies run-to-run, so a
+# fingerprinting service can't pin one static UA to our IP over time.
+_UA_POOL = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 "
+    "(KHTML, like Gecko) Version/17.5 Safari/605.1.15",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:127.0) Gecko/20100101 Firefox/127.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36 Edg/125.0.0.0",
+)
+_SESSION_UA = random.choice(_UA_POOL)
+
+DEFAULT_HEADERS = {
+    "User-Agent": _SESSION_UA,
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    # Drop brotli — httpx doesn't decode it without the brotli package, and many
+    # sites (Brock & Scott / Aldridge / Sucuri-protected) serve br by default
+    "Accept-Encoding": "gzip, deflate",
+    "Cache-Control": "no-cache",
+    "Connection": "keep-alive",
+}
+
+# --- per-host rate limiter --------------------------------------------------
+# Minimum spacing between request STARTS to the same host, plus random jitter so
+# the cadence isn't a tell-tale fixed interval. Tunable via env for a slow,
+# extra-polite run.
+_MIN_INTERVAL_S = float(os.environ.get("HTTP_MIN_INTERVAL_S", "0.8"))
+_JITTER_S = float(os.environ.get("HTTP_JITTER_S", "0.7"))
+_host_last: dict[str, float] = {}
+_host_locks: dict[tuple[int, str], asyncio.Lock] = {}
+
+
+def _host_lock(host: str) -> asyncio.Lock:
+    # Key by running loop so a lock is never reused across event loops (tests).
+    key = (id(asyncio.get_running_loop()), host)
+    lk = _host_locks.get(key)
+    if lk is None:
+        lk = _host_locks[key] = asyncio.Lock()
+    return lk
+
+
+async def _throttle(host: str | None) -> None:
+    if not host:
+        return
+    async with _host_lock(host):
+        wait = (_MIN_INTERVAL_S + random.uniform(0, _JITTER_S)) - (
+            time.monotonic() - _host_last.get(host, 0.0)
+        )
+        if wait > 0:
+            await asyncio.sleep(wait)
+        _host_last[host] = time.monotonic()
+
+
+# Per-run record of block-status HTTP responses, so a scraper that SWALLOWS its
+# own httpx error (returns [] / "") is still classified as BLOCKED by
+# base_scraper.safe_run instead of looking like a legit empty result.
+#
+# The holder is a MUTABLE LIST stored in a ContextVar. safe_run sets a fresh list
+# per run; the transport APPENDS to it (never .set()). This is deliberate: a
+# child asyncio task (asyncio.gather/create_task — how many scrapers fetch)
+# inherits the SAME list object by reference when its context is copied, so an
+# append inside the child is visible to safe_run in the parent. A plain
+# ContextVar.set() inside a child would NOT propagate back — that was the bug.
+# Concurrent scrapers each get their own list (set per safe_run task), so they
+# don't clobber each other.
+_block_holder: "ContextVar[list | None]" = ContextVar("_block_holder", default=None)
+_BLOCK_CODES = {401, 403, 406, 409, 429}
+
+
+def reset_block_signal() -> None:
+    _block_holder.set([])
+
+
+def take_block_signal() -> "tuple[int, str] | None":
+    h = _block_holder.get()
+    return h[0] if h else None   # first block recorded this run
+
+
+def clear_block_signal() -> None:
+    """Forget blocks recorded so far — for a scraper that RECOVERED from one.
+
+    Mutates the holder list in place rather than rebinding the ContextVar, so
+    the change is visible to safe_run in the parent task (a `.set()` inside the
+    child context would not propagate back). Call this only after a fetch tier
+    actually succeeded: an unrecovered block must still surface as BLOCKED.
+    """
+    h = _block_holder.get()
+    if h is not None:
+        h.clear()
+
+
+def record_block_signal(code: int, host: str, reason: str) -> None:
+    """For a scraper that deliberately runs its OWN un-instrumented client (its own pacing/
+    backoff/concurrency tuning matters more than sharing the pool -- e.g. a host that bans on
+    the first sign of concurrency) and detects a block itself: record it the same way
+    _ThrottledTransport.handle_async_request already does for every instrumented client, so
+    safe_run()'s ZERO->BLOCKED promotion (take_block_signal) still fires instead of silently
+    reporting a real block as a legitimate empty result."""
+    holder = _block_holder.get()
+    if holder is not None:
+        holder.append((code, f"HTTP {code} ({reason}) from {host}"))
+
+
+# Process-wide memory of hosts that returned a _BLOCK_CODES status to PLAIN httpx
+# at least once. Once a host is known to fingerprint-block, get_text(impersonate=
+# True) skips the doomed plain attempt and goes straight to the curl-cffi tier —
+# saving a guaranteed-failing round-trip on every later fetch of that host.
+_impersonate_hosts: set[str] = set()
+
+
+def _host_of(url: str) -> str | None:
+    try:
+        return httpx.URL(url).host
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def mark_host_blocked(url: str) -> None:
+    """Record that `url`'s host blocked plain httpx (so future fetches impersonate first)."""
+    host = _host_of(url)
+    if host:
+        _impersonate_hosts.add(host)
+
+
+class _ThrottledTransport(httpx.AsyncBaseTransport):
+    """Wraps the real transport and spaces requests per hostname."""
+
+    def __init__(self, inner: httpx.AsyncBaseTransport):
+        self._inner = inner
+
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        await _throttle(request.url.host)
+        resp = await self._inner.handle_async_request(request)
+        code = resp.status_code
+        if code in _BLOCK_CODES or 500 <= code < 600:
+            holder = _block_holder.get()
+            if holder is not None:   # mutate the shared list (survives child tasks)
+                reason = ("rate-limited" if code == 429
+                          else "blocked/forbidden" if code in (401, 403, 406, 409)
+                          else "server error / possible WAF")
+                holder.append((code, f"HTTP {code} ({reason}) from {request.url.host}"))
+        return resp
+
+    async def aclose(self) -> None:
+        await self._inner.aclose()
+
+
+class SharedSession:
+    """An explicit, caller-owned session for threading cookies across 2+ related calls
+    through get_text/post_text — e.g. a classic-ASP search-then-getall pair where the
+    second call needs the server-side session the first call's response set (confirmed
+    live 2026-11-07: CCHS's ``cmd=getall`` reads the search's session rather than
+    re-querying; see rod/county_sweeps.py's CchsClassicReader, the only caller today).
+
+    Lazily creates and reuses ONE httpx.AsyncClient and/or ONE curl_cffi AsyncSession —
+    whichever tier(s) a given pair of calls actually ends up using — so a Set-Cookie
+    from the first call is sent on the second. The caller owns its lifetime (use as an
+    `async with`); get_text/post_text never close a SharedSession they're handed.
+
+    Every other caller passes no `session` (the default, None): get_text/post_text/
+    client()/_impersonate_fetch all still open and close a fresh one per call, exactly
+    as before this class existed — adding it changes nothing for them.
+    """
+
+    def __init__(self) -> None:
+        self._httpx: httpx.AsyncClient | None = None
+        self._curl = None
+
+    async def httpx_client(self, *, timeout: float, follow_redirects: bool,
+                            headers: dict, http2: bool) -> httpx.AsyncClient:
+        if self._httpx is None:
+            proxy = os.environ.get("PROXY_URL") or None
+            _conn_to = float(os.environ.get("HTTP_CONNECT_TIMEOUT", "8.0"))
+            _pool_to = float(os.environ.get("HTTP_POOL_TIMEOUT", "8.0"))
+            transport = _ThrottledTransport(httpx.AsyncHTTPTransport(retries=0))
+            self._httpx = httpx.AsyncClient(
+                timeout=httpx.Timeout(timeout, connect=_conn_to, pool=_pool_to),
+                follow_redirects=follow_redirects, headers=dict(headers),
+                proxy=proxy, transport=transport, http2=http2,
+            )
+        return self._httpx
+
+    async def curl_session(self):
+        if self._curl is None:
+            from curl_cffi.requests import AsyncSession
+            self._curl = AsyncSession()
+        return self._curl
+
+    async def __aenter__(self) -> "SharedSession":
+        return self
+
+    async def __aexit__(self, *exc: object) -> None:
+        if self._httpx is not None:
+            await self._httpx.aclose()
+        if self._curl is not None:
+            await self._curl.close()
+
+
+@asynccontextmanager
+async def client(
+    *,
+    timeout: float = 30.0,
+    follow_redirects: bool = True,
+    headers: dict | None = None,
+    impersonate_browser: bool = True,
+    http2: bool = True,
+    session: "SharedSession | None" = None,
+) -> AsyncIterator[httpx.AsyncClient]:
+    """Shared throttled client. Pass ``http2=False`` for the rare host whose CDN
+    answers an ordinary HTTP/1.1 request but not httpx's HTTP/2 one (see
+    law_firms.mewborn_deselms) — everything else keeps HTTP/2. Pass `session` (a
+    SharedSession) to reuse one cookie-carrying client across several calls instead of
+    a fresh one per call — see SharedSession's own docstring; default None is today's
+    unchanged behavior."""
+    h = dict(DEFAULT_HEADERS)
+    if headers:
+        h.update(headers)
+    if session is not None:
+        cli = await session.httpx_client(
+            timeout=timeout, follow_redirects=follow_redirects, headers=h, http2=http2)
+        yield cli
+        return
+    proxy = os.environ.get("PROXY_URL") or None
+    # HARD-timeout hardening (flaky-connection safe). Bound CONNECT and POOL-acquire
+    # tightly: a wedged connect or an exhausted pool are the flaky-network stalls that
+    # otherwise freeze a whole per-lead enrichment batch (a float timeout leaves them
+    # loose, and the async budget-bail can't cancel a socket stuck below the loop).
+    # retries=0 removes the transport's connect-retry amplification — callers already
+    # wrap their own AsyncRetrying. All env-tunable.
+    _conn_to = float(os.environ.get("HTTP_CONNECT_TIMEOUT", "8.0"))
+    _pool_to = float(os.environ.get("HTTP_POOL_TIMEOUT", "8.0"))
+    transport = _ThrottledTransport(httpx.AsyncHTTPTransport(retries=0))
+    async with httpx.AsyncClient(
+        timeout=httpx.Timeout(timeout, connect=_conn_to, pool=_pool_to),
+        follow_redirects=follow_redirects,
+        headers=h,
+        proxy=proxy,
+        transport=transport,
+        http2=http2,
+    ) as cli:
+        yield cli
+
+
+async def _impersonate_fetch(
+    url: str,
+    *,
+    timeout: float,
+    headers: dict | None,
+    referer: str | None,
+    impersonate: str,
+    session: "SharedSession | None" = None,
+) -> str:
+    """Fetch via curl-cffi with a real Chrome JA3/TLS + HTTP/2 fingerprint.
+
+    No browser process — this is a fast static-content tier for hosts that
+    fingerprint-block plain httpx at the TLS handshake (403/406) but answer a
+    matching Chrome fingerprint. curl-cffi is sync per-request under the hood but
+    its AsyncSession runs on an internal curl multi loop, so it stays async.
+
+    Honours the same per-host throttle and per-run block signal as the httpx
+    transport, so politeness + BLOCKED classification are unchanged. Raises on
+    block/transient codes so the retry/escalation logic above can react.
+
+    Pass `session` (a SharedSession) to reuse one cookie-carrying curl-cffi session
+    across several calls instead of opening+closing one per call — see SharedSession's
+    docstring; default None is today's unchanged per-call session.
+    """
+    from curl_cffi.requests import AsyncSession  # local import: keep dep optional
+
+    h = dict(DEFAULT_HEADERS)
+    if headers:
+        h.update(headers)
+    if referer:
+        h["Referer"] = referer
+    proxy = os.environ.get("PROXY_URL") or None
+    proxies = {"http": proxy, "https": proxy} if proxy else None
+
+    await _throttle(_host_of(url))
+
+    async def _get(s, hdrs: dict):
+        return await s.get(
+            url, headers=hdrs, impersonate=impersonate, timeout=timeout,
+            proxies=proxies, allow_redirects=True,
+        )
+
+    if session is not None:
+        s = await session.curl_session()
+        r = await _get(s, h)
+        if r.status_code == 406:
+            h2 = dict(h)
+            h2["Accept"] = "*/*"
+            r = await _get(s, h2)
+    else:
+        async with AsyncSession() as s:
+            r = await _get(s, h)
+            # Some hosts (e.g. overpass-api.de) reject the browser-like Accept header
+            # impersonation sends with a 406, yet answer fine with a permissive Accept.
+            # Retry once with Accept: */* before treating it as a block/escalating.
+            if r.status_code == 406:
+                h2 = dict(h)
+                h2["Accept"] = "*/*"
+                r = await _get(s, h2)
+    code = r.status_code
+    if code in _BLOCK_CODES or 500 <= code < 600:
+        holder = _block_holder.get()
+        if holder is not None:
+            reason = ("rate-limited" if code == 429
+                      else "blocked/forbidden" if code in (401, 403, 406, 409)
+                      else "server error / possible WAF")
+            holder.append((code, f"HTTP {code} ({reason}) from {_host_of(url)} [impersonate]"))
+        raise RuntimeError(f"impersonate got {code} for {url}")
+    if code >= 400:
+        raise RuntimeError(f"impersonate got {code} for {url}")
+    return r.text
+
+
+async def get_text_impersonate(
+    url: str,
+    *,
+    timeout: float = 30.0,
+    headers: dict | None = None,
+    referer: str | None = None,
+    impersonate: str = "chrome",
+    session: "SharedSession | None" = None,
+) -> str:
+    """GET via the curl-cffi browser-impersonation tier only, with retry.
+
+    Use directly when a host is known to need a real TLS fingerprint. For the
+    automatic plain->impersonate escalation, prefer `get_text(..., impersonate=True)`.
+    Pass `session` to reuse one cookie-carrying session across calls (default None is
+    unchanged: a fresh session per call, including per retry attempt here).
+    """
+    async for attempt in AsyncRetrying(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential_jitter(initial=1, max=10),
+        reraise=True,
+    ):
+        with attempt:
+            return await _impersonate_fetch(
+                url, timeout=timeout, headers=headers,
+                referer=referer, impersonate=impersonate, session=session,
+            )
+    raise RuntimeError("unreachable")
+
+
+#: The whole argv of every curl subprocess: the options travel in a config read from stdin.
+CURL_ARGV = ("curl", "--config", "-")
+
+
+def _curl_quote(value: object) -> str:
+    """A curl config-file string: double-quoted, backslash and quote escaped, and no CR/LF (a
+    header value must never smuggle a second line into the config)."""
+    v = str(value).replace("\r", " ").replace("\n", " ")
+    return '"' + v.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def curl_config(url: str, *, timeout: float, headers: dict | None = None,
+                referer: str | None = None, user_agent: str | None = None,
+                proxy: str | None = None, follow: bool = True,
+                compressed: bool = True) -> str:
+    """The `curl --config -` text for one GET.
+
+    Request headers (an API token: CourtListener's `Authorization: Token ...`), the proxy URL
+    (which can carry credentials) and the URL itself (some carry a key in the query string) go
+    in here, written to curl's stdin, never in argv: argv is readable by every local user
+    through `ps` and lands in process accounting. Nothing touches the disk either."""
+    lines = ["silent", f"max-time = {int(timeout)}"]
+    if follow:
+        lines.append("location")
+    if compressed:
+        lines.append("compressed")
+    if user_agent:
+        lines.append(f"user-agent = {_curl_quote(user_agent)}")
+    for k, v in (headers or {}).items():
+        lines.append(f"header = {_curl_quote(f'{k}: {v}')}")
+    if referer:
+        lines.append(f"referer = {_curl_quote(referer)}")
+    if proxy:
+        lines.append(f"proxy = {_curl_quote(proxy)}")
+    lines.append(f"url = {_curl_quote(url)}")
+    return "\n".join(lines) + "\n"
+
+
+async def _curl_fallback_text(
+    url: str,
+    *,
+    timeout: float = 45.0,
+    headers: dict | None = None,
+    referer: str | None = None,
+) -> str:
+    """Fallback: use the system curl binary to fetch text.
+
+    On some networks (e.g. macOS with IPv6 issues), httpx times out while
+    the system curl binary works fine. This is a last-resort tier BEFORE
+    impersonation, used when httpx raises TransportError/TimeoutException.
+
+    Every option (headers, user agent, referer, proxy, the URL) is passed as a config on
+    stdin (curl_config), so the argv `ps` shows is exactly CURL_ARGV: until 2026-10-06 the
+    headers were `-H` arguments and a CourtListener token was visible on the command line
+    whenever httpx timed out.
+    """
+    cfg = curl_config(url, timeout=timeout, headers=headers, referer=referer,
+                      user_agent=_SESSION_UA, proxy=os.environ.get("PROXY_URL") or None)
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *CURL_ARGV,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        try:
+            stdout, _ = await asyncio.wait_for(proc.communicate(cfg.encode("utf-8")),
+                                               timeout=timeout + 10)
+        except asyncio.TimeoutError:
+            with contextlib.suppress(ProcessLookupError):
+                proc.kill()
+            raise
+        if proc.returncode == 0 and stdout:
+            return stdout.decode("utf-8", errors="replace")
+    except (asyncio.TimeoutError, OSError) as e:
+        log.warning("curl_fallback.failed", url=url[:100], error=f"{type(e).__name__}: {e}")
+    return ""
+
+
+#: Status codes get_text retries: a server or gateway error can clear on the next try.
+_RETRY_STATUS = frozenset({500, 502, 503, 504})
+
+
+def _retryable_get_error(exc: BaseException) -> bool:
+    """get_text's retry predicate: a transport error, a timeout or a 5xx, never a 4xx.
+
+    Audit 2026-10-09 (source_completeness): every HTTPStatusError used to be retried, so a 403
+    block, a 404 and above all a 429 'Too Many Requests' were asked three times with backoff (six
+    with the impersonation tier). On the 10/8 gated run five TownNews papers read in the same
+    minute all ended BLOCKED that way. A 4xx answers the same on the next try; a 429 asks us to
+    stop. The 4xx still raises (and still escalates to impersonation where the caller allows it)."""
+    if isinstance(exc, httpx.HTTPStatusError):
+        code = exc.response.status_code if exc.response is not None else None
+        return code in _RETRY_STATUS
+    return isinstance(exc, (httpx.TransportError, httpx.TimeoutException))
+
+
+async def get_text(
+    url: str,
+    *,
+    timeout: float = 30.0,
+    headers: dict | None = None,
+    referer: str | None = None,
+    impersonate: bool = False,
+    wall_bypass: bool = False,
+    session: "SharedSession | None" = None,
+) -> str:
+    """GET a URL and return text, with retry on transient errors.
+
+    Fetch tier order:
+    1. plain httpx (HTTP/2, gzip) + rotated real-browser UA — for friendly hosts.
+    2. curl subprocess fallback — when httpx times out (network issue), the
+       system curl binary often succeeds where httpx fails on macOS.
+    3. curl-cffi Chrome impersonation — real TLS fingerprint for hosts that
+       403/406 on plain httpx.
+    4. wall-bypass browsers (pydoll → nodriver) — real Chrome processes for
+       Cloudflare Turnstile, DataDome, and JS challenges that defeat TLS
+       fingerprinting. Only tried when ``wall_bypass=True`` AND all cheaper
+       tiers have failed. Slow (~5-15s) but free.
+
+    Hosts seen blocking plain httpx are remembered process-wide so later
+    fetches impersonate first and skip the doomed attempt.
+
+    Pass `session` (a SharedSession) to carry cookies across this call and others —
+    e.g. a search-then-getall pair on the same vendor session (see SharedSession's own
+    docstring). Threaded through whichever tier(s) this call actually uses. Default
+    None is completely unchanged: a fresh client/session per tier per call, same as
+    before `session` existed.
+    """
+    # Allow forcing wall_bypass via env var for standalone walled-source runs
+    if os.environ.get("WALL_BYPASS_FORCE", "0") == "1":
+        wall_bypass = True
+    h = dict(headers or {})
+    if referer:
+        h["Referer"] = referer
+
+    host = _host_of(url)
+    impersonate_first = impersonate and host is not None and host in _impersonate_hosts
+    if impersonate_first:
+        return await get_text_impersonate(
+            url, timeout=timeout, headers=headers, referer=referer, session=session,
+        )
+
+    try:
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=10),
+            retry=retry_if_exception(_retryable_get_error),
+            reraise=True,
+        ):
+            with attempt:
+                async with client(timeout=timeout, session=session) as c:
+                    r = await c.get(url, headers=h)
+                    if r.status_code in (429, 500, 502, 503, 504):
+                        raise httpx.HTTPStatusError(
+                            f"transient {r.status_code}", request=r.request, response=r
+                        )
+                    r.raise_for_status()
+                    return r.text
+        raise RuntimeError("unreachable")
+    except httpx.HTTPStatusError as exc:
+        code = exc.response.status_code if exc.response is not None else None
+        # Only the impersonation tier can plausibly fix a fingerprint block; a
+        # generic 404/410 won't change, so don't waste a fetch on those.
+        if not (impersonate and (code in _BLOCK_CODES)):
+            if wall_bypass and code in _BLOCK_CODES:
+                # Last resort: real browser (pydoll → nodriver).
+                from . import wall_bypass as _wb
+                log.info("get_text.wall_bypass", host=host, code=code)
+                text = await _wb.fetch_through_walls(url, render_first=False)
+                if text and len(text) > 100:
+                    return text
+            raise
+        log.info("get_text.escalate_impersonate", host=host, code=code)
+        if host:
+            _impersonate_hosts.add(host)
+        try:
+            return await get_text_impersonate(
+                url, timeout=timeout, headers=headers, referer=referer, session=session,
+            )
+        except Exception:
+            if wall_bypass:
+                from . import wall_bypass as _wb
+                log.info("get_text.wall_bypass_after_impersonate", host=host)
+                text = await _wb.fetch_through_walls(url, render_first=False)
+                if text and len(text) > 100:
+                    return text
+            raise
+    except (httpx.TransportError, httpx.TimeoutException) as exc:
+        # httpx timed out — try curl subprocess fallback before giving up.
+        # This is the key workaround for macOS networks where httpx hangs but
+        # the system curl binary works fine (IPv6, DNS, or TLS issues).
+        log.info("get_text.curl_fallback", host=host, error=type(exc).__name__)
+        result = await _curl_fallback_text(
+            url, timeout=min(timeout, 45.0), headers=h, referer=referer
+        )
+        if result:
+            return result
+        # curl also failed — try impersonation as last resort
+        if impersonate:
+            try:
+                return await get_text_impersonate(
+                    url, timeout=timeout, headers=headers, referer=referer, session=session,
+                )
+            except Exception:
+                pass
+        if wall_bypass:
+            from . import wall_bypass as _wb
+            log.info("get_text.wall_bypass_after_timeout", host=host)
+            text = await _wb.fetch_through_walls(url, render_first=False)
+            if text and len(text) > 100:
+                return text
+        raise
+
+
+async def post_text(
+    url: str,
+    *,
+    timeout: float = 30.0,
+    headers: dict | None = None,
+    data: dict | None = None,
+    session: "SharedSession | None" = None,
+) -> str:
+    """POST a URL (plain httpx, through the same throttled `client()`) and return text,
+    with the same transient-5xx retry as `get_text`.
+
+    Added 2026-11-06 for the CourthouseComputerSystems classic-ASP `SearchService.asp`
+    endpoint: the vendor's `us4.courthousecomputersystems.com` host started rejecting
+    GET on that one page with a plain HTTP 405 ("HTTP verb used to access this page is
+    not allowed") while POST with the identical query string answers a clean 200 —
+    confirmed live across every HOSTED_CCHS tenant (county_sweeps.py): all 10 us4
+    tenants 405 on GET / 200 on POST with the real `<SearchResponse>` XML, all 7
+    us3+us5 tenants 200 on GET already and unaffected either way. No impersonation
+    tier here: this is a verb restriction, not a TLS-fingerprint block, and plain
+    httpx POST already clears it on every tenant tested.
+
+    Pass `session` to reuse one cookie-carrying client across calls (default None is
+    unchanged — see SharedSession's docstring).
+    """
+    h = dict(headers or {})
+    async for attempt in AsyncRetrying(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential_jitter(initial=1, max=10),
+        retry=retry_if_exception(_retryable_get_error),
+        reraise=True,
+    ):
+        with attempt:
+            async with client(timeout=timeout, session=session) as c:
+                r = await c.post(url, headers=h, data=data)
+                if r.status_code in (429, 500, 502, 503, 504):
+                    raise httpx.HTTPStatusError(
+                        f"transient {r.status_code}", request=r.request, response=r
+                    )
+                r.raise_for_status()
+                return r.text
+    raise RuntimeError("unreachable")
+
+
+async def _impersonate_fetch_bytes(
+    url: str,
+    *,
+    timeout: float,
+    headers: dict | None,
+    referer: str | None,
+    impersonate: str,
+) -> bytes:
+    """Byte-returning twin of `_impersonate_fetch` — same curl-cffi Chrome
+    JA3/TLS fingerprint tier, for PDFs/binary downloads a WAF blocks on the
+    plain-httpx handshake (e.g. a Cloudflare-fronted PDF link)."""
+    from curl_cffi.requests import AsyncSession  # local import: keep dep optional
+
+    h = dict(DEFAULT_HEADERS)
+    if headers:
+        h.update(headers)
+    if referer:
+        h["Referer"] = referer
+    proxy = os.environ.get("PROXY_URL") or None
+    proxies = {"http": proxy, "https": proxy} if proxy else None
+
+    await _throttle(_host_of(url))
+    async with AsyncSession() as s:
+        r = await s.get(
+            url,
+            headers=h,
+            impersonate=impersonate,
+            timeout=timeout,
+            proxies=proxies,
+            allow_redirects=True,
+        )
+        if r.status_code == 406:
+            h2 = dict(h)
+            h2["Accept"] = "*/*"
+            r = await s.get(
+                url, headers=h2, impersonate=impersonate, timeout=timeout,
+                proxies=proxies, allow_redirects=True,
+            )
+    code = r.status_code
+    if code in _BLOCK_CODES or 500 <= code < 600:
+        holder = _block_holder.get()
+        if holder is not None:
+            reason = ("rate-limited" if code == 429
+                      else "blocked/forbidden" if code in (401, 403, 406, 409)
+                      else "server error / possible WAF")
+            holder.append((code, f"HTTP {code} ({reason}) from {_host_of(url)} [impersonate]"))
+        raise RuntimeError(f"impersonate got {code} for {url}")
+    if code >= 400:
+        raise RuntimeError(f"impersonate got {code} for {url}")
+    return r.content
+
+
+async def get_bytes_impersonate(
+    url: str,
+    *,
+    timeout: float = 60.0,
+    headers: dict | None = None,
+    referer: str | None = None,
+    impersonate: str = "chrome",
+) -> bytes:
+    """GET raw bytes via the curl-cffi browser-impersonation tier only, with retry.
+
+    Use directly when a host is known to need a real TLS fingerprint. For the
+    automatic plain->impersonate escalation, prefer `get_bytes(..., impersonate=True)`.
+    """
+    async for attempt in AsyncRetrying(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential_jitter(initial=1, max=10),
+        reraise=True,
+    ):
+        with attempt:
+            return await _impersonate_fetch_bytes(
+                url, timeout=timeout, headers=headers,
+                referer=referer, impersonate=impersonate,
+            )
+    raise RuntimeError("unreachable")
+
+
+async def get_bytes(url: str, *, timeout: float = 60.0, impersonate: bool = False) -> bytes:
+    """GET raw bytes (images/PDFs), with the same transient-error retry as text.
+
+    Pass ``impersonate=True`` to escalate to the curl-cffi Chrome-fingerprint
+    tier (see `get_text`'s docstring) when plain httpx gets a block code
+    (401/403/406/409/429) — e.g. a Cloudflare-fronted PDF link. Default is
+    False so every existing plain-httpx caller is unchanged.
+    """
+    host = _host_of(url)
+    if impersonate and host is not None and host in _impersonate_hosts:
+        return await get_bytes_impersonate(url, timeout=timeout)
+
+    try:
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=10),
+            retry=retry_if_exception_type(
+                (httpx.TransportError, httpx.HTTPStatusError, httpx.TimeoutException)
+            ),
+            reraise=True,
+        ):
+            with attempt:
+                async with client(timeout=timeout) as c:
+                    r = await c.get(url)
+                    if r.status_code in (429, 500, 502, 503, 504):
+                        raise httpx.HTTPStatusError(
+                            f"transient {r.status_code}", request=r.request, response=r
+                        )
+                    r.raise_for_status()
+                    return r.content
+        raise RuntimeError("unreachable")
+    except httpx.HTTPStatusError as exc:
+        code = exc.response.status_code if exc.response is not None else None
+        if not (impersonate and (code in _BLOCK_CODES)):
+            raise
+        log.info("get_bytes.escalate_impersonate", host=host, code=code)
+        if host:
+            _impersonate_hosts.add(host)
+        return await get_bytes_impersonate(url, timeout=timeout)
+
+
+async def get_wayback_text(url: str, *, timeout: float = 45.0) -> str | None:
+    """Fetch a URL's most recent archived snapshot from the Wayback Machine.
+
+    Use when a source page is down (404/500/DNS fail) or returns a block.
+    Returns None if no archive exists or the archive is empty.
+    """
+    api = f"https://archive.org/wayback/available?url={url}"
+    try:
+        async with client(timeout=timeout) as c:
+            r = await c.get(api)
+            r.raise_for_status()
+            data = r.json()
+            snap = data.get("archived_snapshots", {}).get("closest", {})
+            if not snap or not snap.get("available"):
+                return None
+            snap_url = snap["url"]
+            snap_r = await c.get(snap_url)
+            snap_r.raise_for_status()
+            return snap_r.text
+    except Exception:
+        return None
+
+
+async def gather_with_concurrency(n: int, *aws):
+    sem = asyncio.Semaphore(n)
+
+    async def sem_task(aw):
+        async with sem:
+            return await aw
+
+    return await asyncio.gather(*(sem_task(aw) for aw in aws), return_exceptions=True)

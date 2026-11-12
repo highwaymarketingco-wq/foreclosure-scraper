@@ -1,0 +1,683 @@
+#!/usr/bin/env python3
+"""Grade the board against the one it replaced, and fail loudly when it should.
+
+WHY THIS EXISTS
+    Every real defect this system has produced was found by a human noticing, or
+    by an audit someone thought to ask for. Not one was caught by the system.
+
+    On 2026-08-11 alone: a manufactured home published a $780,300 ARV built from
+    a warehouse's assessor row; one county appraisal was stamped on 1,433 leads
+    and drove $320,145,300 of max bids; a noon job's 1,064 resolved addresses
+    were silently reverted by a concurrent writer; 6,426 cards showed a satellite
+    photo of a place 1-2 miles from the property. Every one of those published
+    successfully. Nothing errored. The tests were green.
+
+    That is the actual gap — not coverage, not sources. A board that cannot tell
+    when it has gone wrong is a board you have to audit by hand forever.
+
+WHAT IT DOES
+    Compares the REAL current board (streamed live via board_stream.
+    iter_board_rows() — never the listings_slim.json.gz mobile derivative,
+    which append_new_rows()/patch_existing_rows() leave stale between full
+    writes; see _current()'s docstring) against the previously PUBLISHED one
+    (the committed slim .gz in git, for MOVEMENT only — see _previous()), and
+    reports two different things:
+
+      INVARIANTS  — statements that must be true of any board we publish.
+                    A breach exits non-zero. These are not thresholds or
+                    heuristics; each one means a specific known defect is back.
+
+      MOVEMENT    — how much changed since the last publish, per field. This
+                    does not fail. It is the signal a human reads to notice
+                    "why did 4,000 ARVs move when I only edited the CSS?".
+                    Silent, unexplained movement is how all of the above got in.
+
+WHY MOVEMENT IS REPORTED AND NOT ENFORCED
+    A legitimate run moves a lot: a fresh scrape adds leads, a vision pass
+    scores 12,000 of them, a valuation fix withdraws $72M of max bid on purpose.
+    Thresholding that would either fire constantly (and be ignored, which is
+    worse than nothing) or be set so loose it never fires. So movement is
+    printed, loudly and comparably, for a human to sanity-check against what
+    they believe they changed.
+
+USAGE
+    uv run python scripts/board_selfcheck.py            # vs the last commit
+    uv run python scripts/board_selfcheck.py --json     # machine-readable
+    uv run python scripts/board_selfcheck.py --against <git-ref>
+    uv run python scripts/board_selfcheck.py --checkpoint [DIR]   # a checkpoint, before publishing
+
+    Exit 0 = every invariant held. Exit 1 = at least one breached.
+"""
+from __future__ import annotations
+
+import argparse
+import gzip
+import json
+import os
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+from typing import Iterable, Iterator
+
+REPO = Path(__file__).resolve().parent.parent
+DOCS = REPO / "docs"
+SLIM = "docs/listings_slim.json.gz"
+
+#: Flags that mean the valuation itself is disputed. A lead carrying one of
+#: these must not publish money derived from the ARV. Kept in sync with
+#: valuation.grading.ARV_FLAGS_CONTRADICTED — imported rather than restated so a
+#: rename cannot make this check silently vacuous, which is the exact failure
+#: mode (a reader and a writer disagreeing) that produced five separate silent
+#: defects in one day.
+sys.path.insert(0, str(REPO / "src"))
+from foreclosure_scraper import identity as _idn  # noqa: E402  (the duplicate rule, see invariants())
+
+try:
+    from foreclosure_scraper.valuation.grading import ARV_FLAGS_CONTRADICTED
+    CONTRADICTED = frozenset(ARV_FLAGS_CONTRADICTED)
+except Exception:  # noqa: BLE001 - the check must still run from a bare checkout
+    CONTRADICTED = frozenset({
+        "anchor_shared_across_parcels", "bid_proxy_arv", "arv_above_anchor",
+        "arv_above_list_price", "arv_land_sqft_mismatch", "arv_proxy_above_ceiling",
+        "arv_above_plausible_max", "arv_implies_implausible_roi",
+    })
+
+#: 2026-11-10: deal_status/deal_message/haircut_needed were re-pointed from the
+#: ARV lens to the as-is/MAO lens (grading.py's as_is_trust gate) so the primary
+#: deal verdict matches DPA's as-is-only rule. ARV_FLAGS_CONTRADICTED above is
+#: still correct for MONEY_FIELDS (still ARV-derived) and for equity (still
+#: arv - payoff - liens), but a contradicted ARV no longer implies a withheld
+#: deal verdict -- most ARV_FLAGS_CONTRADICTED members (arv_above_anchor,
+#: bid_proxy_arv, etc.) say nothing about the as-is anchor itself. Imported
+#: separately so a rename on either side cannot make this check silently
+#: vacuous or silently over-fire.
+try:
+    from foreclosure_scraper.valuation.grading import AS_IS_FLAGS_CONTRADICTED
+    AS_IS_CONTRADICTED = frozenset(AS_IS_FLAGS_CONTRADICTED)
+except Exception:  # noqa: BLE001 - the check must still run from a bare checkout
+    AS_IS_CONTRADICTED = frozenset({"anchor_shared_across_parcels", "cama_class_mismatch"})
+
+# The REAL current board, read via board_stream.iter_board_rows() — never
+# listings_slim.json.gz. That mobile derivative is only regenerated by a full
+# write_artifact() call; append_new_rows()/patch_existing_rows() (2026-09-29,
+# commits 3272b3c0/758d0bb5) are now the write path for most board landings
+# and deliberately leave it stale (see their own docstrings, and
+# web_artifact.py's SLIM-V1 block comment). Importing it here, rather than
+# catching an ImportError at call time, means a bare checkout without the
+# package fails loudly at startup instead of silently falling back to a stale
+# read the way an earlier version of this script did.
+#
+# MEMORY HISTORY (read this before touching _current() again). The comment
+# this replaced claimed "~290 MB peak RSS for the full 219k-row board,
+# measured 2026-09-30" for `rows = list(iter_board_rows(...))` — materializing
+# every row (raw payload and all: ~15-20 KB/row measured on this board, mostly
+# the `raw` sub-object — comps, vision, cama, skip-trace, deed-chain, etc.) as
+# one Python list. That number was stale/wrong by the time it was written:
+# re-measured the same day against the real 219,143-row board, `sample <pid> 1
+# -f` showed 2.3 GB physical footprint after 9 seconds (still climbing, killed
+# there) and separately 6.1 GB before a supervised watchdog SIGKILLed it at its
+# ceiling — the same class of multi-GB spike behind a kernel panic on this 8 GB
+# Mac earlier that same night.
+#
+# A SECOND, related bug was found while fixing the first: _previous() (used only for
+# MOVEMENT, see its own docstring) did `json.loads()` over the ENTIRE ~217k-row committed
+# listings_slim.json.gz in one call. Measured in isolation against this repo's real HEAD:
+# 5.97 GB peak memory footprint / 2.53 GB peak RSS — nearly the same crisis, and one the
+# DEFAULT `main()` invocation hit every time (movement runs against HEAD unless told not
+# to), so fixing _current() alone would NOT have fixed the script.
+#
+# `_current()` (below) is now a GENERATOR: it never holds more than one row at a time, and
+# every caller in this file (invariants(), and movement() via _light_row()/_light_calc()/
+# _tee()) extracts only the handful of small fields each check needs, discarding the rest of
+# the row before moving on. `_previous()` now streams the committed gzip blob through a temp
+# file instead of parsing it whole. No code path in this file ever holds a second full copy
+# of either board.
+#
+# RE-MEASURED after both fixes, real board, real HEAD, full `main()` run (every invariant
+# AND movement, --json), same `sample <pid> 1 -f` methodology, under the same supervised
+# watchdog (hard kill cap, polled every ~1s), run twice for stability: 396-518 MB peak RSS
+# (`maximum resident set size`, /usr/bin/time -l) / 540-549 MB peak physical footprint
+# (`sample -f`, matching /usr/bin/time -l's own "peak memory footprint" line), full run
+# (219,143 current rows, matched against the 217,773-row previous board) complete in 23-25s
+# wall time, measured 2026-09-30 -- under 600 MB either way, against an 8 GB machine that had
+# to SIGKILL this same check hours earlier. Correctness
+# verified two ways before this replaced the list-based version: (1) tests/test_board_selfcheck.py
+# pins exact invariant/movement counts on synthetic boards, including a direct old-vs-new
+# comparison in test_streaming_invariants_agrees_with_the_old_list_based_implementation();
+# (2) the old (list-based) and new (streaming) implementations were run side by side, in and
+# out of process, against a real bounded 15,000-row slice of this board compared against the
+# real committed previous board, and produced byte-identical --json output (every invariant
+# count, every movement count, the full "changed" breakdown, and largest_arv_moves) — see this
+# commit's message for the comparison transcript.
+from foreclosure_scraper import board_parts as _board_parts
+from foreclosure_scraper.board_stream import iter_board_rows
+
+MONEY_FIELDS = ("max_bid_70", "roi_pct", "estimated_profit", "wholesale_mao")
+
+
+def _light_calc(rec: dict) -> dict:
+    """The 5 money fields movement() diffs, extracted from ONE previous-board row. Same idea
+    as _light_row() (see its docstring), applied to `prev` instead of `cur`: a prev row's
+    `raw.calc` sub-object also carries rehab estimates, notes strings, arv_flags, etc. that
+    movement() never reads -- keeping only these 5 numbers per row is what makes streaming
+    _previous() (below) actually bounded rather than just moving the same problem there."""
+    c = _calc(rec)
+    return {f: c.get(f) for f in ("arv_expected",) + MONEY_FIELDS}
+
+
+def _current() -> Iterator[dict]:
+    """Stream the real, currently published board one row at a time — NEVER a list. See the
+    import comment above for why this reads iter_board_rows() and not listings_slim.json.gz,
+    and the MEMORY HISTORY comment above that for why this is a generator and not
+    `list(iter_board_rows(...))` (that pattern measured 2.3-6.1 GB on the real board).
+
+    Every caller (invariants(), and movement() via the _tee()/_light_row() helpers) consumes
+    this in a single streaming pass and keeps only small, bounded per-row state — never a
+    second full copy of the board.
+    """
+    try:
+        rows = iter_board_rows(DOCS / "listings.json.gz")
+        try:
+            first = next(rows)
+        except StopIteration:
+            raise SystemExit("no board rows found under docs/ — nothing to check")
+        yield first
+        yield from rows
+    except _board_parts.BoardIntegrityError as exc:
+        raise SystemExit(f"board payload is not intact — {exc}") from exc
+    except FileNotFoundError as exc:
+        # No manifest, no parts, and no legacy single listings.json.gz either: there is no
+        # board here at all (a bare checkout, or docs/ pointed at an empty scratch dir).
+        raise SystemExit(f"no board found under {DOCS} — nothing to check ({exc})") from exc
+
+
+def _checkpoint_rows(ckpt_dir: Path) -> Iterator[dict]:
+    """Stream a CHECKPOINT's board (``<ckpt_dir>/board.json.gz``, full-fidelity Listing dumps) as
+    the rows it would PUBLISH: each row validated to a Listing and passed through
+    web_artifact._to_dict, the per-row transform write_artifact applies (RAW_KEEP trim, junk
+    street addresses nulled, ...). One row at a time, like _current().
+
+    For the gated launch (docs/HANDOFF.md item 72): ``--checkpoint`` grades the scored
+    pre_publish board that ``vm_run.sh --stop-before-publish`` left, against the published
+    board, BEFORE ``vm_resume.sh --publish-only`` publishes it. Rows that do not validate are
+    skipped (as checkpoint.load() skips them) and reported on stderr."""
+    from foreclosure_scraper.board_parts import iter_gz_rows
+    from foreclosure_scraper.models import Listing
+    from foreclosure_scraper.web_artifact import _to_dict
+    board = Path(ckpt_dir) / "board.json.gz"
+    if not board.exists():
+        raise SystemExit(f"no checkpoint board at {board} - nothing to check")
+    bad = 0
+    for rec in iter_gz_rows(board):
+        try:
+            li = Listing.model_validate(rec)
+        except Exception:  # noqa: BLE001 - counted, like checkpoint.load()
+            bad += 1
+            continue
+        yield _to_dict(li)
+    if bad:
+        print(f"note: {bad:,} checkpoint rows did not validate and were skipped "
+              f"(checkpoint.load() drops them too)", file=sys.stderr)
+
+
+def _previous(ref: str) -> Iterator[dict] | None:
+    """Stream the board as of `ref`, for MOVEMENT only (never for invariants).
+
+    Deliberately still listings_slim.json.gz, not the full board: the full
+    board has not been one committed path since the 2026-09-21 payload split
+    (docs/listings.json.gz is no longer written; it is N listings_part_NNN.json.gz
+    files, and N changes between commits), so there is no single path a plain
+    `git show <ref>:<path>` can read for it. The slim file is still committed
+    whole at one stable path on every full write_artifact() run, which makes it
+    the only cheap way to diff "what did the board look like at a past commit"
+    without checking out that commit's entire part set. It undercounts a board
+    published only through append_new_rows()/patch_existing_rows() since the
+    last full write (see _current()'s comment) — MOVEMENT already reports "new"
+    for anything it does not recognize, so that shows up as new leads, not as a
+    hidden gap.
+
+    A THIRD memory bug this file had (2026-09-30, found while re-measuring the two the
+    MEMORY HISTORY comment above _current() documents). This used to be `return
+    _load_gz(r.stdout)` -- one `json.loads()` over the ENTIRE ~217k-row slim array `git show`
+    returns. Measured in isolation against this repo's real HEAD: 5.97 GB peak memory
+    footprint / 2.53 GB peak RSS -- nearly the same crisis as the original `_current()` bug,
+    and one the default `main()` invocation would have hit EVERY time (movement runs against
+    HEAD by default), even after _current() itself was fixed. Now: the committed gzip blob
+    (already small, ~50 MB) is written to a temp file and streamed row-by-row through
+    board_parts.iter_gz_rows() -- the same bounded reader iter_board_rows() uses -- and
+    movement() (the only caller) immediately reduces each row to _light_calc()'s 5 numbers
+    and discards the rest. Nothing here ever holds more than one row, or the ~50 MB blob
+    itself, in memory at once.
+    """
+    r = subprocess.run(["git", "show", f"{ref}:{SLIM}"],
+                       cwd=REPO, capture_output=True)
+    if r.returncode != 0 or not r.stdout:
+        return None
+    try:
+        tmp_name = None
+        fd, tmp_name = tempfile.mkstemp(suffix=".json.gz", prefix="board_selfcheck_prev_")
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(r.stdout)
+        with gzip.open(tmp_name, "rb") as fh:
+            fh.read(2)  # cheap validity check: a real gzip member has a 2-byte magic header
+    except OSError:
+        if tmp_name:
+            try:
+                os.unlink(tmp_name)
+            except OSError:
+                pass
+        return None
+
+    def _stream() -> Iterator[dict]:
+        try:
+            yield from _board_parts.iter_gz_rows(tmp_name)
+        finally:
+            try:
+                os.unlink(tmp_name)
+            except OSError:
+                pass
+
+    return _stream()
+
+
+def _calc(rec) -> dict:
+    return ((rec or {}).get("raw") or {}).get("calc") or {}
+
+
+def _identifier(rec) -> str | None:
+    """A value that genuinely distinguishes ONE property, or None.
+
+    Returns None deliberately and often. The first version of this used
+    address+case+county+state+source with empty-string fallbacks, and reported
+    8,241 duplicates on a board that has almost none:
+
+      7,901 of them were leads where BOTH address and case_number are empty, so
+            every address-less lead in a county collapsed onto one key;
+        644 were parcels sharing a road name with no house number — "SR 1135",
+            "HWY 226", "OFF PARKER PADGETT RD" in McDowell — which are distinct
+            properties that simply have no street number to tell them apart.
+
+    Neither is a duplicate. A guard that fires on 8,241 good leads is worse than
+    no guard, because the next person deletes it and takes the real check with
+    it.
+
+    Two further identifiers were tried and rejected on the evidence:
+
+      source_url — identifies the SOURCE DOCUMENT, not the property. 80 leads
+        share one Lincoln County delinquent-tax PDF; 8 share one Asheville
+        permits endpoint. Every one is a different house.
+      case_number — one foreclosure case routinely covers several parcels, so a
+        shared case is normal, not a collision.
+
+    What is left is what actually names a property: the county's own parcel id,
+    or a street address carrying a house number. When a lead has neither, this
+    returns None and the lead is excluded from the duplicate count rather than
+    guessed at.
+    """
+    r = rec or {}
+    pid = str(r.get("parcel_id") or "").strip()
+    if pid:
+        return f"parcel:{(r.get('county') or '').lower()}:{pid.lower()}"
+    addr = str(r.get("street_address") or "").strip()
+    parts = addr.split()
+    if parts and any(ch.isdigit() for ch in parts[0]):
+        return f"addr:{(r.get('county') or '').lower()}:{addr.lower()}"
+    return None
+
+
+def _key(rec) -> str:
+    """Stable identity for MATCHING a lead across two publishes.
+
+    Falls back to a composite so every lead gets compared; unlike _identifier
+    this is allowed to be imprecise, because a wrong match here only mislabels a
+    lead as changed rather than asserting a defect.
+    """
+    return _identifier(rec) or "|".join(
+        str((rec or {}).get(f) or "") for f in
+        ("street_address", "case_number", "county", "state", "source"))
+
+
+#: A parcel/address key carried by this many OR MORE distinct street addresses is not
+#: describing one property -- it is a fused or placeholder identifier in the SOURCE data
+#: (a master-tract PIN a subdivision's lots all cite before the county assigns individual
+#: ones, a missing-parcel sentinel, a scraper that fell back to a body of water or a lot
+#: description in the parcel field). Same threshold `dedupe.suspicious_parcel_keys()`
+#: already uses for the identical reason, restated here rather than imported: importing
+#: it would mean building a `Listing` per board row just to reach `dedupe_key()`, which is
+#: the whole-board materialization this script's read of listings_slim.json.gz already
+#: avoids paying twice for.
+#:
+#: WHY THIS EXISTS (2026-09-29 audit of a 7,536 "duplicate" reading). Grouping the board's
+#: 217k rows by `_identifier()` found 1,303 groups with 2+ rows. The 20 LARGEST groups
+#: alone (out of 1,303) covered 5,623 of the 8,839 rows in duplicate groups -- three
+#: quarters of the count -- and every one of them was this exact phenomenon, not a real
+#: duplicate:
+#:   parcel:lincoln:3633940779       1,618 rows, 1,580 from counties_nc.lincoln_vacant,
+#:                                   each a DIFFERENT real street (SIGMON ST, W CHILDS ST,
+#:                                   POWER LINE RD, MISTY DAWN LN, GAMBLE DR, ...) -- a
+#:                                   placeholder/garbage parcel_id the scraper emits when it
+#:                                   has no real one.
+#:   parcel:pender:3208-90-5620-0000   216 rows -- the EXACT case dedupe.py's own
+#:                                   suspicious_parcel_keys() docstring names: one
+#:                                   master-tract PIN a subdivision's lots all cite, 216
+#:                                   distinct addresses, already known and deliberately kept
+#:                                   UNMERGED by dedupe()'s house-number guard so the merge
+#:                                   does not silently delete 215 real properties.
+#:   parcel:transylvania:escrow :    163 rows sharing the literal string "escrow :" as a
+#:                                   "parcel id".
+#:   parcel:carteret:bogue sound      71 rows sharing "bogue sound" (a body of water).
+#: `dedupe()` already refuses to merge any of these (that is WHY they are still separate
+#: rows); counting them as "duplicates" here was this check's own false alarm, not a
+#: rediscovery of a defect dedupe() missed. Below the threshold is where the real signal
+#: lives: 2-3 rows sharing a key with the SAME or an absent house number are what an
+#: undedup'd cross-source landing (measured example: `counties_generic.arcgis_distress.
+#: buncombe_unpaid_bills` storing the tax bill's MAILING address in `street_address` --
+#: documented in `scripts/resolve_parcel_from_address.py`'s DENY_SOURCES, "23%: bill
+#: mailing address" -- against `counties.multi_year_delinquent_tax`'s situs address, same
+#: parcel, 206+ pairs) actually looks like, and this check still catches those.
+#: FIXED AT THE SOURCE 2026-09-29 (arcgis_distress_layers.py now builds situs from
+#: house_num/street_name/street_type, same as multi_year_delinquent_tax, and keeps the
+#: mailing address in raw["owner_mailing"] instead): NEW rows from this source will not
+#: reproduce this pair. The ~206+19 rows already on the board from before the fix are
+#: NOT backfilled by that change and still need the separate load_board()+dedupe()+
+#: write_artifact() normalize pass already flagged as follow-up work.
+FUSION_THRESHOLD = 4
+
+
+def invariants(board: Iterable[dict]) -> list[dict]:
+    """Each entry is a statement that must be true. Breach = a known defect is back.
+
+    SINGLE STREAMING PASS over `board`, bounded per-row state only: a handful of O(1)
+    counters, plus one dict (identifier -> [street addresses]) for the duplicate check —
+    never a list of full rows, and never more than one pass. `board` may be a generator
+    (production: the live board via _current(), possibly wrapped by _tee()) or a plain list
+    (tests: a small synthetic board) — either way this function iterates it exactly once and
+    never calls list()/materializes a second copy of it. Rewritten 2026-09-30 (see the
+    MEMORY HISTORY comment above _current()); every check below produces the identical count
+    the old list-based version did — see tests/test_board_selfcheck.py and the commit message
+    for the old-vs-new comparison this was verified against.
+    """
+    bad_money = {f: 0 for f in MONEY_FIELDS}
+    bad_deal_verdict = 0
+    bad_equity = 0
+    bad_max_bid_2m = 0
+    bad_unflagged_2m = 0
+    # identifier -> [street_address, ...], one entry per row that carries an identifier — the
+    # same shape scripts/run_duplicate_merge_20260930.py's pass-1 "light" dict uses, and for
+    # the same reason: it is the smallest state that still lets the fusion-threshold logic
+    # below reproduce the old full-row-list grouping's counts exactly.
+    ident_addrs: dict[str, list[str]] = {}
+    total = 0
+
+    for r in board:
+        total += 1
+        r = r or {}
+        calc = _calc(r)
+        flags = calc.get("arv_flags") or []
+        if any(f in CONTRADICTED for f in flags):
+            for f in MONEY_FIELDS:
+                if calc.get(f):
+                    bad_money[f] += 1
+            if ((r.get("raw") or {}).get("equity") or {}).get("value"):
+                bad_equity += 1
+        if any(f in AS_IS_CONTRADICTED for f in flags):
+            if calc.get("deal_status"):
+                bad_deal_verdict += 1
+
+        arv_expected = calc.get("arv_expected") or 0
+        if arv_expected > 2_000_000:
+            if calc.get("max_bid_70"):
+                bad_max_bid_2m += 1
+            if not flags:
+                bad_unflagged_2m += 1
+
+        # Duplicates are judged by identity.py (audit 2026-10-09, identity): one valid parcel or
+        # one numbered address, partitioned by PROPERTY (two real house numbers or units on one
+        # parcel are two properties, as dedupe's identity rule says; an aged copy at the owner's
+        # mailing address or of the same source record is not a second one). Fused rows (their
+        # own source record names another parcel) are judged by the identity audit check instead.
+        try:
+            ident = None if _idn.fused_record(r) else _idn.ident_key(r)
+        except Exception:  # noqa: BLE001 - an unreadable row cannot be judged
+            ident = None
+        if ident:
+            ident_addrs.setdefault(hash(ident), []).append(_idn.view(total - 1, r, hash))
+
+    out = []
+    for field in MONEY_FIELDS:
+        out.append({
+            "name": f"no {field} on a contradicted ARV",
+            "count": bad_money[field], "must_be": 0, "ok": not bad_money[field],
+            "why": "the valuation disputes its own number; money derived from it "
+                   "is a bid instruction built on a figure we refused to stand behind",
+        })
+
+    out.append({"name": "no deal verdict on a contradicted as-is anchor", "count": bad_deal_verdict,
+                "must_be": 0, "ok": not bad_deal_verdict,
+                "why": "deal_status is as-is-anchored (2026-11-10); a green GREAT beside "
+                       "a withheld/disputed as-is value is the same failure mode that "
+                       "shipped before, just on the lens that now actually drives the "
+                       "verdict -- a merely-contradicted ARV no longer implies this"})
+
+    out.append({"name": "no equity on a contradicted ARV", "count": bad_equity,
+                "must_be": 0, "ok": not bad_equity,
+                "why": "equity is ARV minus payoff; on a disputed ARV it is the same "
+                       "disputed number wearing a different label, and it feeds the "
+                       "HOT/WARM ranking"})
+
+    out.append({"name": "no max bid on an ARV over $2M", "count": bad_max_bid_2m,
+                "must_be": 0, "ok": not bad_max_bid_2m,
+                "why": "no comparable property in these counties has fetched that; "
+                       "the grader already refuses to letter-grade them"})
+    out.append({"name": "every ARV over $2M carries a flag", "count": bad_unflagged_2m,
+                "must_be": 0, "ok": not bad_unflagged_2m,
+                "why": "an unflagged $2M+ ARV is indistinguishable from a real one"})
+
+    identified = sum(len(v) for v in ident_addrs.values())
+    unidentifiable = total - identified
+
+    dupes = 0
+    fused_keys = 0
+    fused_rows = 0
+    multi_keys = 0
+    for views in ident_addrs.values():
+        if len(views) < 2:
+            continue
+        distinct = {v["tag"] for v in views if v["tag"]}
+        if len(distinct) >= FUSION_THRESHOLD:
+            # Many DISTINCT real addresses under one key: the key is fused/placeholder in
+            # the source data, not one property landed twice. dedupe() already refuses to
+            # merge these (see FUSION_THRESHOLD's comment) -- reported below, not counted
+            # as a breach.
+            fused_keys += 1
+            fused_rows += len(views)
+            continue
+        parts = _idn.partition(views)
+        multi_keys += len(parts) > 1
+        dupes += sum(len(p) - 1 for p in parts)
+
+    entry = {"name": "no duplicate identifiable properties", "count": dupes,
+             "must_be": 0, "ok": dupes == 0,
+             "why": "two rows for one property double-count it in every total "
+                    f"and split its enrichment ({unidentifiable:,} leads carry no "
+                    "parcel/case/url/numbered-address and are excluded — they "
+                    "cannot be judged either way)"}
+    if multi_keys:
+        entry["multi_address_keys"] = multi_keys
+        entry["multi_address_note"] = (
+            f"{multi_keys:,} parcel/address key(s) hold 2-3 different properties (house numbers or "
+            "units each named by its own record: an apartment complex's units, a parcel's two "
+            "structures): not duplicates, see identity.partition")
+    if fused_keys:
+        entry["fused_keys"] = fused_keys
+        entry["fused_rows"] = fused_rows
+        entry["fused_note"] = (
+            f"{fused_keys:,} parcel/address key(s) shared by {FUSION_THRESHOLD}+ distinct "
+            f"street addresses ({fused_rows:,} rows) excluded from the count above as "
+            "fused/placeholder identifiers, not duplicates -- see FUSION_THRESHOLD's "
+            "comment")
+    out.append(entry)
+    return out
+
+
+def _light_row(r: dict) -> dict:
+    """The handful of small fields movement() needs from one full board row: its matching
+    key, street address, and the 5 money fields it diffs against the previous publish.
+    Discards everything else -- in particular the `raw` sub-object, which is where a board
+    row's size actually lives (~15-20 KB/row measured; comps, vision, cama, skip-trace,
+    deed-chain, ...). Built once per row, during the SAME streaming pass invariants() already
+    makes over the live board (see _tee()), so movement() never needs a second read of it."""
+    c = _calc(r)
+    d = {"key": _key(r), "street_address": r.get("street_address")}
+    for f in ("arv_expected",) + MONEY_FIELDS:
+        d[f] = c.get(f)
+    return d
+
+
+def _tee(rows: Iterable[dict], count_sink: list, light_sink: list) -> Iterator[dict]:
+    """Pass every row from `rows` through unchanged (to invariants()), while also counting
+    them (appended to count_sink, a 1-element out-param list) and extracting each row's
+    MOVEMENT summary (_light_row(), appended to light_sink). This is what lets main() do ONE
+    streaming pass over the live board that produces the leads count, every invariant, AND
+    movement()'s input -- instead of reading the (potentially 219k-row) board a second time.
+    light_sink ends up holding one small dict per row (bounded: a handful of numbers and two
+    short strings each), never a full row."""
+    n = 0
+    for r in rows:
+        n += 1
+        light_sink.append(_light_row(r or {}))
+        yield r
+    count_sink.append(n)
+
+
+def movement(cur: Iterable[dict], prev: Iterable[dict]) -> dict:
+    """What changed since the last publish. Reported, never enforced.
+
+    `cur` is an iterable of LIGHT rows (see _light_row()) -- in production, main() builds it
+    as a side effect of the same streaming pass invariants() makes over the live board (via
+    _tee()), so this never triggers a second read of the full board.
+
+    `prev` is a one-shot iterable of FULL rows from the committed listings_slim.json.gz
+    (_previous() now streams it -- see that function's own docstring for the ~6 GB bug this
+    fixes). It is consumed exactly ONCE, right here, immediately reduced to _light_calc()'s 5
+    numbers per row (`pi`) plus a bounded list of keys (`prev_keys`, needed to count `dropped`
+    per PREVIOUS row rather than per unique key -- two prev rows that collide on the same
+    imprecise _key() must still both count if neither survives, matching the pre-streaming
+    behaviour exactly); the full prev rows themselves are never retained.
+    """
+    pi: dict[str, dict] = {}
+    prev_keys: list[str] = []
+    for p in prev:
+        k = _key(p)
+        prev_keys.append(k)
+        pi[k] = _light_calc(p)
+
+    matched = gained = curr_total = 0
+    moved: dict[str, int] = {f: 0 for f in ("arv_expected",) + MONEY_FIELDS}
+    big_moves = []
+    ck: set[str] = set()
+    for r in cur:
+        curr_total += 1
+        k = r["key"]
+        ck.add(k)
+        pc = pi.get(k)
+        if pc is None:
+            gained += 1
+            continue
+        matched += 1
+        for f in moved:
+            a, b = r.get(f), pc.get(f)
+            if a != b:
+                moved[f] += 1
+                if f == "arv_expected" and a and b:
+                    try:
+                        if abs(a - b) / max(b, 1) >= 1.0:
+                            big_moves.append((abs(a - b), r.get("street_address"), b, a))
+                    except Exception:  # noqa: BLE001
+                        pass
+    lost = sum(1 for k in prev_keys if k not in ck)
+    # Sort on the delta ONLY. A bare reverse=True falls through to comparing the
+    # next tuple element when deltas tie, and street_address is None on hundreds
+    # of leads, which raises str < NoneType and takes down the whole check.
+    big_moves.sort(key=lambda t: t[0], reverse=True)
+    return {
+        "prev_count": len(prev_keys), "curr_count": curr_total,
+        "matched": matched, "new": gained, "dropped": lost,
+        "changed": moved,
+        "largest_arv_moves": [
+            {"address": a, "from": b, "to": c2} for _, a, b, c2 in big_moves[:10]
+        ],
+    }
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--against", default="HEAD",
+                    help="git ref holding the board to compare against (default HEAD)")
+    ap.add_argument("--json", action="store_true")
+    ap.add_argument("--checkpoint", nargs="?", const="data/checkpoint", default=None,
+                    metavar="DIR", help="grade a checkpoint's board (default dir data/checkpoint) "
+                    "as it would publish, instead of the published board; movement is still "
+                    "against --against")
+    args = ap.parse_args()
+
+    # ONE streaming pass over the live board: _tee() counts rows and extracts movement()'s
+    # light-row input as a side effect while invariants() consumes them. Never a list of full
+    # rows (see the MEMORY HISTORY comment above _current()).
+    total_box: list[int] = []
+    light_rows: list[dict] = []
+    src = (_checkpoint_rows(REPO / args.checkpoint if not Path(args.checkpoint).is_absolute()
+                            else Path(args.checkpoint))
+           if args.checkpoint else _current())
+    inv = invariants(_tee(src, total_box, light_rows))
+    total = total_box[0] if total_box else 0
+
+    prev = _previous(args.against)
+    mv = movement(light_rows, prev) if prev else None
+    breached = [i for i in inv if not i["ok"]]
+
+    if args.json:
+        print(json.dumps({"invariants": inv, "movement": mv,
+                          "breached": len(breached)}, indent=1, default=str))
+        return 1 if breached else 0
+
+    what = f" (checkpoint {args.checkpoint}, as it would publish)" if args.checkpoint else ""
+    print(f"BOARD SELF-CHECK — {total:,} leads{what}\n")
+    print("INVARIANTS (a breach means a known defect is back)")
+    for i in inv:
+        mark = "ok " if i["ok"] else "FAIL"
+        print(f"  [{mark}] {i['name']:44} {i['count']:>6,} (must be {i['must_be']})")
+        if not i["ok"]:
+            print(f"         why it matters: {i['why']}")
+        if i.get("fused_keys"):
+            print(f"         excluded as fused/placeholder: {i['fused_note']}")
+
+    if mv is None:
+        print(f"\nMOVEMENT: no previous board at {args.against} — nothing to compare.")
+    else:
+        print(f"\nMOVEMENT vs {args.against}")
+        print(f"  leads      {mv['prev_count']:,} -> {mv['curr_count']:,}"
+              f"   (+{mv['new']:,} new / -{mv['dropped']:,} dropped / {mv['matched']:,} matched)")
+        for f, n in mv["changed"].items():
+            pct = (n / mv["matched"] * 100) if mv["matched"] else 0
+            print(f"  {f:20} changed on {n:>6,} matched leads  ({pct:4.1f}%)")
+        if mv["largest_arv_moves"]:
+            print("\n  largest ARV moves (>=2x) — check these against what you changed:")
+            for m in mv["largest_arv_moves"][:6]:
+                print(f"    {str(m['address'])[:34]:36} "
+                      f"{(m['from'] or 0):>12,.0f} -> {(m['to'] or 0):>12,.0f}")
+        print("\n  Movement never fails this check. A real run moves a lot: a scrape adds")
+        print("  leads, a vision pass scores thousands, a valuation fix withdraws money on")
+        print("  purpose. It is printed so a human can ask 'why did that move when I only")
+        print("  changed the CSS?' — which is the question nothing was asking before.")
+
+    if breached:
+        print(f"\n{len(breached)} INVARIANT(S) BREACHED — do not publish this board.")
+        return 1
+    print("\nAll invariants held.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

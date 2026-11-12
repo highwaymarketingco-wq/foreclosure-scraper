@@ -1,0 +1,283 @@
+name: Patch — re-run specific scrapers + merge into docs/listings.json
+
+# Manually-triggered targeted patch. Same secrets + network env as the
+# weekly run, but only does the high-impact subset: scrapers + sold-pool
+# enrichment (GIS / photos / Vision) + NC eCourts case-status (Order
+# Confirming Sale detection) + comp matcher. Skips RentCast / flood /
+# EPA / permits / etc.
+#
+# Use when:
+#   * A scraper bug-fix shipped and you want the missing listings
+#     backfilled NOW without paying 60-90 min for a full weekly run.
+#   * You want NC sold comps populated from the rod-vendor + NC
+#     eCourts paths that don't run in the dev sandbox.
+#   * You want Vision condition tier on every sold comp's primary
+#     photo — only this workflow has the ANTHROPIC_API_KEY.
+#
+# What it does:
+#   * Loads docs/listings.json + docs/foreclosure_sold_pool.json
+#   * Re-runs ONLY the requested scraper slugs (or --all-fixed default)
+#   * Partitions output: active listings vs sold-pool candidates
+#   * Active: filter chain + address enrichments + calc/grade
+#   * Sold pool: GIS + city-split + HomeHarvest photos + Vision +
+#     validate + county_pin + property_kind
+#   * Merges new active into existing active, new sold into existing
+#     sold pool (Listing.merge + dedupe)
+#   * Runs NC eCourts case-status enrichment on the merged active set
+#     (Tyler Odyssey docket detail) — when Order Confirming Sale shows
+#     a hammer price, the listing is promoted to the sold pool
+#   * Comp matcher: like-for-like county / kind / beds±1 / sqft±40%
+#   * Upset-bid window tagging
+#   * Writes back BOTH files + appends a patch entry to run_health.json
+#
+# Cost: ~$2-12 in Vision (capped by SOLD_POOL_VISION_MAX_LISTINGS=100).
+# Apify gated by APIFY_FREE_TIER_ONLY=1 — no paid Apify calls.
+# Runtime: ~15-35 min depending on number of slugs.
+
+on:
+  workflow_dispatch:
+    inputs:
+      slugs:
+        description: 'Space-separated scraper slugs (e.g. "counties_nc.nc_ecourts_lis_pendens"). Leave blank for --all-fixed.'
+        required: false
+        default: ""
+      runner:
+        description: 'Where to run. self-hosted = your laptop (residential IP — needed for Tyler eCourts). ubuntu-latest = GitHub cloud (datacenter IP — Tyler will be WAF-blocked).'
+        required: false
+        default: "ubuntu-latest"
+        type: choice
+        options:
+          - ubuntu-latest
+          - self-hosted
+
+permissions:
+  contents: write
+
+concurrency:
+  # Don't let this collide with the weekly run — they both push to docs/.
+  group: weekly-scrape
+  cancel-in-progress: false
+
+jobs:
+  patch:
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
+    timeout-minutes: 90
+    env:
+      # Same secrets the weekly run uses (some enrichments need them):
+      GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+      APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+      APIFY_FREE_TIER_ONLY: "1"
+      COURTLISTENER_TOKEN: ${{ secrets.COURTLISTENER_TOKEN }}
+      # Vision provider — defaults to 'anthropic'. Set repo variable
+      # VISION_PROVIDER=gemini to flip to Gemini 2.0 Flash (free at 1500
+      # req/day on gemini-2.0-flash-exp; mint key at
+      # https://aistudio.google.com/apikey then add as GEMINI_API_KEY
+      # secret). Both providers fill the same raw.vision +
+      # raw.condition_tier shape so the comp popout works either way.
+      VISION_PROVIDER: ${{ vars.VISION_PROVIDER || 'anthropic' }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      # Multi-account Gemini key rotation — see weekly.yml comment.
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
+      GEMINI_API_KEY_3: ${{ secrets.GEMINI_API_KEY_3 }}
+      GEMINI_API_KEY_4: ${{ secrets.GEMINI_API_KEY_4 }}
+      VISION_MAX_LISTINGS: "0"          # patch run skips active-listing Vision
+      SOLD_POOL_VISION_MAX_LISTINGS: "100"
+      # NC case-status: two-stage dispatch.
+      # Stage 1 (auth): when NC_ECOURTS_USERNAME/PASSWORD are set, drive
+      # Tyler's WS-Fed login flow + scrape case dockets. Verified-account
+      # session cookies pass the WAF's bot challenge.
+      # Stage 2 (heuristic): sale-date math + Trustee's Deed cross-ref
+      # for any listing Tyler didn't tag.
+      PATCH_NC_CASE_STATUS: "1"
+      NC_ECOURTS_USERNAME: ${{ secrets.NC_ECOURTS_USERNAME }}
+      NC_ECOURTS_PASSWORD: ${{ secrets.NC_ECOURTS_PASSWORD }}
+      NC_ECOURTS_AUTH_CAP: "50"
+      # CapSolver API key (capsolver.com). Solves the AWS WAF challenge
+      # in front of Tyler's IdP login page so we can reach the real
+      # username/password form. ~$0.001 per solve, ~$0.20/week at our
+      # volume. Without this, Tyler auth fails at last_step='waf_challenge_detected'.
+      CAPSOLVER_API_KEY: ${{ secrets.CAPSOLVER_API_KEY }}
+      # Skip-trace (dad's #7): homeowner contact info. Default 'none'.
+      # Repo variable SKIP_TRACE_PROVIDER picks the provider.
+      SKIP_TRACE_PROVIDER: ${{ vars.SKIP_TRACE_PROVIDER || 'none' }}
+      SKIP_TRACE_API_KEY: ${{ secrets.SKIP_TRACE_API_KEY }}
+      SKIP_TRACE_MAX_PER_RUN: ${{ vars.SKIP_TRACE_MAX_PER_RUN || '100' }}
+      LOG_LEVEL: INFO
+      PYTHONUNBUFFERED: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Pin Python 3.12
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --frozen || uv sync
+
+      - name: Install Playwright Chromium (for Scrapling stealth fetchers)
+        run: |
+          uv run python -m playwright install chromium --with-deps || true
+
+      - name: Update Scrapling browsers + fingerprints
+        # 0.4.8 ships updated browsers/fingerprints that bypass WAF
+        # challenges more reliably (matters for Tyler eCourts auth).
+        # --force re-downloads patchright Chromium with the latest
+        # stealth patches.
+        run: |
+          uv run scrapling install --force || true
+
+      - name: Run patch
+        run: |
+          if [ -n "${{ inputs.slugs }}" ]; then
+            uv run python scripts/patch_run_scrapers.py ${{ inputs.slugs }}
+          else
+            uv run python scripts/patch_run_scrapers.py --all-fixed
+          fi
+
+      - name: Verify docs/listings.json still exists + is non-empty
+        run: |
+          test -f docs/listings.json || { echo "::error::docs/listings.json missing after patch"; exit 1; }
+          size=$(wc -c < docs/listings.json)
+          echo "Patched listings size: $size bytes"
+          test "$size" -gt 1000 || { echo "::error::listings.json too small ($size bytes)"; exit 1; }
+
+      - name: Backup listings to artifact (always, before publish)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: patched-listings-${{ github.run_id }}
+          path: |
+            docs/listings.json
+            docs/run_health.json
+          retention-days: 90
+
+      # Upload any debug HTML dumps written by scrapers that produced
+      # 0 listings with substantial HTML. ncnotices is the current
+      # producer; future scrapers can also drop into debug/ for the
+      # same artifact treatment.
+      - name: Upload debug HTML artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-html-${{ github.run_id }}
+          path: debug/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      # THIS STEP PUBLISHED NOTHING FOR MONTHS.
+      #
+      # It ran `git add docs/listings.json docs/run_health.json 2>/dev/null ||
+      # true`, twice. docs/listings.json has been gitignored since 4120d30. git
+      # skips the ignored path, stages the rest, and exits non-zero — and the
+      # `2>/dev/null || true` swallowed both the message and the status. So the
+      # workflow committed and pushed run_health.json ALONE: a health report
+      # describing a board it did not ship. It never touched any .gz, the slim
+      # payload, the detail shards or run_meta.json. (Verified in a throwaway
+      # repo.) The cp/mv stash had the same hole — it preserved exactly the two
+      # files it staged across `git reset --hard`, so even once the add was
+      # fixed, the reset would have destroyed everything else.
+      #
+      # scripts/board_payload.sh is now the single definition of what a publish
+      # consists of: board_payload_add stages each path in its own `git add` (so
+      # one bad pathspec cannot void the whole publish), and the stash is a tar
+      # of that same list (so it survives the reset, directory and all).
+      - name: Publish patched dashboard data back to repo
+        run: |
+          set -eu
+          . ./scripts/board_payload.sh
+          # THE ASSUMPTION THE PAYLOAD LIST RESTS ON, asserted rather than
+          # assumed. docs/listings.json is gitignored (it exceeds GitHub's
+          # 100MB/file limit and Pages excludes it), which is precisely why
+          # board_payload_paths omits it and ships the .gz twin instead. Naming
+          # an ignored path in `git add` makes git skip it, stage the rest and
+          # exit non-zero — and with `2>/dev/null || true` around it, that is how
+          # this step used to publish run_health.json alone. If it ever stops
+          # being ignored, the publish list is wrong and someone must decide
+          # what to do with a >100MB file before the next push.
+          git check-ignore -q docs/listings.json || {
+            echo "::error::docs/listings.json is no longer gitignored — the publish list in scripts/board_payload.sh needs revisiting"
+            exit 1
+          }
+          # Fail the job if a required payload would 404 behind Jekyll's
+          # prefix-matching exclude — better to keep the last good deploy than
+          # to push data the site cannot serve.
+          python3 scripts/check_pages_publish.py
+          git config user.name "foreclosure-scraper-bot"
+          git config user.email "actions@github.com"
+          git fetch origin "${{ github.ref_name }}" || true
+          mkdir -p /tmp/published
+          board_payload_stash "$PWD" /tmp/published/payload.tar
+          git reset --hard "origin/${{ github.ref_name }}"
+          board_payload_unstash "$PWD" /tmp/published/payload.tar
+          board_payload_add "$PWD" || { echo "::error::could not stage every board part (docs/listings_part_NNN.json.gz)"; exit 1; }
+          # a mixed part set (parts from two writes, or a part the manifest does not list) is
+          # a mis-joined board: never commit one (audit O1)
+          board_payload_verify_staged "$PWD" || { echo "::error::the staged board parts are not one consistent set"; exit 1; }
+          if git diff --cached --quiet; then
+            echo "No payload changes vs latest origin — skipping commit"
+            exit 0
+          fi
+          git commit -m "patch: re-run scrapers ($(date -u +%Y-%m-%d-%H%M))" || {
+            echo "Nothing to commit"
+            exit 0
+          }
+          # Same 5-attempt fetch+reset+retry pattern as weekly.yml so
+          # concurrent commits don't lose this push.
+          for attempt in 1 2 3 4 5; do
+            if git push origin "HEAD:${{ github.ref_name }}"; then
+              echo "Pushed on attempt $attempt"
+              exit 0
+            fi
+            echo "Push failed (attempt $attempt) — re-syncing with origin"
+            board_payload_stash "$PWD" /tmp/published/payload.tar
+            git fetch origin "${{ github.ref_name }}"
+            git reset --hard "origin/${{ github.ref_name }}"
+            board_payload_unstash "$PWD" /tmp/published/payload.tar
+            board_payload_add "$PWD" || { echo "::error::could not stage every board part (docs/listings_part_NNN.json.gz)"; exit 1; }
+            # a mixed part set (parts from two writes, or a part the manifest does not list) is
+            # a mis-joined board: never commit one (audit O1)
+            board_payload_verify_staged "$PWD" || { echo "::error::the staged board parts are not one consistent set"; exit 1; }
+            if git diff --cached --quiet; then
+              echo "After re-sync: no diff vs latest origin — done"
+              exit 0
+            fi
+            git commit -m "patch: re-run scrapers ($(date -u +%Y-%m-%d-%H%M))" || true
+            sleep $((attempt * 3))
+          done
+          echo "::error::Failed to publish patched data after 5 attempts; artifact still downloadable from run page (patched-listings-${{ github.run_id }})"
+          exit 1
+
+      - name: Surface patch summary
+        if: always()
+        run: |
+          if [ -f docs/run_health.json ]; then
+            uv run python - <<'PY' >> $GITHUB_STEP_SUMMARY
+          import json, pathlib
+          h = json.loads(pathlib.Path("docs/run_health.json").read_text())
+          patches = h.get("patches") or []
+          rerun = [p for p in patches if p.get("kind") == "rerun_scrapers"]
+          if rerun:
+              p = rerun[-1]
+              print("### Scraper re-run patch")
+              print(f"**Applied at:** {p.get('applied_at')}")
+              print(f"**Slugs re-run:** {', '.join(p.get('scraper_slugs') or [])}")
+              print(f"**Raw per slug:**")
+              for slug, n in (p.get('raw_per_slug') or {}).items():
+                  print(f"  - `{slug}`: {n}")
+              print(f"**After filter chain:** {p.get('filtered_kept')}")
+              print(f"**Merged into existing:** {p.get('merged_into_existing')}")
+              print(f"**Added new:** {p.get('added_new')}")
+              print(f"**Total after patch:** {p.get('total_listings_after_patch')}")
+              print(f"**Valuation failures:** {p.get('valuation_failures')}")
+          PY
+          fi

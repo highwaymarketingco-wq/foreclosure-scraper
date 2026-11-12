@@ -1,0 +1,549 @@
+"""SC "Notice to Creditors" probate notices published in county newspapers.
+
+WHY THIS IS THE STRONGEST PROBATE SIGNAL AVAILABLE FOR FREE IN SC
+    SC PublicIndex, the actual probate docket, is ToS-walled (Rule 610) and is
+    deliberately not automated by this engine. But SC Probate Code 62-3-801
+    REQUIRES every estate to publish a Notice to Creditors in a county
+    newspaper, and those papers put it on the open web. The notice carries, in
+    plain text, exactly what the docket would have given us:
+
+        Estate:                 the decedent (the owner of record)
+        Date of Death:          when the property changed hands
+        Case Number:            the real probate case, e.g. 2026ES3900446
+        Personal Representative + Address: who to contact, and where
+
+    A decedent's name plus a live case number is what the name->property
+    resolver needs to pin the parcel, and the PR address is the mailing spine.
+
+THE CASE NUMBER CARRIES THE COUNTY — so attribution is derived, never assumed
+    An SC estate number is YYYY + "ES" + a two-digit COUNTY code + a sequence.
+    2026ES1100303 is Cherokee (11); 2026ES3900446 is Pickens (39). County is
+    read out of the case number rather than inferred from which paper ran the
+    notice, so a Cherokee paper carrying a Spartanburg estate files correctly.
+    An unrecognised code means out of footprint, and the row is dropped.
+
+THREE PAPERS, THREE FIELD DIALECTS — all of them real, none of them documented
+    Pickens   "Estate:"     "Date of Death: 5/30/2026"  "Personal Representative:"
+    Cherokee  "Estate:"     "Death: 06/19/2026"         "PR:"
+    Laurens   "ESTATE OF:"  "Date of Death: May 10, 2026" (spelled-out month)
+
+    Cherokee also puts the PR address on bare unlabelled lines with no
+    "Address:" prefix, so the address reader falls back to the first line that
+    starts with a house number and then takes the "City, ST ZIP" line under it.
+
+WHY THE HOSTS DIFFER IN ACCESS PATH
+    Pickens and Laurens publish notices as ordinary WordPress posts, so the
+    posts endpoint returns the body directly. The Gaffney Ledger files them
+    under a custom post type (gd_classified, the GeoDirectory plugin) whose
+    wp/v2 route is not registered (404) and whose oht_article route returns 403.
+    We do not go around that 403. Since 2026-10-08 the notices are read from the
+    plugin's own public, unauthenticated listing route
+    (/wp-json/geodir/v2/classifieds, the same JSON the site's directory pages
+    use), 50 notices with their full text per request; the old path (the site's
+    public search endpoint, then one ordinary article page per hit) stays as the
+    fallback when that route fails.
+
+WP SEARCH IS FUZZY, so the phrase match is what actually filters
+    /wp-json/wp/v2/search scores loose OR matches: searching "personal
+    representative" on the Gaffney Ledger returns a story about a personal art
+    collection. The reported totals in the hundreds are meaningless. Every body
+    is confirmed to contain the literal phrase "notice to creditors" before a
+    single lead is made, and every lead needs a well-formed ES case number.
+
+PII POSTURE
+    The PR name and mailing address are the operative content of a notice whose
+    entire statutory purpose is public notification, and are the same class of
+    data as the court record itself. There is no phone number, no SSN and no
+    date of birth here, and none is sought.
+
+ROBOTS, checked 2026-08-06
+    All three allow this. Mitchell/Drupal-style /search/ paths are disallowed on
+    some upstate papers, so discovery never uses a site's /search/ HTML page,
+    only the JSON API and the article pages themselves.
+"""
+from __future__ import annotations
+
+import asyncio
+import html as _html
+import os
+import re
+from datetime import datetime, timedelta
+from typing import Iterable, NamedTuple, Optional
+
+import httpx
+import structlog
+from tenacity import (
+    AsyncRetrying,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
+
+from ...base_scraper import BaseScraper
+from ...http_client import client
+from ...layer_guard import LayerHarvest, PartialHarvest
+from ...models import Listing, ListingType, PropertyKind
+from ...sc_case_county import SC_COUNTY_BY_CODE
+
+log = structlog.get_logger()
+
+
+def body_text(raw: str) -> str:
+    """HTML -> text, PRESERVING line breaks.
+
+    The shared strip_html() collapses everything to spaces, which cannot be used
+    here: these notices put the representative's name and the address on the
+    lines FOLLOWING their labels, so losing <br> loses the field association.
+    """
+    t = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", raw or "")
+    t = re.sub(r"(?i)<(?:br\s*/?|/p|/div|/h\d|/li|/tr)>", "\n", t)
+    t = re.sub(r"(?s)<[^>]+>", " ", t)
+    t = _html.unescape(t)
+    t = re.sub(r"[ \t\xa0]+", " ", t)
+    return re.sub(r"\n\s*\n+", "\n", t)
+
+#: Two-digit SC county codes as they appear inside an ES case number (01-46,
+#: alphabetical). 2026-10-08: all 46, not only the 7-county footprint. A probate
+#: notice is a DISTRESSED lead, which the owner's rule of 2026-09-15 admits
+#: anywhere in NC/SC (main._county_in_scope -> config.in_scope_distressed); the
+#: footprint-only map predated that rule and dropped e.g. Greenville and York
+#: estates printed in these papers.
+SC_COUNTY_CODE = dict(SC_COUNTY_BY_CODE)
+
+#: How far back to read. Estates older than this are closed or cold.
+LOOKBACK_DAYS = int(os.environ.get("FORECLOSURE_SC_PROBATE_LOOKBACK_DAYS", "550"))
+#: Bound on article pages fetched per paper, so one paper cannot run away. Applies
+#: ONLY to the article-page fallback (one request per page). Before 2026-10-08 it
+#: was also applied to the inline-body lanes, BEFORE de-duplication: Pickens'
+#: two search terms return 90 + 117 posts in the lookback (measured 2026-10-08)
+#: and only the first 120 entries of the combined list were read.
+MAX_DOCS = int(os.environ.get("FORECLOSURE_SC_PROBATE_MAX_DOCS", "120"))
+#: Pages of 50 per search term for the JSON lanes (each page carries the bodies).
+#: Pickens' "estate notice" needs 3; the old fixed (1, 2) loop left 17 posts unread.
+MAX_JSON_PAGES = int(os.environ.get("FORECLOSURE_SC_PROBATE_MAX_PAGES", "12"))
+
+SEARCH_TERMS = ("notice+to+creditors", "estate+notice")
+
+
+class Paper(NamedTuple):
+    county_hint: str          # only for logging; real county comes from the case number
+    host: str
+    mode: str                 # "posts" = body inline, "search_html" = fetch the article page
+
+
+PAPERS: tuple[Paper, ...] = (
+    Paper("Pickens", "www.yourpickenscounty.com", "posts"),
+    Paper("Laurens", "www.laurenscountyadvertiser.net", "posts"),
+    # "geodir": GeoDirectory's public listing route; falls back to "search_html".
+    # Measured 2026-10-08: the site search reports 557 hits for "notice to
+    # creditors" and the article-page lane read 120 of them (~223 s); the
+    # geodir route returns the same notices with their text, 50 per request.
+    Paper("Cherokee", "www.gaffneyledger.com", "geodir"),
+)
+
+_PHRASE = re.compile(r"notice\s+to\s+creditors", re.I)
+# "Estate:" (Pickens/Cherokee) or "ESTATE OF:" (Laurens).
+_SPLIT = re.compile(r"(?=\bESTATES?\s+OF\s*:|\bEstate\s*:)", re.I)
+_NAME = re.compile(r"\bESTATES?\s+OF\s*:\s*(.+)|\bEstate\s*:\s*(.+)", re.I)
+_CASE = re.compile(r"\bCase\s*(?:Number|No\.?|#)?\s*:?\s*(\d{4}\s?ES\s?\d{5,10})", re.I)
+_DEATH = re.compile(
+    r"\b(?:Date\s+of\s+Death|Death)\s*:?\s*("
+    r"\d{1,2}[/-]\d{1,2}[/-]\d{2,4}"
+    r"|(?:January|February|March|April|May|June|July|August|September|October"
+    r"|November|December)\s+\d{1,2},?\s*\d{4})", re.I)
+_PR = re.compile(
+    r"\b(?:Co-?Personal\s+Representatives?|Personal\s+Representatives?|PR)\s*:?\s*(.*)", re.I)
+_ADDR_LABEL = re.compile(r"\bAddress\s*:\s*(.+)", re.I)
+# A street line starts with a house number, but plenty of representatives give
+# only a PO box, which has no house number and would otherwise be skipped.
+_STREET = re.compile(r"^(?:\d+\s+\S|P\.?\s?O\.?\s+Box\b|Post\s+Office\s+Box\b)", re.I)
+#: "Feb11,18,25" — the run of publication dates that closes each notice. It sits
+#: where a name would sit and is not one.
+_PUBRUN = re.compile(r"^(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s*\d",
+                     re.I)
+_CITY = re.compile(r"^[A-Za-z .'\-]+,\s*[A-Z]{2}\.?\s*\d{5}")
+#: A stray copy of the case-number tail sometimes rides along on the estate line
+#: ("Estate: Edna J. Mockley 276" beside case 2026ES1100276). That is in the
+#: published text, not a parsing fault, so it is trimmed rather than tolerated.
+_TAIL_NUM = re.compile(r"\s+\d{2,6}$")
+_LABELS = re.compile(r"\b(?:Date\s+of\s+Death|Death|Case|Address|Published)\b", re.I)
+
+
+def _clean_name(s: str, case: str) -> Optional[str]:
+    # Strip trailing separators but NOT a trailing period: it belongs to the
+    # name in "Exampleman Jr." and in initials, and dropping it silently
+    # rewrites the very string the name->property resolver matches on.
+    name = re.sub(r"\s+", " ", s).strip(" ,:;-")
+    m = _TAIL_NUM.search(name)
+    if m and case.endswith(m.group(0).strip()):
+        name = name[: m.start()].strip(" .,")
+    if len(name) < 4 or len(name) > 90 or name.replace(" ", "").isdigit():
+        return None
+    return name
+
+
+def _pr_and_address(chunk: str) -> tuple[Optional[str], Optional[str]]:
+    lines = [ln.strip() for ln in chunk.splitlines()]
+    pr: Optional[str] = None
+    pr_idx = -1
+    for i, ln in enumerate(lines):
+        m = _PR.search(ln)
+        if not m:
+            continue
+        pr_idx = i
+        tail = (m.group(1) or "").strip(" .,:")
+        # Pickens puts the name on the NEXT line; the others keep it inline.
+        took_next = False
+        if not tail or _LABELS.search(tail):
+            tail = lines[i + 1].strip(" .,:") if i + 1 < len(lines) else ""
+            pr_idx, took_next = i + 1, True
+        # Guard against the two things that sit where a name sits and are not
+        # names: the closing publication-date run, and a bare PO box.
+        if (tail and not _LABELS.search(tail) and 3 < len(tail) <= 70
+                and not _PUBRUN.match(tail) and not _STREET.match(tail)):
+            pr = re.sub(r"\s+", " ", tail)
+        elif took_next:
+            # The line after the label was NOT a name (a PO box, or the closing
+            # publication run). Give it back, because a PO box is the address.
+            pr_idx = i
+        break
+
+    addr, start = None, pr_idx + 1
+    for i in range(max(start, 0), len(lines)):
+        m = _ADDR_LABEL.search(lines[i])
+        if m:
+            addr, start = m.group(1).strip(), i + 1
+            break
+        if _STREET.match(lines[i]):        # Cherokee: no "Address:" label at all
+            addr, start = lines[i], i + 1
+            break
+    if not addr:
+        return pr, None
+    # The "City, ST ZIP" line usually sits directly under the street line.
+    for i in range(start, min(start + 3, len(lines))):
+        if _CITY.match(lines[i]):
+            addr = f"{addr.rstrip(' ,')}, {lines[i]}"
+            break
+    return pr, re.sub(r"\s+", " ", addr).strip(" ,")
+
+
+def parse_estates(body: str) -> list[dict]:
+    """Pull every estate block out of one notice page. Pure, so it is testable."""
+    if not _PHRASE.search(body or ""):
+        return []                          # fuzzy search hit, not an actual notice
+    out: list[dict] = []
+    seen: set[str] = set()
+    for chunk in _SPLIT.split(body)[1:]:
+        nm = _NAME.search(chunk)
+        cs = _CASE.search(chunk)
+        if not nm or not cs:
+            continue
+        case = re.sub(r"\s+", "", cs.group(1)).upper()
+        county = SC_COUNTY_CODE.get(case[6:8]) if case[4:6] == "ES" else None
+        if not county:
+            continue                       # outside the footprint
+        name = _clean_name(nm.group(1) or nm.group(2) or "", case)
+        if not name or case in seen:
+            continue
+        seen.add(case)
+        d = _DEATH.search(chunk)
+        pr, addr = _pr_and_address(chunk)
+        out.append({"estate": name, "case_number": case, "county": county,
+                    "date_of_death": d.group(1) if d else None,
+                    "personal_representative": pr, "pr_address": addr})
+    return out
+
+
+def _to_listing(e: dict, source_url: str, slug: str) -> Listing:
+    now = datetime.utcnow()
+    bits = [e["estate"], e["case_number"]]
+    if e.get("date_of_death"):
+        bits.append(f"d. {e['date_of_death']}")
+    return Listing(
+        source=slug,
+        source_url=source_url,
+        listing_type=ListingType.PROBATE_NOTICE,
+        property_kind=PropertyKind.UNKNOWN,
+        state="SC", county=e["county"],
+        # No situs is published. The decedent name plus case number is what the
+        # name->property resolver pins the parcel with, exactly as the obituary
+        # and heir-estate sources do.
+        owner_name=e["estate"], defendant=e["estate"],
+        case_number=e["case_number"],
+        foreclosure_process="probate",
+        description=f"{e['county']} SC probate — Notice to Creditors — "
+                    f"{' | '.join(bits)}"[:300],
+        first_seen=now, last_seen=now,
+        raw={
+            "sc_probate_notice": {k: v for k, v in e.items() if v},
+            "life_event": "death",
+            "relationship_signal": {"kind": "probate",
+                                    "keyword": "notice to creditors"},
+            # The PR is the contact of record for the estate.
+            "owner_mailing": ({"mailing": e["pr_address"],
+                               "addressee": e.get("personal_representative")}
+                              if e.get("pr_address") else {}),
+        },
+    )
+
+
+async def _json(c, url: str):
+    # Retried up to 3 times (short exponential-jitter backoff) on a transport error or
+    # timeout -- found 2026-11-07 (gap-sweep continuation): this is the shared fetch
+    # used by ALL THREE call sites (_geodir_docs, and _fetch_paper()'s "posts" and
+    # "search_html" search-listing loops), and it had zero retry cushioning. Those
+    # callers only catch `except RuntimeError:` -- the RuntimeError raised below for a
+    # bad status or a non-JSON body -- so a genuine httpx.TransportError/TimeoutException
+    # raised by c.get() itself was NEVER caught locally: it propagated straight out of
+    # _geodir_docs()/_fetch_paper(), aborting that paper's ENTIRE scrape (losing every
+    # doc already fetched this run, not just the one page that blipped). Same root cause,
+    # same fix, already applied in this same file to the search_html per-article loop
+    # below (2026-10-17) and earlier to the Column legal-notice API scrapers,
+    # spartan_weekly_legals.py, and arcgis_webmap.query_features(). http_client.client()'s
+    # own docstring says every caller must wrap its own retries, and this bare call never
+    # did. The status-code and JSON-parse checks below are UNCHANGED: a real bad status or
+    # a real non-JSON body still becomes RuntimeError on the first attempt, so callers'
+    # existing `except RuntimeError:` handling keeps working exactly as before.
+    async for attempt in AsyncRetrying(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential_jitter(initial=1, max=8),
+        retry=retry_if_exception_type(
+            (httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+        reraise=True,
+    ):
+        with attempt:
+            r = await c.get(url, timeout=60.0)
+    if r.status_code != 200:
+        raise RuntimeError(f"HTTP {r.status_code} for {url}")
+    try:
+        return r.json()
+    except Exception as exc:  # noqa: BLE001
+        raise RuntimeError(f"non-JSON response from {url}") from exc
+
+
+async def _geodir_docs(c, paper: Paper, after_iso: str) -> list[tuple[str, str]] | None:
+    """Notices from GeoDirectory's public listing route, newest first, with their text.
+
+    Returns None when the route itself fails on the first page (the caller then falls
+    back to the article-page lane); an empty list when it answers with nothing."""
+    out: list[tuple[str, str]] = []
+    cutoff = after_iso[:10]
+    for term in SEARCH_TERMS:
+        for page in range(1, MAX_JSON_PAGES + 1):
+            url = (f"https://{paper.host}/wp-json/geodir/v2/classifieds?search={term}"
+                   f"&per_page=50&page={page}")
+            try:
+                rows = await _json(c, url)
+            except RuntimeError:
+                if page == 1 and term == SEARCH_TERMS[0]:
+                    return None
+                break
+            if not isinstance(rows, list) or not rows:
+                break
+            for p in rows:
+                d = str(p.get("date") or "")[:10]
+                if d and d < cutoff:
+                    continue               # older than the lookback
+                content = p.get("content")
+                html_body = content.get("rendered", "") if isinstance(content, dict) else str(content or "")
+                out.append((p.get("link") or paper.host, body_text(html_body)))
+            last = str(rows[-1].get("date") or "")[:10]
+            if len(rows) < 50 or (last and last < cutoff):
+                break                      # last page, or past the lookback (newest first)
+        else:
+            log.warning("sc_probate.page_cap_reached", host=paper.host, term=term,
+                        max_pages=MAX_JSON_PAGES)
+    return out
+
+
+async def _fetch_paper(c, paper: Paper) -> list[Listing]:
+    after = (datetime.utcnow() - timedelta(days=LOOKBACK_DAYS)).strftime("%Y-%m-%dT00:00:00")
+    slug = f"counties_sc.sc_probate_notices.{paper.host.replace('www.', '').split('.')[0]}"
+    docs: list[tuple[str, str]] = []       # (url, body text)
+
+    mode = paper.mode
+    if mode == "geodir":
+        got = await _geodir_docs(c, paper, after)
+        if got is None:
+            log.warning("sc_probate.geodir_unavailable", host=paper.host,
+                        note="falling back to search + article pages")
+            mode = "search_html"
+        else:
+            docs.extend(got)
+    if mode == "posts":
+        for term in SEARCH_TERMS:
+            for page in range(1, MAX_JSON_PAGES + 1):
+                url = (f"https://{paper.host}/wp-json/wp/v2/posts?search={term}"
+                       f"&after={after}&per_page=50&page={page}"
+                       f"&_fields=link,date,content")
+                try:
+                    rows = await _json(c, url)
+                except RuntimeError:
+                    break                  # past the last page, or term unsupported
+                if not rows:
+                    break
+                for p in rows:
+                    docs.append((p.get("link") or paper.host,
+                                 body_text((p.get("content") or {}).get("rendered", ""))))
+                if len(rows) < 50:
+                    break
+            else:
+                log.warning("sc_probate.page_cap_reached", host=paper.host, term=term,
+                            max_pages=MAX_JSON_PAGES)
+    elif mode == "search_html":
+        urls: list[str] = []
+        for term in SEARCH_TERMS:
+            for page in (1, 2):
+                url = (f"https://{paper.host}/wp-json/wp/v2/search?search={term}"
+                       f"&per_page=50&page={page}&_fields=url")
+                try:
+                    rows = await _json(c, url)
+                except RuntimeError:
+                    break
+                if not rows:
+                    break
+                urls += [r["url"] for r in rows if r.get("url")]
+                if len(rows) < 50:
+                    break
+        for u in list(dict.fromkeys(urls))[:MAX_DOCS]:
+            try:
+                # Retried up to 3 times (short exponential-jitter backoff) on a transport
+                # error or timeout -- found 2026-10-17 (gap-sweep): this per-article fetch
+                # had zero retry cushioning, same gap already fixed for the Column
+                # legal-notice API scrapers, spartan_weekly_legals.py, and
+                # arcgis_webmap.query_features(). http_client.client()'s own docstring
+                # says every caller is expected to wrap its own retries, and this bare
+                # call never did -- a single transient blip permanently dropped that
+                # one article's estate records for the whole run, with no retry of any
+                # kind (the surrounding `except Exception: continue` swallows it before
+                # it can ever reach the per-paper LayerHarvest retry in fetch()). The
+                # outer try/except is kept: a real, persistent failure on one article
+                # still must not stop the rest of the urls from being read.
+                async for attempt in AsyncRetrying(
+                    stop=stop_after_attempt(3),
+                    wait=wait_exponential_jitter(initial=1, max=8),
+                    retry=retry_if_exception_type(
+                        (httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+                    reraise=True,
+                ):
+                    with attempt:
+                        r = await c.get(u, timeout=60.0)
+            except Exception:  # noqa: BLE001
+                continue
+            if r.status_code == 200:
+                docs.append((u, body_text(r.text)))
+            await asyncio.sleep(0.4)       # these are small-town servers
+
+    out: list[Listing] = []
+    seen: set[str] = set()
+    hits = 0
+    # One body per URL (the two search terms return many of the same posts). No count
+    # cap here: the bodies are already in hand, and MAX_DOCS bounds only the requests
+    # of the article-page lane above.
+    uniq: dict[str, str] = {}
+    for url, body in docs:
+        uniq.setdefault(url, body)
+    docs = list(uniq.items())
+    for url, body in docs:
+        estates = parse_estates(body)
+        if estates:
+            hits += 1
+        for e in estates:
+            if e["case_number"] in seen:
+                continue                   # notices run 3 weeks; the same estate repeats
+            seen.add(e["case_number"])
+            out.append(_to_listing(e, url, slug))
+    by_county: dict[str, int] = {}
+    for li in out:
+        by_county[li.county or "?"] = by_county.get(li.county or "?", 0) + 1
+    log.info("sc_probate.paper_done", host=paper.host, docs=len(docs),
+             notice_docs=hits, estates=len(out), by_county=by_county)
+    return out
+
+
+class SCProbateNotices(BaseScraper):
+    slug = "counties_sc.sc_probate_notices"
+    name = "SC Notice to Creditors probate notices (upstate county papers)"
+    category = "probate"
+    expected_min_count = 0
+    # AUDITED 2026-10-01: raised from the 180s default. The Gaffney Ledger
+    # alone measures 222.9s (see the docstring below) -- with the OLD 180s
+    # default AND the gather-then-extend bug this source timed out on every
+    # single run while Gaffney was still going, see that fix for why this
+    # alone would not have been enough.
+    timeout_s = 300.0
+
+    async def fetch(self) -> Iterable[Listing]:
+        if os.environ.get("FORECLOSURE_SC_PROBATE_NOTICES") == "0":
+            return []
+        # Bank rows as they are collected: if the soft timeout fires,
+        # base_scraper ships self.partial instead of discarding the run.
+        out = self.partial
+        # The two secondary papers are tolerated because they genuinely wobble:
+        # the Gaffney Ledger is read through article pages and rate-limits, and
+        # the Laurens Advertiser runs only a handful of notices at a time.
+        # Pickens is NOT tolerated. It is the anchor, it is the richest, and if
+        # it ever starts returning nothing that is a break we want to hear about
+        # rather than a quiet drop to a third of the leads.
+        guard = LayerHarvest(self.slug, [p.host for p in PAPERS], attempts=2,
+                             tolerate=("www.gaffneyledger.com",
+                                       "www.laurenscountyadvertiser.net"))
+        # CONCURRENT, not sequential. Measured 2026-09-10: Pickens 520 rows in 4.5s,
+        # Laurens 135 in 2.3s, but the Gaffney Ledger takes 222.9s on its own because
+        # it is read one article page at a time. Run in series that is ~230s against a
+        # 180s soft timeout, so the source timed out and reported ALARM every run.
+        #
+        # AUDITED 2026-10-01 -- THE "banked in self.partial" CLAIM ABOVE WAS FALSE.
+        # This used to be `harvested = await asyncio.gather(*(guard.harvest(...) for
+        # paper in PAPERS), return_exceptions=True)` followed by a loop that only
+        # THEN extended `out` (== self.partial). asyncio.gather does not resolve
+        # until EVERY task finishes, so self.partial stayed an empty list for the
+        # ENTIRE run -- including the whole time Pickens' 525 rows and Laurens' 142
+        # had ALREADY completed and logged success. Verified live the same day: a
+        # run against the real sites hit the soft timeout while Gaffney was still
+        # going and shipped outcome=TIMEOUT, n=0 -- the 667 already-fetched Pickens
+        # + Laurens rows were discarded, the exact loss this comment claimed could
+        # not happen. This is the identical "gather-then-extend defeats self.partial"
+        # bug class counties_sc.qpaybill_delinquent_roll's fetch() already documents
+        # fixing (see that module's "SALVAGE AS EACH COUNTY COMPLETES" comment) --
+        # fixed here the same way, with asyncio.as_completed so each paper's rows
+        # land in self.partial the moment ITS OWN task resolves, not when the
+        # slowest one does.
+        async with client(timeout=60.0) as c:
+            try:
+                with guard:
+                    tasks = [asyncio.ensure_future(guard.harvest(paper.host, self._one(c, paper)))
+                             for paper in PAPERS]
+                    for finished in asyncio.as_completed(tasks):
+                        try:
+                            res = await finished
+                        except asyncio.CancelledError:
+                            # MUST propagate, not be swallowed: a CancelledError here is
+                            # an outer caller (safe_run()'s own wait_for, or an
+                            # orchestrator-level _await_capped) stopping this scraper.
+                            # Catching it as an ordinary failure would make wait_for()
+                            # see a normal return instead of a cancellation and silently
+                            # defeat the timeout this exact fix depends on elsewhere.
+                            raise
+                        except Exception:
+                            # guard.harvest() already banks a real failure for verify()
+                            # to re-raise; this only catches something stranger. A
+                            # tolerated host blowing up must not take the other papers'
+                            # rows down with it.
+                            continue
+                        out.extend(res)
+            except PartialHarvest as exc:
+                # Pickens (yourpickenscounty.com) is the anchor paper and is NOT
+                # in the tolerated set, so a Pickens failure raises PartialHarvest
+                # from guard.__exit__. But as_completed already banked every
+                # completed paper's rows into self.partial — we must NOT discard
+                # them. Log the partial harvest and ship what we have.
+                log.warning("sc_probate_notices.partial_harvest_shipped",
+                            error=str(exc)[:200], rows=len(out))
+        return out
+
+    @staticmethod
+    def _one(c, paper: Paper):
+        async def _run() -> list[Listing]:
+            return await _fetch_paper(c, paper)
+        return _run

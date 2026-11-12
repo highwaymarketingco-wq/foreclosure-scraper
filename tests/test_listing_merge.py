@@ -1,0 +1,312 @@
+"""Pin Listing.merge() behavior (M1 fix).
+
+Pre-fix bugs:
+  - 0/0.0 in monetary fields blocked real values from filling
+  - first_seen kept self's value instead of min(both)
+  - raw merge was shallow — nested subkeys clobbered
+  - No multi-source attribution recorded
+
+These tests pin each fix so regressions can't sneak in.
+"""
+from __future__ import annotations
+
+from datetime import datetime, timedelta
+
+from foreclosure_scraper.models import Listing, ListingType, _deep_merge_dict
+
+
+def _li(**kw) -> Listing:
+    base = dict(
+        source="test_a",
+        source_url="https://a.example.com/x",
+        listing_type=ListingType.FORECLOSURE_SALE,
+        first_seen=datetime.utcnow(),
+        last_seen=datetime.utcnow(),
+    )
+    base.update(kw)
+    return Listing(**base)
+
+
+# ---- monetary-field falsy treatment ----
+
+def test_zero_opening_bid_does_not_block_real_value():
+    """Pre-M1, a scraper writing opening_bid=0.0 blocked the real
+    bid from filling on merge. Now 0 is treated as falsy."""
+    a = _li(opening_bid=0.0, street_address="123 Main St")
+    b = _li(opening_bid=85_000.0, street_address="123 Main St")
+    merged = a.merge(b)
+    assert merged.opening_bid == 85_000.0
+
+
+def test_zero_tax_value_does_not_block_real_value():
+    a = _li(tax_value=0.0)
+    b = _li(tax_value=125_000.0)
+    merged = a.merge(b)
+    assert merged.tax_value == 125_000.0
+
+
+def test_real_opening_bid_kept_over_zero():
+    """The other direction: don't OVERWRITE a real value with 0."""
+    a = _li(opening_bid=85_000.0)
+    b = _li(opening_bid=0.0)
+    merged = a.merge(b)
+    assert merged.opening_bid == 85_000.0
+
+
+def test_non_money_zero_kept():
+    """Non-monetary fields where 0 is a valid sentinel (e.g. bedrooms=0
+    for studios) should NOT be treated as falsy."""
+    a = _li(bedrooms=0)
+    b = _li(bedrooms=3)
+    merged = a.merge(b)
+    # 0 bedrooms is a valid value for studio — keep self (current)
+    assert merged.bedrooms == 0
+
+
+# ---- first_seen / last_seen ----
+
+def test_first_seen_uses_min():
+    """Earliest sighting preserved across merges."""
+    earlier = datetime(2026, 1, 1)
+    later = datetime(2026, 5, 1)
+    a = _li(first_seen=later)
+    b = _li(first_seen=earlier)
+    merged = a.merge(b)
+    assert merged.first_seen == earlier
+
+
+def test_last_seen_uses_max():
+    """Most recent sighting preserved."""
+    earlier = datetime(2026, 1, 1)
+    later = datetime(2026, 5, 1)
+    a = _li(last_seen=earlier)
+    b = _li(last_seen=later)
+    merged = a.merge(b)
+    assert merged.last_seen == later
+
+
+# ---- raw deep-merge ----
+
+def test_deep_merge_preserves_nested_subkeys():
+    """Pre-fix shallow merge wiped raw['gis'] entirely when both sides
+    had it. Now nested dicts merge."""
+    a_raw = {"gis": {"roof_age": 15, "stories": 2}}
+    b_raw = {"gis": {"year_built": 1985}}
+    a = _li(raw=a_raw)
+    b = _li(raw=b_raw)
+    merged = a.merge(b)
+    assert merged.raw["gis"]["roof_age"] == 15
+    assert merged.raw["gis"]["stories"] == 2
+    assert merged.raw["gis"]["year_built"] == 1985
+
+
+def test_deep_merge_b_wins_on_leaf_collision():
+    """When both sides set the SAME nested leaf, b wins (it's the
+    newer scrape)."""
+    a = _li(raw={"gis": {"stories": 2}})
+    b = _li(raw={"gis": {"stories": 3}})
+    merged = a.merge(b)
+    assert merged.raw["gis"]["stories"] == 3
+
+
+def test_deep_merge_handles_disjoint_top_level():
+    a = _li(raw={"gis": {"x": 1}})
+    b = _li(raw={"zillow": {"y": 2}})
+    merged = a.merge(b)
+    assert merged.raw["gis"] == {"x": 1}
+    assert merged.raw["zillow"] == {"y": 2}
+
+
+# ---- multi-source attribution ----
+
+def test_merge_records_secondary_source_slug():
+    """When two listings from different sources merge, the secondary
+    source goes into raw['also_seen_in']."""
+    a = _li(source="law_firms.brock_scott", source_url="https://brockandscott.com/1")
+    b = _li(source="counties_nc.nc_ecourts_lis_pendens",
+            source_url="https://ecourts.nc.gov/2")
+    merged = a.merge(b)
+    assert merged.source == "law_firms.brock_scott"
+    # also_seen_in keeps BOTH the secondary source slug AND its link (so an
+    # investor can open the other portal too) — list of {source, url} dicts.
+    also_seen = merged.raw.get("also_seen_in", [])
+    assert any(e["source"] == "counties_nc.nc_ecourts_lis_pendens" for e in also_seen)
+    assert any(e["url"] == "https://ecourts.nc.gov/2" for e in also_seen)
+
+
+def test_merge_preserves_already_seen_in():
+    """Three-way merge: A merged with B (a+b), then merged with C
+    should retain attribution + link for all three sources."""
+    a = _li(source="src.a", source_url="https://a.example/1")
+    b = _li(source="src.b", source_url="https://b.example/2")
+    c = _li(source="src.c", source_url="https://c.example/3")
+    ab = a.merge(b)
+    abc = ab.merge(c)
+    also_seen = abc.raw.get("also_seen_in", [])
+    seen_srcs = {e["source"] for e in also_seen}
+    seen_urls = {e["url"] for e in also_seen}
+    assert "src.b" in seen_srcs and "https://b.example/2" in seen_urls
+    assert "src.c" in seen_srcs and "https://c.example/3" in seen_urls
+
+
+def test_merge_keeps_self_attribution_when_other_has_its_own_list():
+    """2026-10-06: _deep_merge_dict lets other's list leaf win, so (a+b).merge(c+d) used to
+    keep only c's list: b vanished from the attribution, and with it the only trace that b had
+    been folded in (the 2026-10-05 run audit found prior rows with no trace anywhere). Shapes
+    from that run: eCourts lis pendens rows, one link per case."""
+    u = "https://portal-nc.tylertech.cloud/app/NCJudgmentSearch/#/search?caseNumber="
+    src = "counties_nc.nc_ecourts_lis_pendens"
+    a = _li(source=src, source_url=u + "26M000535-640")
+    b = _li(source=src, source_url=u + "26M000545-640")
+    c = _li(source=src, source_url=u + "26M000752-640")
+    d = _li(source="nc_ecourts_judgments", source_url=u + "26M000777-640")
+    ab, cd = a.merge(b), c.merge(d)
+    assert cd.raw.get("also_seen_in")             # precondition: other carries its own list
+    merged = ab.merge(cd)
+    urls = [e["url"] for e in merged.raw["also_seen_in"]]
+    assert urls == [u + "26M000545-640", u + "26M000752-640", u + "26M000777-640"]
+    assert {e["source"] for e in merged.raw["also_seen_in"]} == {src, "nc_ecourts_judgments"}
+    # merging the same group again adds nothing
+    assert [e["url"] for e in merged.merge(cd).raw["also_seen_in"]] == urls
+
+
+def test_merge_keeps_self_entries_verbatim_and_never_lists_the_primary_link():
+    a = _li(source="src.a", source_url="https://a.example/1",
+            raw={"also_seen_in": [{"source": "src.b", "url": "https://b.example/2", "note": "x"}]})
+    c = _li(source="src.c", source_url="https://c.example/3",
+            raw={"also_seen_in": [{"source": "src.a", "url": "https://a.example/1"},
+                                  {"source": "src.b", "url": "https://b.example/2"}]})
+    seen = a.merge(c).raw["also_seen_in"]
+    assert seen[0] == {"source": "src.b", "url": "https://b.example/2", "note": "x"}
+    assert [e["url"] for e in seen] == ["https://b.example/2", "https://c.example/3"]
+
+
+def test_merge_does_not_duplicate_source_in_also_seen():
+    """Merging the same scraper twice (e.g. two separate scrape runs
+    of the same source) doesn't pile up duplicate also_seen entries."""
+    a = _li(source="src.a")
+    b = _li(source="src.a")
+    merged = a.merge(b)
+    also_seen = merged.raw.get("also_seen_in", [])
+    # same slug as the primary source -> never added to also_seen_in
+    assert sum(1 for e in also_seen if e["source"] == "src.a") == 0
+
+
+# ---- _deep_merge_dict directly ----
+
+def test_deep_merge_dict_basic():
+    a = {"x": 1, "y": {"a": 1}}
+    b = {"y": {"b": 2}, "z": 3}
+    out = _deep_merge_dict(a, b)
+    assert out == {"x": 1, "y": {"a": 1, "b": 2}, "z": 3}
+
+
+def test_deep_merge_dict_none_doesnt_overwrite():
+    a = {"x": 5}
+    b = {"x": None}
+    out = _deep_merge_dict(a, b)
+    assert out == {"x": 5}
+
+
+def test_deep_merge_dict_handles_non_dict_b():
+    out = _deep_merge_dict({"x": 1}, "not a dict")  # noqa
+    assert out == {"x": 1}
+
+
+# ---- re-gate after merge (a deep-merge union can resurrect a withheld figure) ----
+#
+# _deep_merge_dict can only overwrite or add a key that BOTH sides name; a key one
+# side has already dropped (calc.to_dict()/withhold_equity both drop a gated field's
+# key rather than writing None) is invisible to it. So merging an older, un-gated
+# copy of a lead (max_bid_70/wholesale_mao/equity still published) with a freshly
+# re-graded copy of the SAME lead (ARV now flagged contradicted, those fields
+# correctly absent) used to keep the stale, ungated values -- board_selfcheck.py's
+# "no {field} on a contradicted ARV" invariants (97/43/100 rows on the live board,
+# 2026-09-30) caught exactly this. Listing.merge() now re-runs the same trust gate
+# every other raw['calc']/raw['equity'] producer goes through.
+
+def _contradicted_calc(**extra) -> dict:
+    d = {"arv_expected": 378_000.0,
+         "arv_flags": ["anchor_not_independent", "arv_land_sqft_mismatch"]}
+    d.update(extra)
+    return d
+
+
+def test_merge_strips_stale_max_bid_and_wholesale_mao_on_contradicted_arv():
+    old = _li(street_address="30 Henbit Way", raw={
+        "calc": {"arv_expected": 378_000.0, "arv_flags": [],
+                 "max_bid_70": 70_000.0, "wholesale_mao": 60_000.0,
+                 "deal_status": "PASS"},
+    })
+    new = _li(source="test_b", source_url="https://b.example.com/x",
+               street_address="30 Henbit Way",
+               raw={"calc": _contradicted_calc()})
+    merged = old.merge(new)
+    calc = merged.raw["calc"]
+    assert "max_bid_70" not in calc
+    assert "wholesale_mao" not in calc
+    assert "deal_status" not in calc
+    assert calc["arv_flags"] == ["anchor_not_independent", "arv_land_sqft_mismatch"]
+
+
+def test_merge_strips_stale_equity_on_contradicted_arv():
+    old = _li(street_address="30 Henbit Way", raw={
+        "calc": {"arv_expected": 378_000.0, "arv_flags": []},
+        "equity": {"value": 125_100.0, "pct": 0.998},
+    })
+    new = _li(source="test_b", source_url="https://b.example.com/x",
+               street_address="30 Henbit Way",
+               raw={"calc": _contradicted_calc(),
+                    "equity": {"withheld": True, "withheld_reason": "...",
+                               "arv_trust": "contradicted",
+                               "arv_flags": ["anchor_not_independent",
+                                             "arv_land_sqft_mismatch"]}})
+    merged = old.merge(new)
+    eq = merged.raw["equity"]
+    assert eq.get("value") is None
+    assert eq["withheld"] is True
+    assert eq["arv_trust"] == "contradicted"
+
+
+def test_merge_regate_is_order_independent():
+    """The stale copy can be either side of the merge — self or other."""
+    fresh = _li(street_address="30 Henbit Way", raw={"calc": _contradicted_calc()})
+    stale = _li(source="test_b", source_url="https://b.example.com/x",
+                street_address="30 Henbit Way",
+                raw={"calc": {"arv_expected": 378_000.0, "arv_flags": [],
+                               "max_bid_70": 70_000.0, "wholesale_mao": 60_000.0}})
+    merged = stale.merge(fresh)
+    assert "max_bid_70" not in merged.raw["calc"]
+    assert "wholesale_mao" not in merged.raw["calc"]
+
+
+def test_merge_leaves_clean_merge_untouched():
+    """No false positive: an ordinary (non-contradicted) merge keeps its money."""
+    a = _li(street_address="1 Main St", raw={
+        "calc": {"arv_expected": 200_000.0, "arv_flags": [],
+                 "max_bid_70": 130_000.0, "wholesale_mao": 120_000.0,
+                 "deal_status": "GREAT"},
+        "equity": {"value": 100_000.0, "pct": 0.5},
+        "gis": {"roof": "shingle"},
+    })
+    b = _li(source="test_b", source_url="https://b.example.com/x",
+            street_address="1 Main St",
+            raw={"calc": {"arv_expected": 200_000.0, "arv_flags": [],
+                          "max_bid_70": 130_000.0, "wholesale_mao": 120_000.0,
+                          "deal_status": "GREAT"},
+                 "gis": {"year_built": 1990}})
+    merged = a.merge(b)
+    assert merged.raw["calc"]["max_bid_70"] == 130_000.0
+    assert merged.raw["calc"]["wholesale_mao"] == 120_000.0
+    assert merged.raw["calc"]["deal_status"] == "GREAT"
+    assert merged.raw["equity"]["value"] == 100_000.0
+    assert merged.raw["gis"] == {"roof": "shingle", "year_built": 1990}
+
+
+def test_merge_regate_no_equity_key_is_a_noop():
+    """A lead with no raw['equity'] at all merges cleanly (no KeyError/crash)."""
+    a = _li(street_address="1 Main St", raw={"calc": _contradicted_calc()})
+    b = _li(source="test_b", source_url="https://b.example.com/x",
+            street_address="1 Main St", raw={"calc": _contradicted_calc()})
+    merged = a.merge(b)
+    assert "equity" not in merged.raw or merged.raw["equity"] is None

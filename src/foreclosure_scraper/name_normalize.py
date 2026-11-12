@@ -1,0 +1,553 @@
+"""Reusable owner-name normalization + strict matching for name->property work.
+
+County GIS parcel layers store owners UPPERCASE, SURNAME-FIRST, with no comma
+("BYRD SANDRA D", "SMITH JOHN C & MELINDA P", "SAR 6 LLC"). Court/probate feeds
+emit the opposite ("Sandra L Byrd", "Byrd, Sandra L") with title case, double
+spaces, stray punctuation and entity suffixes ("Allied Of Spartanburg, Llc").
+
+This module is the ONE place that reconciles the two. It is intentionally
+dependency-free and side-effect-free so both the resolver and any offline
+dry-run/QA script use identical logic.
+
+MATCH POLICY (this data drives outreach, so it errs toward committing nothing):
+
+  * ``exact``  — the two names carry the SAME set of core tokens once titles,
+    generational suffixes, entity suffixes and boilerplate are dropped.
+    'Sandra L Byrd' == 'BYRD SANDRA D'  (the lone 'L'/'D' initials are noise).
+
+  * ``strong`` — the parsed surname sits in the GIS owner's SURNAME position
+    (token 0) AND the parsed first name sits in the FIRST-NAME position
+    (token 1). These layers are strictly surname-first, so position carries
+    real signal. This is what kills the false positives a bag-of-tokens rule
+    accepts:
+        'Michael Duane Crowe'       vs 'CROWE KEVIN MICHAEL'   -> REJECT
+        'Mario Roberto Cruz Montes' vs 'MONTES HEMRY CRUZ'     -> REJECT
+        'Robert Lewis Grant Jr'     vs 'STEPP ROBERT GRANT'    -> REJECT
+    while keeping the true positives:
+        'Angela Dawn Alexander'     vs 'ALEXANDER ANGELA FAYE' -> accept
+        'John Mathis Anthony'       vs 'ANTHONY JOHN MATHIS'   -> accept
+
+  * anything else -> no match.
+
+ORDERING: a bare 'A B C' string is ambiguous — it can be read FIRST MIDDLE LAST
+or LAST FIRST MIDDLE (SC Public Index emits both). ``person_orderings`` returns
+BOTH readings; a comma ('LAST, FIRST') is unambiguous and returns one.
+"""
+from __future__ import annotations
+
+import re
+from typing import NamedTuple, Optional
+
+# Corporate / fiduciary markers. Presence of any of these makes the name an
+# ENTITY (matched by exact token-set equality, never by surname position).
+_ENTITY_MARKERS = {
+    "LLC", "LLP", "LP", "PLLC", "PA", "INC", "INCORPORATED", "CORP",
+    "CORPORATION", "COMPANY", "CO", "LTD", "FUND", "ENTERPRISES", "HOLDINGS",
+    "GROUP", "PROPERTIES", "PROPERTY", "INVESTMENTS", "PARTNERS",
+    "PARTNERSHIP", "ASSOCIATION", "ASSOC", "TRUST", "BANK", "CHURCH",
+    "MINISTRIES", "FOUNDATION", "AUTHORITY", "DISTRICT",
+}
+
+# Generational / professional suffixes and honorifics — noise for matching.
+_PERSON_SUFFIXES = {"JR", "SR", "II", "III", "IV", "MD", "DDS", "DVM", "ESQ", "PHD"}
+_TITLES = {"MR", "MRS", "MS", "DR", "REV"}
+
+# Filing boilerplate and connectives that carry no identity.
+_NOISE = {
+    "ET", "AL", "ETAL", "AKA", "FKA", "DBA", "DECD", "DECEASED", "LIFE",
+    "ESTATE", "THE", "AND", "OR", "OF", "FOR", "A", "AN", "AS", "TRUSTEE",
+    "TRUSTEES", "REVOCABLE", "IRREVOCABLE", "PERSONAL", "REPRESENTATIVE",
+    "REP", "UNKNOWN", "SPOUSE", "HEIRS", "DEVISEES", "CURRENT", "OCCUPANT",
+    "OCCUPANTS", "TENANT", "TENANTS", "IF", "ANY", "CO", "C",
+}
+
+# Tokens too generic to anchor a broad entity LIKE query. Picking the LONGEST
+# token (the old rule) turns 'Allied Of Spartanburg, Llc' into '%SPARTANBURG%',
+# which returns ten civic parcels and matches none of them. Rank by
+# distinctiveness instead: drop these, keep what's left in original order.
+_GENERIC_ENTITY_TOKENS = {
+    # SC/NC place names that appear in hundreds of civic parcel owners
+    "SPARTANBURG", "GREENVILLE", "ANDERSON", "PICKENS", "OCONEE", "LAURENS",
+    "UNION", "CHEROKEE", "GREENWOOD", "ABBEVILLE", "CHARLESTON", "COLUMBIA",
+    "CAROLINA", "CAROLINAS", "SOUTH", "NORTH", "EAST", "WEST", "AMERICAN",
+    "AMERICA", "UNITED", "STATES", "NATIONAL", "STATE", "COUNTY", "CITY",
+    "TOWN", "USA", "US",
+    # corporate filler
+    "SERVICES", "SERVICE", "SOLUTIONS", "MANAGEMENT", "DEVELOPMENT", "REALTY",
+    "REAL", "HOMES", "HOME", "HOUSING", "LAND", "CAPITAL", "VENTURES",
+}
+
+_TAG_RE = re.compile(r"<[^>]*>")
+# Apostrophes collapse to NOTHING (not to a space) because assessor indexes store
+# "OBRIEN SEAN P", never "O BRIEN": mapping ' to a space split O'Brien into
+# ["O","BRIEN"] so the name could never match.
+# Hyphens deliberately stay in _NONWORD_RE (-> space). normalize_name runs on BOTH
+# sides, so hyphen->space makes "SMITH-LEE" and "SMITH LEE" converge on "SMITH LEE"
+# and match either storage form; collapsing them would break the spaced variant.
+_APOSTROPHE_RE = re.compile(r"['’ʼ`]")
+_NONWORD_RE = re.compile(r"[^A-Z0-9]+")
+# ';' joins co-owners on NC OneMap ('MANLY DAVID T;DILLON MARGARET') exactly the
+# way '&' does on the county layers. Without it normalize_name turns the
+# semicolon into a space and primary_party fuses two people into one four-token
+# name, so neither owner can ever match. Strings without a ';' are unaffected.
+_JOINT_SPLIT_RE = re.compile(r"\s*(?:&|;|\bAND\b)\s*")
+
+
+class PersonName(NamedTuple):
+    """A parsed individual: surname plus ordered given-name tokens."""
+
+    surname: str
+    given: tuple[str, ...]
+
+
+def normalize_name(name: Optional[str]) -> str:
+    """Uppercase, strip markup/punctuation, collapse repeated whitespace.
+
+    'Allied Of Spartanburg, Llc' -> 'ALLIED OF SPARTANBURG LLC'
+    'Chante  Fleming'            -> 'CHANTE FLEMING'
+    "Sean O'Brien"               -> 'SEAN OBRIEN'   (matches GIS 'OBRIEN SEAN P')
+    'Smith-Lee'                  -> 'SMITH LEE'     (matches either GIS spelling)
+    """
+    s = _TAG_RE.sub(" ", str(name or "")).upper()
+    s = _APOSTROPHE_RE.sub("", s)
+    s = _NONWORD_RE.sub(" ", s)
+    return " ".join(s.split())
+
+
+def _raw_tokens(name: Optional[str]) -> list[str]:
+    n = normalize_name(name)
+    return n.split() if n else []
+
+
+def is_entity(name: Optional[str]) -> bool:
+    """True when the name reads as a company/trust/agency rather than a person."""
+    return bool(_ENTITY_MARKERS & set(_raw_tokens(name)))
+
+
+# ---------------------------------------------------------------------------
+# entity_type classification (richer than is_entity()'s flat True/False)
+# ---------------------------------------------------------------------------
+# is_entity() only answers "does this read as ANY kind of entity" with one
+# yes/no, by design (every one of its ~10 call sites across the codebase
+# needs exactly that). classify_entity_type() answers the richer "WHAT KIND"
+# question the persisted raw['entity_type'] field (enrichment_entity_type.py)
+# needs. It calls is_entity() internally rather than re-implementing it, and
+# adds two categories is_entity() does not distinguish at all -- estate and
+# government -- mirroring the supplemental heuristics
+# enrichment_sc_phone.owner_is_non_person() and enrichment_owner_cluster.
+# _NOT_A_PERSON already carry independently (both documented in their own
+# files as deliberate additions on top of is_entity(), not a disagreement
+# with it) instead of inventing a third, different word list.
+_ESTATE_MARKERS = {"ESTATE", "HEIRS", "HEIR", "DECEASED", "DECD"}
+_GOV_TOKENS = {"COUNTY"}
+_GOV_OF_RE = re.compile(r"\b(?:CITY|TOWN|STATE|VILLAGE)\s+OF\b")
+# AUTHORITY/AUTHORITY and DISTRICT are already in _ENTITY_MARKERS (so
+# is_entity() already returns True for them); checked here FIRST so a
+# housing/school/fire authority or district reads as 'government' rather than
+# falling into the flat 'entity' bucket below.
+_GOV_ENTITY_MARKERS = {"AUTHORITY", "DISTRICT"}
+
+
+def classify_entity_type(name: Optional[str]) -> str:
+    """'individual' | 'entity' | 'trust' | 'estate' | 'government' | 'unknown'.
+
+    'unknown' only for an empty/missing name -- never a guess. 'entity' is the
+    flat LLC/Inc/Corp/bank/church/... bucket is_entity() detects; the marker-set
+    approach cannot tell a specific entity TYPE apart (an LLC from a
+    foundation from a partnership), so this does not pretend to either.
+    """
+    toks = _raw_tokens(name)
+    if not toks:
+        return "unknown"
+    tokset = set(toks)
+
+    if "TRUST" in tokset:
+        return "trust"
+
+    # "LIFE ESTATE" is an interest held by a LIVING person, not a decedent's
+    # estate -- same exception enrichment_sc_phone.owner_is_non_person applies.
+    live_toks = [t for i, t in enumerate(toks)
+                 if not (t == "ESTATE" and i > 0 and toks[i - 1] == "LIFE")]
+    if _ESTATE_MARKERS & set(live_toks):
+        return "estate"
+
+    raw_upper = str(name or "").upper()
+    if (tokset & _GOV_TOKENS) or _GOV_OF_RE.search(raw_upper) or (tokset & _GOV_ENTITY_MARKERS):
+        return "government"
+
+    if is_entity(name):
+        return "entity"
+
+    return "individual"
+
+
+def core_tokens(name: Optional[str], *, keep_initials: bool = False) -> list[str]:
+    """Identity-bearing tokens: no titles, generational/entity suffixes,
+    boilerplate, or bare initials. Order preserved, duplicates dropped."""
+    out: list[str] = []
+    for t in _raw_tokens(name):
+        if t in _TITLES or t in _PERSON_SUFFIXES or t in _NOISE:
+            continue
+        if t in _ENTITY_MARKERS:
+            continue
+        if not keep_initials and len(t) < 2:
+            continue
+        if t.isdigit() and len(t) < 2:
+            continue
+        if t not in out:
+            out.append(t)
+    return out
+
+
+def distinctive_tokens(name: Optional[str]) -> list[str]:
+    """Entity tokens ranked by distinctiveness (generic place/filler words last).
+
+    'Allied Of Spartanburg, Llc' -> ['ALLIED', 'SPARTANBURG']
+    """
+    toks = core_tokens(name)
+    strong = [t for t in toks if t not in _GENERIC_ENTITY_TOKENS]
+    weak = [t for t in toks if t in _GENERIC_ENTITY_TOKENS]
+    return strong + weak
+
+
+def primary_party(owner: Optional[str]) -> str:
+    """First party of a joint GIS owner string.
+
+    'SMITH JOHN C & MELINDA P' -> 'SMITH JOHN C'
+    """
+    # Split BEFORE normalizing — normalize_name turns '&' into a space, which
+    # would silently fuse 'SMITH JOHN C & MELINDA P' into one four-token name.
+    raw = _TAG_RE.sub(" ", str(owner or "")).upper()
+    if not raw.strip():
+        return ""
+    return normalize_name(_JOINT_SPLIT_RE.split(raw)[0])
+
+
+_FL_SUFFIXES = {"JR", "SR", "II", "III", "IV", "V"}
+_FL_COUPLE = re.compile(r"\s(?:&|and|\+)\s", re.I)
+
+
+def first_last_parts(owner: Optional[str]) -> Optional[tuple[str, str]]:
+    """(LAST, FIRST) when `owner` is in the Title Case FIRST [MIDDLE] LAST
+    convention used by court-party and probate-notice sources, else None.
+
+    The board holds two conventions: county GIS / tax rolls are ALL-CAPS
+    SURNAME-FIRST ('BYRD SANDRA D'); sc_public_index and sc_probate_notices.*
+    are Title Case FIRST-LAST ('Joshua D Smith'). Any lowercase letter with no
+    comma is the tell (a comma always means LAST, FIRST and is not handled here).
+    Returning None means "not this convention -- use your own surname-first
+    parse". Found 2026-09-18 when ~5,000 such leads were divorce-searched with
+    the two orders swapped.
+    """
+    if not owner:
+        return None
+    raw = re.split(r"[;]|<br\s*/?>", owner, maxsplit=1)[0]
+    if "," in raw or not re.search(r"[a-z]", raw):
+        return None
+    raw = _FL_COUPLE.split(raw, maxsplit=1)[0]
+    toks = re.sub(r"[^A-Za-z ]", " ", raw).upper().split()
+    while len(toks) > 1 and toks[-1] in _FL_SUFFIXES:
+        toks.pop()
+    if len(toks) < 2:
+        return None
+    return toks[-1], toks[0]
+
+
+def owner_last_first_middle(owner: Optional[str]) -> Optional[tuple[str, str, str]]:
+    """(LAST, FIRST, MIDDLE-INITIAL or '') for the FIRST person named in `owner`, or None.
+
+    Handles the board's two conventions (Title Case FIRST [MIDDLE] LAST for court and
+    probate sources, ALL-CAPS or comma SURNAME-FIRST for county rolls) and cuts a joint
+    owner at the first '&', 'and', '+', ';' so a co-owner's name is never read as this
+    person's middle name."""
+    if not owner:
+        return None
+    raw = re.split(r"[;]|<br\s*/?>", str(owner), maxsplit=1)[0]
+    raw = _FL_COUPLE.split(raw, maxsplit=1)[0]
+    if "," in raw:
+        last_part, _, rest = raw.partition(",")
+        last = re.sub(r"[^A-Za-z]", "", last_part).upper()
+        toks = [t for t in re.sub(r"[^A-Za-z ]", " ", rest).upper().split() if t not in _FL_SUFFIXES]
+        if not last or not toks:
+            return None
+        return last, toks[0], (toks[1][0] if len(toks) > 1 else "")
+    toks = [t for t in re.sub(r"[^A-Za-z ]", " ", raw).upper().split() if t not in _FL_SUFFIXES]
+    if len(toks) < 2:
+        return None
+    if re.search(r"[a-z]", raw):                          # FIRST [MIDDLE] LAST
+        return toks[-1], toks[0], (toks[1][0] if len(toks) > 2 else "")
+    return toks[0], toks[1], (toks[2][0] if len(toks) > 2 else "")   # SURNAME FIRST [MIDDLE]
+
+
+_VS_SPLIT_RE = re.compile(r"\s+vs\.?\s+", re.I)
+# Bare, whitespace-bounded 'and' -- how PACER joins JOINT bankruptcy filers in
+# one case_name ('Robert Lee Newman and Sharon Elaine Newman'). Bounded by
+# \s so it can never fire inside a word (no name token is literally "and").
+_AND_SPLIT_RE = re.compile(r"\s+and\s+", re.I)
+
+
+def _party_split_verdict(owner: Optional[str], strings, split_re: "re.Pattern[str]") -> str:
+    """Shared core of `party_middle_verdict`/`debtor_middle_verdict`.
+
+    Splits each string in `strings` on `split_re` into ONE-PERSON segments,
+    then requires that segment's LAST token equal the owner's last name AND
+    its FIRST token equal the owner's first name -- POSITION, not bag-of-
+    tokens. Position is what rejects the shape found live on the board
+    2026-10-02: an owner 'JONES, RAY' (surname JONES, given RAY) is NOT a
+    match for debtor 'Billy Ray Jones' just because both names contain a
+    'RAY' and a 'JONES' token somewhere -- 'Ray' sits in Billy Jones's MIDDLE
+    slot, not his first-name slot, and position catches that a bag-of-tokens
+    check cannot. Splitting BEFORE the positional check also means a joint
+    filing's two debtors are never pooled into one token set: 'Robert Curtis
+    Best and Shannon Marie Jones' is checked as two separate one-person
+    strings, so it can never be mistaken for a phantom third person "Robert
+    Jones" assembled from debtor #1's first name and debtor #2's last name
+    (the exact false positive the old bankruptcy matcher produced live).
+    See `party_middle_verdict`/`debtor_middle_verdict` for the verdict policy.
+    """
+    parts = owner_last_first_middle(owner)
+    if not parts or not parts[2]:
+        return "unverified"
+    last, first, mid = parts
+    matched = agreed = 0
+    for ps in strings or ():
+        for side in split_re.split(str(ps or "")):
+            toks = [t for t in re.sub(r"[^A-Za-z ]", " ", side).upper().split() if t not in _FL_SUFFIXES]
+            if len(toks) >= 2 and toks[-1] == last and toks[0] == first:
+                if len(toks) > 2:
+                    matched += 1
+                    agreed += toks[1][0] == mid
+                else:
+                    return "unverified"                   # a party with no middle: cannot rule it out
+    if matched == 0:
+        return "unverified"
+    return "agrees" if agreed else "conflict"
+
+
+def party_middle_verdict(owner: Optional[str], party_strings) -> str:
+    """'agrees' | 'conflict' | 'unverified' for a COURT-CAPTION match on `owner`
+    ('X vs. Y' divorce-caption style; see `debtor_middle_verdict` for the PACER
+    bankruptcy sibling, which splits joint filers on a bare 'and' instead).
+
+    conflict: a party shares the owner's FIRST and LAST name, every such party carries a middle
+    initial, and none matches the owner's. That is a different person with the same name
+    (measured 2026-09-21: 41% of comparable SC divorce hits).
+    agrees: a matching party carries the same middle initial as the owner.
+    unverified: no middle initial on one side, so nothing says the match is wrong OR right."""
+    return _party_split_verdict(owner, party_strings, _VS_SPLIT_RE)
+
+
+def debtor_middle_verdict(owner: Optional[str], debtor_strings) -> str:
+    """'agrees' | 'conflict' | 'unverified' for a PACER bankruptcy DEBTOR-NAME
+    match on `owner`. Same verdict policy as `party_middle_verdict` (see its
+    docstring) -- the only difference is the separator: a bankruptcy
+    case_name joins joint filers with a bare 'and' ('Robert Lee Newman and
+    Sharon Elaine Newman'), not a divorce caption's 'X vs. Y', and may name
+    just one debtor at all (no separator present, same as a lone party).
+
+    Fixed 2026-10-02 alongside the matching rewrite in enrichment_bankruptcy.py:
+    live board audit found the OLD bag-of-tokens matcher there pooled a joint
+    filing's two debtors into one token set, producing phantom matches like
+    'JONES, ROBERT' <- 'Robert Curtis Best and Shannon Marie Jones' (neither
+    real debtor is named Robert Jones) and position-blind matches like
+    'DAVIS, DAVID' <- 'Bryan David Davis' ('David' is Bryan Davis's MIDDLE
+    name, not his first name). Splitting on 'and' into one-person segments
+    before the shared positional check in `_party_split_verdict` fixes both.
+    """
+    return _party_split_verdict(owner, debtor_strings, _AND_SPLIT_RE)
+
+
+def party_middle_conflict(owner: Optional[str], party_strings) -> bool:
+    """True only on a proven middle-initial conflict; see party_middle_verdict."""
+    return party_middle_verdict(owner, party_strings) == "conflict"
+
+
+def debtor_positional_match(owner: Optional[str], debtor_strings) -> bool:
+    """True when at least one one-person segment of `debtor_strings` (split on
+    a bare 'and', same as `debtor_middle_verdict`) has its LAST token equal
+    the owner's last name AND its FIRST token equal the owner's first name --
+    i.e. there is a REAL candidate debtor in the right name-order, regardless
+    of whether either side even carries a middle name.
+
+    A deliberately separate, simpler primitive from `debtor_middle_verdict`:
+    that function's 'unverified' lumps together two very different
+    situations -- (a) NO debtor segment positionally matches the owner at
+    all (the dominant real bug found live 2026-10-02: 'JONES, ROBERT' has no
+    positional candidate in 'Robert Curtis Best and Shannon Marie Jones' --
+    matched==0), and (b) a real positional candidate exists but neither side
+    has a middle name to compare ('TALLANT, BRYAN' <-> 'Bryan Christopher
+    Tallant' has owner mid=='', so party_middle_verdict never even reaches
+    the loop). Treating both alike was right for the SC-divorce fix (that
+    population's own live court-index check found 0% real matches, so
+    `party_middle_verdict(...) == "agrees"` is required there, full stop).
+    It is NOT right for bankruptcy: an independent live validation of 234
+    board rows found 56% were ALREADY strong, correct matches, and the
+    GIS/tax-roll `defendant` field this signal matches against very often
+    carries no middle name at all (even on a correct match) -- requiring
+    'agrees' there would reject most of the genuinely good matches along
+    with the bad ones. `enrichment_bankruptcy.py` therefore gates on THIS
+    function (a real positional candidate must exist -- this alone rejects
+    every concrete false positive found live) plus
+    `debtor_middle_verdict(...) != "conflict"` (reject a PROVEN different
+    person), rather than requiring 'agrees' outright.
+    """
+    parts = owner_last_first_middle(owner)
+    if not parts:
+        return False
+    last, first, _mid = parts
+    for ps in debtor_strings or ():
+        for side in _AND_SPLIT_RE.split(str(ps or "")):
+            toks = [t for t in re.sub(r"[^A-Za-z ]", " ", side).upper().split() if t not in _FL_SUFFIXES]
+            if len(toks) >= 2 and toks[-1] == last and toks[0] == first:
+                return True
+    return False
+
+
+def person_orderings(name: Optional[str]) -> list[PersonName]:
+    """Every plausible (surname, given...) reading of an individual's name.
+
+    A comma is authoritative ('BYRD, SANDRA L' -> surname BYRD). Without one the
+    string is genuinely ambiguous, so BOTH 'FIRST MIDDLE LAST' and
+    'LAST FIRST MIDDLE' are returned, most-likely first.
+    """
+    raw = str(name or "")
+    if "," in raw:
+        left, right = raw.split(",", 1)
+        sur = core_tokens(left)
+        giv = core_tokens(right)
+        if sur:
+            return [PersonName(sur[0], tuple(giv))]
+        return []
+
+    toks = core_tokens(raw)
+    if not toks:
+        return []
+    if len(toks) == 1:
+        return [PersonName(toks[0], ())]
+
+    out: list[PersonName] = [
+        PersonName(toks[-1], tuple(toks[:-1])),   # FIRST MIDDLE LAST
+        PersonName(toks[0], tuple(toks[1:])),     # LAST FIRST MIDDLE
+    ]
+    # De-dup a palindromic 2-token name read both ways.
+    seen: set[PersonName] = set()
+    uniq: list[PersonName] = []
+    for p in out:
+        if p not in seen:
+            seen.add(p)
+            uniq.append(p)
+    return uniq
+
+
+def like_patterns(name: Optional[str]) -> list[str]:
+    """ArcGIS LIKE patterns for an owner-field search, most-specific first.
+
+    Individuals get one two-token pattern per ordering. The old surname-only
+    broad fallback ('%SMITH%') is deliberately NOT emitted: capped at 25 rows it
+    returns arbitrary strangers, never satisfies the strict matcher, and costs a
+    request per lead.
+    """
+    pats: list[str] = []
+
+    def _add(p: str) -> None:
+        if p not in pats:
+            pats.append(p)
+
+    if is_entity(name):
+        toks = [t.replace("'", "''") for t in distinctive_tokens(name)]
+        if not toks:
+            return []
+        if len(toks) >= 2:
+            _add(f"%{toks[0]}%{toks[1]}%")
+            _add(f"%{toks[1]}%{toks[0]}%")
+        _add(f"%{toks[0]}%")
+        return pats
+
+    for p in person_orderings(name):
+        s = p.surname.replace("'", "''")
+        if p.given:
+            g = p.given[0].replace("'", "''")
+            _add(f"%{s}%{g}%")
+        else:
+            _add(f"%{s}%")
+    return pats
+
+
+def _exact_token_match(a: Optional[str], b: Optional[str]) -> bool:
+    ta, tb = set(core_tokens(a)), set(core_tokens(b))
+    return bool(ta) and ta == tb
+
+
+def strong_person_match(
+    person: PersonName, gis_owner: Optional[str], *, require_all_given: bool = False,
+) -> bool:
+    """Surname in surname position AND first name in first-name position.
+
+    `require_all_given` additionally demands that every one of the lead's given
+    tokens appear somewhere in the GIS owner. It is applied to the SPECULATIVE
+    'LAST FIRST MIDDLE' reading of an un-comma'd name, which is otherwise a
+    false-positive factory: 'Casey William Gillespie' read as surname CASEY
+    matches the unrelated 'CASEY WILLIAM MICHAEL' on position alone, but fails
+    containment because GILLESPIE is nowhere in that owner string.
+    """
+    if not person.given:
+        return False
+    toks = core_tokens(primary_party(gis_owner))
+    if len(toks) < 2:
+        return False
+    if toks[0] != person.surname or toks[1] != person.given[0]:
+        return False
+    if require_all_given:
+        owner_set = set(toks)
+        return all(g in owner_set for g in person.given)
+    return True
+
+
+def middle_conflict(lead_name: Optional[str], gis_owner: Optional[str]) -> bool:
+    """True when BOTH names carry a spelled-out middle name and they disagree.
+
+    'James Quentin Kirby' vs 'KIRBY JAMES A' -> False (GIS middle is an initial,
+    which we cannot contradict). 'James Quentin Kirby' vs 'KIRBY JAMES HUNTER'
+    -> True: same surname and first name, provably different middle names, so
+    this is likely a different James Kirby. The match is still returned (a
+    surname+firstname hit is real signal) but the flag rides along in the
+    provenance so a human reviewing outreach can see the doubt.
+    """
+    gis = core_tokens(primary_party(gis_owner))
+    if len(gis) < 3:
+        return False
+    gis_middles = {t for t in gis[2:] if len(t) > 1}
+    if not gis_middles:
+        return False
+    for person in person_orderings(lead_name):
+        if not strong_person_match(person, gis_owner):
+            continue
+        lead_middles = {t for t in person.given[1:] if len(t) > 1}
+        if lead_middles and not (lead_middles & gis_middles):
+            return True
+    return False
+
+
+def match_owner(lead_name: Optional[str], gis_owner: Optional[str]) -> Optional[str]:
+    """Strict comparison. Returns 'exact', 'strong', or None (no match).
+
+    Only these two verdicts are ever committed to a Listing — anything weaker
+    would put the wrong person's address in front of outreach.
+    """
+    if not normalize_name(lead_name) or not normalize_name(gis_owner):
+        return None
+
+    primary = primary_party(gis_owner)
+    if _exact_token_match(lead_name, primary) or _exact_token_match(lead_name, gis_owner):
+        return "exact"
+
+    if is_entity(lead_name) or is_entity(gis_owner):
+        # Entities never get the positional rule — exact token-set equality only.
+        return None
+
+    for idx, person in enumerate(person_orderings(lead_name)):
+        # idx 0 is the likely reading; anything after it is speculative and must
+        # additionally contain every given token.
+        if strong_person_match(person, gis_owner, require_all_given=idx > 0):
+            return "strong"
+    return None

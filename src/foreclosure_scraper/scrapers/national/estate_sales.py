@@ -1,0 +1,1044 @@
+"""Estate sale company listings from estatesales.net and estatesale.com.
+
+Estate liquidation events often indicate that a property is being sold —
+either the owner has died (probate) or is downsizing/relocating. These
+listings provide the event address and dates, which we cross-reference
+against tax records to identify properties being liquidated.
+
+Sources (free, no auth):
+  - estatesales.net  — search by zip code, returns JSON + HTML
+  - estatesale.com   — search by location, HTML listings
+
+We search by zip code for our footprint cities:
+  - Asheville NC 28801 (Buncombe)
+  - Hendersonville NC 28792 (Henderson)
+  - Shelby NC 28150 (Cleveland)
+  - Gastonia NC 28052 (Gaston)
+  - Spartanburg SC 29302 (Spartanburg)
+  - Greenville SC 29601 (was in footprint historically)
+  - Charlotte NC 28202 (Gastonia/Cleveland corridor)
+
+Extract: event title, address, dates, company name, description.
+Listing type: ESTATE_LEAD (property may be in probate or motivated sale).
+source: "national.estate_sales"
+
+Robots.txt checked per host; fail-closed if disallowed.
+"""
+from __future__ import annotations
+
+import json
+import re
+import time
+from datetime import datetime
+from typing import Iterable
+from urllib.parse import urljoin, quote_plus, urlparse
+
+import httpx
+import structlog
+from selectolax.parser import HTMLParser
+from tenacity import (
+    AsyncRetrying,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
+
+from ..._upstate_city_to_county import upstate_county_for
+from ...base_scraper import BaseScraper
+from ...models import Listing, ListingType, PropertyKind
+
+log = structlog.get_logger()
+
+# (zip_code, city, state, county)
+SEARCH_ZIPS: tuple[tuple[str, str, str, str], ...] = (
+    ("28801", "Asheville", "NC", "Buncombe"),
+    ("28792", "Hendersonville", "NC", "Henderson"),
+    ("28150", "Shelby", "NC", "Cleveland"),
+    ("28052", "Gastonia", "NC", "Gaston"),
+    ("29302", "Spartanburg", "SC", "Spartanburg"),
+    ("29601", "Greenville", "SC", "Greenville"),
+    ("28202", "Charlotte", "NC", "Mecklenburg"),
+)
+
+ESTATESALES_NET_BASE = "https://www.estatesales.net"
+ESTATESALE_COM_BASE = "https://www.estatesale.com"
+
+ADDR_RE = re.compile(
+    r"\d+\s+[A-Z][\w .'#-]+"
+    r"(?:\s+(?:St|Street|Rd|Road|Dr|Drive|Ave|Avenue|Ln|Lane|Ct|Court|"
+    r"Blvd|Boulevard|Hwy|Highway|Pl|Place|Way|Cir|Circle|Trl|Trail|"
+    r"Pkwy|Parkway|Ter|Terrace))\b\.?",
+    re.I,
+)
+DATE_RE = re.compile(
+    r"(\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2}"
+    r"(?:\s*[-–to]+\s*\d{1,2})?,?\s*\d{4}\b"
+    r"|\b\d{1,2}/\d{1,2}/\d{2,4}\b"
+    r"|\b\d{4}-\d{2}-\d{2}\b)",
+    re.I,
+)
+
+
+def _parse_date(text: str | None) -> datetime | None:
+    if not text:
+        return None
+    text = text.strip()
+    # Found 2026-10-01 (national/reo per-source audit): the schema.org
+    # SaleEvent JSON-LD path (_saleevent_to_listing, the dominant source of
+    # rows live-verified today) hands this full ISO-8601 datetimes
+    # ("2026-10-01T12:00:00.000Z") straight from startDate/endDate -- none of
+    # the formats below ever matched that shape, so sale_date silently came
+    # back None on every JSON-LD-sourced row despite the real date sitting
+    # right there in raw.estate_sales.start_date. Tried first since it is the
+    # most specific/unambiguous format.
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00")).replace(tzinfo=None)
+    except ValueError:
+        pass
+    for fmt in (
+        "%B %d, %Y", "%b %d, %Y",
+        "%B %d %Y", "%b %d %Y",
+        "%m/%d/%Y", "%m/%d/%y",
+        "%Y-%m-%d",
+    ):
+        try:
+            return datetime.strptime(text, fmt)
+        except ValueError:
+            continue
+    m = DATE_RE.search(text)
+    if m:
+        s = m.group(1)
+        # Handle date ranges like "Jul 15-17, 2026" or "Jul 15 to 17, 2026"
+        # -- take the first day only, keep the month/year.
+        #
+        # Found 2026-10-01 (national/reo per-source audit) alongside the
+        # ISO-8601 gap above: re.split(r"[-–to]+", s) is a CHARACTER CLASS,
+        # not the literal word "to" -- it matches any of '-', '–', 't', 'o'
+        # individually. On "Jul 15-17, 2026" it split before ever reaching
+        # the comma (neither 'J','u','l' nor the digits contain those chars,
+        # but splitting on bare '-' alone already cuts the string to "Jul 15"
+        # / "17, 2026"), discarding the YEAR along with the second day, so
+        # every strptime attempt below failed and this whole fallback path
+        # silently returned None for ANY date-range string. Range removed
+        # by substitution instead, which keeps the month/comma/year intact.
+        s = re.sub(r"(\d+)\s*(?:-|–|\bto\b)\s*\d+", r"\1", s).strip()
+        for fmt in (
+            "%B %d, %Y", "%b %d, %Y",
+            "%B %d %Y", "%b %d %Y",
+            "%m/%d/%Y", "%m/%d/%y",
+            "%Y-%m-%d",
+        ):
+            try:
+                return datetime.strptime(s, fmt)
+            except ValueError:
+                continue
+    return None
+
+
+async def _robots_allows(host: str, path: str) -> bool:
+    """Check robots.txt. Fails OPEN if unreachable."""
+    robots_url = f"https://{host}/robots.txt"
+    try:
+        async with httpx.AsyncClient(timeout=10, follow_redirects=True) as c:
+            r = await c.get(robots_url)
+            if r.status_code != 200:
+                return True
+            body = r.text or ""
+    except Exception:
+        return True
+
+    ua_star = False
+    for raw in body.splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if not line or ":" not in line:
+            continue
+        field, _, value = line.partition(":")
+        field = field.strip().lower()
+        value = value.strip()
+        if field == "user-agent":
+            ua_star = value == "*"
+        elif ua_star and field == "disallow":
+            if value and (path == value or path.startswith(value)):
+                return False
+    return True
+
+
+async def _fetch_text(url: str, timeout: float = 20.0,
+                      headers: dict | None = None) -> str:
+    """GET text through the shared throttled client, with our own retry.
+
+    http_client.client() is a bare httpx.AsyncClient context manager with
+    retries=0 on its transport (callers must wrap their own AsyncRetrying --
+    see that module's docstring). This function is a local caller that
+    bypasses the project's already-retried get_text() helper, so without this
+    wrapper a single transient connect/read blip would zero out whichever
+    call site invoked it (both of this file's call sites are dateless, so a
+    zeroed run can't self-heal on a later date window). Retries only
+    transport/timeout errors -- a real bad HTTP status from raise_for_status()
+    is not a transient-network symptom and must not be retried here.
+    """
+    from ...http_client import client
+    h = {"Accept": "text/html,application/json,*/*"}
+    if headers:
+        h.update(headers)
+    async for attempt in AsyncRetrying(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential_jitter(initial=1, max=8),
+        retry=retry_if_exception_type(
+            (httpx.TransportError, httpx.TimeoutException, TimeoutError)
+        ),
+        reraise=True,
+    ):
+        with attempt:
+            async with client(timeout=timeout, headers=h) as c:
+                r = await c.get(url)
+                r.raise_for_status()
+                return r.text
+    raise RuntimeError("unreachable")
+
+
+# --- schema.org JSON-LD SaleEvent ------------------------------------------
+
+def _saleevent_to_listing(node: dict, source_url: str, city: str, state: str,
+                          county: str, source_site: str) -> Listing | None:
+    """Build a Listing from a schema.org SaleEvent JSON-LD node.
+
+    Captures organizer.telephone/url (contactability the HTML cards lack),
+    endDate, and — when location is a Place — its address.streetAddress.
+    """
+    if not isinstance(node, dict):
+        return None
+    name = node.get("name") or ""
+    url = node.get("url") or source_url
+    if isinstance(url, str) and not url.startswith("http"):
+        url = urljoin(ESTATESALES_NET_BASE, url)
+
+    organizer = node.get("organizer")
+    if not isinstance(organizer, dict):
+        organizer = {}
+    org_name = organizer.get("name") or None
+    org_phone = organizer.get("telephone") or None
+    org_url = organizer.get("url") or None
+
+    street = None
+    ev_city, ev_state, ev_zip = city, state, None
+    location = node.get("location")
+    if isinstance(location, dict):
+        loc_type = location.get("@type")
+        loc_types = loc_type if isinstance(loc_type, list) else [loc_type]
+        addr = location.get("address")
+        if "Place" in loc_types or addr is not None:
+            if isinstance(addr, dict):
+                street = addr.get("streetAddress") or None
+                ev_city = addr.get("addressLocality") or city
+                ev_state = addr.get("addressRegion") or state
+                ev_zip = addr.get("postalCode") or None
+            elif isinstance(addr, str):
+                street = addr or None
+
+    start_date = node.get("startDate")
+    end_date = node.get("endDate")
+    sale_date = _parse_date(start_date) if isinstance(start_date, str) else None
+    description = node.get("description") or ""
+
+    if not street and not name:
+        return None
+
+    # estatesales.net's zip search returns events within a wide radius, not
+    # just the searched city -- a Shelby (Cleveland Co.) search page's own
+    # JSON-LD includes real sales in Hickory (Catawba), Gastonia (Gaston),
+    # Starr (Anderson SC), etc. Stamping the search county onto every event
+    # fused unrelated counties' leads onto one shared address (verified
+    # 2026-09-23: the same Hickory/Conover address recurred under Cleveland,
+    # Gaston, Greenville, Mecklenburg AND Spartanburg on the board). Resolve
+    # the event's own county from its actual city; only fall back to the
+    # search county when the event has no place (VirtualLocation) or its
+    # city isn't in the gazetteer.
+    #
+    # 2026-10-04 (national.* extraction-completeness audit, batch 15): that
+    # fallback was unconditional, which let it ALSO fire across STATE lines
+    # -- live-verified: a Buncombe-zip (28801 Asheville) search page's own
+    # JSON-LD returns real sales in Knoxville, TN and Bristol, TN (both well
+    # outside the gazetteer, same radius-search behavior as the in-state
+    # Hickory/Gastonia case above), and the unconditional `or county` stamped
+    # "Buncombe" (a North Carolina county) onto a Tennessee street address.
+    # These particular rows still get rejected downstream by
+    # main._in_scope()'s state check (TN is simply never NC/SC), but the
+    # raw data itself was wrong regardless, and the same unconditional
+    # fallback would silently mislabel a genuine same-STATE gazetteer gap's
+    # county too. Only fall back to the search county when the event is
+    # actually in the SAME state the search was run in.
+    event_county = upstate_county_for(ev_city, ev_state)
+    if event_county is None and (ev_state or "").strip().upper() == (state or "").strip().upper():
+        event_county = county
+
+    return Listing(
+        source="national.estate_sales",
+        source_url=url,
+        listing_type=ListingType.ESTATE_LEAD,
+        property_kind=PropertyKind.UNKNOWN,
+        street_address=street,
+        city=ev_city,
+        state=ev_state,
+        zip_code=ev_zip,
+        county=event_county,
+        sale_date=sale_date,
+        trustee=org_name,  # company/organizer name stored in trustee field
+        description=(f"{name} | {description}"[:500] if description else name[:500]) or None,
+        first_seen=datetime.utcnow(),
+        last_seen=datetime.utcnow(),
+        raw={
+            "estate_sales": {
+                "source_site": source_site,
+                "title": name,
+                "company": org_name,
+                "organizer_phone": org_phone,
+                "organizer_url": org_url,
+                "start_date": start_date,
+                "end_date": end_date,
+            },
+        },
+    )
+
+
+def _parse_jsonld_sale_events(html: str, source_url: str, city: str, state: str,
+                              county: str, source_site: str) -> list[Listing]:
+    """Parse schema.org SaleEvent blocks from <script type=application/ld+json>.
+
+    The prior JSON gate keyed on window.__INITIAL_STATE__ markers
+    ('saleEvents'/'events'), so the ld+json SaleEvent blocks estatesales.net
+    actually emits were never parsed. Detects @type=='SaleEvent' nodes (incl.
+    inside @graph arrays) and maps organizer/location/dates."""
+    out: list[Listing] = []
+    tree = HTMLParser(html)
+    for script in tree.css('script[type="application/ld+json"]'):
+        txt = script.text()
+        if not txt or "SaleEvent" not in txt:
+            continue
+        try:
+            data = json.loads(txt)
+        except (json.JSONDecodeError, ValueError, TypeError):
+            continue
+        nodes: list[dict] = []
+
+        def _collect(obj):
+            if isinstance(obj, list):
+                for x in obj:
+                    _collect(x)
+            elif isinstance(obj, dict):
+                if isinstance(obj.get("@graph"), list):
+                    _collect(obj["@graph"])
+                nodes.append(obj)
+
+        _collect(data)
+        for node in nodes:
+            t = node.get("@type")
+            types = t if isinstance(t, list) else [t]
+            if "SaleEvent" not in types:
+                continue
+            li = _saleevent_to_listing(node, source_url, city, state, county,
+                                       source_site)
+            if li:
+                out.append(li)
+    return out
+
+
+# --- estatesales.net -------------------------------------------------------
+
+def _parse_estatesales_net(html: str, source_url: str,
+                           city: str, state: str,
+                           county: str) -> list[Listing]:
+    """Parse estatesales.net search results. The site returns HTML with
+    event cards, and sometimes embedded JSON. We handle both."""
+    tree = HTMLParser(html)
+    out: list[Listing] = []
+
+    # schema.org SaleEvent JSON-LD (organizer phone/url, endDate, Place address)
+    out.extend(_parse_jsonld_sale_events(
+        html, source_url, city, state, county, "estatesales.net"))
+
+    # Try embedded JSON first (more structured)
+    for script in tree.css("script"):
+        text = script.text()
+        if '"saleEvents"' not in text and '"events"' not in text:
+            continue
+        # Find JSON-like structures
+        try:
+            # Try to find a JSON blob
+            json_match = re.search(
+                r'(?:window\.\w+\s*=\s*|__INITIAL_STATE__\s*=\s*)(\{.+?\});',
+                text, re.S,
+            )
+            if json_match:
+                data = json.loads(json_match.group(1))
+                events = (
+                    data.get("saleEvents")
+                    or data.get("events")
+                    or data.get("sales")
+                    or []
+                )
+                if isinstance(events, list):
+                    for ev in events:
+                        li = _estatesales_net_json_to_listing(
+                            ev, source_url, city, state, county,
+                        )
+                        if li:
+                            out.append(li)
+        except (json.JSONDecodeError, ValueError, TypeError):
+            pass
+
+    # HTML card parsing -- only when the JSON sources above found nothing.
+    # MEASURED 2026-09-23 on a live Shelby-zip search page: JSON-LD alone
+    # matched the page's 20 real sale cards 1:1 (div.sale-row__details also
+    # matches exactly 20). But the broad selector list below additionally
+    # matches a "sales near you" widget -- div[class*='sale'] catches its
+    # promo cards too -- yielding 81 elements, 61 of them "<city>, ST ZIP NN
+    # milesaway" widget noise mis-parsed as street addresses/cities. JSON-LD
+    # already carries richer, correctly-scoped data (organizer phone, clean
+    # dates, structured address) for every real card, so running this path
+    # unconditionally only added duplicate, lower-quality, sometimes-garbage
+    # rows on top. Keep it as a genuine last-resort fallback, matching the
+    # text-block fallback pattern right below it.
+    if not out:
+        for card in tree.css(
+            "div.sale-row__details, div.sale-card, div.event-card, div.listing-item, "
+            "article.sale, li.sale-item, div.es-item, "
+            "div[data-sale-id], div[class*='sale']"
+        ):
+            li = _parse_estatesales_net_card(card, source_url, city, state, county)
+            if li:
+                out.append(li)
+
+    # Fallback: look for any div/article with address-like content
+    if not out:
+        for el in tree.css("div.card, article, li.media, div.result"):
+            text = el.text(strip=True)
+            if not text or len(text) < 20:
+                continue
+            addr = ADDR_RE.search(text)
+            if not addr:
+                continue
+            # Extract link
+            a = el.css_first("a[href]")
+            url = source_url
+            if a is not None:
+                href = a.attributes.get("href", "")
+                if href:
+                    url = urljoin(ESTATESALES_NET_BASE, href)
+            title = a.text(strip=True) if a is not None else "Estate Sale"
+
+            li = Listing(
+                source="national.estate_sales",
+                source_url=url,
+                listing_type=ListingType.ESTATE_LEAD,
+                property_kind=PropertyKind.UNKNOWN,
+                street_address=addr.group().strip(),
+                city=city,
+                state=state,
+                county=county,
+                sale_date=_parse_date(text),
+                description=text[:500],
+                first_seen=datetime.utcnow(),
+                last_seen=datetime.utcnow(),
+                raw={
+                    "estate_sales": {
+                        "source_site": "estatesales.net",
+                        "text_block": text[:500],
+                    },
+                },
+            )
+            out.append(li)
+
+    return out
+
+
+def _estatesales_net_json_to_listing(
+    ev: dict, source_url: str,
+    city: str, state: str, county: str,
+) -> Listing | None:
+    """Convert an estatesales.net JSON event to a Listing."""
+    if not isinstance(ev, dict):
+        return None
+
+    title = ev.get("title") or ev.get("name") or ""
+    url = ev.get("url") or ev.get("detailUrl") or source_url
+    if not url.startswith("http"):
+        url = urljoin(ESTATESALES_NET_BASE, url)
+
+    address = (
+        ev.get("address")
+        or ev.get("streetAddress")
+        or ev.get("location", {}).get("address")
+        or ""
+    )
+    company = (
+        ev.get("companyName")
+        or ev.get("company", {}).get("name")
+        or ev.get("organizer")
+        or ""
+    )
+
+    # Date handling
+    date_str = ev.get("startDate") or ev.get("dateStart") or ev.get("date")
+    sale_date = _parse_date(date_str) if isinstance(date_str, str) else None
+
+    description = ev.get("description") or ev.get("summary") or ""
+
+    # Full address components
+    ev_city = ev.get("city") or city
+    ev_state = ev.get("state") or state
+    ev_zip = ev.get("zip") or ev.get("zipCode")
+
+    if not address and not title:
+        return None
+
+    # Same cross-state fix as _saleevent_to_listing (2026-10-04, see that
+    # function's docstring comment) -- never stamp the search's own county
+    # onto an event confirmed to be in a DIFFERENT state.
+    event_county = upstate_county_for(ev_city, ev_state)
+    if event_county is None and (ev_state or "").strip().upper() == (state or "").strip().upper():
+        event_county = county
+
+    return Listing(
+        source="national.estate_sales",
+        source_url=url,
+        listing_type=ListingType.ESTATE_LEAD,
+        property_kind=PropertyKind.UNKNOWN,
+        street_address=address or None,
+        city=ev_city,
+        state=ev_state,
+        zip_code=ev_zip,
+        county=event_county,
+        sale_date=sale_date,
+        trustee=company or None,  # company name stored in trustee field
+        description=f"{title} | {description}"[:500] if description else title[:500],
+        first_seen=datetime.utcnow(),
+        last_seen=datetime.utcnow(),
+        raw={
+            "estate_sales": {
+                "source_site": "estatesales.net",
+                "title": title,
+                "company": company,
+                "dates_raw": date_str,
+                "description": description[:300],
+            },
+        },
+    )
+
+
+def _parse_estatesales_net_card(card, source_url: str,
+                                city: str, state: str,
+                                county: str) -> Listing | None:
+    """Parse a single estatesales.net HTML card element."""
+    # Title + link
+    a = card.css_first("a[href]")
+    title = ""
+    url = source_url
+    if a is not None:
+        href = a.attributes.get("href", "")
+        if href:
+            url = urljoin(ESTATESALES_NET_BASE, href)
+        title = a.text(strip=True) or a.attributes.get("title", "")
+
+    # Title from heading if link text is empty
+    if not title:
+        for sel in ("h2", "h3", "h4", ".title", ".sale-title"):
+            n = card.css_first(sel)
+            if n is not None:
+                title = n.text(strip=True)
+                break
+
+    # Address
+    address = None
+    for sel in (".address", ".location", ".sale-address", "[class*='address']"):
+        n = card.css_first(sel)
+        if n is not None:
+            addr_text = n.text(strip=True)
+            if addr_text:
+                address = addr_text
+                break
+    if not address:
+        blob = card.text()
+        m = ADDR_RE.search(blob)
+        if m:
+            address = m.group().strip()
+
+    # Dates
+    date_text = None
+    for sel in (".dates", ".sale-dates", ".date", "[class*='date']"):
+        n = card.css_first(sel)
+        if n is not None:
+            date_text = n.text(strip=True)
+            if date_text:
+                break
+
+    sale_date = _parse_date(date_text)
+
+    # Company name
+    company = None
+    for sel in (".company", ".company-name", ".organizer", "[class*='company']"):
+        n = card.css_first(sel)
+        if n is not None:
+            company = n.text(strip=True)
+            if company:
+                break
+
+    if not title and not address:
+        return None
+
+    return Listing(
+        source="national.estate_sales",
+        source_url=url,
+        listing_type=ListingType.ESTATE_LEAD,
+        property_kind=PropertyKind.UNKNOWN,
+        street_address=address,
+        city=city,
+        state=state,
+        county=county,
+        sale_date=sale_date,
+        trustee=company,
+        description=f"{title} | {date_text or ''}".strip(" |")[:500] or None,
+        first_seen=datetime.utcnow(),
+        last_seen=datetime.utcnow(),
+        raw={
+            "estate_sales": {
+                "source_site": "estatesales.net",
+                "title": title,
+                "company": company,
+                "dates_raw": date_text,
+            },
+        },
+    )
+
+
+# --- estatesales.net detail-page photo gallery -----------------------------
+#
+# ADDED 2026-10-13 (source-completeness audit, Pattern B): this scraper never
+# captured a single photo -- not "kept one and dropped the rest" (the pattern
+# the audit describes for freddie_homesteps/govdeals/etc.), genuinely ZERO.
+# The schema.org SaleEvent JSON-LD block on the search-results card does
+# carry an "image" field, but it is always a single cover photo (confirmed
+# live against 20 real cards on a current Asheville-zip search: every one
+# had exactly 0 or 1 image), and the current code never even reads it.
+#
+# Live-verified 2026-10-13 against 3 real, currently-active listings (one
+# cross-state radius-search bleed, one in-footprint Gastonia NC sale, one
+# brand-new listing with no photos yet) that each listing's own detail page
+# -- already captured as source_url, never fetched -- server-renders the
+# FULL photo gallery into a plain (non-escaped) JSON blob:
+# <script id="estatesales-net-state" type="application/json">, an Angular
+# NGRX state-transfer dump. Inside it, the sale's own entity carries
+# `pictures` (list of {pictureOrder, url, thumbnailUrl, ...}), `mainPicture`
+# (== pictures[0]) and `pictureCount`. Measured real totals: 148 and 90
+# unique photos on the two populated listings, 0 on the brand-new one (items
+# not yet photographed -- must degrade to no gallery, not an error). No
+# login, no CAPTCHA, no WAF bypass -- a plain unauthenticated GET already
+# returns this, same as the search page it is next to.
+#
+# These are REAL photos of the sale's own items (the organizer's photography,
+# not necessarily the house itself), ordered by the organizer's own
+# `pictureOrder` -- pictures[0]/mainPicture is their chosen lead/cover photo.
+# Real totals run into the hundreds, far past any sane per-row cap, so only
+# the first 8 (in the organizer's own order) are kept -- same cap as the
+# freddie_homesteps reference pattern this fix mirrors.
+_GALLERY_PHOTO_CAP = 8
+
+
+def _find_picture_entity(obj, depth: int = 0) -> dict | None:
+    """Recursively find the dict carrying both `pictures` (a list) and
+    `pictureCount` -- the sale entity's own fingerprint inside the NGRX
+    state dump, independent of whatever feature-slice/key name wraps it
+    (an Angular implementation detail that could rename across site
+    versions; this is also why the state is parsed structurally instead of
+    regex-scraping picturescdn.estatesales.net URLs out of the raw HTML,
+    which would silently include stale/unrelated CDN links from other page
+    chrome).
+
+    Confirmed live: the search-results page ALSO has this same
+    estatesales-net-state script and ALSO has `pictureCount` per card, but
+    never the full `pictures` list (only the detail page loads that) -- so
+    this fingerprint naturally never matches on a search page, even if a
+    listing's source_url ever ended up pointing at one instead of its own
+    detail page.
+    """
+    if depth > 14:
+        return None
+    if isinstance(obj, dict):
+        if isinstance(obj.get("pictures"), list) and "pictureCount" in obj:
+            return obj
+        for v in obj.values():
+            found = _find_picture_entity(v, depth + 1)
+            if found is not None:
+                return found
+    elif isinstance(obj, list):
+        for v in obj:
+            found = _find_picture_entity(v, depth + 1)
+            if found is not None:
+                return found
+    return None
+
+
+def _parse_detail_gallery(html: str) -> list[str]:
+    """Extract the real photo gallery from an estatesales.net listing's own
+    detail page HTML. Returns [] (never raises) when the page has no
+    gallery, is malformed, or doesn't match the expected shape at all --
+    a parse miss here must never take down the listing it was enriching."""
+    try:
+        tree = HTMLParser(html)
+        node = tree.css_first("script#estatesales-net-state")
+        if node is None:
+            return []
+        text = node.text()
+        if not text:
+            return []
+        data = json.loads(text)
+    except (json.JSONDecodeError, ValueError, TypeError):
+        return []
+
+    entity = _find_picture_entity(data)
+    if entity is None:
+        return []
+    pictures = entity.get("pictures") or []
+
+    ordered = sorted(
+        (p for p in pictures if isinstance(p, dict)),
+        key=lambda p: p.get("pictureOrder", 0),
+    )
+    out: list[str] = []
+    for p in ordered:
+        url = p.get("url") or p.get("thumbnailUrl")
+        if url and url not in out:
+            out.append(url)
+        if len(out) >= _GALLERY_PHOTO_CAP:
+            break
+    return out
+
+
+def _is_estatesales_net_detail_url(url: str | None) -> bool:
+    """True only for a per-listing detail URL (e.g.
+    /NC/Asheville/28801/5104050), never a bare zip/city search page (e.g.
+    /NC/Asheville/) -- the fallback `source_url = source_url` path in
+    _saleevent_to_listing can hand back the SEARCH page's own URL when a
+    SaleEvent node has no "url" field, and re-fetching that would waste a
+    request for a gallery fetch that can never match (see
+    _find_picture_entity's docstring: the search page never carries the
+    full `pictures` list, so it would just return [] anyway -- this check
+    only saves the wasted round-trip)."""
+    if not url:
+        return False
+    try:
+        path = urlparse(url).path
+    except ValueError:
+        return False
+    segments = [s for s in path.split("/") if s]
+    return len(segments) >= 3
+
+
+async def _enrich_estatesales_net_gallery(li: Listing) -> None:
+    """Fetch this one listing's own detail page and attach its real photo
+    gallery to raw["images"]["real"]. Never raises: a failed or unreachable
+    detail-page fetch must never break the main listing, which already
+    shipped (via EstateSales.fetch()'s partial-salvage) before this runs."""
+    if not _is_estatesales_net_detail_url(li.source_url):
+        return
+    try:
+        html = await _fetch_text(li.source_url, timeout=20.0)
+    except Exception as exc:
+        log.warning("estate_sales.gallery_fetch_failed", url=li.source_url,
+                    error=str(exc)[:160])
+        return
+    try:
+        photos = _parse_detail_gallery(html)
+    except Exception as exc:
+        log.warning("estate_sales.gallery_parse_failed", url=li.source_url,
+                    error=str(exc)[:160])
+        return
+    if photos:
+        li.raw.setdefault("images", {})["real"] = photos
+
+
+#: Share of timeout_s the per-listing detail-page gallery fetches may use.
+#: List-page rows are handed to self.partial (ships even on a soft timeout)
+#: before any of these run, so a cutoff here only means fewer galleries
+#: filled in, never a dropped listing.
+DETAIL_BUDGET_SHARE = 0.6
+
+
+# --- estatesale.com --------------------------------------------------------
+
+def _parse_estatesale_com(html: str, source_url: str,
+                          city: str, state: str,
+                          county: str) -> list[Listing]:
+    """Parse estatesale.com search results."""
+    tree = HTMLParser(html)
+    out: list[Listing] = []
+
+    # schema.org SaleEvent JSON-LD (organizer phone/url, endDate, Place address)
+    out.extend(_parse_jsonld_sale_events(
+        html, source_url, city, state, county, "estatesale.com"))
+
+    # Card parsing -- only when JSON-LD found nothing. Same estatesales.net
+    # bug pattern applies here (div.card / div[class*='sale'] are broad
+    # enough to catch a "nearby sales" widget's cards, not just real search
+    # results), so treat this as a fallback rather than an unconditional
+    # supplement to the JSON-LD listings above.
+    if not out:
+        for card in tree.css(
+            "div.sale-listing, div.listing, div.event, "
+            "article.sale, li.sale-item, div.card, "
+            "div[class*='sale'], div[class*='listing']"
+        ):
+            a = card.css_first("a[href]")
+            title = ""
+            url = source_url
+            if a is not None:
+                href = a.attributes.get("href", "")
+                if href:
+                    url = urljoin(ESTATESALE_COM_BASE, href)
+                title = a.text(strip=True) or a.attributes.get("title", "")
+
+            if not title:
+                for sel in ("h2", "h3", "h4", ".title", ".sale-title", ".name"):
+                    n = card.css_first(sel)
+                    if n is not None:
+                        title = n.text(strip=True)
+                        break
+
+            address = None
+            for sel in (".address", ".location", ".addr", "[class*='address']"):
+                n = card.css_first(sel)
+                if n is not None:
+                    address = n.text(strip=True)
+                    if address:
+                        break
+            if not address:
+                blob = card.text()
+                m = ADDR_RE.search(blob)
+                if m:
+                    address = m.group().strip()
+
+            date_text = None
+            for sel in (".dates", ".date", ".when", "[class*='date']"):
+                n = card.css_first(sel)
+                if n is not None:
+                    date_text = n.text(strip=True)
+                    if date_text:
+                        break
+
+            company = None
+            for sel in (".company", ".company-name", ".organizer", "[class*='company']"):
+                n = card.css_first(sel)
+                if n is not None:
+                    company = n.text(strip=True)
+                    if company:
+                        break
+
+            if not title and not address:
+                continue
+
+            sale_date = _parse_date(date_text)
+
+            out.append(Listing(
+                source="national.estate_sales",
+                source_url=url,
+                listing_type=ListingType.ESTATE_LEAD,
+                property_kind=PropertyKind.UNKNOWN,
+                street_address=address,
+                city=city,
+                state=state,
+                county=county,
+                sale_date=sale_date,
+                trustee=company,
+                description=f"{title} | {date_text or ''}".strip(" |")[:500] or None,
+                first_seen=datetime.utcnow(),
+                last_seen=datetime.utcnow(),
+                raw={
+                    "estate_sales": {
+                        "source_site": "estatesale.com",
+                        "title": title,
+                        "company": company,
+                        "dates_raw": date_text,
+                    },
+                },
+            ))
+
+    # Fallback: scan all text blocks
+    if not out:
+        for el in tree.css("div.card, article, li, p"):
+            text = el.text(strip=True)
+            if not text or len(text) < 20:
+                continue
+            addr = ADDR_RE.search(text)
+            if not addr:
+                continue
+            a = el.css_first("a[href]")
+            url = source_url
+            if a is not None:
+                href = a.attributes.get("href", "")
+                if href:
+                    url = urljoin(ESTATESALE_COM_BASE, href)
+            title = a.text(strip=True) if a is not None else "Estate Sale"
+
+            out.append(Listing(
+                source="national.estate_sales",
+                source_url=url,
+                listing_type=ListingType.ESTATE_LEAD,
+                property_kind=PropertyKind.UNKNOWN,
+                street_address=addr.group().strip(),
+                city=city,
+                state=state,
+                county=county,
+                sale_date=_parse_date(text),
+                description=text[:500],
+                first_seen=datetime.utcnow(),
+                last_seen=datetime.utcnow(),
+                raw={
+                    "estate_sales": {
+                        "source_site": "estatesale.com",
+                        "text_block": text[:500],
+                    },
+                },
+            ))
+
+    return out
+
+
+async def _fetch_estatesales_net(zip_code: str, city: str, state: str,
+                                 county: str) -> list[Listing]:
+    """Search estatesales.net by zip code."""
+    host = "www.estatesales.net"
+    search_path = f"/estate-sales/{zip_code}.html"
+    if not await _robots_allows(host, search_path):
+        log.info("estate_sales.net_robots_skip")
+        return []
+
+    url = f"{ESTATESALES_NET_BASE}/{state}/{city}/"
+    try:
+        html = await _fetch_text(url, timeout=20.0)
+    except Exception as exc:
+        log.warning("estate_sales.net_fail", zip=zip_code, error=str(exc)[:200])
+        return []
+
+    if not html or len(html) < 200:
+        return []
+
+    return _parse_estatesales_net(html, url, city, state, county)
+
+
+async def _fetch_estatesale_com(zip_code: str, city: str, state: str,
+                                county: str) -> list[Listing]:
+    """Search estatesale.com by zip code.
+
+    DISABLED 2026-10-01 (national/reo per-source audit): /search?zip=...
+    is a dead path -- confirmed live, HTTP 404 on every one of the 7 footprint
+    zips, every time. The site has migrated to a client-rendered SPA: both
+    the homepage and the new /sales/advanceSearch/ path return HTTP 200 with
+    only ~950 bytes (a bare JS-bundle shell, no server-rendered listings), so
+    a plain httpx fetch can no longer see real content here even at a correct
+    URL -- confirmed via robots.txt, which documents the live paths as
+    /sales/view/ and /sales/advanceSearch/, neither matching the old /search
+    this module targeted. Recovering this source would need a stealth-browser
+    render (requires_render), which was not worth building for what is only
+    the secondary of two estate-sale sources: estatesales.net alone already
+    returns real rows across the footprint (34 live 2026-10-01) and is
+    unaffected. Returns [] immediately so every run stops wasting 7 guaranteed
+    404s (one per SEARCH_ZIPS entry) and the log noise that came with them.
+    See _fetch_estatesale_com_disabled_reference below for the pre-404
+    implementation, kept for a future StealthyFetcher rebuild.
+    """
+    return []
+
+
+async def _fetch_estatesale_com_disabled_reference(
+    zip_code: str, city: str, state: str, county: str
+) -> list[Listing]:
+    """Dead reference implementation -- see _fetch_estatesale_com's
+    docstring. Not called anywhere; kept only so a future rebuild (with a
+    stealth-browser render instead of a plain fetch) does not start from
+    scratch on the parsing side (_parse_estatesale_com is unaffected and
+    still correct for whatever HTML a render eventually produces)."""
+    host = "www.estatesale.com"
+    search_path = f"/search"
+    if not await _robots_allows(host, search_path):
+        log.info("estate_sales.com_robots_skip")
+        return []
+
+    url = f"{ESTATESALE_COM_BASE}/search?zip={zip_code}&radius=25"
+    try:
+        html = await _fetch_text(url, timeout=20.0)
+    except Exception as exc:
+        log.warning("estate_sales.com_fail", zip=zip_code, error=str(exc)[:200])
+        return []
+
+    if not html or len(html) < 200:
+        return []
+
+    return _parse_estatesale_com(html, url, city, state, county)
+
+
+class EstateSales(BaseScraper):
+    slug = "national.estate_sales"
+    name = "Estate Sales (estatesales.net + estatesale.com)"
+    category = "estate_sale"
+    expected_min_count = 0
+    timeout_s = 180.0
+
+    async def fetch(self) -> Iterable[Listing]:
+        start = time.monotonic()
+        out: list[Listing] = []
+        for zip_code, city, state, county in SEARCH_ZIPS:
+            try:
+                listings = await _fetch_estatesales_net(
+                    zip_code, city, state, county,
+                )
+                out.extend(listings)
+                log.info("estate_sales.net_done", zip=zip_code,
+                         count=len(listings))
+            except Exception as exc:
+                log.warning("estate_sales.net_failed", zip=zip_code,
+                            error=str(exc)[:200])
+
+            try:
+                listings = await _fetch_estatesale_com(
+                    zip_code, city, state, county,
+                )
+                out.extend(listings)
+                log.info("estate_sales.com_done", zip=zip_code,
+                         count=len(listings))
+            except Exception as exc:
+                log.warning("estate_sales.com_failed", zip=zip_code,
+                            error=str(exc)[:200])
+
+        # Dedupe by source_url
+        seen: set[str] = set()
+        deduped: list[Listing] = []
+        for li in out:
+            if li.source_url in seen:
+                continue
+            seen.add(li.source_url)
+            deduped.append(li)
+
+        # Ship the list-page rows as the salvage set BEFORE attempting any
+        # per-listing detail-page gallery fetch below, so a soft-timeout
+        # mid-enrichment still ships every row already found here (see
+        # base_scraper.safe_run's partial-salvage path; same ordering as
+        # freddie_homesteps's sink-before-detail-fetch pattern).
+        self.partial = deduped
+
+        # Per-listing detail-page photo gallery (2026-10-13 source-
+        # completeness audit, Pattern B) -- see _parse_detail_gallery's
+        # docstring. One extra request per estatesales.net listing
+        # (~34 live 2026-10-13 across the whole footprint), time-budgeted
+        # so a slow day fills in fewer galleries instead of dropping rows.
+        deadline = start + self.timeout_s * DETAIL_BUDGET_SHARE
+        for n, li in enumerate(deduped):
+            source_site = (li.raw.get("estate_sales") or {}).get("source_site")
+            if source_site != "estatesales.net":
+                continue
+            if time.monotonic() > deadline:
+                log.info("estate_sales.gallery_budget_spent", done=n,
+                         remaining=len(deduped) - n)
+                break
+            await _enrich_estatesales_net_gallery(li)
+
+        return deduped

@@ -1,0 +1,23 @@
+{
+ "generated_at": "2026-11-07T06:03:05+00:00",
+ "source": "board:docs",
+ "rows": 472777,
+ "seconds": 38.6,
+ "peak_rss_mb": 326.1,
+ "ok": false,
+ "not_ok": [
+  "valuation-hot-arv-supported"
+ ],
+ "checks": [
+  {
+   "name": "valuation-hot-arv-supported",
+   "module": "valuation",
+   "checked": 119,
+   "violations": 1,
+   "max_violations": 0,
+   "ok": false
+  }
+ ],
+ "limited": null,
+ "invalid_checkpoint_rows": 0
+}

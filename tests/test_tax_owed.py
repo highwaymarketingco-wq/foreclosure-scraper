@@ -1,0 +1,180 @@
+"""Tax-owed normalizer: per-source amounts -> raw['tax_owed'] + parcel cross-ref."""
+from __future__ import annotations
+
+from datetime import date, datetime
+
+from foreclosure_scraper.models import Listing, ListingType, PropertyKind
+from foreclosure_scraper.enrichment_tax_owed import enrich_tax_owed
+
+
+def _li(source, parcel=None, county="Buncombe", state="NC", raw=None, **kw):
+    now = datetime.utcnow()
+    return Listing(
+        source=source, source_url="https://x/1",
+        listing_type=ListingType.TAX_LIEN, property_kind=PropertyKind.UNKNOWN,
+        county=county, state=state, parcel_id=parcel,
+        first_seen=now, last_seen=now, raw=raw or {}, **kw)
+
+
+def test_buncombe_principal_tax_due_normalized():
+    li = _li("counties_nc.buncombe_delinquent_tax", parcel="9678-12-3456",
+             raw={"buncombe_delinquent_tax": {"principal_tax_due": "$775.59"}})
+    stats = enrich_tax_owed([li])
+    assert stats["stamped"] == 1
+    assert li.raw["tax_owed"]["balance"] == 775.59
+    assert li.raw["tax_owed"]["kind"] == "delinquent_tax"
+    assert li.raw["tax_owed"]["basis"] == "own_record"
+
+
+def test_sc_state_lien_balance_normalized():
+    li = _li("counties_sc.sc_state_tax_lien", county="Spartanburg", state="SC",
+             raw={"sc_state_tax_lien": {"balance": 12500.0}})
+    enrich_tax_owed([li])
+    assert li.raw["tax_owed"]["balance"] == 12500.0
+    assert li.raw["tax_owed"]["kind"] == "state_tax_lien"
+
+
+def test_cross_reference_onto_matching_parcel():
+    # A delinquent-tax lead carries the balance; a court lead resolved to the SAME
+    # parcel (different source, no own amount) should inherit it.
+    tax = _li("counties_nc.buncombe_delinquent_tax", parcel="9678-12-3456",
+              raw={"buncombe_delinquent_tax": {"principal_tax_due": 920.0}})
+    court = _li("national.courtlistener_bankruptcy", parcel="9678123456",
+                raw={"resolved_from_name": {"confidence": "unique_match"}})
+    stats = enrich_tax_owed([tax, court])
+    assert stats["cross_referenced"] == 1
+    assert court.raw["tax_owed"]["balance"] == 920.0
+    assert court.raw["tax_owed"]["basis"] == "parcel_cross_ref"
+
+
+def test_no_cross_ref_across_counties():
+    a = _li("counties_nc.buncombe_delinquent_tax", parcel="123", county="Buncombe",
+            raw={"buncombe_delinquent_tax": {"principal_tax_due": 500.0}})
+    b = _li("national.courtlistener_bankruptcy", parcel="123", county="Burke",
+            raw={})
+    enrich_tax_owed([a, b])
+    assert "tax_owed" not in b.raw  # same parcel string, different county -> no match
+
+
+def test_zero_amount_not_stamped():
+    li = _li("counties_nc.buncombe_delinquent_tax", parcel="1",
+             raw={"buncombe_delinquent_tax": {"principal_tax_due": "$-"}})
+    stats = enrich_tax_owed([li])
+    assert stats["stamped"] == 0
+    assert "tax_owed" not in li.raw
+
+
+def test_tax_block_merged_into_a_non_taxish_source_is_still_found():
+    """Regression 2026-09-14: dedupe().merge() keeps the BUCKET-HOLDER's
+    source/source_url, so a tax-delinquent record merged into a foreclosure
+    lead ends up with li.source == the foreclosure scraper's slug (no "tax"
+    substring) while still carrying the tax raw block. The old Pass B gate
+    checked only li.source and silently never saw it."""
+    li = _li("counties_sc.greenville_mie_adverts", parcel="0646050100800",
+             county="Greenville", state="SC",
+             raw={"greenville_mie": {"case_number": "2023-CP-23-01209"},
+                  "greenville_delinquent_tax": {"total_due": 6108.13, "map_number": "0646050100800"}})
+    stats = enrich_tax_owed([li])
+    assert stats["stamped"] == 1
+    assert li.raw["tax_owed"]["balance"] == 6108.13
+    assert li.raw["tax_owed"]["basis"] == "own_record"
+
+
+def test_qpaybill_roll_balance_owed_is_normalized():
+    # The qPayBill roll (19 SC counties) and Transylvania's scraper store the real
+    # delinquent balance as `balance_owed`. It was missing from _GENERIC_KEYS, so
+    # ~40,000 rows had a known debt that never reached raw['tax_owed'].
+    li = _li("counties_sc.qpaybill_delinquent_roll", county="Cherokee", state="SC",
+             raw={"qpaybill_roll": {"owner": "BYERS DOUGLAS", "balance_owed": 216.75,
+                                    "years_unpaid": ["2025"]}})
+    stats = enrich_tax_owed([li])
+    assert stats["stamped"] == 1
+    assert li.raw["tax_owed"]["balance"] == 216.75
+    assert li.raw["tax_owed"]["kind"] == "delinquent_tax"
+
+
+def test_balance_owed_does_not_outrank_a_more_specific_key():
+    li = _li("counties_sc.qpaybill_delinquent_roll", county="Cherokee", state="SC",
+             raw={"qpaybill_roll": {"total_due": 500.0, "balance_owed": 900.0}})
+    enrich_tax_owed([li])
+    assert li.raw["tax_owed"]["balance"] == 500.0
+
+
+def test_transylvania_tax_balance_owed_is_normalized():
+    li = _li("counties_nc.transylvania_delinquent_tax", county="Transylvania", state="NC",
+             raw={"transylvania_tax": {"tax_year": "2025", "balance_owed": 1234.5}})
+    enrich_tax_owed([li])
+    assert li.raw["tax_owed"]["balance"] == 1234.5
+    assert li.raw["tax_owed"]["year"] == 2025
+
+
+def test_georgetown_flc_opening_bid_is_normalized():
+    # 2026-09-29 audit: the FLC (Forfeited-Land-Commission) row carries a real,
+    # county-published over-the-counter opening-bid price on li.opening_bid AND
+    # in the raw block (added so this mapping can see it), but before this fix
+    # it never reached raw['tax_owed'] -- the source substring "georgetown_civicengage"
+    # wasn't in _SOURCES.
+    li = _li("counties_sc.georgetown_civicengage", county="Georgetown", state="SC",
+             parcel="01-0442-029-03-00.001", opening_bid=901.77,
+             raw={"georgetown_civicengage": {"doc": "flc", "opening_bid": 901.77,
+                                             "line": "5028 Baker Louise (H) "
+                                                     "01-0442-029-03-00.001 1973 "
+                                                     "12x45 Panoramic 11/1/2021 "
+                                                     "$901.77"}})
+    stats = enrich_tax_owed([li])
+    assert stats["stamped"] == 1
+    assert li.raw["tax_owed"]["balance"] == 901.77
+    assert li.raw["tax_owed"]["kind"] == "flc_opening_bid"
+    assert li.raw["tax_owed"]["basis"] == "own_record"
+
+
+def test_years_delinquent_promoted_from_multi_year_sibling_block():
+    # Depth audit 2026-10-02: raw['multi_year_delinquent_tax'] already carries
+    # years_delinquent (and the full per-year breakdown) but it never reached the
+    # unified raw['tax_owed'] every downstream reader actually consults.
+    # 2026-10-07: years_delinquent counts only the LATE years (tax_calendar). In October 2026 the
+    # 2026 bill is not late yet, so "unpaid 2025 + 2026" is one year delinquent; the raw count of
+    # unpaid bills is kept apart.
+    li = _li("counties_nc.buncombe_delinquent_tax", parcel="9608-10-8745",
+             raw={"buncombe_delinquent_tax": {"principal_tax_due": 1920.86, "tax_year": 2026},
+                  "multi_year_delinquent_tax": {"years": [2025, 2026], "years_delinquent": 2,
+                                                "parcel_key": "9608108745",
+                                                "total_due": 1920.86}})
+    enrich_tax_owed([li], today=date(2026, 10, 7))
+    to = li.raw["tax_owed"]
+    assert to["years_delinquent"] == 1
+    assert to["unpaid_bill_years"] == 2
+    assert to["not_yet_late_years"] == [2026]
+    enrich_tax_owed([li], today=date(2027, 1, 6))     # the 2026 bill is late from January 6
+    assert li.raw["tax_owed"]["years_delinquent"] == 2
+
+
+def test_years_delinquent_falls_back_to_years_list_length():
+    # qpaybill_roll states a list of unpaid years, not an explicit count.
+    li = _li("counties_sc.qpaybill_delinquent_roll", county="Cherokee", state="SC",
+             raw={"qpaybill_roll": {"balance_owed": 2506.55, "years_unpaid": ["2024", "2025"]}})
+    enrich_tax_owed([li])
+    assert li.raw["tax_owed"]["years_delinquent"] == 2
+
+
+def test_years_delinquent_absent_when_no_source_states_one():
+    li = _li("counties_sc.sc_state_tax_lien", county="Spartanburg", state="SC",
+             raw={"sc_state_tax_lien": {"balance": 12500.0}})
+    enrich_tax_owed([li])
+    assert "years_delinquent" not in li.raw["tax_owed"]
+
+
+def test_georgetown_tax_sale_doc_has_no_amount_and_is_not_stamped():
+    # The Tax-Sale list (a DIFFERENT doc under the same source/raw-block key) has
+    # no dollar figure at all on Georgetown's public PDF (confirmed live 2026-09-29:
+    # zero "$" characters across all 24 pages) -- the shared raw block key must not
+    # cause a false-positive stamp for these rows.
+    li = _li("counties_sc.georgetown_civicengage", county="Georgetown", state="SC",
+             parcel="05-0017-114-00-00",
+             raw={"georgetown_civicengage": {"doc": "tax", "item": "2024-1010302-0",
+                                             "line": "ANDREWS LARRY A "
+                                                     "05-0017-114-00-00 "
+                                                     "2024-1010302-0"}})
+    stats = enrich_tax_owed([li])
+    assert stats["stamped"] == 0
+    assert "tax_owed" not in li.raw

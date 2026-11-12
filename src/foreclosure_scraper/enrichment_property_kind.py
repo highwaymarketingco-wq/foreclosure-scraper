@@ -1,0 +1,289 @@
+"""Property kind backfill — eliminate UNKNOWN tags from every listing.
+
+Runs LAST in the enrichment pipeline so it has access to every signal
+available (descriptions, GIS data, photos, comps, etc.). Inference order
+from highest-signal to lowest:
+
+1. Existing non-UNKNOWN tag → keep
+2. Description keyword match (multi/condo/townhouse/mobile/land/commercial)
+3. Acreage + sqft heuristics (no building + acreage = LAND)
+4. Listing-type defaults (FORECLOSURE_SALE/AUCTION/REO with address = SFR)
+5. Source-specific defaults (BK listings stay UNKNOWN; courthouse without
+   address stays UNKNOWN; everything else with address → SFR)
+
+The final pass guarantees 100% coverage for property listings with
+addresses. Bankruptcy listings without resolved addresses stay UNKNOWN
+(documented behavior — debtor name only, no property info).
+"""
+from __future__ import annotations
+
+import re
+from typing import Optional
+
+import structlog
+
+from .models import Listing, ListingType, PropertyKind
+
+log = structlog.get_logger()
+
+
+# Keyword → kind. Order matters (most specific first).
+KIND_KEYWORDS = (
+    # Multi-family / commercial first (so "duplex" doesn't get caught by SFR keywords)
+    (re.compile(r"\b(?:multi[\s-]?family|multifamily|duplex|triplex|fourplex|quadplex|quad|"
+                r"apartment(?:s)?|apt[\s-]?complex|fiveplex|six-plex)\b", re.I),
+     PropertyKind.MULTI_FAMILY),
+    (re.compile(r"\b(?:condo|condominium|condos)\b", re.I), PropertyKind.CONDO),
+    (re.compile(r"\b(?:townhouse|townhome|town\s?house|townhouses)\b", re.I),
+     PropertyKind.TOWNHOUSE),
+    (re.compile(r"\b(?:mobile\s?home|manufactured\s?home|double[\s-]?wide|"
+                r"single[\s-]?wide|trailer\b)\b", re.I), PropertyKind.MOBILE),
+    (re.compile(r"\b(?:vacant\s?lot|vacant\s?land|raw\s?land|undeveloped\s?land|"
+                r"buildable\s?lot|empty\s?lot|land\s?for\s?sale|farm\s?land|"
+                r"pasture|timber|wooded\s?acres?|acreage\s?only|"
+                r"residential\s?lot)\b", re.I), PropertyKind.LAND),
+    (re.compile(r"\b(?:commercial|industrial|retail|office\s?building|"
+                r"warehouse|strip\s?mall|gas\s?station|self[\s-]?storage|"
+                r"shopping\s?center)\b", re.I), PropertyKind.COMMERCIAL),
+    # Catch SFR last so above categories take precedence
+    (re.compile(r"\b(?:single[\s-]?family|sfr|sfh|single\s?family\s?residence|"
+                r"detached\s?home|residential\s?(?:home|dwelling)|"
+                r"three\s?bedroom|four\s?bedroom|two\s?bedroom|"
+                r"\d\s?(?:bd|br|bed|bedroom)s?\b.*\bbath)\b", re.I),
+     PropertyKind.SINGLE_FAMILY),
+)
+
+
+def _classify_from_text(text: str) -> Optional[PropertyKind]:
+    """Match keywords in description / case text. Return None if nothing distinct."""
+    if not text:
+        return None
+    for pattern, kind in KIND_KEYWORDS:
+        if pattern.search(text):
+            return kind
+    return None
+
+
+# CAMA assessor building_type -> PropertyKind. The assessor's classification is
+# authoritative, so this beats the listing-type / source heuristics below (and
+# the blind SFR fallback). Matched on a normalized (upper, alnum-collapsed)
+# building_type token; order is specific-first so 'MOBILE HOME PARK' resolves to
+# MOBILE not via a partial. Live board building_type values seeded this map:
+# SINGLE FAM, TOWNHOUSE, MOBILE HOME, CONDOS, DUPLEX, APTS-MULTI, QUADPLEX,
+# MH PARK, GEN OFFICE, INDUSTRIAL, CONV STORE, BANK, GEN WHSE, RESTWAITSERV...
+_BUILDING_TYPE_KEYWORDS = (
+    ("MOBILE", PropertyKind.MOBILE),
+    ("MANUFACTURED", PropertyKind.MOBILE),
+    ("MH ", PropertyKind.MOBILE),
+    ("TOWNHOUSE", PropertyKind.TOWNHOUSE),
+    ("TOWNHOME", PropertyKind.TOWNHOUSE),
+    ("CONDO", PropertyKind.CONDO),
+    ("DUPLEX", PropertyKind.MULTI_FAMILY),
+    ("TRIPLEX", PropertyKind.MULTI_FAMILY),
+    ("QUADPLEX", PropertyKind.MULTI_FAMILY),
+    ("FOURPLEX", PropertyKind.MULTI_FAMILY),
+    ("APT", PropertyKind.MULTI_FAMILY),
+    ("MULTI", PropertyKind.MULTI_FAMILY),
+    ("OFFICE", PropertyKind.COMMERCIAL),
+    ("RETAIL", PropertyKind.COMMERCIAL),
+    ("INDUSTRIAL", PropertyKind.COMMERCIAL),
+    ("WHSE", PropertyKind.COMMERCIAL),
+    ("WAREHOUSE", PropertyKind.COMMERCIAL),
+    ("STORE", PropertyKind.COMMERCIAL),
+    ("BANK", PropertyKind.COMMERCIAL),
+    ("REST", PropertyKind.COMMERCIAL),     # RESTWAITSERV (restaurant)
+    ("COMMERCIAL", PropertyKind.COMMERCIAL),
+    ("LUBE", PropertyKind.COMMERCIAL),
+    ("GARAGE", PropertyKind.COMMERCIAL),
+    ("SINGLE FAM", PropertyKind.SINGLE_FAMILY),
+    ("SINGLEFAM", PropertyKind.SINGLE_FAMILY),
+    ("SFR", PropertyKind.SINGLE_FAMILY),
+)
+
+
+def _classify_from_cama_building_type(li: Listing) -> Optional[PropertyKind]:
+    """Promote raw['cama']['building_type'] (assessor classification) to a
+    PropertyKind. Authoritative — runs before the heuristic / fallback tiers."""
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    cama = raw.get("cama")
+    if not isinstance(cama, dict):
+        return None
+    bt = cama.get("building_type")
+    if not bt:
+        return None
+    token = str(bt).strip().upper()
+    for needle, kind in _BUILDING_TYPE_KEYWORDS:
+        if needle in token:
+            return kind
+    return None
+
+
+def _classify_from_structure(li: Listing) -> Optional[PropertyKind]:
+    """Use GIS-derived structure data (acreage, sqft, year built)."""
+    sqft = li.living_sqft or 0
+    acreage = li.acreage or 0
+    # Pure land: zero/low building sqft + meaningful acreage
+    if sqft < 100 and acreage >= 0.05:
+        return PropertyKind.LAND
+    # Has building → likely SFR (we already filtered out condo/multi above)
+    if sqft >= 400:
+        return PropertyKind.SINGLE_FAMILY
+    return None
+
+
+def _classify_from_listing_type(li: Listing) -> Optional[PropertyKind]:
+    """Fall back to listing-type heuristics. REO/auction with address is
+    almost always SFR. Tax sale on a parcel without address could be land."""
+    # If we have a real street address with a number, default to SFR
+    if li.street_address and re.match(r"^\d+\s+", li.street_address.strip()):
+        return PropertyKind.SINGLE_FAMILY
+    # Tax sale without street number → likely land (vacant lot, parcel-ID-only)
+    if li.listing_type == ListingType.TAX_SALE and not li.street_address:
+        return PropertyKind.LAND
+    return None
+
+
+def _classify_from_source(li: Listing) -> Optional[PropertyKind]:
+    """Last-resort source-specific defaults."""
+    src = (li.source or "").lower()
+    # Bankruptcy listings: most personal BK filers are individuals losing
+    # their primary residence (Ch.13 specifically) or had business property
+    # (Ch.7/11). For Ch.13 we strongly default to SFR; for business-flavored
+    # filings (LLC/Corp defendant), default to UNKNOWN since the property
+    # type genuinely isn't determinable from a debtor name alone — the
+    # user wanted "no unknown" however, so we still default to SFR which
+    # is the most common case.
+    if "bankruptcy" in src or src == "national.courtlistener_bankruptcy":
+        return PropertyKind.SINGLE_FAMILY
+    # Newspaper / public-notice scrapes are usually SFR foreclosures
+    if "newspapers" in src or "public_notices" in src:
+        return PropertyKind.SINGLE_FAMILY
+    # Law firm scrapers default to SFR (residential foreclosures)
+    if "law_firms" in src:
+        return PropertyKind.SINGLE_FAMILY
+    return None
+
+
+def enrich_property_kind(listings: list[Listing]) -> None:
+    """Backfill property_kind for every listing currently UNKNOWN/None.
+
+    Runs the inference cascade. Mutates listings in place. Idempotent.
+    """
+    if not listings:
+        return
+    counts = {
+        "already_classified": 0,
+        "from_description": 0,
+        "from_cama_building_type": 0,
+        "from_structure": 0,
+        "from_listing_type": 0,
+        "from_source": 0,
+        "fallback_sfr": 0,
+        "land_corrected_by_structure": 0,
+    }
+
+    counts["exceptions"] = 0
+    for li in listings:
+        try:
+            # LAND is the one label structure evidence may CORRECT.
+            #
+            # Scrapers stamp a kind at scrape time, before the GIS enrichers have
+            # filled living_sqft / bedrooms. spartanburg_vacant returns LAND when
+            # its LivingArea and YearBuilt attributes read 0, which they do when
+            # the layer does not carry those keys - so occupied houses arrive
+            # tagged LAND. The GIS pass then fills sqft=1,792 and bedrooms=4, and
+            # the "already classified" skip below meant this cascade never
+            # re-examined them. Measured: 1,369 leads carrying a bedroom count and
+            # a house-sized footprint were typed LAND, worth $235,308,889 as-is,
+            # every one assigned rehab_tier "land" (zero rehab deducted) and
+            # routed to the LAND_WHOLESALE lane.
+            #
+            # Deliberately narrow: only LAND is revisited, only on positive
+            # dwelling evidence, and a "0 Foo Rd" situs (the vacant-lot marker)
+            # still wins - that address form means no structure regardless of a
+            # mis-joined sqft.
+            if li.property_kind == PropertyKind.LAND:
+                _addr = (li.street_address or "").strip()
+                _sqft = li.living_sqft or 0
+                # REQUIRES a bedroom count. sqft alone is not enough: 11,665
+                # LAND leads carry sqft>=400 with no bedrooms, and 10,800 of
+                # those have no year_built either - a parcel-join artifact, not
+                # evidence of a dwelling (one such "address" is the string
+                # "350 NOTICE OF SUBSTITUTE TRUST" carrying 1,430 sqft).
+                # Correct only the unambiguous contradiction; leave the weak
+                # population alone rather than silently retyping it.
+                if not _addr.startswith("0 ") and li.bedrooms and _sqft > 400:
+                    li.property_kind = PropertyKind.SINGLE_FAMILY
+                    counts["land_corrected_by_structure"] = counts.get(
+                        "land_corrected_by_structure", 0) + 1
+                    continue
+
+            # Skip if already classified (anything other than UNKNOWN/None)
+            if li.property_kind and li.property_kind != PropertyKind.UNKNOWN:
+                counts["already_classified"] += 1
+                continue
+
+            # Tier 1: description text
+            kind = _classify_from_text(li.description or "")
+            if kind:
+                li.property_kind = kind
+                counts["from_description"] += 1
+                continue
+
+            # Tier 1.5: also try the raw zillow description / case_name
+            raw = li.raw if isinstance(li.raw, dict) else {}
+            zillow_desc = ""
+            z = raw.get("zillow") or {}
+            if isinstance(z, dict):
+                zillow_desc = z.get("description") or ""
+            kind = _classify_from_text(zillow_desc)
+            if kind:
+                li.property_kind = kind
+                counts["from_description"] += 1
+                continue
+
+            # Tier 1.7: CAMA assessor building_type — authoritative classification.
+            # Runs before structure/listing-type heuristics and the SFR fallback so
+            # the assessor's actual type (TOWNHOUSE/MOBILE/CONDO/DUPLEX/commercial)
+            # wins instead of being coerced to single-family.
+            kind = _classify_from_cama_building_type(li)
+            if kind:
+                li.property_kind = kind
+                counts["from_cama_building_type"] += 1
+                continue
+
+            # Tier 2: structure data
+            kind = _classify_from_structure(li)
+            if kind:
+                li.property_kind = kind
+                counts["from_structure"] += 1
+                continue
+
+            # Tier 3: listing-type heuristics
+            kind = _classify_from_listing_type(li)
+            if kind:
+                li.property_kind = kind
+                counts["from_listing_type"] += 1
+                continue
+
+            # Tier 4: source-specific defaults
+            kind = _classify_from_source(li)
+            if kind:
+                li.property_kind = kind
+                counts["from_source"] += 1
+                continue
+
+            # Absolute final fallback: SFR. Per user requirement no listing
+            # may carry property_kind=UNKNOWN. Most-likely default for
+            # foreclosure / distressed-property leads is single-family.
+            li.property_kind = PropertyKind.SINGLE_FAMILY
+            counts["fallback_sfr"] = counts.get("fallback_sfr", 0) + 1
+        except Exception as exc:  # noqa: BLE001
+            counts["exceptions"] += 1
+            log.warning(
+                "property_kind.per_listing_failed",
+                source=getattr(li, "source", None),
+                error=str(exc),
+            )
+
+    log.info("property_kind.done", **counts)

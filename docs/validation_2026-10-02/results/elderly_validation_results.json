@@ -1,0 +1,3239 @@
+[
+  {
+    "parcel_id": "9609266949",
+    "parcel_id_15": "960926694900000",
+    "owner_name_board": "PETERSON ADA MARIE",
+    "first_name": "Ada",
+    "last_name": "Peterson",
+    "street_address": "69 FREEDOM FARM RD",
+    "city": "Leicester",
+    "board_assessed_value": 77000.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "960926694900000",
+      "fetch_ok": true,
+      "real_owner": "ADA PETERSON",
+      "real_value_str": "52,000",
+      "bills_by_year": {
+        "2026": 0.0,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Ada",
+      "last_name": "Peterson",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 1,
+      "status": "active",
+      "match": {
+        "full_name": "PETERSON, ADA MARIE",
+        "status_desc": "ACTIVE",
+        "county_name": "BUNCOMBE",
+        "voter_reg_num": "000000094587",
+        "ncid": "AL40114",
+        "res_address_csz": "LEICESTER, NC 28748"
+      },
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": {
+        "election": "11/03/2020 GENERAL",
+        "voted_county": "BUNCOMBE",
+        "voted_method": "ABSENTEE BY MAIL",
+        "voted_party": null
+      }
+    }
+  },
+  {
+    "parcel_id": "9730448857",
+    "parcel_id_15": "973044885700000",
+    "owner_name_board": "BIDDIX JERRY NEIL;BIDDIX KATHY W",
+    "first_name": "Jerry",
+    "last_name": "Biddix",
+    "street_address": "119 ELK MOUNTAIN RD",
+    "city": "Asheville",
+    "board_assessed_value": 200700.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "973044885700000",
+      "fetch_ok": true,
+      "real_owner": "JERRY BIDDIX, KATHY BIDDIX",
+      "real_value_str": "100,350",
+      "bills_by_year": {
+        "2026": 1269.67,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Jerry",
+      "last_name": "Biddix",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 1,
+      "status": "active",
+      "match": {
+        "full_name": "BIDDIX, JERRY NEIL",
+        "status_desc": "ACTIVE",
+        "county_name": "BUNCOMBE",
+        "voter_reg_num": "000000005293",
+        "ncid": "AL3935",
+        "res_address_csz": "ASHEVILLE, NC 28804"
+      },
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": {
+        "election": "03/03/2026 PRIMARY",
+        "voted_county": "BUNCOMBE",
+        "voted_method": "IN-PERSON ELECTION DAY",
+        "voted_party": "REPUBLICAN"
+      }
+    }
+  },
+  {
+    "parcel_id": "9606039457",
+    "parcel_id_15": "960603945700000",
+    "owner_name_board": "WILLIAM DAVID HIPPS (ETAL) AMBERLI RUSSELL (ETAL)",
+    "first_name": "David",
+    "last_name": "William",
+    "street_address": "149 BEAVER CREEK CIR",
+    "city": "Candler",
+    "board_assessed_value": 47300.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "960603945700000",
+      "fetch_ok": true,
+      "real_owner": "WILLIAM DAVID HIPPS (ETAL) AMBERLI RUSSELL (ETAL)",
+      "real_value_str": "22,300",
+      "bills_by_year": {
+        "2026": 175.99,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "David",
+      "last_name": "William",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 0,
+      "status": "not_found",
+      "match": null,
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": null
+    }
+  },
+  {
+    "parcel_id": "9676933171",
+    "parcel_id_15": "967693317100000",
+    "owner_name_board": "KEEVER OSCAR G",
+    "first_name": "Oscar",
+    "last_name": "Keever",
+    "street_address": "38 WINDING WAY",
+    "city": "Fairview",
+    "board_assessed_value": 299100.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "967693317100000",
+      "fetch_ok": true,
+      "real_owner": "OSCAR KEEVER",
+      "real_value_str": "158,010",
+      "bills_by_year": {
+        "2026": 1247.01,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Oscar",
+      "last_name": "Keever",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 1,
+      "status": "active",
+      "match": {
+        "full_name": "KEEVER, OSCAR GILSON",
+        "status_desc": "ACTIVE",
+        "county_name": "BUNCOMBE",
+        "voter_reg_num": "000000202554",
+        "ncid": "AL114143",
+        "res_address_csz": "FAIRVIEW, NC 28730"
+      },
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": {
+        "election": "11/03/2020 GENERAL",
+        "voted_county": "BUNCOMBE",
+        "voted_method": "IN-PERSON ELECTION DAY",
+        "voted_party": null
+      }
+    }
+  },
+  {
+    "parcel_id": "9649292284",
+    "parcel_id_15": "964929228400000",
+    "owner_name_board": "MCAFEE PATRICIA A",
+    "first_name": "Patricia",
+    "last_name": "Mcafee",
+    "street_address": "21 LAUREL AVE",
+    "city": "Asheville",
+    "board_assessed_value": 332800.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "964929228400000",
+      "fetch_ok": true,
+      "real_owner": "PATRICIA MCAFEE",
+      "real_value_str": "166,400",
+      "bills_by_year": {
+        "2026": 2064.53,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Patricia",
+      "last_name": "Mcafee",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 2,
+      "status": "ambiguous",
+      "match": null,
+      "disambiguated_by_city": false,
+      "candidates": [
+        {
+          "VoterRegNum": "000000095367",
+          "CountyId": 11,
+          "CountyName": "BUNCOMBE",
+          "FullName": "MCAFEE, PATRICIA ANN",
+          "NCID": "AL40431",
+          "ResAddressCSZ": "ASHEVILLE, NC 28804",
+          "StatusDesc": "ACTIVE",
+          "StatusLbl": "A"
+        },
+        {
+          "VoterRegNum": "000000377957",
+          "CountyId": 11,
+          "CountyName": "BUNCOMBE",
+          "FullName": "MCAFEE, PATRICIA BLEDSOE",
+          "NCID": "AL270616",
+          "ResAddressCSZ": "ASHEVILLE, NC 28804",
+          "StatusDesc": "ACTIVE",
+          "StatusLbl": "A"
+        }
+      ],
+      "most_recent_vote": null
+    }
+  },
+  {
+    "parcel_id": "9655053516",
+    "parcel_id_15": "965505351600000",
+    "owner_name_board": "MELISSAS CARL",
+    "first_name": "Carl",
+    "last_name": "Melissas",
+    "street_address": "15 DEER RUN DR",
+    "city": "Asheville",
+    "board_assessed_value": 286900.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "965505351600000",
+      "fetch_ok": true,
+      "real_owner": "CARL MELISSAS",
+      "real_value_str": "143,450",
+      "bills_by_year": {
+        "2026": 1611.23,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Carl",
+      "last_name": "Melissas",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 1,
+      "status": "active",
+      "match": {
+        "full_name": "MELISSAS, CARL MICAHEL",
+        "status_desc": "ACTIVE",
+        "county_name": "BUNCOMBE",
+        "voter_reg_num": "000000263685",
+        "ncid": "AL173568",
+        "res_address_csz": "ASHEVILLE, NC 28803"
+      },
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": {
+        "election": "03/03/2026 PRIMARY",
+        "voted_county": "BUNCOMBE",
+        "voted_method": "IN-PERSON ELECTION DAY",
+        "voted_party": "DEMOCRATIC"
+      }
+    }
+  },
+  {
+    "parcel_id": "9731777408",
+    "parcel_id_15": "973177740800000",
+    "owner_name_board": "YALE MARY ANN;YALE SAMUEL CLIFFORD II",
+    "first_name": "Mary",
+    "last_name": "Yale",
+    "street_address": "43 LEISURE MOUNTAIN RD",
+    "city": "Asheville",
+    "board_assessed_value": 233100.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "973177740800000",
+      "fetch_ok": true,
+      "real_owner": "MARY YALE, SAMUEL YALE",
+      "real_value_str": "126,300",
+      "bills_by_year": {
+        "2026": 996.76,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Mary",
+      "last_name": "Yale",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 0,
+      "status": "not_found",
+      "match": null,
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": null
+    }
+  },
+  {
+    "parcel_id": "9648683147",
+    "parcel_id_15": "964868314700000",
+    "owner_name_board": "TOBE WILLIE H",
+    "first_name": "Willie",
+    "last_name": "Tobe",
+    "street_address": "143 CARROLL AVE",
+    "city": "Asheville",
+    "board_assessed_value": 251100.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "964868314700000",
+      "fetch_ok": true,
+      "real_owner": "WILLIE TOBE",
+      "real_value_str": "125,550",
+      "bills_by_year": {
+        "2026": 1557.69,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Willie",
+      "last_name": "Tobe",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 2,
+      "status": "ambiguous",
+      "match": null,
+      "disambiguated_by_city": false,
+      "candidates": [
+        {
+          "VoterRegNum": "000000259995",
+          "CountyId": 11,
+          "CountyName": "BUNCOMBE",
+          "FullName": "TOBE, WILLIE HAYES",
+          "NCID": "AL169878",
+          "ResAddressCSZ": "ASHEVILLE, NC 28801",
+          "StatusDesc": "ACTIVE",
+          "StatusLbl": "A"
+        },
+        {
+          "VoterRegNum": "000000383210",
+          "CountyId": 11,
+          "CountyName": "BUNCOMBE",
+          "FullName": "TOBE, WILLIE HAYES JR",
+          "NCID": "AL274448",
+          "ResAddressCSZ": "ASHEVILLE, NC 28801",
+          "StatusDesc": "ACTIVE",
+          "StatusLbl": "A"
+        }
+      ],
+      "most_recent_vote": null
+    }
+  },
+  {
+    "parcel_id": "8697626611",
+    "parcel_id_15": "869762661100000",
+    "owner_name_board": "MAXWELL DIANE S",
+    "first_name": "Diane",
+    "last_name": "Maxwell",
+    "street_address": "170 FAIRMONT RD",
+    "city": "Candler",
+    "board_assessed_value": 208500.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "869762661100000",
+      "fetch_ok": true,
+      "real_owner": "DIANE MAXWELL",
+      "real_value_str": "104,250",
+      "bills_by_year": {
+        "2026": 822.74,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Diane",
+      "last_name": "Maxwell",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 1,
+      "status": "active",
+      "match": {
+        "full_name": "MAXWELL, DIANE SHOOK",
+        "status_desc": "ACTIVE",
+        "county_name": "BUNCOMBE",
+        "voter_reg_num": "000000109572",
+        "ncid": "AL46352",
+        "res_address_csz": "CANDLER, NC 28715"
+      },
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": {
+        "election": "03/03/2026 PRIMARY",
+        "voted_county": "BUNCOMBE",
+        "voted_method": "EARLY VOTING IN-PERSON",
+        "voted_party": "REPUBLICAN"
+      }
+    }
+  },
+  {
+    "parcel_id": "9720184100",
+    "parcel_id_15": "972018410000000",
+    "owner_name_board": "GEVEDON THOMAS ADRIAN;GEVEDON MARIA JETER",
+    "first_name": "Thomas",
+    "last_name": "Gevedon",
+    "street_address": "59 GILLIS RD",
+    "city": "Asheville",
+    "board_assessed_value": 176500.0,
+    "gis_exempt": {
+      "code": "VET",
+      "tag": "disabled_veteran_exemption"
+    },
+    "tax": {
+      "parcel_id": "972018410000000",
+      "fetch_ok": true,
+      "real_owner": "THOMAS GEVEDON, MARIA GEVEDON",
+      "real_value_str": "131,500",
+      "bills_by_year": {
+        "2026": 1037.8,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Thomas",
+      "last_name": "Gevedon",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 1,
+      "status": "active",
+      "match": {
+        "full_name": "GEVEDON, THOMAS ADRIAN",
+        "status_desc": "ACTIVE",
+        "county_name": "BUNCOMBE",
+        "voter_reg_num": "000000150037",
+        "ncid": "AL71551",
+        "res_address_csz": "ASHEVILLE, NC 28806"
+      },
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": {
+        "election": "11/05/2024 GENERAL",
+        "voted_county": "BUNCOMBE",
+        "voted_method": "EARLY VOTING IN-PERSON",
+        "voted_party": null
+      }
+    }
+  },
+  {
+    "parcel_id": "9664993078",
+    "parcel_id_15": "966499307800000",
+    "owner_name_board": "STOKLEY MARTHA J;STOKLEY ROBT",
+    "first_name": "Martha",
+    "last_name": "Stokley",
+    "street_address": "35 STOKLEY LN",
+    "city": "Fletcher",
+    "board_assessed_value": 133700.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "966499307800000",
+      "fetch_ok": true,
+      "real_owner": "MARTHA STOKLEY, ROBT STOKLEY",
+      "real_value_str": "66,850",
+      "bills_by_year": {
+        "2026": 0.0,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Martha",
+      "last_name": "Stokley",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 0,
+      "status": "not_found",
+      "match": null,
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": null
+    }
+  },
+  {
+    "parcel_id": "9639276462",
+    "parcel_id_15": "963927646200000",
+    "owner_name_board": "HOWELL KATHERINE W",
+    "first_name": "Katherine",
+    "last_name": "Howell",
+    "street_address": "108 BONNIES CREST LN",
+    "city": "Asheville",
+    "board_assessed_value": 294500.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "963927646200000",
+      "fetch_ok": true,
+      "real_owner": "KATHERINE HOWELL",
+      "real_value_str": "147,250",
+      "bills_by_year": {
+        "2026": 1162.1,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Katherine",
+      "last_name": "Howell",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 2,
+      "status": "ambiguous",
+      "match": null,
+      "disambiguated_by_city": false,
+      "candidates": [
+        {
+          "VoterRegNum": "000000479902",
+          "CountyId": 11,
+          "CountyName": "BUNCOMBE",
+          "FullName": "HOWELL, KATHERINE AMELIA",
+          "NCID": "AL342668",
+          "ResAddressCSZ": "ASHEVILLE, NC 28804",
+          "StatusDesc": "INACTIVE",
+          "StatusLbl": "I"
+        },
+        {
+          "VoterRegNum": "000000259505",
+          "CountyId": 11,
+          "CountyName": "BUNCOMBE",
+          "FullName": "HOWELL, KATHERINE WILLS",
+          "NCID": "AL169388",
+          "ResAddressCSZ": "ASHEVILLE, NC 28806",
+          "StatusDesc": "ACTIVE",
+          "StatusLbl": "A"
+        }
+      ],
+      "most_recent_vote": null
+    }
+  },
+  {
+    "parcel_id": "9634724431",
+    "parcel_id_15": "963472443100000",
+    "owner_name_board": "SABATINI JODIE",
+    "first_name": "Jodie",
+    "last_name": "Sabatini",
+    "street_address": "33 HALYN LN",
+    "city": "Arden",
+    "board_assessed_value": 316500.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "963472443100000",
+      "fetch_ok": true,
+      "real_owner": "JODIE SABATINI",
+      "real_value_str": "158,250",
+      "bills_by_year": {
+        "2026": 1248.91,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Jodie",
+      "last_name": "Sabatini",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 1,
+      "status": "active",
+      "match": {
+        "full_name": "SABATINI, JODIE LYNN",
+        "status_desc": "ACTIVE",
+        "county_name": "BUNCOMBE",
+        "voter_reg_num": "000000494250",
+        "ncid": "AL352655",
+        "res_address_csz": "ARDEN, NC 28704"
+      },
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": {
+        "election": "11/05/2024 GENERAL",
+        "voted_county": "BUNCOMBE",
+        "voted_method": "IN-PERSON ELECTION DAY",
+        "voted_party": null
+      }
+    }
+  },
+  {
+    "parcel_id": "9658891042",
+    "parcel_id_15": "965889104200000",
+    "owner_name_board": "DUNN NANCY J",
+    "first_name": "Nancy",
+    "last_name": "Dunn",
+    "street_address": "11 MILLER RD E",
+    "city": "Asheville",
+    "board_assessed_value": 253100.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "965889104200000",
+      "fetch_ok": true,
+      "real_owner": "NANCY DUNN",
+      "real_value_str": "126,550",
+      "bills_by_year": {
+        "2026": 1421.41,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Nancy",
+      "last_name": "Dunn",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 1,
+      "status": "active",
+      "match": {
+        "full_name": "DUNN, NANCY JORDAN",
+        "status_desc": "ACTIVE",
+        "county_name": "BUNCOMBE",
+        "voter_reg_num": "000000032356",
+        "ncid": "AL14767",
+        "res_address_csz": "ASHEVILLE, NC 28805"
+      },
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": {
+        "election": "03/03/2026 PRIMARY",
+        "voted_county": "BUNCOMBE",
+        "voted_method": "IN-PERSON ELECTION DAY",
+        "voted_party": "REPUBLICAN"
+      }
+    }
+  },
+  {
+    "parcel_id": "9699866551",
+    "parcel_id_15": "969986655100000",
+    "owner_name_board": "SHELL SANDRA H",
+    "first_name": "Sandra",
+    "last_name": "Shell",
+    "street_address": "103 EDEN GLEN CT",
+    "city": "Black Mtn",
+    "board_assessed_value": 267100.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "969986655100000",
+      "fetch_ok": true,
+      "real_owner": "SANDRA SHELL",
+      "real_value_str": "133,550",
+      "bills_by_year": {
+        "2026": 0.0,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Sandra",
+      "last_name": "Shell",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 0,
+      "status": "not_found",
+      "match": null,
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": null
+    }
+  },
+  {
+    "parcel_id": "9740407480",
+    "parcel_id_15": "974040748000000",
+    "owner_name_board": "PEREDA DAVID M",
+    "first_name": "David",
+    "last_name": "Pereda",
+    "street_address": "39 WILDWOOD AVE",
+    "city": "Asheville",
+    "board_assessed_value": 237900.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "974040748000000",
+      "fetch_ok": true,
+      "real_owner": "DAVID PEREDA",
+      "real_value_str": "118,950",
+      "bills_by_year": {
+        "2026": 1475.82,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "David",
+      "last_name": "Pereda",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 1,
+      "status": "active",
+      "match": {
+        "full_name": "PEREDA, DAVID MARIO",
+        "status_desc": "ACTIVE",
+        "county_name": "BUNCOMBE",
+        "voter_reg_num": "000000305439",
+        "ncid": "AL213187",
+        "res_address_csz": "ASHEVILLE, NC 28804"
+      },
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": {
+        "election": "03/03/2026 PRIMARY",
+        "voted_county": "BUNCOMBE",
+        "voted_method": "EARLY VOTING IN-PERSON",
+        "voted_party": "DEMOCRATIC"
+      }
+    }
+  },
+  {
+    "parcel_id": "9700337280",
+    "parcel_id_15": "970033728000000",
+    "owner_name_board": "SCHAFER DONNA J",
+    "first_name": "Donna",
+    "last_name": "Schafer",
+    "street_address": "1 RED ROSE LN",
+    "city": "Leicester",
+    "board_assessed_value": 328700.0,
+    "gis_exempt": {
+      "code": "VET",
+      "tag": "disabled_veteran_exemption"
+    },
+    "tax": {
+      "parcel_id": "970033728000000",
+      "fetch_ok": true,
+      "real_owner": "DONNA SCHAFER",
+      "real_value_str": "283,700",
+      "bills_by_year": {
+        "2026": 0.0,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Donna",
+      "last_name": "Schafer",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 1,
+      "status": "active",
+      "match": {
+        "full_name": "SCHAFER, DONNA JEAN",
+        "status_desc": "ACTIVE",
+        "county_name": "BUNCOMBE",
+        "voter_reg_num": "000000277725",
+        "ncid": "AL187608",
+        "res_address_csz": "LEICESTER, NC 28748"
+      },
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": {
+        "election": "11/04/2014 GENERAL",
+        "voted_county": "BUNCOMBE",
+        "voted_method": "EARLY VOTING",
+        "voted_party": null
+      }
+    }
+  },
+  {
+    "parcel_id": "9784381227",
+    "parcel_id_15": "978438122700000",
+    "owner_name_board": "CARSON DAVID;CARSON B AMBER",
+    "first_name": "David",
+    "last_name": "Carson",
+    "street_address": "682 DILLINGHAM RD",
+    "city": "Barnardsville",
+    "board_assessed_value": 195000.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "978438122700000",
+      "fetch_ok": true,
+      "real_owner": "DAVID CARSON, B CARSON",
+      "real_value_str": "142,200",
+      "bills_by_year": {
+        "2026": 1122.24,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "David",
+      "last_name": "Carson",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 1,
+      "status": "active",
+      "match": {
+        "full_name": "CARSON, DAVID LEE",
+        "status_desc": "ACTIVE",
+        "county_name": "BUNCOMBE",
+        "voter_reg_num": "000000338610",
+        "ncid": "AL240131",
+        "res_address_csz": "BARNARDSVILLE, NC 28709"
+      },
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": {
+        "election": "11/05/2024 GENERAL",
+        "voted_county": "BUNCOMBE",
+        "voted_method": "IN-PERSON ELECTION DAY",
+        "voted_party": null
+      }
+    }
+  },
+  {
+    "parcel_id": "9744003879",
+    "parcel_id_15": "974400387900000",
+    "owner_name_board": "PENN MICHAEL H",
+    "first_name": "Michael",
+    "last_name": "Penn",
+    "street_address": "15 TIMBER TRL",
+    "city": "Weaverville",
+    "board_assessed_value": 270400.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "974400387900000",
+      "fetch_ok": true,
+      "real_owner": "MICHAEL PENN",
+      "real_value_str": "135,200",
+      "bills_by_year": {
+        "2026": 1067.0,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Michael",
+      "last_name": "Penn",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 1,
+      "status": "active",
+      "match": {
+        "full_name": "PENN, MICHAEL H",
+        "status_desc": "ACTIVE",
+        "county_name": "BUNCOMBE",
+        "voter_reg_num": "000000134446",
+        "ncid": "AL60267",
+        "res_address_csz": "WEAVERVILLE, NC 28787"
+      },
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": {
+        "election": "11/05/2024 GENERAL",
+        "voted_county": "BUNCOMBE",
+        "voted_method": "EARLY VOTING IN-PERSON",
+        "voted_party": null
+      }
+    }
+  },
+  {
+    "parcel_id": "9634282372",
+    "parcel_id_15": "963428237200000",
+    "owner_name_board": "JORDAN ROBERT ADAMS",
+    "first_name": "Robert",
+    "last_name": "Jordan",
+    "street_address": "251 BALL GAP RD",
+    "city": "Arden",
+    "board_assessed_value": 58100.0,
+    "gis_exempt": {
+      "code": "DIS",
+      "tag": "disabled_exemption"
+    },
+    "tax": {
+      "parcel_id": "963428237200000",
+      "fetch_ok": true,
+      "real_owner": "ROBERT JORDAN",
+      "real_value_str": "29,050",
+      "bills_by_year": {
+        "2026": 229.26,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Robert",
+      "last_name": "Jordan",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 2,
+      "status": "active",
+      "match": {
+        "full_name": "JORDAN, ROBERT ADAMS",
+        "status_desc": "ACTIVE",
+        "county_name": "BUNCOMBE",
+        "voter_reg_num": "000000119178",
+        "ncid": "AL50920",
+        "res_address_csz": "ARDEN, NC 28704"
+      },
+      "disambiguated_by_city": true,
+      "candidates": [],
+      "most_recent_vote": {
+        "election": "03/03/2026 PRIMARY",
+        "voted_county": "BUNCOMBE",
+        "voted_method": "IN-PERSON ELECTION DAY",
+        "voted_party": "DEMOCRATIC"
+      }
+    }
+  },
+  {
+    "parcel_id": "0609881932",
+    "parcel_id_15": "060988193200000",
+    "owner_name_board": "NEWTON TRISHA;NEWTON SHANE L",
+    "first_name": "Trisha",
+    "last_name": "Newton",
+    "street_address": "121 FAIRWAY DR",
+    "city": "Black Mtn",
+    "board_assessed_value": 402400.0,
+    "gis_exempt": {
+      "code": "VET",
+      "tag": "disabled_veteran_exemption"
+    },
+    "tax": {
+      "parcel_id": "060988193200000",
+      "fetch_ok": true,
+      "real_owner": "TRISHA NEWTON, SHANE NEWTON",
+      "real_value_str": "357,400",
+      "bills_by_year": {
+        "2026": 0.0,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Trisha",
+      "last_name": "Newton",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 1,
+      "status": "active",
+      "match": {
+        "full_name": "NEWTON, TRISHA MICHELLE",
+        "status_desc": "ACTIVE",
+        "county_name": "BUNCOMBE",
+        "voter_reg_num": "000000532649",
+        "ncid": "BE221233",
+        "res_address_csz": "BLACK MOUNTAIN, NC 28711"
+      },
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": {
+        "election": "11/05/2024 GENERAL",
+        "voted_county": "BUNCOMBE",
+        "voted_method": "IN-PERSON ELECTION DAY",
+        "voted_party": null
+      }
+    }
+  },
+  {
+    "parcel_id": "9730705160",
+    "parcel_id_15": "973070516000000",
+    "owner_name_board": "WORLEY ROBIN C",
+    "first_name": "Robin",
+    "last_name": "Worley",
+    "street_address": "179 LOOKOUT RD",
+    "city": "Asheville",
+    "board_assessed_value": 127700.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "973070516000000",
+      "fetch_ok": true,
+      "real_owner": "ROBIN WORLEY",
+      "real_value_str": "63,850",
+      "bills_by_year": {
+        "2026": 749.72,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Robin",
+      "last_name": "Worley",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 1,
+      "status": "active",
+      "match": {
+        "full_name": "WORLEY, ROBIN CELESTE",
+        "status_desc": "ACTIVE",
+        "county_name": "BUNCOMBE",
+        "voter_reg_num": "000000084068",
+        "ncid": "AL35649",
+        "res_address_csz": "ASHEVILLE, NC 28804"
+      },
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": {
+        "election": "11/05/2024 GENERAL",
+        "voted_county": "BUNCOMBE",
+        "voted_method": "EARLY VOTING IN-PERSON",
+        "voted_party": null
+      }
+    }
+  },
+  {
+    "parcel_id": "9657627901",
+    "parcel_id_15": "965762790100000",
+    "owner_name_board": "RAY WANDA LEE",
+    "first_name": "Wanda",
+    "last_name": "Ray",
+    "street_address": "499 ONTEORA BLVD",
+    "city": "Asheville",
+    "board_assessed_value": 189100.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "965762790100000",
+      "fetch_ok": true,
+      "real_owner": "WANDA RAY",
+      "real_value_str": "94,550",
+      "bills_by_year": {
+        "2026": 746.19,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Wanda",
+      "last_name": "Ray",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 2,
+      "status": "ambiguous",
+      "match": null,
+      "disambiguated_by_city": false,
+      "candidates": [
+        {
+          "VoterRegNum": "000000539680",
+          "CountyId": 11,
+          "CountyName": "BUNCOMBE",
+          "FullName": "RAY, WANDA JEAN",
+          "NCID": "AL383389",
+          "ResAddressCSZ": "ASHEVILLE, NC 28804",
+          "StatusDesc": "ACTIVE",
+          "StatusLbl": "A"
+        },
+        {
+          "VoterRegNum": "000000337743",
+          "CountyId": 11,
+          "CountyName": "BUNCOMBE",
+          "FullName": "RAY, WANDA LEE",
+          "NCID": "AL239448",
+          "ResAddressCSZ": "ASHEVILLE, NC 28803",
+          "StatusDesc": "ACTIVE",
+          "StatusLbl": "A"
+        }
+      ],
+      "most_recent_vote": null
+    }
+  },
+  {
+    "parcel_id": "9734176974",
+    "parcel_id_15": "973417697400000",
+    "owner_name_board": "BLANKENSHIP PERRY L;BLANKENSHIP LELA",
+    "first_name": "Perry",
+    "last_name": "Blankenship",
+    "street_address": "30 INDIAN CAMP BRANCH RD",
+    "city": "Weaverville",
+    "board_assessed_value": 198300.0,
+    "gis_exempt": {
+      "code": "VET",
+      "tag": "disabled_veteran_exemption"
+    },
+    "tax": {
+      "parcel_id": "973417697400000",
+      "fetch_ok": true,
+      "real_owner": "PERRY BLANKENSHIP, LELA BLANKENSHIP",
+      "real_value_str": "153,300",
+      "bills_by_year": {
+        "2026": 1209.85,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Perry",
+      "last_name": "Blankenship",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 1,
+      "status": "not_active",
+      "match": {
+        "full_name": "BLANKENSHIP, PERRY LEE",
+        "status_desc": "INACTIVE",
+        "county_name": "BUNCOMBE",
+        "voter_reg_num": "000000077035",
+        "ncid": "AL32836",
+        "res_address_csz": "WEAVERVILLE, NC 28787"
+      },
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": {
+        "election": "11/08/2016 GENERAL",
+        "voted_county": "BUNCOMBE",
+        "voted_method": "EARLY VOTING",
+        "voted_party": null
+      }
+    }
+  },
+  {
+    "parcel_id": "9626550843",
+    "parcel_id_15": "962655084300000",
+    "owner_name_board": "LEIFERT M PETER;COUDERT MARIE LISE",
+    "first_name": "M",
+    "last_name": "Leifert",
+    "street_address": "12 COFFEY CIR",
+    "city": "Asheville",
+    "board_assessed_value": 275900.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "962655084300000",
+      "fetch_ok": true,
+      "real_owner": "M LEIFERT, MARIE COUDERT",
+      "real_value_str": "137,950",
+      "bills_by_year": {
+        "2026": 1088.7,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "M",
+      "last_name": "Leifert",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 1,
+      "status": "active",
+      "match": {
+        "full_name": "LEIFERT, M PETER",
+        "status_desc": "ACTIVE",
+        "county_name": "BUNCOMBE",
+        "voter_reg_num": "000000367368",
+        "ncid": "AL262482",
+        "res_address_csz": "ASHEVILLE, NC 28806"
+      },
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": {
+        "election": "03/03/2026 PRIMARY",
+        "voted_county": "BUNCOMBE",
+        "voted_method": "EARLY VOTING IN-PERSON",
+        "voted_party": "DEMOCRATIC"
+      }
+    }
+  },
+  {
+    "parcel_id": "9638220233",
+    "parcel_id_15": "963822023300000",
+    "owner_name_board": "HILL CRYSTAL",
+    "first_name": "Crystal",
+    "last_name": "Hill",
+    "street_address": "1 LILAC ST",
+    "city": "Asheville",
+    "board_assessed_value": 301200.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "963822023300000",
+      "fetch_ok": true,
+      "real_owner": "CRYSTAL HILL",
+      "real_value_str": "150,600",
+      "bills_by_year": {
+        "2026": 1557.5,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Crystal",
+      "last_name": "Hill",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 1,
+      "status": "active",
+      "match": {
+        "full_name": "HILL, CRYSTAL DAWN",
+        "status_desc": "ACTIVE",
+        "county_name": "BUNCOMBE",
+        "voter_reg_num": "000000288190",
+        "ncid": "AL198073",
+        "res_address_csz": "ASHEVILLE, NC 28806"
+      },
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": {
+        "election": "11/05/2024 GENERAL",
+        "voted_county": "BUNCOMBE",
+        "voted_method": "ABSENTEE BY MAIL",
+        "voted_party": null
+      }
+    }
+  },
+  {
+    "parcel_id": "9649540711",
+    "parcel_id_15": "964954071100000",
+    "owner_name_board": "HILL MARIE",
+    "first_name": "Marie",
+    "last_name": "Hill",
+    "street_address": "279 HILLSIDE ST",
+    "city": "Asheville",
+    "board_assessed_value": 382600.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "964954071100000",
+      "fetch_ok": true,
+      "real_owner": "MARIE HILL",
+      "real_value_str": "191,300",
+      "bills_by_year": {
+        "2026": 1780.1,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Marie",
+      "last_name": "Hill",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 0,
+      "status": "not_found",
+      "match": null,
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": null
+    }
+  },
+  {
+    "parcel_id": "9668285135",
+    "parcel_id_15": "966828513500000",
+    "owner_name_board": "LUMSTON SHIRLEY ANN",
+    "first_name": "Shirley",
+    "last_name": "Lumston",
+    "street_address": "86 MAPLE SPRINGS RD",
+    "city": "Asheville",
+    "board_assessed_value": 272900.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "966828513500000",
+      "fetch_ok": true,
+      "real_owner": "SHIRLEY LUMSTON",
+      "real_value_str": "136,450",
+      "bills_by_year": {
+        "2026": 1532.6,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Shirley",
+      "last_name": "Lumston",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 1,
+      "status": "active",
+      "match": {
+        "full_name": "LUMSTON, SHIRLEY CHASTEEN",
+        "status_desc": "ACTIVE",
+        "county_name": "BUNCOMBE",
+        "voter_reg_num": "000000314396",
+        "ncid": "AL220690",
+        "res_address_csz": "ASHEVILLE, NC 28805"
+      },
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": {
+        "election": "11/05/2024 GENERAL",
+        "voted_county": "BUNCOMBE",
+        "voted_method": "EARLY VOTING IN-PERSON",
+        "voted_party": null
+      }
+    }
+  },
+  {
+    "parcel_id": "8696990970",
+    "parcel_id_15": "869699097000000",
+    "owner_name_board": "HOWELL LETTERMAN BARBARA ANN;LETTERMAN PHILIP",
+    "first_name": "Letterman",
+    "last_name": "Howell",
+    "street_address": "26 MIDGE LN",
+    "city": "Candler",
+    "board_assessed_value": 49000.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "869699097000000",
+      "fetch_ok": true,
+      "real_owner": "BARBARA HOWELL LETTERMAN, PHILIP LETTERMAN",
+      "real_value_str": "24,000",
+      "bills_by_year": {
+        "2026": 189.41,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Letterman",
+      "last_name": "Howell",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 0,
+      "status": "not_found",
+      "match": null,
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": null
+    }
+  },
+  {
+    "parcel_id": "9668076032",
+    "parcel_id_15": "966807603200000",
+    "owner_name_board": "QUINN MARTHA M;HARRELSON ANNA Q",
+    "first_name": "Martha",
+    "last_name": "Quinn",
+    "street_address": "121 BEVERLY RD",
+    "city": "Asheville",
+    "board_assessed_value": 452700.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "966807603200000",
+      "fetch_ok": true,
+      "real_owner": "MARTHA QUINN, ANNA HARRELSON",
+      "real_value_str": "226,350",
+      "bills_by_year": {
+        "2026": 2542.37,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Martha",
+      "last_name": "Quinn",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 1,
+      "status": "active",
+      "match": {
+        "full_name": "QUINN, MARTHA MARRONE",
+        "status_desc": "ACTIVE",
+        "county_name": "BUNCOMBE",
+        "voter_reg_num": "000000306594",
+        "ncid": "CW510909",
+        "res_address_csz": "ASHEVILLE, NC 28805"
+      },
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": {
+        "election": "11/05/2024 GENERAL",
+        "voted_county": "BUNCOMBE",
+        "voted_method": "EARLY VOTING IN-PERSON",
+        "voted_party": null
+      }
+    }
+  },
+  {
+    "parcel_id": "9710889174",
+    "parcel_id_15": "971088917400000",
+    "owner_name_board": "LOCKHART BETTY H",
+    "first_name": "Betty",
+    "last_name": "Lockhart",
+    "street_address": "39 HICKORY DR",
+    "city": "Asheville",
+    "board_assessed_value": 220400.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "971088917400000",
+      "fetch_ok": true,
+      "real_owner": "BETTY LOCKHART",
+      "real_value_str": "110,200",
+      "bills_by_year": {
+        "2026": 869.7,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Betty",
+      "last_name": "Lockhart",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 1,
+      "status": "active",
+      "match": {
+        "full_name": "LOCKHART, BETTY HENRY",
+        "status_desc": "ACTIVE",
+        "county_name": "BUNCOMBE",
+        "voter_reg_num": "000000027041",
+        "ncid": "AL12609",
+        "res_address_csz": "ASHEVILLE, NC 28806"
+      },
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": {
+        "election": "11/05/2024 GENERAL",
+        "voted_county": "BUNCOMBE",
+        "voted_method": "IN-PERSON ELECTION DAY",
+        "voted_party": null
+      }
+    }
+  },
+  {
+    "parcel_id": "8780941632",
+    "parcel_id_15": "878094163200000",
+    "owner_name_board": "MARLER BELVA",
+    "first_name": "Belva",
+    "last_name": "Marler",
+    "street_address": "27 BRIDGES COVE RD",
+    "city": "Leicester",
+    "board_assessed_value": 68100.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "878094163200000",
+      "fetch_ok": true,
+      "real_owner": "BELVA MARLER",
+      "real_value_str": "43,100",
+      "bills_by_year": {
+        "2026": 340.15,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Belva",
+      "last_name": "Marler",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 1,
+      "status": "not_active",
+      "match": {
+        "full_name": "MARLER, BELVA MARY",
+        "status_desc": "INACTIVE",
+        "county_name": "BUNCOMBE",
+        "voter_reg_num": "000000336245",
+        "ncid": "AL238293",
+        "res_address_csz": "LEICESTER, NC 28748"
+      },
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": {
+        "election": "11/08/2016 GENERAL",
+        "voted_county": "BUNCOMBE",
+        "voted_method": "EARLY VOTING",
+        "voted_party": null
+      }
+    }
+  },
+  {
+    "parcel_id": "0609993729",
+    "parcel_id_15": "060999372900000",
+    "owner_name_board": "AUSTIN BETTY CAROLINE",
+    "first_name": "Betty",
+    "last_name": "Austin",
+    "street_address": "99 CHAPEL RD",
+    "city": "Black Mtn",
+    "board_assessed_value": 389100.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "060999372900000",
+      "fetch_ok": true,
+      "real_owner": "BETTY AUSTIN",
+      "real_value_str": "204,000",
+      "bills_by_year": {
+        "2026": 161.62,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Betty",
+      "last_name": "Austin",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 1,
+      "status": "active",
+      "match": {
+        "full_name": "AUSTIN, BETTY C",
+        "status_desc": "ACTIVE",
+        "county_name": "BUNCOMBE",
+        "voter_reg_num": "000000002741",
+        "ncid": "AL2929",
+        "res_address_csz": "BLACK MOUNTAIN, NC 28711"
+      },
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": {
+        "election": "11/05/2024 GENERAL",
+        "voted_county": "BUNCOMBE",
+        "voted_method": "EARLY VOTING CURBSIDE",
+        "voted_party": null
+      }
+    }
+  },
+  {
+    "parcel_id": "9743518725",
+    "parcel_id_15": "974351872500000",
+    "owner_name_board": "BEALS LINDA S",
+    "first_name": "Linda",
+    "last_name": "Beals",
+    "street_address": "15 LEISURE LOOP",
+    "city": "Weaverville",
+    "board_assessed_value": 307700.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "974351872500000",
+      "fetch_ok": true,
+      "real_owner": "LINDA BEALS",
+      "real_value_str": "153,850",
+      "bills_by_year": {
+        "2026": 1214.18,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Linda",
+      "last_name": "Beals",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 1,
+      "status": "active",
+      "match": {
+        "full_name": "BEALS, LINDA S",
+        "status_desc": "ACTIVE",
+        "county_name": "BUNCOMBE",
+        "voter_reg_num": "000000227664",
+        "ncid": "AL137825",
+        "res_address_csz": "WEAVERVILLE, NC 28787"
+      },
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": {
+        "election": "03/03/2026 PRIMARY",
+        "voted_county": "BUNCOMBE",
+        "voted_method": "EARLY VOTING IN-PERSON",
+        "voted_party": "REPUBLICAN"
+      }
+    }
+  },
+  {
+    "parcel_id": "9627061128",
+    "parcel_id_15": "962706112800000",
+    "owner_name_board": "MOOREFIELD DAVID L",
+    "first_name": "David",
+    "last_name": "Moorefield",
+    "street_address": "3 TASHA LN",
+    "city": "Asheville",
+    "board_assessed_value": 182800.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "962706112800000",
+      "fetch_ok": true,
+      "real_owner": "DAVID MOOREFIELD",
+      "real_value_str": "91,400",
+      "bills_by_year": {
+        "2026": 1026.61,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "David",
+      "last_name": "Moorefield",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 0,
+      "status": "not_found",
+      "match": null,
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": null
+    }
+  },
+  {
+    "parcel_id": "9712328237",
+    "parcel_id_15": "971232823700000",
+    "owner_name_board": "WOLLMAN ROBYN",
+    "first_name": "Robyn",
+    "last_name": "Wollman",
+    "street_address": "827 OLD NC 20 HWY",
+    "city": "Alexander",
+    "board_assessed_value": 228100.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "971232823700000",
+      "fetch_ok": true,
+      "real_owner": "ROBYN WOLLMAN",
+      "real_value_str": "114,050",
+      "bills_by_year": {
+        "2026": 900.08,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Robyn",
+      "last_name": "Wollman",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 1,
+      "status": "active",
+      "match": {
+        "full_name": "WOLLMAN, ROBYN MELANIE",
+        "status_desc": "ACTIVE",
+        "county_name": "BUNCOMBE",
+        "voter_reg_num": "000000351095",
+        "ncid": "AL250221",
+        "res_address_csz": "ALEXANDER, NC 28701"
+      },
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": {
+        "election": "11/05/2024 GENERAL",
+        "voted_county": "BUNCOMBE",
+        "voted_method": "ABSENTEE BY MAIL",
+        "voted_party": null
+      }
+    }
+  },
+  {
+    "parcel_id": "8770751441",
+    "parcel_id_15": "877075144100000",
+    "owner_name_board": "SAUNBY JOHN;KIMMEL JENNY L",
+    "first_name": "John",
+    "last_name": "Saunby",
+    "street_address": "1136 N TURKEY CREEK RD",
+    "city": "Leicester",
+    "board_assessed_value": 296800.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "877075144100000",
+      "fetch_ok": true,
+      "real_owner": "JOHN SAUNBY, JENNY KIMMEL",
+      "real_value_str": "247,600",
+      "bills_by_year": {
+        "2026": 1954.06,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "John",
+      "last_name": "Saunby",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 1,
+      "status": "active",
+      "match": {
+        "full_name": "SAUNBY, JOHN HENRY",
+        "status_desc": "ACTIVE",
+        "county_name": "BUNCOMBE",
+        "voter_reg_num": "000000423313",
+        "ncid": "DS83770",
+        "res_address_csz": "LEICESTER, NC 28748"
+      },
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": {
+        "election": "11/05/2024 GENERAL",
+        "voted_county": "BUNCOMBE",
+        "voted_method": "EARLY VOTING IN-PERSON",
+        "voted_party": null
+      }
+    }
+  },
+  {
+    "parcel_id": "9744458371",
+    "parcel_id_15": "974445837100000",
+    "owner_name_board": "MCKINNEY JERRY DAVID III",
+    "first_name": "Jerry",
+    "last_name": "Mckinney",
+    "street_address": "26 BELL SPRINKLE RD",
+    "city": "Weaverville",
+    "board_assessed_value": 221800.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "974445837100000",
+      "fetch_ok": true,
+      "real_owner": "JERRY MCKINNEY",
+      "real_value_str": "115,200",
+      "bills_by_year": {
+        "2026": 909.16,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Jerry",
+      "last_name": "Mckinney",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 2,
+      "status": "active",
+      "match": {
+        "full_name": "MCKINNEY, JERRY DAVID",
+        "status_desc": "ACTIVE",
+        "county_name": "BUNCOMBE",
+        "voter_reg_num": "000000264559",
+        "ncid": "AL174442",
+        "res_address_csz": "WEAVERVILLE, NC 28787"
+      },
+      "disambiguated_by_city": true,
+      "candidates": [],
+      "most_recent_vote": {
+        "election": "11/05/2024 GENERAL",
+        "voted_county": "BUNCOMBE",
+        "voted_method": "EARLY VOTING CURBSIDE",
+        "voted_party": null
+      }
+    }
+  },
+  {
+    "parcel_id": "8791709026",
+    "parcel_id_15": "879170902600000",
+    "owner_name_board": "GALLOWAY JIMMY W;GALLOWAY ROSA A",
+    "first_name": "Jimmy",
+    "last_name": "Galloway",
+    "street_address": "45 JONES PATTON RD",
+    "city": "Leicester",
+    "board_assessed_value": 243300.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "879170902600000",
+      "fetch_ok": true,
+      "real_owner": "JIMMY GALLOWAY, ROSA GALLOWAY",
+      "real_value_str": "198,300",
+      "bills_by_year": {
+        "2026": 1564.99,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Jimmy",
+      "last_name": "Galloway",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 1,
+      "status": "active",
+      "match": {
+        "full_name": "GALLOWAY, JIMMY WILLIAM",
+        "status_desc": "ACTIVE",
+        "county_name": "BUNCOMBE",
+        "voter_reg_num": "000000308731",
+        "ncid": "CP31269",
+        "res_address_csz": "LEICESTER, NC 28748"
+      },
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": {
+        "election": "03/03/2026 PRIMARY",
+        "voted_county": "BUNCOMBE",
+        "voted_method": "IN-PERSON ELECTION DAY",
+        "voted_party": "DEMOCRATIC"
+      }
+    }
+  },
+  {
+    "parcel_id": "9647926584",
+    "parcel_id_15": "964792658400000",
+    "owner_name_board": "COX SHIRLEY B",
+    "first_name": "Shirley",
+    "last_name": "Cox",
+    "street_address": "26 JEFFRESS AVE",
+    "city": "Asheville",
+    "board_assessed_value": 150900.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "964792658400000",
+      "fetch_ok": true,
+      "real_owner": "SHIRLEY COX",
+      "real_value_str": "75,450",
+      "bills_by_year": {
+        "2026": 847.46,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Shirley",
+      "last_name": "Cox",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 2,
+      "status": "ambiguous",
+      "match": null,
+      "disambiguated_by_city": false,
+      "candidates": [
+        {
+          "VoterRegNum": "000000210572",
+          "CountyId": 11,
+          "CountyName": "BUNCOMBE",
+          "FullName": "COX, SHIRLEY ARROWOOD",
+          "NCID": "AL121403",
+          "ResAddressCSZ": "ASHEVILLE, NC 28806",
+          "StatusDesc": "ACTIVE",
+          "StatusLbl": "A"
+        },
+        {
+          "VoterRegNum": "000000006405",
+          "CountyId": 11,
+          "CountyName": "BUNCOMBE",
+          "FullName": "COX, SHIRLEY B",
+          "NCID": "AL4375",
+          "ResAddressCSZ": "ASHEVILLE, NC 28803",
+          "StatusDesc": "ACTIVE",
+          "StatusLbl": "A"
+        }
+      ],
+      "most_recent_vote": null
+    }
+  },
+  {
+    "parcel_id": "8695336914",
+    "parcel_id_15": "869533691400000",
+    "owner_name_board": "BAKER KATHLEEN M",
+    "first_name": "Kathleen",
+    "last_name": "Baker",
+    "street_address": "12 BRETT WAY",
+    "city": "Candler",
+    "board_assessed_value": 375300.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "869533691400000",
+      "fetch_ok": true,
+      "real_owner": "KATHLEEN BAKER",
+      "real_value_str": "193,300",
+      "bills_by_year": {
+        "2026": 1525.53,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Kathleen",
+      "last_name": "Baker",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 1,
+      "status": "active",
+      "match": {
+        "full_name": "BAKER, KATHLEEN MARY",
+        "status_desc": "ACTIVE",
+        "county_name": "BUNCOMBE",
+        "voter_reg_num": "000000409474",
+        "ncid": "AL293874",
+        "res_address_csz": "CANDLER, NC 28715"
+      },
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": {
+        "election": "11/05/2024 GENERAL",
+        "voted_county": "BUNCOMBE",
+        "voted_method": "EARLY VOTING IN-PERSON",
+        "voted_party": null
+      }
+    }
+  },
+  {
+    "parcel_id": "9731618727",
+    "parcel_id_15": "973161872700000",
+    "owner_name_board": "JUSTICE VILEY F",
+    "first_name": "Viley",
+    "last_name": "Justice",
+    "street_address": "11 WELLINGTON DR",
+    "city": "Asheville",
+    "board_assessed_value": 208200.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "973161872700000",
+      "fetch_ok": true,
+      "real_owner": "VILEY JUSTICE",
+      "real_value_str": "104,100",
+      "bills_by_year": {
+        "2026": 1200.2,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Viley",
+      "last_name": "Justice",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 1,
+      "status": "not_active",
+      "match": {
+        "full_name": "JUSTICE, VILEY F",
+        "status_desc": "INACTIVE",
+        "county_name": "BUNCOMBE",
+        "voter_reg_num": "000000095505",
+        "ncid": "AL40488",
+        "res_address_csz": "ASHEVILLE, NC 28804"
+      },
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": {
+        "election": "11/03/2020 GENERAL",
+        "voted_county": "BUNCOMBE",
+        "voted_method": "ABSENTEE BY MAIL",
+        "voted_party": null
+      }
+    }
+  },
+  {
+    "parcel_id": "0710205783",
+    "parcel_id_15": "071020578300000",
+    "owner_name_board": "REILLY DEBBIE E;REILLY KEVIN J",
+    "first_name": "Debbie",
+    "last_name": "Reilly",
+    "street_address": "350 GENESIS CIR",
+    "city": "Black Mtn",
+    "board_assessed_value": 220500.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "071020578300000",
+      "fetch_ok": true,
+      "real_owner": "DEBBIE REILLY, KEVIN REILLY",
+      "real_value_str": "110,250",
+      "bills_by_year": {
+        "2026": 1069.87,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Debbie",
+      "last_name": "Reilly",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 1,
+      "status": "active",
+      "match": {
+        "full_name": "REILLY, DEBBIE ELANE",
+        "status_desc": "ACTIVE",
+        "county_name": "BUNCOMBE",
+        "voter_reg_num": "000000259683",
+        "ncid": "AL169566",
+        "res_address_csz": "BLACK MOUNTAIN, NC 28711"
+      },
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": {
+        "election": "03/03/2026 PRIMARY",
+        "voted_county": "BUNCOMBE",
+        "voted_method": "EARLY VOTING IN-PERSON",
+        "voted_party": "DEMOCRATIC"
+      }
+    }
+  },
+  {
+    "parcel_id": "9743532107",
+    "parcel_id_15": "974353210700000",
+    "owner_name_board": "LEDFORD JIMMY W;LEDFORD RUTH C",
+    "first_name": "Jimmy",
+    "last_name": "Ledford",
+    "street_address": "87 DULA SPRINGS RD",
+    "city": "Weaverville",
+    "board_assessed_value": 211400.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "974353210700000",
+      "fetch_ok": true,
+      "real_owner": "JIMMY LEDFORD, RUTH LEDFORD",
+      "real_value_str": "105,700",
+      "bills_by_year": {
+        "2026": 834.19,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Jimmy",
+      "last_name": "Ledford",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 1,
+      "status": "active",
+      "match": {
+        "full_name": "LEDFORD, JIMMY WAYNE",
+        "status_desc": "ACTIVE",
+        "county_name": "BUNCOMBE",
+        "voter_reg_num": "000000035060",
+        "ncid": "AL15849",
+        "res_address_csz": "WEAVERVILLE, NC 28787"
+      },
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": {
+        "election": "11/05/2024 GENERAL",
+        "voted_county": "BUNCOMBE",
+        "voted_method": "IN-PERSON ELECTION DAY",
+        "voted_party": null
+      }
+    }
+  },
+  {
+    "parcel_id": "9606317943",
+    "parcel_id_15": "960631794300000",
+    "owner_name_board": "TESNER DAVID B;TESNER NANCY B",
+    "first_name": "David",
+    "last_name": "Tesner",
+    "street_address": "15 PEONY LN",
+    "city": "Candler",
+    "board_assessed_value": 162600.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "960631794300000",
+      "fetch_ok": true,
+      "real_owner": "DAVID TESNER, NANCY TESNER",
+      "real_value_str": "137,600",
+      "bills_by_year": {
+        "2026": 1085.94,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "David",
+      "last_name": "Tesner",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 1,
+      "status": "not_active",
+      "match": {
+        "full_name": "TESNER, DAVID TROY",
+        "status_desc": "INACTIVE",
+        "county_name": "BUNCOMBE",
+        "voter_reg_num": "000000538371",
+        "ncid": "CR31916",
+        "res_address_csz": "ASHEVILLE, NC 28804"
+      },
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": {
+        "election": "11/03/2020 GENERAL",
+        "voted_county": "MADISON",
+        "voted_method": "EARLY VOTING",
+        "voted_party": null
+      }
+    }
+  },
+  {
+    "parcel_id": "9702815753",
+    "parcel_id_15": "970281575300000",
+    "owner_name_board": "STEPPE STEVEN DAVID SR;STEPPE TAMPA SHOPE",
+    "first_name": "Steven",
+    "last_name": "Steppe",
+    "street_address": "11 MIDDLE GRASSY BRANCH RD",
+    "city": "Asheville",
+    "board_assessed_value": 103100.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "970281575300000",
+      "fetch_ok": true,
+      "real_owner": "STEVEN STEPPE, TAMPA STEPPE",
+      "real_value_str": "55,900",
+      "bills_by_year": {
+        "2026": 0.0,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Steven",
+      "last_name": "Steppe",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 0,
+      "status": "not_found",
+      "match": null,
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": null
+    }
+  },
+  {
+    "parcel_id": "9657732305",
+    "parcel_id_15": "965773230500000",
+    "owner_name_board": "WHITE PINK V JR;WHITE SARAH G",
+    "first_name": "Pink",
+    "last_name": "White",
+    "street_address": "472 ONTEORA BLVD",
+    "city": "Asheville",
+    "board_assessed_value": 214000.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "965773230500000",
+      "fetch_ok": true,
+      "real_owner": "PINK WHITE, SARAH WHITE",
+      "real_value_str": "107,000",
+      "bills_by_year": {
+        "2026": 844.45,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Pink",
+      "last_name": "White",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 1,
+      "status": "active",
+      "match": {
+        "full_name": "WHITE, PINK VESTER",
+        "status_desc": "ACTIVE",
+        "county_name": "BUNCOMBE",
+        "voter_reg_num": "000000231322",
+        "ncid": "AL141404",
+        "res_address_csz": "ASHEVILLE, NC 28803"
+      },
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": {
+        "election": "11/05/2024 GENERAL",
+        "voted_county": "BUNCOMBE",
+        "voted_method": "ABSENTEE BY MAIL",
+        "voted_party": null
+      }
+    }
+  },
+  {
+    "parcel_id": "9657057787",
+    "parcel_id_15": "965705778700000",
+    "owner_name_board": "ELLIS BRENDA K",
+    "first_name": "Brenda",
+    "last_name": "Ellis",
+    "street_address": "85 WYATT ST",
+    "city": "Asheville",
+    "board_assessed_value": 176700.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "965705778700000",
+      "fetch_ok": true,
+      "real_owner": "BRENDA ELLIS",
+      "real_value_str": "88,350",
+      "bills_by_year": {
+        "2026": 12.35,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Brenda",
+      "last_name": "Ellis",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 2,
+      "status": "active",
+      "match": {
+        "full_name": "ELLIS, BRENDA GIBSON",
+        "status_desc": "ACTIVE",
+        "county_name": "BUNCOMBE",
+        "voter_reg_num": "000000018623",
+        "ncid": "AL9180",
+        "res_address_csz": "ASHEVILLE, NC 28803"
+      },
+      "disambiguated_by_city": true,
+      "candidates": [],
+      "most_recent_vote": {
+        "election": "11/05/2024 GENERAL",
+        "voted_county": "BUNCOMBE",
+        "voted_method": "EARLY VOTING CURBSIDE",
+        "voted_party": null
+      }
+    }
+  },
+  {
+    "parcel_id": "9629854912",
+    "parcel_id_15": "962985491200000",
+    "owner_name_board": "GARRETT MARY ANN",
+    "first_name": "Mary",
+    "last_name": "Garrett",
+    "street_address": "3 ANTEBELLUM DR",
+    "city": "Asheville",
+    "board_assessed_value": 77400.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "962985491200000",
+      "fetch_ok": true,
+      "real_owner": "MARY GARRETT",
+      "real_value_str": "38,700",
+      "bills_by_year": {
+        "2026": 305.42,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Mary",
+      "last_name": "Garrett",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 0,
+      "status": "not_found",
+      "match": null,
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": null
+    }
+  },
+  {
+    "parcel_id": "9755863538",
+    "parcel_id_15": "975586353800000",
+    "owner_name_board": "LITCHFORD JULIE;LITCHFORD FREDRIC W",
+    "first_name": "Julie",
+    "last_name": "Litchford",
+    "street_address": "105 IVY HILL RD",
+    "city": "Weaverville",
+    "board_assessed_value": 322200.0,
+    "gis_exempt": {
+      "code": "ELD",
+      "tag": "elderly_exemption"
+    },
+    "tax": {
+      "parcel_id": "975586353800000",
+      "fetch_ok": true,
+      "real_owner": "JULIE LITCHFORD, FREDRIC LITCHFORD",
+      "real_value_str": "277,200",
+      "bills_by_year": {
+        "2026": 2187.66,
+        "2025": 0.0,
+        "2024": 0.0,
+        "2023": 0.0,
+        "2022": 0.0,
+        "2021": 0.0,
+        "2020": 0.0,
+        "2019": 0.0,
+        "2018": 0.0,
+        "2017": 0.0,
+        "2016": 0.0,
+        "2015": 0.0,
+        "2014": 0.0,
+        "2013": 0.0,
+        "2012": 0.0,
+        "2011": 0.0
+      },
+      "real_prior_years_delinquent": 0,
+      "real_prior_years_owed_detail": {},
+      "real_total_prior_arrears": 0
+    },
+    "voter": {
+      "first_name": "Julie",
+      "last_name": "Litchford",
+      "county": "BUNCOMBE",
+      "ok": true,
+      "error": null,
+      "total_matches": 1,
+      "status": "active",
+      "match": {
+        "full_name": "LITCHFORD, JULIE LYNN",
+        "status_desc": "ACTIVE",
+        "county_name": "BUNCOMBE",
+        "voter_reg_num": "000000535309",
+        "ncid": "CB93619",
+        "res_address_csz": "WEAVERVILLE, NC 28787"
+      },
+      "disambiguated_by_city": false,
+      "candidates": [],
+      "most_recent_vote": {
+        "election": "11/03/2020 GENERAL",
+        "voted_county": "HAYWOOD",
+        "voted_method": "IN-PERSON ELECTION DAY",
+        "voted_party": null
+      }
+    }
+  }
+]

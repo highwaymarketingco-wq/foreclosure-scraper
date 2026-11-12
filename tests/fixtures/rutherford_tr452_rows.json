@@ -1,0 +1,92 @@
+[
+ {
+  "0": "Date run: 2/1/2026 10:37:43 AM",
+  "7": "TR-452 Delinquent Bills Report w/ Parcel Id",
+  "13": "NCPTS V4"
+ },
+ {
+  "0": "Data as of: 1/31/2026 10:13:19 PM"
+ },
+ {},
+ {
+  "0": "Report Parameters:"
+ },
+ {},
+ {
+  "0": "Source Type:",
+  "3": " REI",
+  "8": "Tax District:",
+  "10": " ALL"
+ },
+ {
+  "0": "Tax Year:",
+  "3": " 2025"
+ },
+ {
+  "0": "Default Sort-By:",
+  "2": " Bill #, Amount Due, Taxpayer Name"
+ },
+ {
+  "0": "Grouping:",
+  "2": " No Grouping"
+ },
+ {},
+ {
+  "0": "Bill #",
+  "6": "Taxpayer Name",
+  "11": "Bill Description",
+  "16": "Parcel Id",
+  "18": "Amount Due",
+  "20": "Source Type"
+ },
+ {},
+ {
+  "0": "0000000022-2025-2025-0000-00-REG",
+  "6": "STEMBRIDGE, HENRY H III ",
+  "11": "297 E MAIN ST FOREST CITY, NC 28043",
+  "16": "425508",
+  "18": "4275.29",
+  "20": "REI"
+ },
+ {
+  "0": "0000000004-2025-2025-0000-00-REG",
+  "6": "PATEL, VICK ",
+  "11": "0 WAMBLI PASS LAKE LURE, NC 28746",
+  "16": "1640084",
+  "18": "143.37",
+  "20": "REI"
+ },
+ {
+  "0": "0000000003-2025-2025-0000-00-REG",
+  "6": "EAST WEST ASSOCIATES LLC",
+  "11": "FIREFLY LODGE UN101 PL29-123",
+  "16": "1646174",
+  "18": "3061.92",
+  "20": "REI"
+ },
+ {
+  "0": "0000003965-2025-2025-0000-00-REG",
+  "6": "THRIFT, ROBERT ",
+  "11": "827 OLD HENRIETTA RD NC 00000",
+  "16": "914402",
+  "18": "1065.99",
+  "20": "REI"
+ },
+ {
+  "0": "0000000022-2025-2025-0000-01-REG",
+  "6": "STEMBRIDGE, HENRY H III ",
+  "11": "297 E MAIN ST FOREST CITY, NC 28043",
+  "16": "425508",
+  "18": "10.50",
+  "20": "REI"
+ },
+ {
+  "0": "Subtotal",
+  "18": "9999.99"
+ },
+ {
+  "0": "Total",
+  "18": "9999.99"
+ },
+ {}
+]

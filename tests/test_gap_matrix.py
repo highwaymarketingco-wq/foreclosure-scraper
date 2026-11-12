@@ -1,0 +1,1077 @@
+"""scripts/gap_matrix.py: the pure pieces, on hand-made rows (no board, no network)."""
+from __future__ import annotations
+
+import importlib.util
+import sys
+from datetime import date
+from pathlib import Path
+
+import pytest
+
+_PATH = Path(__file__).resolve().parents[1] / "scripts" / "gap_matrix.py"
+_SPEC = importlib.util.spec_from_file_location("gap_matrix", _PATH)
+gm = importlib.util.module_from_spec(_SPEC)
+sys.modules["gap_matrix"] = gm          # dataclasses resolve string annotations through sys.modules
+_SPEC.loader.exec_module(gm)
+
+TODAY = date(2026, 10, 7)
+
+
+def row(**kw):
+    base = {"source": "test.src", "source_url": "https://example.test/x", "listing_type": "tax_lien",
+            "property_kind": "single_family", "state": "NC", "county": "Buncombe", "raw": {}}
+    base.update(kw)
+    return base
+
+
+# ---------------------------------------------------------------- the 73 columns (10/1 rules)
+
+def test_column_counts():
+    assert len(gm.OWNER_COLUMNS) == 73
+    assert len(gm.ATTY_COLUMNS) == 9
+    assert set(gm.SPECS) == set(gm.ALL_COLUMNS)
+
+
+def test_owner_columns_fields_and_types():
+    r = row(street_address="1 A ST", parcel_id="9648-12-3456", owner_name="DOE JOHN ET AL",
+            living_sqft=1200, bedrooms=3, bathrooms=2, acreage=0.3, tax_value=100000,
+            raw={"owner_phone": {"phone": "8285550100"}, "owner_email": {"best_email": "x@y.test"},
+                 "comps": [{"match_quality": "zip+kind+sqft+beds"}]})
+    got = gm.owner_columns(r)
+    assert {"address", "parcel_id", "owner_name", "phone", "email", "sqft", "beds_baths", "lot_size",
+            "assessed_value", "comps", "comps_tight", "lt_tax_lien", "name_et_al"} <= got
+    assert "lt_tax_sale" not in got
+
+
+def test_owner_columns_wrappers_follow_10_01():
+    raw = {"divorce": {"case_count": 0, "cases": []},           # checked, nothing found: not a hit
+           "probate": {"personal_representative": "x"},          # no decedent / case number: not a hit
+           "two_year_delinquent": {"is_two_year_plus": False},
+           "tax_aging_surfaced": {"status": "current", "years_delinquent": 0},
+           "marriage_license": {"status": "no_match"},           # 10/1 counts bare presence
+           "code_enforcement": {"has_open": False, "severe": False},
+           "deed_chain": {"transfers": [], "summary": {"chain_breaks": 1}},
+           "column": {"is_quiet_title": True}}
+    got = gm.owner_columns(row(raw=raw))
+    assert "divorce" not in got and "probate" not in got
+    assert "two_year_delinquent" not in got and "tax_aging_surfaced" not in got
+    assert "code_enforcement" not in got
+    assert "marriage_license" in got                      # the 10/1 ambiguity, kept for comparability
+    assert {"deed_chain_has_history", "deed_chain_break", "quiet_title"} <= got
+    raw2 = {"divorce": {"case_count": 2}, "probate": {"es_case_number": "26E001"}, "code_enforcement": True}
+    assert {"divorce", "probate", "code_enforcement"} <= gm.owner_columns(row(raw=raw2))
+
+
+def test_presence_zero_is_empty_like_10_01():
+    assert "liens" not in gm.owner_columns(row(raw={"liens": []}))
+    assert "condemned" not in gm.owner_columns(row(raw={"condemned": False}))
+    assert "condemned" in gm.owner_columns(row(raw={"condemned": True}))
+
+
+def test_vacant_recognizes_the_gis_vacant_key_its_real_producers_actually_write():
+    """2026-10-16: enrichment_arcgis.py and nc_lincoln_bulk.py both write the
+    vacant-structure signal to raw["gis"]["vacant"], never the bare top-level
+    raw["vacant"] this column used to check alone -- invisible to the gap list for
+    every county either one covers (confirmed live: Gaston 107 rows, Lincoln 1,095
+    rows). spartanburg_vacant.py's own raw["vacant"] top-level write must still work."""
+    assert "vacant" in gm.owner_columns(row(raw={"gis": {"vacant": True}}))
+    assert "vacant" not in gm.owner_columns(row(raw={"gis": {"vacant": False}}))
+    assert "vacant" not in gm.owner_columns(row(raw={"gis": {}}))
+    assert "vacant" in gm.owner_columns(row(raw={"vacant": {"source": "spartanburg_city_registry"}}))
+
+
+# ---------------------------------------------------------------- second view
+
+def test_positive_drops_marriage_no_match_and_adds_attorney():
+    r = row(owner_name="DOE JANE", legal_description="LOT 4 BLK B",
+            raw={"marriage_license": {"status": "no_match"},
+                 "deed_chain": {"transfers": [{"date": "2001-01-01", "book": "123", "page": "45"}]},
+                 "gis": {"owner": "DOE JANE"},
+                 "rod": {"instrument_count": 3},
+                 "heir_estate": {"owner_of_record": "x", "heir_names": ["a"]},
+                 "probate": {"es_case_number": "26E001"}})
+    owner = gm.owner_columns(r)
+    pos = gm.positive_columns(r, owner, {"tax_lien": "confirmed"})
+    assert "marriage_license" not in pos
+    assert {"atty_legal_description", "atty_deed_ref", "atty_taxpayer_of_record", "atty_heir_candidates",
+            "atty_rod_lien_checked", "atty_deed_chain_fetched", "atty_probate_case",
+            "atty_tax_verified_confirmed"} <= pos
+
+
+def test_checked_columns_from_wrappers_and_inputs():
+    # owner_email carries a still-live source (liensnc_filing) so "email" counts as checked here;
+    # see test_email_phone_checked_only_from_a_still_live_source for the retired-module case.
+    r = row(owner_name="DOE JOHN", defendant="DOE JOHN",
+            raw={"tax_owed": {"balance": 10}, "divorce": {"case_count": 0},
+                 "owner_email": {"best_email": None, "source": "liensnc_filing"},
+                 "incarceration_check": {"result": "no_match"}, "deed_chain": {"transfers": []}})
+    owner = gm.owner_columns(r)
+    pos = gm.positive_columns(r, owner, {})
+    chk = gm.checked_columns(r, pos, {"tax_lien": "refuted"})
+    # 2026-10-16: multi_year_delinquent_tax AND two_year_delinquent both split out of the
+    # shared broad tax check -- tax_owed alone (unrelated to either one's own real
+    # producer) no longer marks either checked.
+    assert {"divorce", "email", "incarceration",
+            "deed_chain_break", "name_heirs", "owner_cluster", "owner_mismatch",
+            "atty_tax_verified_confirmed"} <= chk
+    assert "multi_year_delinquent_tax" not in chk
+    assert "two_year_delinquent" not in chk
+    assert "bop_federal" not in chk
+    assert "atty_tax_verified_confirmed" not in gm.checked_columns(r, pos, {"tax_lien": "unconfirmed"})
+
+
+def test_email_phone_checked_only_from_a_still_live_source():
+    """Audit 2026-10-19: a non-empty owner_email/owner_phone dict used to mark "checked" on its
+    own (any dict at all, via SCORER_GATES' generic not-empty test plus a redundant explicit
+    owner_email check) -- even when that dict is nothing but frozen scan exhaust from a module
+    RETIRED 2026-10-09 (enrichment_email_extract.py, enrichment_surface_contacts.py,
+    enrichment_sc_voter_xref.py, enrichment_ocr.py; deploy/oracle/run_profile.json's own
+    unwired_allowlist documents the retirement) that will never run again on this row. Live-measured
+    19 (county, column) cells, all SC, all literal 0.0% yield, inflated by exactly this. A row
+    whose only touch is dead-scanner exhaust (no recognizable live source, and no genuine fill)
+    must not count as checked."""
+    retired_email = row(raw={"owner_email": {"best_email": None, "best_classification": "other"}})
+    retired_phone = row(raw={"owner_phone": {"source": "surface_contacts", "checked_at": "2026-01-01"}})
+    live_email = row(raw={"owner_email": {"best_email": None, "source": "liensnc_filing"}})
+    live_phone = row(raw={"owner_phone": {"source": "ncsbe_voter", "checked_at": "2026-01-01"}})
+
+    for r in (retired_email, retired_phone, live_email, live_phone):
+        owner = gm.owner_columns(r)
+        pos = gm.positive_columns(r, owner, {})
+        chk = gm.checked_columns(r, pos, {})
+        if r is retired_email or r is retired_phone:
+            assert "email" not in chk and "phone" not in chk, r["raw"]
+        else:
+            assert ("email" in chk) or ("phone" in chk), r["raw"]
+
+
+def test_multi_year_delinquent_tax_checked_only_by_its_own_key():
+    """Its real producer (scrapers/counties_generic/multi_year_delinquent_tax.py) covers
+    exactly 3 counties (Buncombe NC, Oconee SC, Pickens SC); the generic tax_status_known()
+    predicate used to mark it checked from any unrelated tax key board-wide -- live-measured
+    150,198 false-"checked" rows outside those 3 counties (audit 2026-10-16)."""
+    hit = row(raw={"multi_year_delinquent_tax": {"years": [2023, 2024]}})
+    assert "multi_year_delinquent_tax" in gm.checked_columns(hit, set(), {})
+    miss = row(raw={"tax_owed": {"balance": 10}, "nc_ptscloud_delinquent_tax": {"years": 3}})
+    assert "multi_year_delinquent_tax" not in gm.checked_columns(miss, set(), {})
+    assert "two_year_delinquent" not in gm.checked_columns(miss, set(), {})
+    assert "tax_aging_surfaced" not in gm.checked_columns(miss, set(), {})
+    # the other 2 columns on the shared broad line are unaffected by any of the 3 splits
+    assert {"repeat_tax_loss", "bankruptcy_tax_combo"} <= gm.checked_columns(miss, set(), {})
+
+
+def test_tax_aging_surfaced_checked_only_by_its_own_key_and_never_by_the_dead_default_stamp():
+    """enrichment_tax_aging.py IS genuinely board-wide and growing (unlike
+    multi_year_delinquent_tax/two_year_delinquent's narrow producers) -- but the shared
+    tax_status_known() predicate still overcounted it by 37,566 rows (audit 2026-10-16,
+    wave-4 gap-sweep) against keys unrelated to its own precondition. "default" is the
+    dead one-shot-script stamp (scripts/surface_tax_aging.py); the live producer only
+    ever writes source="nc_ptscloud" or "tax_owed"."""
+    hit = row(raw={"tax_aging_surfaced": {"years_delinquent": 2, "source": "tax_owed"}})
+    assert "tax_aging_surfaced" in gm.checked_columns(hit, set(), {})
+    stale = row(raw={"tax_aging_surfaced": {"years_delinquent": 2, "source": "default"}})
+    assert "tax_aging_surfaced" not in gm.checked_columns(stale, set(), {})
+    miss = row(raw={"tax_owed": {"balance": 10}, "catalis_roll": {"years": 3}})
+    assert "tax_aging_surfaced" not in gm.checked_columns(miss, set(), {})
+
+
+def test_two_year_delinquent_checked_only_by_its_own_key():
+    """Its 3 real producers (albemarle_observer_tax_lists.py, nc_its_public_tax.py,
+    sc_catalis_delinquent_roll.py) all write raw['two_year_delinquent'] directly; the
+    shared tax_status_known() predicate used to mark it checked from any unrelated tax
+    key board-wide -- live-measured 122,976 false-"checked" rows (audit 2026-10-16)."""
+    hit = row(raw={"two_year_delinquent": {"is_two_year_plus": False, "years": 1}})
+    assert "two_year_delinquent" in gm.checked_columns(hit, set(), {})
+    miss = row(raw={"tax_owed": {"balance": 10}, "qpaybill_roll": {"years": 3}})
+    assert "two_year_delinquent" not in gm.checked_columns(miss, set(), {})
+
+
+def test_sos_screen_counts_as_checked_but_never_as_a_positive_hit():
+    """Found 2026-10-16 (gap-sweep wave 3): enrichment_sos_dissolution.py wrote nothing for
+    a completed "active"/"unknown" lookup, so a clean screen looked unchecked forever (the
+    code_enforcement anti-pattern). Fixed by writing raw.sos_screen -- a SEPARATE key from
+    raw.sos_dissolution, because sos_dissolution has no SCORER_GATES gate: owner_columns()'s
+    bare presence check on that key is what decides the POSITIVE hit too, so a negative
+    result written to the same key would wrongly mark a clean entity as dissolved."""
+    screened = row(raw={"sos_screen": {"checked": True, "status": "active", "checked_at": "2026-10-16T00:00:00"}})
+    owner = gm.owner_columns(screened)
+    pos = gm.positive_columns(screened, owner, {})
+    assert "sos_dissolution" not in owner       # a clean screen is never a positive hit
+    assert "sos_dissolution" not in pos
+    assert "sos_dissolution" in gm.checked_columns(screened, pos, {})   # but it was screened
+
+    dissolved = row(raw={"sos_dissolution": {"checked": True, "status": "dissolved"}})
+    owner2 = gm.owner_columns(dissolved)
+    pos2 = gm.positive_columns(dissolved, owner2, {})
+    assert "sos_dissolution" in owner2          # a real hit still counts as positive
+    assert "sos_dissolution" in pos2
+    assert "sos_dissolution" in gm.checked_columns(dissolved, pos2, {})
+
+
+def test_jail_booking_screen_counts_as_checked_but_never_as_a_positive_hit():
+    """Found 2026-10-16 (gap-sweep wave 3): match_rosters()'s bulk-roster lane wrote
+    nothing at all when a healthy roster matched nobody, so a county-scope "ran" check
+    (pos>0 or chk>0 on ANY row in the county) could never flip -- Transylvania/Polk NC
+    fetched a clean, healthy roster for 2+ months with zero rows ever credited as
+    checked. Fixed by writing raw.jail_booking_screen -- a SEPARATE key from
+    raw.jail_booking, because _gate_jail treats ANY non-empty jail_booking dict without
+    a release marker as a currently-active booking, so a no-match wrapper written to
+    that same key would wrongly read as a hit."""
+    screened = row(raw={"jail_booking_screen": {"county": "Transylvania", "state": "NC", "result": "no_match"}})
+    owner = gm.owner_columns(screened)
+    pos = gm.positive_columns(screened, owner, {})
+    assert "jail_booking" not in owner          # a clean screen is never a positive hit
+    assert "jail_booking" not in pos
+    assert "jail_booking" in gm.checked_columns(screened, pos, {})   # but it was screened
+
+    hit = row(raw={"jail_booking": {"release_status": "in_custody"}})
+    owner2 = gm.owner_columns(hit)
+    pos2 = gm.positive_columns(hit, owner2, {})
+    assert "jail_booking" in owner2             # a real hit still counts as positive
+    assert "jail_booking" in pos2
+    assert "jail_booking" in gm.checked_columns(hit, pos2, {})
+
+
+def test_tax_status_known_ignores_state_income_lien():
+    assert gm.tax_status_known({"nc_ptscloud_delinquent_tax": {"x": 1}})
+    assert gm.tax_status_known({"rutherford_tax": {"x": 1}})
+    assert not gm.tax_status_known({"sc_state_tax_lien": {"owner": "x"}})
+    assert not gm.tax_status_known({"bankruptcy_tax_combo": {"x": 1}, "amount_owed": {"value": 1}})
+
+
+def test_applicability_rules():
+    land_sc = row(state="SC", county="Greenville", property_kind="land", raw={"entity_type": "government"})
+    rules = gm.row_rules(land_sc, land_sc["raw"], set())
+    app = gm.applicable_columns(land_sc, rules)
+    assert "beds_baths" not in app and "sqft" not in app and "comps" not in app
+    assert "phone" not in app and "divorce" not in app            # government owner
+    assert "sc_state_tax_lien" in app and "liensnc_related" not in app
+    nc = row(owner_name="SMITH MARY HEIRS", raw={"entity_type": "individual"})
+    rules = gm.row_rules(nc, nc["raw"], gm.owner_columns(nc))
+    assert "deceased" in rules
+    app = gm.applicable_columns(nc, rules)
+    assert {"atty_heir_candidates", "atty_probate_case", "liensnc_related", "phone"} <= app
+    assert "sc_state_tax_lien" not in app
+    assert "atty_tax_verified_confirmed" in app                   # a tax_lien row claims delinquent tax
+
+
+# ---------------------------------------------------------------- verdicts
+
+def test_row_verdicts_prefers_board_then_ledger():
+    idx = {"tax_lien": {"parcel:NC:buncombe:123": "stale"}, "jail_booking": {"parcel:NC:buncombe:123": "confirmed"}}
+    r = row(raw={"verification": [{"signal": "tax_lien", "verdict": "confirmed"}]})
+    got = gm.row_verdicts(r, idx, ["parcel:NC:buncombe:123"])
+    assert got == {"tax_lien": "confirmed", "jail_booking": "confirmed"}
+    assert gm.row_verdicts(row(), idx, ["addr:NC:buncombe:1 a st"]) == {}
+
+
+def test_load_ledger_index_case_scoped_keys(tmp_path):
+    (tmp_path / "jail_booking.json").write_text(
+        '{"kind": "verification_ledger", "signal": "jail_booking", "rows": {"jail:x@parcel:NC:cleveland:9": {"keys": ["jail:x@parcel:NC:cleveland:9"],'
+        ' "row": {"state": "NC", "county": "cleveland"}, "latest": {"verdict": "confirmed"}}}}')
+    (tmp_path / "broken.json").write_text("{not json")
+    idx, counts = gm.load_ledger_index(tmp_path)
+    assert idx["jail_booking"]["parcel:NC:cleveland:9"] == "confirmed"
+    assert counts["jail_booking"] == {"NC|Cleveland|confirmed": 1}
+
+
+# ---------------------------------------------------------------- sources and classes
+
+MATRIX_REC = {"state": "NC", "county": "wake",
+              "rod": {"access": "captcha", "free_name_search": "yes", "legal_description_in_index": "yes",
+                      "url": "https://rod.example.test/search"},
+              "probate": {"access": "captcha", "free_search": "yes", "url": "https://portal.example.test"},
+              "tax": {"access": "open", "free_by_parcel": "yes", "url": "https://tax.example.test"},
+              "gis": {"url": "https://gis.example.test", "legal_description_field": "no", "deed_book_page_field": "yes",
+                      "owner_field": "yes"},
+              "manual_lane": "a person ticks the reCAPTCHA"}
+
+
+def test_source_status_paths():
+    S = gm.SPECS
+    assert gm.source_status(S["atty_rod_lien_checked"], "NC", MATRIX_REC)[:2] == ("walled", "CAPTCHA")
+    assert gm.source_status(S["atty_probate_case"], "NC", MATRIX_REC)[0] == "walled"
+    assert gm.source_status(S["sqft"], "NC", MATRIX_REC)[0] == "free"
+    assert gm.source_status(S["atty_legal_description"], "NC", MATRIX_REC)[:2] == ("walled", "CAPTCHA")
+    assert gm.source_status(S["deed_chain_has_history"], "NC", MATRIX_REC)[0] == "free"
+    assert gm.source_status(S["phone"], "NC", None)[0] == "free"                     # statewide voter file
+    assert gm.source_status(S["phone"], "SC", None)[0] == "walled"
+    assert gm.source_status(S["atty_deed_ref"], "NC", None)[2].startswith("statewide (not read yet)")
+    assert gm.source_status(S["liens"], "SC", None)[2] == \
+        "county missing from the county records matrix"
+    assert gm.source_status(S["jail_booking"], "NC", MATRIX_REC)[0] == "unknown"
+    blocked = dict(MATRIX_REC, rod={"access": "open", "terms_forbid_automation": "yes"})
+    assert gm.source_status(S["liens"], "NC", blocked)[:2] == ("walled", "terms forbid automation")
+
+
+@pytest.mark.parametrize("app,target,ran,built,src,want", [
+    (0, 0, False, "no", ("free", "", ""), "not applicable"),
+    (10, 10, True, "ran", ("free", "", ""), None),
+    (10, 3, True, "ran", ("walled", "CAPTCHA", ""), "built-but-low-yield"),
+    (10, 0, False, "code", ("free", "", ""), "built-but-low-yield"),
+    (10, 0, False, "code", ("walled", "login", ""), "walled (login)"),
+    (10, 0, False, "no", ("walled", "CAPTCHA", ""), "walled (CAPTCHA)"),
+    (10, 0, False, "no", ("free", "", ""), "sourced-not-built"),
+    (10, 0, False, "no", ("unknown", "", ""), "no source known"),
+])
+def test_classify_cell(app, target, ran, built, src, want):
+    assert gm.classify_cell(gm.SPECS["liens"], app, target, ran, built, src) == want
+
+
+def test_next_action_walled_uses_manual_lane():
+    act = gm.next_action("walled (CAPTCHA)", "liens", gm.SPECS["liens"], "", "CAPTCHA", MATRIX_REC, 5)
+    assert act.startswith("manual lane: a person ticks")
+    assert "no free owner-email source" in gm.next_action("built-but-low-yield", "email", gm.SPECS["email"], "", "", None, 3)
+
+
+# ---------------------------------------------------------------- correctness invariants
+
+def test_parcel_and_phone_helpers():
+    assert gm.parcel_shape("9648-12-3456") == "9999-99-9999"
+    assert gm.parcel_shape("R12A") == "A99A"
+    assert gm.parcel_junk("000000") and gm.parcel_junk("N/A") and gm.parcel_junk("12")
+    assert not gm.parcel_junk("9648-12-3456")
+    assert gm.phone_problem("(828) 555-0100") == "fictional_555"
+    assert gm.phone_problem("1-828-253-1234") is None
+    assert gm.phone_problem("12345") == "not_10_digits"
+    assert gm.phone_problem("0285551234") == "bad_area_or_exchange"
+
+
+def test_row_invariants():
+    bad = row(state="NC", county="greenville", zip_code="29601", latitude=32.5, longitude=-82.4,
+              owner_name="123 MAIN ST", sale_date="1970-01-01", first_seen="2026-10-05", last_seen="2026-10-01",
+              year_built=1600, tax_value=100000, living_sqft=1000,
+              raw={"calc": {"arv_expected": 900000}, "owner_phone": {"phone": "123"},
+                   "last_sale": {"date": "2030-01-01"}})
+    got = gm.row_invariants(bad, TODAY)
+    assert {"county_not_in_state", "zip_not_in_state", "latlon_outside_state", "owner_name_looks_like_address",
+            "sale_date_impossible", "first_seen_after_last_seen", "year_built_impossible", "arv_over_5x_assessed",
+            "last_sale_in_future", "phone_not_10_digits"} <= got
+    ok = row(state="NC", county="Buncombe", zip_code="28801", latitude=35.6, longitude=-82.5, owner_name="DOE JOHN",
+             raw={"owner_mailing": {"mailing": "PO BOX 1 ASHEVILLE NC"}, "calc": {"arv_expected": 250000}},
+             tax_value=200000, living_sqft=1500)
+    assert gm.row_invariants(ok, TODAY) == set()
+    assert "county_noncanonical_spelling" in gm.row_invariants(row(county="buncombe"), TODAY)
+    assert "county_blank" in gm.row_invariants(row(county=""), TODAY)
+    same = row(owner_name="1 A ST ASHEVILLE", raw={"owner_mailing": {"mailing": "1 A ST, ASHEVILLE"}})
+    assert "owner_name_equals_mailing" in gm.row_invariants(same, TODAY)
+
+
+def test_county_key():
+    assert gm.county_key(row(county="mcdowell")) == ("NC", "McDowell")
+    assert gm.county_key(row(county=None)) == ("NC", "UNKNOWN")
+    assert gm.county_key(row(state=" sc ", county="Greenville County")) == ("SC", "Greenville")
+
+
+def test_counties_named_in(tmp_path):
+    f = tmp_path / "x.py"
+    f.write_text('LAYERS = {"buncombe": 1}\n# Polk County roster\nslug = "henderson_vacant"\nunion_all = 1\n')
+    got = gm.counties_named_in([f])
+    assert {("NC", "Buncombe"), ("NC", "Henderson")} <= got
+    assert ("NC", "Union") not in got and ("SC", "Union") not in got
+    # "# Polk County roster" is a COMMENT, not real producer code -- see
+    # test_counties_named_in_ignores_comments_and_docstrings below for why this no longer counts.
+    assert ("NC", "Polk") not in got
+
+
+def test_counties_named_in_ignores_comments_and_docstrings(tmp_path):
+    """2026-10-19: a live audit of built_in_code()'s real output found 47 (county, column) credit
+    pairs across 21 columns whose ONLY textual evidence anywhere in the producer file was a
+    comment or docstring -- never real code -- e.g. a rejection note ("Gaston Blight Problems:
+    live, 0 rows"), a name-parsing docstring example ('MICHAEL LEE ABSHER' -> 'LEE'), or an aside
+    comparing one file's style to another's ("same spirit as nc_rowan_cott.py's"). None of the 47
+    were legitimate; stripping comments/docstrings before matching removes exactly those 47 and
+    adds zero new matches anywhere in the real codebase (verified against the live SPECS/producer
+    set, not just this synthetic file)."""
+    f = tmp_path / "y.py"
+    f.write_text(
+        '"""Module docstring mentioning Transylvania County as an example, not real coverage."""\n'
+        '# Catawba County: rejected, 0 rows ever returned\n'
+        'def helper():\n'
+        '    """'"'"'JOHN LEE SMITH'"'"' -> '"'"'LEE'"'"' (a middle-name docstring example).\n'
+        '    Also mentions Wake in prose, not code."""\n'
+        '    return 1\n'
+        'COUNTIES = {"mecklenburg": True}  # a real, active registry entry\n'
+    )
+    got = gm.counties_named_in([f])
+    assert ("NC", "Mecklenburg") in got, "a real code entry (not a comment) must still match"
+    for st, n in [("NC", "Transylvania"), ("NC", "Catawba"), ("NC", "Lee"), ("SC", "Lee"), ("NC", "Wake")]:
+        assert (st, n) not in got, f"{(st, n)} only ever appeared in a comment/docstring"
+
+
+def test_strip_comments_and_docstrings_keeps_real_string_literals():
+    """The blanking must only ever remove COMMENT tokens and bare/docstring STRING statements --
+    never a string literal that is actually part of the running code (a tuple/set/dict element,
+    a function argument, an f-string), since those are exactly the real-coverage signal this
+    function must keep matching."""
+    src = (
+        '# a comment naming Rowan\n'
+        '"""module docstring naming Transylvania"""\n'
+        'TOWNS = ("Moore", "Woodruff")  # Spartanburg-metro towns, not the real Moore County\n'
+        'def f(county="Gaston"):\n'
+        '    return county\n'
+    )
+    stripped = gm._strip_comments_and_docstrings(src)
+    assert "Rowan" not in stripped
+    assert "Transylvania" not in stripped
+    assert '"Moore"' in stripped and '"Gaston"' in stripped  # real code, must survive
+
+
+def test_built_in_code_known_false_positives_not_silently_fixed():
+    """2026-10-19 audit of built_in_code()'s real output against the actual producer files:
+    comment-stripping (the two tests above) fixes the jail_booking Lee NC/SC false positive (a
+    name-parsing docstring example in scrapers/national/jail_bookings.py) and, as a bonus, a
+    previously-known Gaston/condemned rejection-comment false positive. It does NOT fix three
+    other confirmed false positives below, because each is a match inside REAL CODE (a string
+    literal in a collection of place names that happens to share a name with an unrelated county),
+    which would need per-file semantic knowledge of what the collection represents -- something
+    this text-grep approach has no way to determine without a fragile, unvalidated per-file
+    allowlist. This test pins down the exact mechanism so it can't silently regress further or get
+    "fixed" by accident without the fix being deliberate and re-validated against the 1,676 other
+    (county, column) pairs that currently rely on this same function:
+      - condemned still credits ('NC', 'Moore') via scrapers/counties_sc/spartanburg_condemned.py's
+        `_local` set of Spartanburg-metro SC town names (includes the real town "Moore, SC",
+        zero relation to Moore County, NC).
+      - condemned still credits ('NC', 'Davidson') via
+        scrapers/city_websites/charlotte_open_data.py's `_MUNICIPALITIES` tuple of
+        Mecklenburg-metro town names (includes the town of Davidson, NC, zero relation to
+        Davidson County, NC).
+      - jail_booking still credits ('NC', 'Cherokee') via scrapers/national/jail_bookings.py's own,
+        genuinely real `("SC", "Cherokee", "zuercher", "cherokee-so-sc")` adapter-registry entry --
+        a real SC Cherokee producer exists, but the regex is state-blind (it only checks whether
+        the literal word "Cherokee" appears, not which state tuple it's paired with), so it also
+        credits NC's unrelated Cherokee County with the same real entry.
+
+    2026-11-10 UPDATE: the "previously-known Gaston/condemned rejection-comment false positive"
+    this docstring used to also pin down is GONE, not regressed -- gastonia_code_enforcement.py
+    (a real raw["condemned"]=True producer, confirmed by reading its code, missing from this
+    tuple until the vacant/condemned coverage-gap research pass that day) was added to
+    SPECS["condemned"].producers, and `county="Gaston"` is real code in that file, not a comment
+    or docstring example. ('NC', 'Gaston') crediting 'condemned' now is a true positive, the
+    opposite of the Moore/Davidson/Cherokee cases above, and belongs in
+    test_built_in_code_drops_arcgis_distress_layers_false_credit_for_condemned_and_code_enforcement
+    -style end-to-end assertions, not here.
+    """
+    condemned_files = [gm.PKG / f for f in gm.SPECS["condemned"].producers if (gm.PKG / f).exists()]
+    jail_files = [gm.PKG / f for f in gm.SPECS["jail_booking"].producers if (gm.PKG / f).exists()]
+    condemned_counties = gm.counties_named_in(condemned_files)
+    jail_counties = gm.counties_named_in(jail_files)
+
+    assert ("NC", "Moore") in condemned_counties, (
+        "known-unfixed: 'MOORE' the Spartanburg SC town, in spartanburg_condemned.py's town set"
+    )
+    assert ("NC", "Davidson") in condemned_counties, (
+        "known-unfixed: 'DAVIDSON' the Mecklenburg-metro town, in charlotte_open_data.py's town tuple"
+    )
+    assert ("NC", "Cherokee") in jail_counties, (
+        "known-unfixed: cross-state leak from jail_bookings.py's real SC Cherokee registry entry"
+    )
+    # the two FPs comment-stripping DOES fix must stay fixed
+    assert ("NC", "Lee") not in jail_counties and ("SC", "Lee") not in jail_counties
+    # Gaston is now a TRUE positive here (see 2026-11-10 UPDATE above) -- a real producer, not a
+    # stale rejection comment.
+    assert ("NC", "Gaston") in condemned_counties
+
+
+def test_condemned_and_code_enforcement_producers_include_gastonia_kinston_rocky_mount():
+    """2026-11-10 vacant/condemned coverage-gap research pass: three real raw["condemned"]/
+    raw["vacancy"]/raw["code_enforcement"] writers were missing from these producer tuples
+    entirely (confirmed by reading each file's own code, not its docstring) -- Gaston/Lenoir/
+    Nash/Edgecombe read as unbuilt despite real, already-running code. Same bug class, same fix
+    shape, as test_vacancy_producers_cover_all_three_real_writers above (that one was wave 5;
+    this is the same omission recurring in two more tuples plus a fourth writer vacancy itself
+    had not yet picked up)."""
+    condemned = gm.SPECS["condemned"].producers
+    vacancy = gm.SPECS["vacancy"].producers
+    code_enf = gm.SPECS["code_enforcement"].producers
+    assert any("gastonia_code_enforcement" in p for p in condemned)
+    assert any("kinston_proposed_demolition" in p for p in condemned)
+    assert any("rocky_mount_blight_survey" in p for p in condemned)
+    assert any("gastonia_code_enforcement" in p for p in vacancy)
+    assert any("gastonia_code_enforcement" in p for p in code_enf)
+
+
+def test_arcgis_distress_layers_credit_respects_process_and_condemned_fields():
+    """2026-10-19 follow-up to the Richland/condemned investigation (gap-matrix mislabel sweep):
+    arcgis_distress_layers.py is a single multi-county, multi-PROCESS module (tax/storm_damage/
+    flood_zone/demolition_permit/buyout_applicant/poor_condition/code_enforcement all share its one
+    LAYERS registry) listed as a producer for both 'condemned' and 'code_enforcement'. The blanket
+    counties_named_in() text match cannot see WHICH process a county's own Layer entry belongs to,
+    so (before this fix) it credited a county for either column merely for being named anywhere in
+    the file -- live-confirmed: Transylvania is named only on a storm_damage entry (zero
+    code_enforcement/condemned=True entries at all) yet was credited 'built' for both columns;
+    Lincoln/Guilford/Durham/Richland each have a real process='code_enforcement' entry but, same as
+    Richland's own already-investigated case, ZERO condemned=True entry, yet were also credited
+    'built' for condemned. _arcgis_distress_layers_credit() reads the LAYERS registry's own fields
+    directly instead.
+
+    2026-11-10 UPDATE: Guilford dropped out of code_enforcement's expected set. greensboro_code_
+    housing (this test's 5th layer, Guilford's only process='code_enforcement' entry in this file)
+    was REMOVED 2026-10-28 -- the file's own dated comment explains why (a 665-row "active" set
+    whose newest case number was 2+ years stale, the sync had simply stopped) -- so this test went
+    stale against that change rather than being updated alongside it. Guilford is correctly absent
+    now; it has no other code_enforcement producer anywhere in the codebase."""
+    credit = gm._arcgis_distress_layers_credit()
+    # only York's rockhill_code_demolition sets condemned=True in this entire file
+    assert credit["condemned"] == {("SC", "York")}
+    # the 4 real process="code_enforcement" layers left after greensboro_code_housing's 2026-10-28
+    # removal (columbia_code_vacant_boarded, durham_open_code_violations, lincoln_code_violations,
+    # rockhill_code_housing/_exterior_major)
+    assert credit["code_enforcement"] == {
+        ("SC", "Richland"), ("NC", "Durham"), ("NC", "Lincoln"), ("SC", "York"),
+    }
+
+
+def test_built_in_code_drops_arcgis_distress_layers_false_credit_for_condemned_and_code_enforcement():
+    """End-to-end: built_in_code()'s real output for 'condemned' no longer credits a county whose
+    only textual evidence in arcgis_distress_layers.py is an entry tagged a different process (the
+    exact mislabel mechanism the test above pins down), while counties with a genuine producer --
+    in this file or another -- keep their credit.
+
+    2026-11-10 UPDATE: Guilford moved from "has code_enforcement" to "has neither" -- its only
+    code_enforcement producer, greensboro_code_housing, was REMOVED 2026-10-28 as stale (see
+    test_arcgis_distress_layers_credit_respects_process_and_condemned_fields's dated note above).
+    Gaston also joined this test's world: gastonia_code_enforcement.py (missing from the condemned/
+    code_enforcement producer tuples until the 2026-11-10 coverage-gap pass) now genuinely credits
+    it for both."""
+    built = gm.built_in_code()
+    # false positives removed: named in the file, but on an unrelated-process entry only
+    for st, co in (("NC", "Transylvania"), ("NC", "Buncombe"), ("NC", "Burke"), ("NC", "New Hanover"),
+                   ("SC", "Greenville"), ("SC", "Greenwood"), ("SC", "Laurens"), ("SC", "Pickens")):
+        assert (st, co) not in built["condemned"], f"{st}/{co} has no condemned=True entry anywhere"
+    for st, co in (("NC", "Transylvania"), ("NC", "Burke"), ("SC", "Greenville"), ("SC", "Greenwood"),
+                   ("SC", "Laurens"), ("SC", "Pickens")):
+        assert (st, co) not in built["code_enforcement"], f"{st}/{co} has no code_enforcement entry anywhere"
+    # Guilford has neither signal now -- its only producer is gone, not merely mislabeled.
+    assert ("NC", "Guilford") not in built["condemned"] and ("NC", "Guilford") not in built["code_enforcement"]
+    # real producers (in this file, via condemned=True / process='code_enforcement', or via another
+    # file entirely) keep their credit
+    assert ("SC", "York") in built["condemned"] and ("SC", "York") in built["code_enforcement"]
+    assert ("SC", "Spartanburg") in built["condemned"]            # spartanburg_condemned.py
+    assert ("NC", "Henderson") in built["condemned"]              # hendersonville_vacant_structures.py
+    assert ("NC", "Mecklenburg") in built["condemned"]            # charlotte_open_data.py
+    assert ("NC", "Gaston") in built["condemned"]                 # gastonia_code_enforcement.py (added 2026-11-10)
+    assert ("NC", "Gaston") in built["code_enforcement"]          # gastonia_code_enforcement.py (added 2026-11-10)
+    assert ("NC", "Lincoln") in built["code_enforcement"]         # lincoln_code_violations (this file)
+    assert ("NC", "Durham") in built["code_enforcement"]          # durham_open_code_violations (this file)
+    assert ("NC", "Buncombe") in built["code_enforcement"]        # asheville_code_enforcement.py (a DIFFERENT file)
+    # Lincoln/Durham DO have a real code_enforcement producer but, same as Richland, no
+    # condemned=True entry -- the narrower, opposite-direction half of the same mislabel
+    for st, co in (("NC", "Lincoln"), ("NC", "Durham"), ("SC", "Richland")):
+        assert (st, co) not in built["condemned"], f"{st}/{co} has a code_enforcement entry, not a condemned one"
+
+
+def test_vacant_cohort_credit_reads_real_registries_not_text():
+    """2026-10-19 vacant-sweep follow-up, same bug class as the condemned/code_enforcement fix
+    above: enrichment_arcgis.py is a producer of 'vacant', but it also carries NC_GIS/SC_GIS --
+    per-county parcel/address/owner/deed-lookup registries used for a dozen unrelated columns --
+    so a blanket counties_named_in() text match over this one file alone credits 69 counties
+    'built' for vacant (live-measured) when the real vacant-cohort flag (_cohort_flags()'s
+    VacantImpro read) is only ever populated for a county in the module's own
+    `_COHORT_FLAG_COUNTIES` -- today just Gaston. _vacant_cohort_credit() reads that frozenset
+    directly, plus spartanburg_vacant.py's own hardcoded single-county literal, instead of
+    trusting the blanket file-level name match either file's many unrelated registries/mentions
+    would otherwise manufacture."""
+    credit = gm._vacant_cohort_credit()
+    assert credit == {("NC", "Gaston"), ("SC", "Spartanburg")}
+
+
+def test_built_in_code_drops_vacant_cohort_false_credit():
+    """End-to-end: built_in_code()'s real output for 'vacant' no longer credits a county whose
+    only textual evidence is co-location in enrichment_arcgis.py's NC_GIS/SC_GIS registries
+    (used for unrelated columns, not the vacant cohort flag), while the two counties with a
+    genuine vacant producer, and nc_lincoln_bulk.py's own untouched single-county credit, keep
+    theirs.
+
+    2026-11-11 UPDATE (same shape as the 2026-11-10 UPDATE on
+    test_built_in_code_known_false_positives_not_silently_fixed above, for 'condemned'/Gaston):
+    SC/Richland and SC/York move from "known false positive, must stay absent" to "true positive,
+    must stay present" -- NOT a regression. The vacant/vacancy breadth pass that day gave
+    arcgis_distress_layers.py a real, precise Layer.vacancy=True opt-in for exactly two of its
+    ~26 entries (columbia_code_vacant_boarded -- Richland SC, where= pre-filtered to Boarded
+    Building/Demolition/Vacant Building cases; rockhill_code_demolition -- York SC, a dedicated
+    demolition sub-layer), read back here via _arcgis_distress_layers_credit()'s new 'vacant' key
+    (see its own and _ARCGIS_DISTRESS_LAYERS_REL's docstrings) -- not the blanket file-name match
+    this test originally guarded against. The same pass also gave three more real, single/few-
+    county NC producers (gastonia_code_enforcement.py/Gaston, kinston_proposed_demolition.py/
+    Lenoir, rocky_mount_blight_survey.py/Nash+Edgecombe) a raw['gis']['vacant'] mirror of the
+    raw['vacancy'] wrapper each already wrote -- their blanket text-match credit was already
+    correct (each file only ever names its own real county/counties), so they are new true
+    positives here too, not a refinement like Richland/York's."""
+    built = gm.built_in_code()
+    # false positives removed: named only via enrichment_arcgis.py's unrelated GIS registries
+    for st, co in (("NC", "Mecklenburg"), ("NC", "Buncombe"), ("NC", "Henderson"), ("NC", "Burke"),
+                   ("NC", "Cleveland"), ("SC", "Greenville")):
+        assert (st, co) not in built["vacant"], f"{st}/{co} has no real vacant-cohort producer"
+    # real producers keep their credit
+    assert ("NC", "Gaston") in built["vacant"]           # gastonia_code_enforcement.py (condemned branch)
+    assert ("NC", "Lenoir") in built["vacant"]            # kinston_proposed_demolition.py (utility-cutoff basis)
+    assert ("NC", "Nash") in built["vacant"]              # rocky_mount_blight_survey.py (vacant_boarded class)
+    assert ("NC", "Edgecombe") in built["vacant"]         # rocky_mount_blight_survey.py (vacant_boarded class)
+    assert ("SC", "Spartanburg") in built["vacant"]      # spartanburg_vacant.py (single-county, correct as-is)
+    assert ("SC", "Richland") in built["vacant"]          # arcgis_distress_layers.py: columbia_code_vacant_boarded
+    assert ("SC", "York") in built["vacant"]              # arcgis_distress_layers.py: rockhill_code_demolition
+    assert ("NC", "Lincoln") in built["vacant"]           # nc_lincoln_bulk.py -- untouched, not part of this bug
+    assert len(built["vacant"]) == 8
+
+
+def test_sc_heir_estate_parcel_cache_credit_reads_real_registry_not_text():
+    """2026-10-19 wave3 follow-up, same bug class as the condemned/code_enforcement and vacant
+    fixes above: sc_heir_estate_parcel_cache.py is a real producer of 'heir_estate' for ~18-20 SC
+    counties, but that list is resolved entirely at RUNTIME inside its own _candidate_counties()
+    (from parcel_cache's PARCEL_LAYERS/SC_DUAL_LAYERS registries), never written as literal
+    county-name text in the file -- the few county names that DO appear there (Greenville,
+    Dorchester) live only in its module docstring, which counties_named_in()'s own
+    _strip_comments_and_docstrings() removes before matching. Live-measured: the blanket grep over
+    this file alone credits ZERO counties. _sc_heir_estate_parcel_cache_credit() calls the
+    scraper's own _candidate_counties() directly instead."""
+    credit = gm._sc_heir_estate_parcel_cache_credit()
+    # the three counties nc_heir_estate_parcels.py already covers live are excluded by the
+    # scraper's own _ALREADY_LIVE_COVERED, never double-sourced
+    for st, co in (("SC", "York"), ("SC", "Charleston"), ("SC", "Beaufort")):
+        assert (st, co) not in credit
+    # the 6 counties this bug was hiding as "sourced-not-built"
+    for co in ("Greenville", "Orangeburg", "Dorchester", "Jasper", "Aiken", "Greenwood"):
+        assert ("SC", co) in credit
+    assert all(st == "SC" for st, _co in credit)
+
+
+def test_built_in_code_adds_sc_heir_estate_parcel_cache_credit():
+    """End-to-end: built_in_code()'s real output for 'heir_estate' now credits the 6 SC counties
+    this bug hid (already fully served by the shipped sc_heir_estate_parcel_cache.py producer).
+    henderson_foreclosure_parcels.py's own (genuine, untouched) text-grep credit for NC/Henderson
+    survives too. nc_heir_estate_parcels.py's real coverage was flagged here, at the time, as "a
+    SEPARATE pre-existing instance of this same dynamic-list blind spot in a DIFFERENT producer
+    file -- out of scope here" -- the 2026-10-19 systematic sweep this comment called for found
+    it (its "NC:Cleveland"-style literals are colon-prefixed, which counties_named_in()'s own
+    pattern does not match) and fixed it with _nc_heir_estate_parcels_credit(), reading its own
+    COUNTY_GIS keys directly. SC/Beaufort, SC/Charleston and SC/York -- the 3 counties that bug
+    USED to reach by the wrong mechanism (a false match on sc_heir_estate_parcel_cache.py's own
+    _ALREADY_LIVE_COVERED exclusion-list literal, which this fix's own sc_heir_estate_parcel_cache
+    credit already corrected to exclude) -- are now legitimately credited again, through the
+    REAL mechanism: they are 3 of nc_heir_estate_parcels.py's own 9 real SC COUNTY_GIS entries,
+    exactly the "stay on nc_heir_estate_parcels.py's live producer instead" the exclusion-list's
+    own comment always said. NC/Beaufort is NOT one of COUNTY_GIS's 20 real keys (there is no
+    "NC:Beaufort" entry, only "SC:Beaufort"), so it correctly stays uncredited."""
+    built = gm.built_in_code()
+    for co in ("Greenville", "Orangeburg", "Dorchester", "Jasper", "Aiken", "Greenwood"):
+        assert ("SC", co) in built["heir_estate"], f"SC/{co} should be credited by the parcel-cache producer"
+    assert ("NC", "Henderson") in built["heir_estate"]  # henderson_foreclosure_parcels.py, untouched
+    # now legitimately credited via nc_heir_estate_parcels.py's own real COUNTY_GIS entries
+    for st, co in (("SC", "Beaufort"), ("SC", "Charleston"), ("SC", "York")):
+        assert (st, co) in built["heir_estate"], f"{st}/{co} is a real nc_heir_estate_parcels.py COUNTY_GIS entry"
+    # NC/Beaufort is not: COUNTY_GIS has no "NC:Beaufort" key, only "SC:Beaufort"
+    assert ("NC", "Beaufort") not in built["heir_estate"]
+
+
+def test_county_lien_sweep_marriage_credit_reads_real_registry_not_text():
+    """2026-10-19 wave3 follow-up, same bug class again: enrichment_county_lien_sweep.py's
+    SWEEP_COUNTIES registry (and the shared rod/county_sweeps.py constants it draws on, e.g.
+    HOSTED_CCHS) names 24 counties in plain code text, but only ONE of them (NC/Beaufort) carries
+    a kind=='marriage' Job -- every other name (Orange/Stanly/Surry NC, Sumter/Oconee SC, the 17
+    HOSTED_CCHS tenants) is there for the unrelated 'lien' job only. A blanket counties_named_in()
+    grep over this file pair can't tell the difference; _county_lien_sweep_marriage_credit() reads
+    SWEEP_COUNTIES' own Job.kind field directly instead. (Watauga joined Beaufort as a second real
+    marriage job 2026-10-19, same wave3 follow-up, task 3's near-zero-cost LRSearch win; Johnston
+    joined as a third, 2026-10-21, via the Tyler EagleWeb BookTypeID='M' sweep.)"""
+    credit = gm._county_lien_sweep_marriage_credit()
+    assert credit == {("NC", "Beaufort"), ("NC", "Watauga"), ("NC", "Johnston")}
+
+
+def test_built_in_code_drops_county_lien_sweep_false_marriage_credit():
+    """End-to-end: built_in_code()'s real output for 'marriage_license' now credits NC/Beaufort
+    (enrichment_county_lien_sweep.py's real, if dormant, marriage sweep) but none of the 23 other
+    counties a blanket grep over enrichment_county_lien_sweep.py/rod/county_sweeps.py would
+    otherwise manufacture from the unrelated 'lien' job, while enrichment_register_checks.py's/
+    rod/register_checks.py's own text-grep credit for this column keeps its credit."""
+    built = gm.built_in_code()
+    assert ("NC", "Beaufort") in built["marriage_license"]
+    # false positives that a naive blanket grep over the lien-sweep file pair would have added
+    for st, co in (("NC", "Orange"), ("NC", "Stanly"), ("NC", "Surry"), ("NC", "Burke"),
+                   ("NC", "Lincoln"), ("NC", "Henderson"), ("SC", "Sumter"), ("SC", "Oconee")):
+        assert (st, co) not in built["marriage_license"], f"{st}/{co} has no marriage job, lien job only"
+    # real register_checks.py text-grep credit (the Cott v4 family) keeps its credit
+    assert ("NC", "Rowan") in built["marriage_license"]
+
+
+def test_built_in_code_adds_nc_harris_marriage_credit():
+    """End-to-end: built_in_code()'s real output for 'marriage_license' now credits NC/Mecklenburg
+    and NC/Carteret (rod/nc_harris.marriage_search, wired live in main.py via
+    enrichment_nc_rod_render.enrich_marriage_render -- OFF today only by the FORECLOSURE_NC_HARRIS_
+    ROD/MARRIAGE flags defaulting to 0, a cost hold per HANDOFF item 82, not missing code). Live-
+    reconfirmed 2026-10-20: meckrod.manatron.com/RealEstate + /Marriage answers a real
+    marriage_search('Mecklenburg', ...) with no login and no CAPTCHA (108 rows for a common name) --
+    a SEPARATE app on that host from the curl_cffi rod/aumentum.py /External/LandRecords path, which
+    is still broken (county-side ASP.NET 'Session state is not available in this context')."""
+    built = gm.built_in_code()
+    assert ("NC", "Mecklenburg") in built["marriage_license"]
+    assert ("NC", "Carteret") in built["marriage_license"]
+
+
+def test_built_in_code_adds_ustaxdata_tax_aging_credit():
+    """End-to-end: built_in_code()'s real output for 'tax_aging_surfaced' now credits NC/Robeson,
+    NC/Alexander and NC/Rockingham (enrichment_ustaxdata_tax_search.py's TENANTS/NAME_SEARCH_TENANTS
+    -- its raw['ustaxdata_delinquent_tax'] block is in enrichment_tax_owed.py's _LIVE_ROLL_BLOCKS,
+    so Pass B there folds it into raw['tax_owed'], and enrichment_tax_aging.py -- tax_aging_
+    surfaced's only producer, wired every run, no county restriction -- derives raw[
+    'tax_aging_surfaced'] from that). Found chasing a 2026-10-20 Rockingham "sourced-not-built" ask;
+    live-reconfirmed the same day: a real enrich_ustaxdata() name-search call against live
+    Rockingham board rows returned real, address-confirmed, multi-year (2019-2026) bill histories
+    for 2 of several real owners tried. Not found by the blanket counties_named_in() grep because
+    neither real producer (enrichment_tax_owed.py, enrichment_tax_aging.py) names a county at all."""
+    built = gm.built_in_code()
+    assert ("NC", "Robeson") in built["tax_aging_surfaced"]
+    assert ("NC", "Alexander") in built["tax_aging_surfaced"]
+    assert ("NC", "Rockingham") in built["tax_aging_surfaced"]
+
+
+def test_built_in_code_leaves_ustaxdata_two_year_and_multiyear_uncredited():
+    """The SAME vendor's two OTHER gap-list columns (two_year_delinquent,
+    multi_year_delinquent_tax) must NOT gain a false credit from this fix: no code path writes
+    either column's own literal raw key (raw['two_year_delinquent'], raw[
+    'multi_year_delinquent_tax']) from ustaxdata_delinquent_tax/tax_owed data -- only
+    tax_aging_surfaced is a real, derived chain. This is the same vendor-attribution imprecision
+    already documented for rollback_exposure against this exact vendor (enrichment_ustaxdata_
+    tax_search.py's own docstring), a real separate gap, not a credit bug for THIS fix to close."""
+    built = gm.built_in_code()
+    assert ("NC", "Rockingham") not in built.get("two_year_delinquent", set())
+    assert ("NC", "Rockingham") not in built.get("multi_year_delinquent_tax", set())
+
+
+def test_built_in_code_drops_retired_probate_search_false_credit():
+    """2026-10-19 systematic producers-tuple sweep (the follow-up this session's own 5 one-at-a-
+    time catches called for): enrichment_probate_search.py was RETIRED 2026-10-09 (main.py never
+    runs it; the one script that still imports it, scripts/enrich_board.py, is itself one of the
+    ad-hoc scripts main.py's own enrich_deed_chain comment says were never wired into the real
+    run) but was still listed as a 'probate' producer, and its own SC_PROBATE_COUNTY_CODES literal
+    is real code text (not a comment), so a blanket grep over it credited 10 counties that never
+    actually get probate-searched by any code that runs. 3 of them (SC Bamberg, SC Greenville, SC
+    York) have no other 'probate' producer at all."""
+    built = gm.built_in_code()
+    for st, co in (("SC", "Bamberg"), ("SC", "Greenville"), ("SC", "York")):
+        assert (st, co) not in built["probate"], f"{st}/{co} has no live probate producer (retired module only)"
+    # sc_public_notices.py's own real text-grep credit (this column's only live producer) stays
+    assert ("SC", "Anderson") in built["probate"] and ("NC", "Beaufort") in built["probate"]
+
+
+def test_nc_heir_estate_parcels_credit_reads_county_gis_keys_not_text():
+    """2026-10-19 systematic sweep: nc_heir_estate_parcels.py's COUNTY_GIS dict is keyed by
+    literal 'ST:County' strings ('NC:Cleveland', 'SC:York', ...), but counties_named_in()'s own
+    regex needs a quote/slash/underscore immediately before the name (or a trailing 'County'
+    suffix) -- a colon satisfies neither, so its blanket text match is empty despite 20 real
+    entries. _nc_heir_estate_parcels_credit() reads COUNTY_GIS's own keys directly instead."""
+    assert gm.counties_named_in([gm.PKG / gm._NC_HEIR_ESTATE_PARCELS_REL]) == set()
+    credit = gm._nc_heir_estate_parcels_credit()
+    assert ("NC", "Cleveland") in credit and ("SC", "York") in credit
+    assert len(credit) == 20
+
+
+def test_built_in_code_adds_nc_heir_estate_parcels_credit():
+    """End-to-end: built_in_code()'s real output for 'heir_estate' now credits every NC county
+    nc_heir_estate_parcels.py's own COUNTY_GIS actually covers (not just Henderson, the one
+    henderson_foreclosure_parcels.py's own text-grep credit already caught)."""
+    built = gm.built_in_code()
+    for co in ("Buncombe", "Burke", "Cleveland", "Gaston", "Lincoln", "McDowell", "Mitchell",
+               "Polk", "Rutherford", "Transylvania"):
+        assert ("NC", co) in built["heir_estate"], f"NC/{co} is a real COUNTY_GIS entry"
+    assert ("NC", "Henderson") in built["heir_estate"]  # henderson_foreclosure_parcels.py, untouched
+
+
+def test_rod_enrich_lien_priority_credit_reads_vendors_not_text():
+    """2026-10-19 systematic sweep: 'lien_priority''s only producer, rod/enrich.py, carries no
+    literal county-name text at all -- its VENDORS dict is built entirely at import time from
+    rod/cchs.py, rod/aumentum.py, rod/cott.py and rod/kofile.py's own constants. A blanket grep
+    over this one file finds nothing; _rod_enrich_lien_priority_credit() reads VENDORS' own keys
+    directly instead."""
+    assert gm.counties_named_in([gm.PKG / "rod/enrich.py"]) == set()
+    credit = gm._rod_enrich_lien_priority_credit()
+    assert ("NC", "Buncombe") in credit and ("SC", "Oconee") in credit
+    assert len(credit) == 11
+
+
+def test_built_in_code_adds_lien_priority_credit():
+    """End-to-end: built_in_code()'s real output for 'lien_priority' is no longer empty -- it now
+    credits every (state, county) pair rod/enrich.py's own VENDORS registry actually drives."""
+    built = gm.built_in_code()
+    assert built["lien_priority"] == gm._rod_enrich_lien_priority_credit()
+    assert ("NC", "Mecklenburg") in built["lien_priority"]
+
+
+def test_repeat_tax_loss_credit_is_the_full_state_county_universe():
+    """2026-10-19 systematic sweep: enrichment_repeat_tax_loss.py's own enrich_repeat_tax_loss()
+    loop takes li.county/li.state straight off whatever row it is handed, with no per-county
+    registry, allowlist or skip-list anywhere in the file -- the same cross-parcel deed-chain join
+    runs for every county, NC or SC. A blanket grep over this file finds zero literal county text;
+    _repeat_tax_loss_credit() returns the full STATE_COUNTIES universe instead, since that is
+    genuinely what the code already covers."""
+    assert gm.counties_named_in([gm.PKG / "enrichment_repeat_tax_loss.py"]) == set()
+    credit = gm._repeat_tax_loss_credit()
+    assert ("NC", "Buncombe") in credit and ("SC", "Charleston") in credit
+    assert len(credit) == len(gm.NC_COUNTIES) + len(gm.SC_COUNTIES)
+
+
+def test_built_in_code_fills_repeat_tax_loss_credit():
+    """End-to-end: built_in_code()'s real output for 'repeat_tax_loss' is no longer empty."""
+    built = gm.built_in_code()
+    assert built["repeat_tax_loss"] == gm._repeat_tax_loss_credit()
+
+
+def test_nc_case_status_tyler_credit_is_every_nc_county():
+    """2026-10-19 systematic sweep: enrichment_nc_case_status_tyler.py's own is_target() gates
+    only on li.state == 'NC' plus a case number already on the row, never a county -- so its real
+    coverage is every NC county, but a blanket grep over the file finds zero literal county text."""
+    assert gm.counties_named_in([gm.PKG / "enrichment_nc_case_status_tyler.py"]) == set()
+    credit = gm._nc_case_status_tyler_credit()
+    assert credit == {("NC", c) for c in gm.NC_COUNTIES}
+
+
+def test_built_in_code_adds_nc_case_status_tyler_credit_keeps_case_detail():
+    """End-to-end: built_in_code()'s real output for 'child_support' now credits every NC county
+    (enrichment_nc_case_status_tyler.py's own state-wide reach) on top of
+    enrichment_case_detail.py's own (already-correct) SC_COUNTY_BY_CODE text-grep credit, which
+    keeps its credit untouched."""
+    built = gm.built_in_code()
+    assert ("NC", "Alleghany") in built["child_support"]   # only via the Tyler state-wide fix
+    assert ("SC", "Anderson") in built["child_support"]    # enrichment_case_detail.py, untouched
+
+
+def test_deed_chain_credit_is_the_full_state_county_universe():
+    """2026-10-19 systematic sweep: enrichment_deed_chain.py is the sole producer of all 4 of
+    deed_chain_has_history/deed_chain_break/deed_chain_distress_transfer/atty_deed_chain_fetched,
+    applies to every row with no per-county registry, allowlist or skip-list of any kind, and
+    names zero literal county text. _deed_chain_credit() returns the full STATE_COUNTIES universe
+    instead of the (correctly empty) blanket grep."""
+    assert gm.counties_named_in([gm.PKG / "enrichment_deed_chain.py"]) == set()
+    credit = gm._deed_chain_credit()
+    assert ("SC", "Fairfield") in credit
+    assert len(credit) == len(gm.NC_COUNTIES) + len(gm.SC_COUNTIES)
+
+
+def test_built_in_code_fills_deed_chain_credit_for_all_four_columns():
+    """End-to-end: built_in_code()'s real output for all 4 deed_chain-driven columns is no longer
+    empty. SC/Fairfield (208 applicable rows, previously 'no source known' on all 4 with code_counties
+    empty) is the one county where this has real, measured impact today -- every other county with
+    an applicable row already shows ran=True on the live board, independent of code_counties."""
+    built = gm.built_in_code()
+    for col in ("deed_chain_has_history", "deed_chain_break", "deed_chain_distress_transfer",
+                "atty_deed_chain_fetched"):
+        assert ("SC", "Fairfield") in built[col], col
+        assert built[col] == gm._deed_chain_credit()
+
+
+def test_read_baseline_maps_unknown(tmp_path):
+    p = tmp_path / "b.csv"
+    p.write_text("State,County,Rows,address\nNC,UNKNOWN,5,1.0\nNC,Mcdowell,3,2.0\n")
+    b = gm.read_baseline(p)
+    assert ("NC", "UNKNOWN") in b and ("NC", "McDowell") in b
+
+
+# ---------------------------------------------------------------- the roll-up, end to end on four rows
+
+def test_cube_roll_up_classes():
+    cube = gm.Cube(today=TODAY)
+    a = row(county="Buncombe", owner_name="DOE JOHN", raw={"jail_booking": {"county": "Buncombe"},
+                                                           "entity_type": "individual"})
+    b = row(county="Buncombe", owner_name="ROE JANE", raw={"entity_type": "individual"})
+    c = row(county="Polk", owner_name="POE JIM", raw={"entity_type": "individual"})
+    d = row(county=None, owner_name="X Y", raw={})
+    for r in (a, b, c, d):
+        cube.add(r)
+    matrix = {("NC", "Polk"): dict(MATRIX_REC, county="polk")}
+    roll = gm.roll_up(cube, matrix, {"jail_booking": set()})
+    jail_b = roll["cells"][("NC", "Buncombe", "jail_booking")]
+    assert jail_b["ran"] and jail_b["target"] == jail_b["app"] == 2      # roster ran: both screened
+    jail_p = roll["cells"][("NC", "Polk", "jail_booking")]
+    assert not jail_p["ran"] and jail_p["class"] == "no source known"
+    rod_p = roll["cells"][("NC", "Polk", "atty_rod_lien_checked")]
+    assert rod_p["class"] == "walled (CAPTCHA)"
+    unk = [g for g in roll["gaps"] if g["county"] == "UNKNOWN" and g["column"] == "address"]
+    assert unk and unk[0]["next_action"].startswith("resolve the county")
+    assert all("DOE" not in str(g) and "ROE" not in str(g) for g in roll["gaps"])
+    corr = gm.correctness(cube)
+    assert corr["invariants"]["county_blank"]["total"] == 1
+
+
+# ---------------------------------------------------------------- 2026-10-09 remeasure: flip scope, SC-only quiet title, screens
+
+def test_flip_feed_columns_apply_only_in_flip_scope():
+    # Buncombe is a footprint county; Alamance is not (and not oceanfront); Dare is oceanfront
+    assert gm.in_flip_scope("NC", "Buncombe")
+    assert not gm.in_flip_scope("NC", "Alamance")
+    assert gm.in_flip_scope("NC", "Dare")
+    assert gm.in_flip_scope("NC", None)                 # no county: cannot be ruled out
+    out = row(county="Alamance", listing_type="tax_lien")
+    rules = gm.row_rules(out, out["raw"], set())
+    app = gm.applicable_columns(out, rules)
+    assert not (set(gm.FLIP_FEED_COLS) & app)
+    assert "lt_tax_lien" in app and "lt_divorce_notice" in app   # distressed types apply everywhere
+    inn = row(county="Buncombe")
+    assert set(gm.FLIP_FEED_COLS) <= gm.applicable_columns(inn, gm.row_rules(inn, inn["raw"], set()))
+
+
+def test_nc_quiet_title_is_read_by_nc_heir_notices():
+    # top-80 item: NC notices are now parsed (scrapers/public_notices/nc_heir_notices.py). A county
+    # with a Column paper is a read source; one without is a wall verdict (ncnotices.com bodies are
+    # CAPTCHA-walled), not a gap
+    m = gm.load_matrix(gm.REPO / "docs" / "county_records" / "county_records_matrix.json")
+    for col in ("quiet_title", "heir_naming_publication"):
+        spec = gm.SPECS[col]
+        assert spec.sources == () and any("nc_heir_notices" in p for p in spec.producers)
+        johnston = gm.source_status(spec, "NC", m[("NC", "Johnston")])
+        assert johnston[0] == "free" and "Column" in johnston[2]
+        alleghany = gm.source_status(spec, "NC", m[("NC", "Alleghany")])
+        assert alleghany[0] == "walled" and "Column" in alleghany[1]
+        # 25 NC counties with no Column paper, plus 27 SC counties outside column_legal_notices's
+        # active 19-county SC estate-lane loop (grew from 18 after the 2026-10-23 re-probe added
+        # one more county back in; gap-sweep wave 2, 2026-10-16)
+        assert len(spec.statewide_except) == 25 + 27
+    assert gm.source_status(gm.SPECS["heir_naming_publication"], "SC", None)[2].startswith("statewide: SC estate")
+
+
+def test_sc_quiet_title_only_reaches_column_legal_notices_18_county_footprint():
+    # column_legal_notices's SC estate lane only queries SC_FOOTPRINT + SC_DISTRESSED_ONLY +
+    # SC_PROBATE_EXTRA_COUNTIES -- 18 of 46 counties originally, now 19 of 46 after the
+    # 2026-10-23 re-probe added one back in; the rest were dropped after a one-time 2026-10-02
+    # probe found zero notices there, then re-confirmed empty on re-probe. Before the original
+    # fix, gap_matrix.py claimed blanket SC statewide coverage with no exception, so those
+    # excluded counties showed an unsatisfiable "run it for this county" built-but-low-yield gap
+    # forever (gap-sweep wave 2, 2026-10-16).
+    m = gm.load_matrix(gm.REPO / "docs" / "county_records" / "county_records_matrix.json")
+    for col in ("quiet_title", "heir_naming_publication"):
+        spec = gm.SPECS[col]
+        greenville = gm.source_status(spec, "SC", m[("SC", "Greenville")])  # SC_PROBATE_EXTRA_COUNTIES
+        assert greenville[0] == "free" and "SC estate" in greenville[2]
+        abbeville = gm.source_status(spec, "SC", m[("SC", "Abbeville")])  # not in the active 19
+        assert abbeville[0] == "walled" and "19 of 46" in abbeville[1]
+
+
+def test_ledger_signals_accepts_several_verifier_signals():
+    assert gm.ledger_signals(gm.SPECS["lt_divorce_notice"]) == ("nc_ecourts_case", "divorce")
+    assert gm.ledger_signals(gm.SPECS["lt_lis_pendens"]) == ("foreclosure_rod", "nc_ecourts_case", "court_wall")
+    assert gm.ledger_signals(gm.SPECS["heir_estate"]) == ("probate_heir", "heir_roll")
+    assert gm.ledger_signals(gm.SPECS["address"]) == ()
+
+
+def _ledger(screens):
+    return {"schema": "screen-ledger-v1", "run_at": "2026-10-07T00:00:00Z", "screens": screens}
+
+
+def test_screen_ledger_closes_county_and_tax_roster_cells():
+    cube = gm.Cube(today=TODAY)
+    for name in ("DOE JOHN", "ROE JANE"):
+        cube.add(row(county="Polk", owner_name=name, raw={"entity_type": "individual"}))
+    matrix = {("NC", "Polk"): dict(MATRIX_REC, county="polk")}
+    plain = gm.roll_up(cube, matrix, {})
+    assert plain["cells"][("NC", "Polk", "jail_booking")]["class"] == "no source known"
+    assert plain["cells"][("NC", "Polk", "two_year_delinquent")]["target"] == 0
+    led = _ledger({"jail_booking": {"NC|Polk": {"sources": ["national.jail_bookings"]}},
+                   "two_year_delinquent": {"NC|Polk": {"sources": ["counties_nc.polk_delinquent_tax"]}}})
+    roll = gm.roll_up(cube, matrix, {}, led)
+    jail = roll["cells"][("NC", "Polk", "jail_booking")]
+    assert jail["ran"] and jail["screened"] and jail["class"] is None and jail["target"] == jail["app"] == 2
+    tax = roll["cells"][("NC", "Polk", "two_year_delinquent")]
+    assert tax["class"] is None and tax["target"] == tax["app"]
+    # a screen never fills a FIELD
+    assert roll["cells"][("NC", "Polk", "phone")]["target"] == 0
+
+
+def test_screen_ledger_ignored_for_unknown_county():
+    cube = gm.Cube(today=TODAY)
+    cube.add(row(county=None, owner_name="X Y", raw={"entity_type": "individual"}))
+    led = _ledger({"jail_booking": {"NC|UNKNOWN": {"sources": ["x"]}}})
+    roll = gm.roll_up(cube, {}, {}, led)
+    assert not roll["cells"][("NC", "UNKNOWN", "jail_booking")]["screened"]
+
+
+# ---------------------------------------------------------------- 2026-10-17 gap-sweep wave 5
+
+def test_storm_damage_applies_only_in_the_real_fema_helene_footprint():
+    """Was applies="all" (default): every one of 437,170 rows statewide counted as a gap
+    even though the real producer (enrichment_helene_damage.py) is permanently scoped to 3
+    counties and Helene structural damage cannot occur where the storm never reached --
+    a 392,412-row false gap (wave 5, verified not refuted)."""
+    assert gm.in_storm_scope("NC", "Buncombe")          # wired producer county
+    assert gm.in_storm_scope("NC", "Mecklenburg")       # real FEMA IA registrations exist here too
+    assert not gm.in_storm_scope("NC", "Wake")          # outside the declared footprint entirely
+    assert gm.in_storm_scope("NC", None)                # no county: cannot be ruled out
+    out = row(county="Wake", listing_type="tax_lien")
+    assert "storm_damage" not in gm.applicable_columns(out, gm.row_rules(out, out["raw"], set()))
+    inn = row(county="Buncombe")
+    assert "storm_damage" in gm.applicable_columns(inn, gm.row_rules(inn, inn["raw"], set()))
+
+
+def test_bankruptcy_stay_applies_only_to_a_foreclosure_class_row_with_a_bankruptcy_match():
+    """Was applies="bankrupt" (shared with lt_bankruptcy): matched any listing_type=='bankruptcy'
+    row too, even though the real producer (enrichment_bankruptcy_stay.py) always skips those --
+    only a FORECLOSURE-class lead gets stayed. Inflated the published gap ~70x (wave 5, verified
+    not refuted)."""
+    bk_lead = row(listing_type="bankruptcy", raw={"bankruptcy": {"chapter": "13"}})
+    assert "bankruptcy_stay" not in gm.applicable_columns(bk_lead, gm.row_rules(bk_lead, bk_lead["raw"], set()))
+    stayed = row(listing_type="lis_pendens", raw={"bankruptcy": {"chapter": "13"}})
+    assert "bankruptcy_stay" in gm.applicable_columns(stayed, gm.row_rules(stayed, stayed["raw"], set()))
+    no_bk = row(listing_type="lis_pendens", raw={})
+    assert "bankruptcy_stay" not in gm.applicable_columns(no_bk, gm.row_rules(no_bk, no_bk["raw"], set()))
+
+
+def test_divorce_no_subsequent_deed_is_nc_only():
+    """enrichment_divorce_no_subsequent_deed.py hard-skips every SC row; the Spec had no
+    states= override, so SC rows counted as a gap for a signal that can never close there
+    (wave 5, verified not refuted)."""
+    assert gm.SPECS["divorce_no_subsequent_deed"].states == ("NC",)
+    sc = row(state="SC", county="Spartanburg", raw={"divorce": {"case_count": 1}})
+    assert "divorce_no_subsequent_deed" not in gm.applicable_columns(sc, gm.row_rules(sc, sc["raw"], set()))
+
+
+def test_notice_service_defect_is_nc_only():
+    """SC's delinquent-tax process is purely administrative -- no lawsuit/docket/service event
+    exists to have a defect in (producer's own live-verified SC note); the Spec claimed a
+    working SC statewide source anyway (wave 5, verified not refuted)."""
+    assert gm.SPECS["notice_service_defect"].states == ("NC",)
+    sc = row(state="SC", county="Charleston", listing_type="tax_lien")
+    assert "notice_service_defect" not in gm.applicable_columns(sc, gm.row_rules(sc, sc["raw"], set()))
+
+
+def test_divorce_no_subsequent_deed_checked_by_resolved_from_name_not_deed_chain():
+    """checked_columns() credited this column off raw.deed_chain, a key the producer never
+    reads (its real gate is raw.resolved_from_name) -- wrong/unrelated-key bug class, same
+    shape fixed repeatedly tonight for the tax columns (wave 5, verified not refuted)."""
+    wrong_key = row(raw={"deed_chain": {"transfers": []}})
+    assert "divorce_no_subsequent_deed" not in gm.checked_columns(wrong_key, set(), {})
+    assert "deed_chain_break" in gm.checked_columns(wrong_key, set(), {})     # unaffected sibling credit
+    right_key = row(raw={"resolved_from_name": {"matched": False}})
+    assert "divorce_no_subsequent_deed" in gm.checked_columns(right_key, set(), {})
+
+
+def test_title_risk_checked_only_via_plaintiff_never_defendant():
+    """checked_columns() also credited title_risk off rec['defendant'], a field
+    enrichment_title_risk.py's _party_text() never reads -- silent over-crediting (wave 5,
+    verified: the code defect is real even though the verifier corrected the claimed
+    impact's magnitude)."""
+    defendant_only = row(defendant="DOE JOHN")
+    assert "title_risk" not in gm.checked_columns(defendant_only, set(), {})
+    plaintiff = row(plaintiff="ABC BANK")
+    assert "title_risk" in gm.checked_columns(plaintiff, set(), {})
+
+
+def test_vacancy_producers_cover_all_three_real_writers():
+    """Was missing 2 of 3 real writers of raw['vacancy'] (rocky_mount_blight_survey.py,
+    kinston_proposed_demolition.py), so built_in_code() couldn't see Lenoir County as
+    code-covered and mislabeled its cell 'no source known' (wave 5, correctly_classified_non_bug
+    for the headline gap, but this narrow metadata fix is real)."""
+    producers = gm.SPECS["vacancy"].producers
+    assert any("rocky_mount_blight_survey" in p for p in producers)
+    assert any("kinston_proposed_demolition" in p for p in producers)
+
+
+def test_board_rows_reads_a_checkpoint(tmp_path):
+    import gzip
+    import json as _json
+    d = tmp_path / "ckpt"
+    d.mkdir()
+    (d / "manifest.json").write_text("{}")
+    with gzip.open(d / "board.json.gz", "wt") as f:
+        _json.dump([{"source": "t.s", "source_url": "https://example.test/1", "listing_type": "tax_lien",
+                     "state": "NC", "county": "Buncombe", "raw": {}}], f)
+    assert gm.is_checkpoint(d) and gm.is_checkpoint(d / "board.json.gz")
+    rows = list(gm.board_rows(d))
+    assert len(rows) == 1 and rows[0]["county"] == "Buncombe"

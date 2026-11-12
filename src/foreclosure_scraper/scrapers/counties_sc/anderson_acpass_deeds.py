@@ -1,0 +1,483 @@
+"""Anderson County SC ACPASS deed search (deedmain.cgi / dedtypen.cgi) —
+keyless, auth-free instrument-type sweep.
+
+NOT the login-walled assessor module (``enrichment_acpass.py``, which hits
+``asrmain.cgi`` / ``asrdetail1.cgi`` — Anderson's property tax/ASSESSMENT
+search, gated behind ``ACPASS_EMAIL`` / ``ACPASS_PASSWORD``). This module
+hits the REGISTER-OF-DEEDS "LAND SEARCH" form on the same ACPASS host
+instead (``acpass.andersoncountysc.org/deeda.cgi?SearchType=L``), which
+needs no account at all.
+
+``robots.txt`` here is a bare ``Disallow: /``. Per the 2026-09-20 compliance
+ruling (see ``CLAUDE.md``) that is a policy signal, not a technical wall —
+no CAPTCHA, login, or WAF challenge sits in front of it — so fetching it
+politely (rate-limited through the shared ``http_client``) is in scope.
+
+Mechanics fully mapped 2026-08-03 in ``docs/enumeration_r4/r4_deed_mining.md``
+and re-confirmed live 2026-10-01 against the real host:
+
+- A ``QryType`` code is MANDATORY (an empty one returns a 0-row error page —
+  there is no type-less date sweep).
+- Search: ``POST deedmain.cgi`` with
+  ``QrySrchType=L&QryName=&QryFromDate=MM/DD/YYYY&QryToDate=MM/DD/YYYY&QryType=NNN&Submit=Submit``.
+- Hard 25 rows/page. The "More" button posts a DIFFERENT endpoint,
+  ``dedtypen.cgi``, carrying hidden cursor fields
+  (``searchtype``/``searchinstr``/``searchbegdate``/``searchenddate``/
+  ``daten``/``instrnon``) lifted straight off the previous page.
+- Detail: ``GET deddetail1.cgi?instryearnbr=L{year}{instr}`` — Inst #, File
+  Date, Type, Book/Page (Amount is always blank at Anderson — confirmed
+  across 8 sampled types including this one), a GRANTOR/GRANTEE party list,
+  a free-text DESCRIPTION, and a "View Images" link.
+- "View Images" is a Real Vision Software viewer SHELL page
+  (``pgms/rvimain.pgm?RQSTYP=IMAGEV&RQSDTA=...``), not the document itself —
+  it embeds the real scanned instrument PDF in
+  ``<iframe src="https://.../OPTICAL/PDFnnnnn.PDF">``. Live-reconfirmed
+  2026-10-13 on 3/3 sampled COURT ORDER instruments: a plain GET on both
+  hops, no login/CAPTCHA/Referer needed, 200 ``application/pdf`` (125-230
+  KB). UNLIKE ``rod.logan``'s ``view_image.php?key=...`` (session-scoped --
+  dies outside the sweep that rendered it, so that module embeds bytes as a
+  data: URI), the ``/OPTICAL/*.PDF`` link here is NOT session-bound: a
+  brand-new client with zero prior requests to the host gets the same 200
+  ``application/pdf`` (confirmed in a separate process) as long as it sends
+  a real-browser User-Agent -- a bare ``python-httpx`` UA gets 403'd, which
+  is exactly what ``http_client.DEFAULT_HEADERS`` already sends on every
+  call through the shared ``client()``. So the URL is safe to hand off as a
+  plain link for a LATER pass: this module follows the viewer hop itself
+  (one extra GET per row, budget-capped by ``_MAX_IMAGE_FETCHES``) and hands
+  the real PDF URL to ``document_links.stamp_documents`` so
+  ``enrichment_doc_ocr.py`` fetches + OCRs it same as any other scraper's
+  document link. The scanned-image OCR itself stays out of this module's
+  scope, same as before.
+
+Two instrument-type codes captured here (of the 144 total; see the doc above
+for the full audited list — most codes return 0 rows for the distress types
+this project cares about):
+
+  **020 POA** — power of attorney. The GRANTOR is the PRINCIPAL (the person
+  granting power — the one going absentee or losing capacity); the GRANTEE
+  is the agent. Absentee/incapacity proxy signal, no sale clock.
+
+  **195 COURT ORDER** — a mixed bag by description, captured by TYPE CODE
+  (not by keyword), but includes ``ORDER ESTABLISHING/DETERMINING HEIRS``
+  (a heir-property lead with the estate already judicially adjudicated —
+  "the highest value per row on the whole board" per the research doc) and
+  ``ORDER QUIET TITLE`` (a title-defect flag). Rows whose description does
+  not mention HEIR get listing_type UNKNOWN rather than a confident
+  classification — still captured, just not claimed as an estate lead.
+
+No property address is carried by this index at all — ACPASS land-search
+rows are INSTRUMENT-level (parties + book/page), not parcel-level.
+``enrichment_resolve_name_to_property`` already exists for exactly this
+shape (the same gap ``counties_nc.nc_ecourts_divorce`` has) and resolves
+these by owner name downstream. No sale_date either — these are standing
+legal-record events, not scheduled auctions — so the slug is whitelisted in
+``main.DATELESS_OK_SOURCES``.
+"""
+from __future__ import annotations
+
+import os
+import re
+from datetime import datetime, timedelta
+from typing import Iterable
+
+import httpx
+import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
+
+from ...base_scraper import BaseScraper
+from ...document_links import stamp_documents
+from ...http_client import client
+from ...models import Listing, ListingType, PropertyKind
+
+log = structlog.get_logger()
+
+_BASE = "https://acpass.andersoncountysc.org"
+_FORM_URL = f"{_BASE}/deeda.cgi?SearchType=L"
+_SEARCH_CGI = f"{_BASE}/deedmain.cgi"
+_NEXT_CGI = f"{_BASE}/dedtypen.cgi"
+_DETAIL_CGI = f"{_BASE}/deddetail1.cgi"
+
+#: code -> human label. The live TYPE column already spells these out, but
+#: this drives which codes get queried and is stamped into raw[] for a code
+#: fetched with 0 rows (where the live label is never observed).
+#: COURT ORDER runs FIRST: it is small and carries the heir orders.
+CODES: dict[str, str] = {"195": "COURT ORDER", "020": "POA"}
+
+# Matches the 24-month probe window in docs/enumeration_r4/r4_deed_mining.md
+# (195 was "finite", 17 rows in 24 months as of 2026-08-03, 17 again on 2026-10-08).
+_LOOKBACK_DAYS = 730
+# 020 POA is high volume and the search lists it OLDEST first: on 2026-10-08 the
+# first 25-row page of the 730-day window covered only 3 days (about 8 a day, so
+# several thousand rows). With one detail GET per row that sweep could not finish
+# inside the timeout (TIMEOUT with 0 rows on 10/7 and 10/8), and the page cap would
+# have kept the oldest rows. POA reads a recent window instead (about 170 rows
+# and 180 requests at 30 days).
+_LOOKBACK_DAYS_BY_CODE: dict[str, int] = {
+    "195": _LOOKBACK_DAYS,
+    "020": int(os.environ.get("ANDERSON_ACPASS_POA_DAYS", "30")),
+}
+# Hard safety cap on pagination per code: 25 rows/page, so this bounds a
+# single code's sweep to 1,000 rows even if the real total has grown well
+# past the research snapshot.
+_MAX_PAGES_PER_CODE = 40
+# Detail fetches are the expensive part (one GET per instrument). Cap the
+# whole run so a surprise high-volume code can't turn this into an
+# hours-long crawl.
+_MAX_DETAIL_FETCHES = 400
+# Resolving "View Images" to the real PDF is a SECOND GET per row (on top of
+# the detail GET above) — capped independently so it can't silently double
+# the run's total request count past what _MAX_DETAIL_FETCHES already bounds.
+_MAX_IMAGE_FETCHES = 400
+
+_UA = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+)
+
+_ROW_SPLIT_RE = re.compile(r'name="instryearnbr"\s+value="(L\d+)"')
+_TYPE_RE = re.compile(r'<div align="center">([^<]+)</div>')
+_DATE_RE = re.compile(r"(\d{1,2}/\d{1,2}/\d{4})")
+_BOOKPAGE_RE = re.compile(r"(\d{4,6})(?:&nbsp;)+\s*(\d{3,6})")
+_DESC_RE = re.compile(r"<strong>([^<]+)</strong>")
+
+# The "View Images" viewer shell's <iframe> holding the real scanned PDF.
+# Real markup (confirmed live 2026-10-13) wraps attributes across a newline
+# before `src=`, which `[^>]` already matches (it excludes only `>`), and
+# emits the scheme/host upper-case (``HTTPS://ACPASS...``) -- re.I covers
+# matching; the scheme is lower-cased separately in `_resolve_image_pdf`.
+_IMAGE_IFRAME_RE = re.compile(r'<iframe[^>]+src="(https?://[^"]+\.pdf)"', re.I)
+
+# The "More" button's hidden paging form. Real markup has a malformed
+# attribute (confirmed live) — `value=240000520"` is missing its OPENING
+# quote on `instrnon` — so that one field's regex tolerates either quoting.
+_CURSOR_FIELD_RE = {
+    "searchtype": re.compile(r'name="searchtype"\s+type="hidden"\s+value="([^"]*)"'),
+    "searchinstr": re.compile(r'name="searchinstr"\s+type="hidden"\s+value="([^"]*)"'),
+    "searchbegdate": re.compile(r'name="searchbegdate"\s+type="hidden"\s+value="([^"]*)"'),
+    "searchenddate": re.compile(r'name="searchenddate"\s+type="hidden"\s+value="([^"]*)"'),
+    "daten": re.compile(r'name="daten"\s+type="hidden"\s+value="([^"]*)"'),
+    "instrnon": re.compile(r'name="instrnon"\s+type="hidden"\s+value="?([^">]*)"?>'),
+}
+
+# Institutional parties (the court, the county, the clerk's office) show up
+# as both GRANTOR and GRANTEE on a COURT ORDER (the index cross-references
+# both roles for searchability) — never the actual human subject of the
+# order. Excluded when picking a lead name.
+_INSTITUTIONAL_RE = re.compile(
+    r"\b(COURT|PROBATE|COUNTY|STATE OF|CLERK|SHERIFF|MASTER IN EQUITY)\b", re.I
+)
+
+
+def _parse_search_rows(html: str) -> list[dict]:
+    """Parse a deedmain.cgi / dedtypen.cgi result page into row dicts.
+
+    Real markup is tag-soup `<font>`/`<div>` tables with no stable class
+    names, so this is regex-driven (same house style as
+    ``anderson_master_in_equity._parse_pdf``) rather than a DOM walk."""
+    rows: list[dict] = []
+    parts = _ROW_SPLIT_RE.split(html)
+    # parts = [preamble, key0, chunk0, key1, chunk1, ...]
+    for i in range(1, len(parts), 2):
+        key = parts[i]
+        chunk = parts[i + 1] if i + 1 < len(parts) else ""
+        no_re = re.compile(r'deddetail1\.cgi\?instryearnbr=' + re.escape(key) + r'">(\d+)</a>')
+        m_no = no_re.search(chunk)
+        if not m_no:
+            continue  # malformed/foreign chunk (e.g. the trailing paging form) — skip
+        m_type = _TYPE_RE.search(chunk)
+        m_date = _DATE_RE.search(chunk)
+        m_bp = _BOOKPAGE_RE.search(chunk)
+        m_desc = _DESC_RE.search(chunk)
+        rows.append({
+            "instr_key": key,
+            "instr_no": m_no.group(1),
+            "type": m_type.group(1).strip() if m_type else None,
+            "file_date": m_date.group(1) if m_date else None,
+            "book": m_bp.group(1) if m_bp else None,
+            "page": m_bp.group(2) if m_bp else None,
+            "description": re.sub(r"\s+", " ", m_desc.group(1)).strip() if m_desc else None,
+            "detail_url": f"{_DETAIL_CGI}?instryearnbr={key}",
+        })
+    return rows
+
+
+def _parse_cursor(html: str) -> dict[str, str] | None:
+    """Pull the hidden dedtypen.cgi paging fields off a result page's 'More'
+    form. None when there is no more-button block (last/only page) or any
+    expected field is missing (safer to stop paging than to guess)."""
+    if 'name="instrnon"' not in html:
+        return None
+    out: dict[str, str] = {}
+    for field, rx in _CURSOR_FIELD_RE.items():
+        m = rx.search(html)
+        if not m:
+            return None
+        out[field] = m.group(1)
+    return out
+
+
+def _parse_detail(html: str) -> dict:
+    """Parse a deddetail1.cgi instrument detail page: the GRANTOR/GRANTEE
+    party list, the DESCRIPTION line, and the "View Images" URL if present.
+    Amount is always blank at Anderson (confirmed across 8 sampled
+    instrument types in docs/enumeration_r4/r4_deed_mining.md) so it is not
+    extracted."""
+    clean = re.sub(r"<[^>]+>", "\n", html)
+    clean = clean.replace("&nbsp;", " ")
+    lines = [ln.strip() for ln in clean.split("\n") if ln.strip()]
+
+    parties: list[dict] = []
+    for i, line in enumerate(lines):
+        if line in ("GRANTOR", "GRANTEE") and i >= 1:
+            name = lines[i - 1]
+            if name and name != ":":
+                parties.append({"name": name, "role": line})
+
+    info: dict = {"parties": parties}
+    for i, line in enumerate(lines):
+        if line.upper() == "DESCRIPTION" and i + 1 < len(lines):
+            val = lines[i + 1]
+            if val and val.upper() != "IMAGES":
+                info["description"] = val
+            break
+
+    m_img = re.search(r'href="(/pgms/rvimain\.pgm\?[^"]+)"', html)
+    if m_img:
+        href = m_img.group(1)
+        info["image_url"] = f"{_BASE}{href}" if href.startswith("/") else href
+
+    return info
+
+
+async def _resolve_image_pdf(c, viewer_url: str) -> str | None:
+    """Follow a "View Images" viewer URL (``pgms/rvimain.pgm?RQSTYP=IMAGEV...``)
+    to the real scanned-instrument PDF it embeds in an ``<iframe>``. Live-
+    confirmed 2026-10-13: a plain GET, no login/CAPTCHA/Referer needed, 200
+    ``application/pdf`` on 3/3 sampled instruments. Best-effort like the rest
+    of this module -- returns None on any failure (wrong host down, shell
+    markup changed, no iframe found) rather than raising, so one bad row
+    never breaks the sweep.
+
+    The GET itself gets retry cushioning (transport/timeout errors only,
+    never a real bad status) -- found 2026-11-07: this call had zero retry
+    cushioning, the same http_client-style gap already fixed in this file's
+    own ``_fetch_type_code``. Lower severity than that one (this is a single
+    per-row image fetch, not a whole type-code's search), so the retry just
+    gives a transient blip a second chance before the existing best-effort
+    ``except`` swallows a failure that persists."""
+    try:
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type(
+                (httpx.TransportError, httpx.TimeoutException, TimeoutError)
+            ),
+            reraise=True,
+        ):
+            with attempt:
+                resp = await c.get(viewer_url)
+    except Exception:
+        return None
+    if resp.status_code != 200:
+        return None
+    m = _IMAGE_IFRAME_RE.search(resp.text)
+    if not m:
+        return None
+    url = m.group(1)
+    scheme, sep, rest = url.partition("://")
+    return f"{scheme.lower()}{sep}{rest}" if sep else url
+
+
+def _subject_names(parties: list[dict], role_priority: tuple[str, ...]) -> list[str]:
+    """Unique, non-institutional party names, preferring earlier roles in
+    ``role_priority``."""
+    seen: list[str] = []
+    for role in role_priority:
+        for p in parties:
+            if p.get("role") != role:
+                continue
+            name = (p.get("name") or "").strip()
+            if name and not _INSTITUTIONAL_RE.search(name) and name not in seen:
+                seen.append(name)
+    return seen
+
+
+def _build_listing(slug: str, code: str, label: str, row: dict, detail: dict) -> Listing:
+    parties = detail.get("parties", [])
+    description = row.get("description") or detail.get("description")
+    if code == "020":
+        # The PRINCIPAL (GRANTOR) is the subject of interest, not the agent.
+        names = _subject_names(parties, ("GRANTOR",))
+        listing_type = ListingType.UNKNOWN
+    else:  # "195" COURT ORDER
+        names = _subject_names(parties, ("GRANTEE", "GRANTOR"))
+        listing_type = (
+            ListingType.ESTATE_LEAD if description and "HEIR" in description.upper()
+            else ListingType.UNKNOWN
+        )
+
+    owner_name = "; ".join(names[:3]) if names else None
+    image_pdf_url = detail.get("image_pdf_url")
+
+    li = Listing(
+        source=slug,
+        source_url=row["detail_url"],
+        listing_type=listing_type,
+        property_kind=PropertyKind.UNKNOWN,
+        state="SC",
+        county="Anderson",
+        case_number=row.get("instr_no"),
+        defendant=owner_name,
+        owner_name=owner_name,
+        legal_description=description,
+        description=description,
+        raw={
+            "anderson_acpass": {
+                "instr_key": row.get("instr_key"),
+                "instr_no": row.get("instr_no"),
+                "type_code": code,
+                "type_label": row.get("type") or label,
+                "file_date": row.get("file_date"),
+                "book": row.get("book"),
+                "page": row.get("page"),
+                "parties": parties,
+                "image_url": detail.get("image_url"),
+                "image_pdf_url": image_pdf_url,
+            },
+        },
+    )
+    if image_pdf_url:
+        # Flat raw['documents']/['document_url'] (already RAW_KEEP'd + already
+        # scanned by doc_inventory.OCR_DOC_FIELDS) is how enrichment_doc_ocr.py
+        # finds a lead's document across every scraper -- the same convention
+        # other counties_sc scrapers use (meares_auctions, terry_howe_auctions).
+        stamp_documents(li, [image_pdf_url])
+    return li
+
+
+async def _fetch_type_code(c, code: str, from_str: str, to_str: str) -> list[dict]:
+    """Run the date+type sweep for one code, following 'More' pagination.
+
+    Both POSTs below are retried (transport/timeout errors only, never a real
+    bad status) -- found 2026-10-17: this function had zero retry cushioning
+    (same gap already fixed tonight for the Column legal-notice API scrapers,
+    spartan_weekly_legals.py, and arcgis_webmap.query_features()). Unwrapped, a
+    single transient blip here propagates out of this function and is only
+    caught at the call site in fetch() as catch-and-skip-the-whole-code -- with
+    only two codes total (195/020), losing one zeroes up to half this dateless
+    source's output for the run with no fallback date window to self-heal on."""
+    async for attempt in AsyncRetrying(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential_jitter(initial=1, max=8),
+        retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+        reraise=True,
+    ):
+        with attempt:
+            resp = await c.post(
+                _SEARCH_CGI,
+                data={
+                    "QrySrchType": "L", "QryName": "",
+                    "QryFromDate": from_str, "QryToDate": to_str,
+                    "QryType": code, "Submit": "Submit",
+                },
+                headers={
+                    "Referer": _FORM_URL, "Origin": _BASE,
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+            )
+    if resp.status_code != 200:
+        log.warning("anderson_acpass.search_failed", code=code, status=resp.status_code)
+        return []
+
+    rows = _parse_search_rows(resp.text)
+    cursor = _parse_cursor(resp.text)
+    pages = 1
+    while cursor and pages < _MAX_PAGES_PER_CODE:
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                resp = await c.post(
+                    _NEXT_CGI, data=cursor,
+                    headers={
+                        "Referer": _SEARCH_CGI, "Origin": _BASE,
+                        "Content-Type": "application/x-www-form-urlencoded",
+                    },
+                )
+        if resp.status_code != 200:
+            break
+        new_rows = _parse_search_rows(resp.text)
+        if not new_rows:
+            break
+        rows.extend(new_rows)
+        cursor = _parse_cursor(resp.text)
+        pages += 1
+    return rows
+
+
+class AndersonAcpassDeeds(BaseScraper):
+    slug = "counties_sc.anderson_acpass_deeds"
+    name = "Anderson County (SC) ACPASS deed search (POA + Court Order)"
+    category = "county_rod"
+    # About 200 requests at the shared client's 0.8-1.5 s per-host spacing.
+    timeout_s = 480.0
+    # 195 COURT ORDER alone was a thin 17 rows / 24 months as of 2026-08-03 —
+    # too thin to set a nonzero floor without false-flagging a quiet month.
+    expected_min_count = 0
+
+    async def fetch(self) -> Iterable[Listing]:
+        # Rows go into self.partial as they are built, so a soft timeout ships them.
+        out = self.partial
+        today = datetime.utcnow()
+        to_str = today.strftime("%m/%d/%Y")
+        detail_budget = _MAX_DETAIL_FETCHES
+        image_budget = _MAX_IMAGE_FETCHES
+
+        async with client(timeout=30.0, headers={"User-Agent": _UA}) as c:
+            for code, label in CODES.items():
+                days = _LOOKBACK_DAYS_BY_CODE.get(code, _LOOKBACK_DAYS)
+                from_str = (today - timedelta(days=days)).strftime("%m/%d/%Y")
+                try:
+                    rows = await _fetch_type_code(c, code, from_str, to_str)
+                except Exception:
+                    log.warning("anderson_acpass.code_fetch_error", code=code)
+                    continue
+
+                for row in rows:
+                    detail: dict = {}
+                    if detail_budget > 0:
+                        detail_budget -= 1
+                        # Retry cushioning on transport/timeout errors only (never a
+                        # real bad status) -- found 2026-11-07: this per-row detail
+                        # GET had zero retry cushioning, the same http_client-style
+                        # gap already fixed for _fetch_type_code's two POSTs. Per-row
+                        # (not a SPOF): the existing `except Exception: pass` below is
+                        # kept as-is, so a failure that persists past the retry budget
+                        # still just skips this one row's detail, same as before.
+                        try:
+                            async for attempt in AsyncRetrying(
+                                stop=stop_after_attempt(3),
+                                wait=wait_exponential_jitter(initial=1, max=8),
+                                retry=retry_if_exception_type(
+                                    (httpx.TransportError, httpx.TimeoutException, TimeoutError)
+                                ),
+                                reraise=True,
+                            ):
+                                with attempt:
+                                    dr = await c.get(row["detail_url"], headers={"Referer": _SEARCH_CGI})
+                            if dr.status_code == 200:
+                                detail = _parse_detail(dr.text)
+                        except Exception:
+                            pass
+                        if detail.get("image_url") and image_budget > 0:
+                            image_budget -= 1
+                            pdf_url = await _resolve_image_pdf(c, detail["image_url"])
+                            if pdf_url:
+                                detail["image_pdf_url"] = pdf_url
+                    out.append(_build_listing(self.slug, code, label, row, detail))
+
+        log.info("anderson_acpass.done", total=len(out))
+        return list(out)

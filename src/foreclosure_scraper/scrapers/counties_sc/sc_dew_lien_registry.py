@@ -1,0 +1,648 @@
+"""SC DEW Lien Registry — UI Tax Lien + Benefit Lien (one WCF service, two lien types).
+
+The SC Dept of Employment & Workforce publishes ALL of its filed liens in a
+single public, name-searchable, login-free registry. Two public front doors:
+
+  (a) UI Tax Lien Registry — https://uitax.dew.sc.gov/LienRegistry/  (Angular 13
+      SPA, hash route #/registry). Employer unemployment-INSURANCE-tax liens.
+  (b) Benefit Lien Registry — https://dew.sc.gov/benefit-lien-registry (a Drupal
+      info page). Benefit-OVERPAYMENT liens against claimants.
+
+Per the DEW Benefit Lien FAQ ("all liens held by SCDEW are listed on the Lien
+Registry"), BOTH lien types live in the SAME store and are served by the same
+WCF endpoint the SPA calls:
+
+  POST https://uitax.dew.sc.gov/CoreServices/Lien/TaxLienRegistry.svc/SearchTaxLienRegistry
+  Header: SecurityKey: <static key shipped in the SPA bundle>
+  Body (JSON): {BusinessName, EmployerFEIN, EmployerAccountId, FirstName,
+                LastName, IssuedFrom, IssuedTo, LienID}   -> name/ID search
+           or  {IPAddress, Export_All_Ind:"Y"}            -> dump full active set
+
+  Response (JSON array of):
+    {LienID, TaxpayerName, DBAName, EmployerAddress, EmployerAccountId,
+     EmployerFEIN, LienType, LienStatus, StatusDescription, LeinAmount,
+     BalanceAmount, LienDateFiled, LienDateStatisfied, LienIssued, ...}
+
+The SearchTaxLienRegistry call is what the SPA itself fires, so we drive it the
+compliant way: StealthyFetcher renders the real SPA, then we invoke the same
+fetch() from the page's own origin (same SecurityKey, same headers). No CAPTCHA
+is involved — reCAPTCHA in the bundle gates ONLY the by-SSN search path, never
+name / business / LienID / export search.
+
+Strategy: try Export_All_Ind="Y" first (one call, the active registry as of the
+1st of the month). The DEW backend (a net.tcp WCF service) intermittently times
+out on the big export; if it does, fall back to a bounded sweep of common-surname
+searches so a run still returns rows. Each row becomes an address-less,
+debtor-name-keyed Listing (LienType -> tax vs benefit) feeding the lien-stack +
+name->property enrichers. When EmployerAddress carries an SC county/city we keep
+it for footprint scoping; otherwise the row is retained statewide for name
+cross-reference.
+
+IMPORTANT — live behavior verified 2026-06-26: the service does NOT filter a
+name search to a substring; a bare LastName returns the ENTIRE registry
+(active + released, ~190MB). So the in-page fetch (a) reads the body in capped
+streaming chunks and aborts past a byte ceiling, and (b) keeps only ACTIVE
+liens (drops RLSD / "Released") on the fallback path — active unpaid liens are
+the distress signal; satisfied ones are noise. Export_All_Ind already returns
+active-only.
+
+Statewide SC. Dateless. Free, no login, no bot-detection bypass.
+"""
+from __future__ import annotations
+
+import json
+import os
+import re
+from datetime import datetime
+from typing import Iterable
+
+import httpx
+import structlog
+
+from ...base_scraper import BaseScraper
+from ...config import in_scope_distressed
+from ...models import Listing, ListingType, PropertyKind
+
+log = structlog.get_logger()
+
+REGISTRY_URL = "https://uitax.dew.sc.gov/LienRegistry/"
+SVC_URL = (
+    "https://uitax.dew.sc.gov/CoreServices/Lien/"
+    "TaxLienRegistry.svc/SearchTaxLienRegistry"
+)
+_UA_DIRECT = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+              "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
+
+# Static SecurityKey shipped in the public SPA bundle (main.*.js). Public,
+# non-secret — every browser hitting the registry sends it. Not a credential.
+SECURITY_KEY = "LbBr3hPJ2qw9mHvmE+Px7gI8HiDaU+F3fWx68Z39YBw="
+SOURCE_URL = "https://dew.sc.gov/benefit-lien-registry"
+
+# Empty search model the SPA posts; we override individual fields per query.
+_EMPTY_MODEL = {
+    "BusinessName": "", "EmployerFEIN": "", "EmployerAccountId": "",
+    "FirstName": "", "LastName": "", "IssuedFrom": "", "IssuedTo": "",
+    "LienID": "",
+}
+
+# Surname sweep used ONLY if the full export times out. A bare LastName returns
+# the whole registry, so ONE surname is enough to seed active rows; we keep a
+# couple as retries against the flaky backend. Bounded hard by _MAX_BYTES.
+_FALLBACK_SURNAMES = ("SMITH", "JOHNSON")
+
+# Byte ceiling for any single response read in-page. A bare name search can
+# stream ~190MB (whole registry); we abort well before that and parse only what
+# arrived, which still yields thousands of rows.
+_MAX_BYTES = 12_000_000
+
+# Build the in-page fetch JS once. Reads the body in capped streaming chunks so
+# a 190MB name-search response can't blow up the browser/Python bridge; returns
+# {status, len, truncated, text} or {err}.
+_FETCH_JS = """async (payload) => {
+    try {
+        const r = await fetch(%s, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "SecurityKey": %s
+            },
+            body: JSON.stringify(payload)
+        });
+        const CAP = %d;
+        const reader = r.body.getReader();
+        const dec = new TextDecoder();
+        let buf = "", total = 0, truncated = false;
+        while (true) {
+            const {done, value} = await reader.read();
+            if (done) break;
+            total += value.length;
+            buf += dec.decode(value, {stream: true});
+            if (total > CAP) { truncated = true; try { await reader.cancel(); } catch (e) {} break; }
+        }
+        return {status: r.status, len: total, truncated: truncated, text: buf};
+    } catch (e) {
+        return {err: String(e)};
+    }
+}""" % (json.dumps(SVC_URL), json.dumps(SECURITY_KEY), _MAX_BYTES)
+
+# Trailing 'CITY, ST[ ]ZIP' — the export format is "STREET, CITY, SC29036" /
+# "..., North Myrtle Beach, SC29582-1234" (no space before the zip). State and
+# zip optional-spaced; state captured so out-of-SC debtors keep their real state.
+_CITY_STATE_ZIP = re.compile(
+    r",\s*([A-Za-z .'-]+?)\s*,?\s*([A-Z]{2})\s*(\d{5}(?:-\d{4})?)?\s*$"
+)
+_COUNTY_RE = re.compile(r"\b([A-Za-z]+)\s+COUNTY\b", re.I)
+
+
+def _benefit_lien(lien_type: str | None, status_desc: str | None) -> bool:
+    """True when a row is a UI-BENEFIT (overpayment) lien rather than an
+    employer unemployment-TAX lien. The registry mingles both; LienType /
+    StatusDescription carry the distinction ('benefit' / 'overpayment')."""
+    blob = f"{lien_type or ''} {status_desc or ''}".lower()
+    return "benefit" in blob or "overpay" in blob or "claimant" in blob
+
+
+def _money(v) -> float | None:
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return None
+    return f if f else None
+
+
+def _parse_date(v) -> datetime | None:
+    if not v or not isinstance(v, str):
+        return None
+    s = v.strip()
+    # WCF serializes /Date(ms)/, ISO, or "M/D/YYYY h:mm:ss AM". Handle all.
+    m = re.search(r"/Date\((\d+)", s)
+    if m:
+        try:
+            return datetime.utcfromtimestamp(int(m.group(1)) / 1000.0)
+        except (ValueError, OverflowError):
+            return None
+    head = s.split()[0]  # date token before any time component
+    for fmt in ("%m/%d/%Y", "%Y-%m-%d", "%Y-%m-%dT%H:%M:%S"):
+        try:
+            return datetime.strptime(head if "T" not in fmt else s.rstrip("Z"), fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def _county_for_city(city: str | None, state: str | None) -> str | None:
+    """Resolve a city to its county via the shared SC city->county maps
+    (upstate map is statewide-SC; coastal map adds beach towns)."""
+    if not city:
+        return None
+    try:
+        from ..._upstate_city_to_county import upstate_county_for
+        from ..._coastal_city_to_county import coastal_county_for
+    except ImportError:
+        return None
+    return upstate_county_for(city, state) or coastal_county_for(city, state)
+
+
+def _split_address(
+    addr: str | None,
+) -> tuple[str | None, str | None, str | None, str | None, str | None]:
+    """Best-effort split of EmployerAddress -> (street, city, state, zip, county).
+
+    Export rows are mailing strings like "103 BEAUFORT ST, CHAPIN, SC29036".
+    We pull the trailing 'CITY, ST ZIP', keep the real state (so out-of-SC
+    debtors aren't mislabeled SC), and resolve county from an explicit
+    'X COUNTY' token or, failing that, the city via the shared maps. Purely to
+    enable footprint scoping; nothing fabricated."""
+    if not addr or not isinstance(addr, str):
+        return None, None, None, None, None
+    s = " ".join(addr.split())
+    county = None
+    mc = _COUNTY_RE.search(s)
+    if mc:
+        county = mc.group(1).title()
+    city = state = zipc = None
+    street = s
+    mz = _CITY_STATE_ZIP.search(s)
+    if mz:
+        city = (mz.group(1) or "").strip().title() or None
+        state = (mz.group(2) or "").strip().upper() or None
+        zipc = (mz.group(3) or "").strip()[:5] or None
+        street = s[: mz.start()].rstrip(" ,") or None
+    if not county:
+        county = _county_for_city(city, state)
+    return street, city, state, zipc, county
+
+
+# Kept as a belt-and-suspenders check after the 2026-09-29 in_scope_distressed fix below
+# (a coastal town resolved via _county_for_city should already normalize to a real SC
+# county name that in_scope_distressed() accepts, but this costs nothing to keep).
+_SC_COASTAL = {"Charleston", "Horry", "Beaufort", "Georgetown", "Colleton"}
+
+
+def _to_listing(row: dict, slug: str) -> Listing | None:
+    if not isinstance(row, dict):
+        return None
+    # A backend-error sentinel row carries ErrorMessage + all-null/zero fields.
+    if row.get("ErrorMessage") and not (row.get("TaxpayerName") or row.get("DBAName")):
+        return None
+    name = (row.get("TaxpayerName") or row.get("DBAName") or "").strip()
+    if not name:
+        return None
+    lien_id = row.get("LienID") or None
+    lien_type = row.get("LienType")
+    status = row.get("LienStatus") or row.get("StatusDescription")
+    balance = _money(row.get("BalanceAmount"))
+    lien_amt = _money(row.get("LeinAmount"))  # NB: backend misspells "Lein"
+    filed = _parse_date(row.get("LienDateFiled"))
+    # 2026-10-01 per-source audit: the bulk Export_All_Ind response carries a full
+    # debt breakdown that was being thrown away. Live-verified on an 8,000-row
+    # export: TaxAmount populated on 7,445/8,000, InterestAmount on 7,342/8,000,
+    # PenaltyAmount on 7,961/8,000 (Cost_FeesAmount is almost always 0 but kept
+    # for completeness). LienID/LienStatus/LienDateFiled/LienDocument are ALL
+    # null on every one of those 8,000 rows on this export endpoint -- not a
+    # parsing gap, the bulk-export view genuinely does not populate them.
+    tax_principal = _money(row.get("TaxAmount"))
+    interest = _money(row.get("InterestAmount"))
+    penalty = _money(row.get("PenaltyAmount"))
+    cost_fees = _money(row.get("Cost_FeesAmount"))
+    # 2026-10-04 extraction-completeness audit: the NAME-SEARCH fallback path
+    # (used whenever the bulk Export_All_Ind pull times out -- a documented,
+    # real occurrence, not a hypothetical) returns a materially richer row
+    # than the bulk export. Live-verified on a capped SMITH name-search pull,
+    # 220 rows that actually survive _is_active(): LienLastUpdated is
+    # populated on 220/220 and is NOT a duplicate of LienDateFiled (0/220
+    # equal -- it is a genuinely distinct "last touched" date) and
+    # LiendPeriods (the API's own misspelling, kept verbatim as the dict key)
+    # is real free text on 159/220 ("Q3-2009, Q4-2009, Q1-2010, ...", the
+    # actual tax quarters the lien covers) on 159/220 -- both silently
+    # dropped before this fix. "Payoff" was checked too and is NOT data: it
+    # is a static UI button label ("PayOff" literal, 220/220) that the SPA
+    # renders as a link, not a per-row fact -- correctly left uncaptured.
+    last_updated = _parse_date(row.get("LienLastUpdated"))
+    periods = (row.get("LiendPeriods") or "").strip() or None
+    # 2026-10-14 source-completeness audit flagged "LienDocument" as an
+    # uncaptured field. Re-verified live on a FRESH 5,860-row real
+    # name-search fallback pull (LastName=JOHNSON, the path the 2026-10-04
+    # comment above checked for LienLastUpdated/LiendPeriods but not this
+    # field): LienDocument is null on 5,860/5,860 rows -- extending the
+    # above bulk-export finding (null on 8,000/8,000) to the fallback path
+    # too. Also checked while live-verifying: NoticeId, LienPartialRelease,
+    # and LienPayoffAmt exist in the schema and are ALSO null on all 5,860
+    # rows -- not a parsing gap on any of the four, the service genuinely
+    # never populates them on either access path. Nothing to wire in.
+
+    street, city, addr_state, zipc, county = _split_address(row.get("EmployerAddress"))
+    state = (addr_state or "SC").upper()
+    # LienIssued is the filing COUNTY (e.g. "Greenville"), not a date — use it as
+    # a county fallback only for SC debtors when the mailing address lacked one.
+    issued = (row.get("LienIssued") or "").strip()
+    if not county and issued and state == "SC" and not any(ch.isdigit() for ch in issued):
+        county = issued.title()
+    # COUNTYLESS-only emission (2026-06-26, narrowed 2026-09-29): keeping every
+    # statewide row "for name cross-ref" spawned ~8k address-less rows that bloated
+    # the board and dragged enrichment -- that problem is "no county at all"
+    # (bool(county)), not "county outside the 18-county flip footprint". This used
+    # to gate on config.in_scope() (the narrow flip footprint plus a hand-picked
+    # coastal allowlist), which silently dropped a real, named, in-state lien for
+    # any of the ~139 NC/SC counties outside that footprint -- including the entire
+    # 17-county SC "thin coverage" cluster this source could otherwise help close
+    # (docs/completeness_audit_2026-09-29.md section 3). A TAX_LIEN row is a
+    # DISTRESS SIGNAL, not a flip listing, so it belongs on the broader
+    # in_scope_distressed() gate main.py's own _county_in_scope() already applies
+    # to every other distress-type source (config.in_scope_distressed's docstring,
+    # the 2026-09-15 owner rule: "if its a distressed property its anywhere in nc
+    # and sc"). Emit a board row for any real, named NC/SC county; only a
+    # genuinely countyless row is dropped here.
+    cty = (county or "").replace(" County", "").strip().title()
+    in_footprint = state == "SC" and bool(county) and (in_scope_distressed(county, "SC") or cty in _SC_COASTAL)
+    if not in_footprint:
+        return None
+
+    is_benefit = _benefit_lien(lien_type, status)
+    kind_label = "benefit-overpayment" if is_benefit else "UI-tax"
+    desc = f"SC DEW {kind_label} lien"
+    if lien_id:
+        desc += f" #{lien_id}"
+    if status:
+        desc += f" ({str(status).strip()})"
+    if balance:
+        desc += f" — balance ${balance:,.0f}"
+
+    return Listing(
+        source=slug,
+        source_url=SOURCE_URL,
+        listing_type=ListingType.TAX_LIEN,
+        property_kind=PropertyKind.UNKNOWN,
+        state=state,
+        county=county,
+        city=city,
+        zip_code=zipc,
+        street_address=street,
+        defendant=name,
+        # The DEW registrant IS the property owner being liened -- unlike a
+        # bankruptcy case caption, `name` here is a clean party name, so it is
+        # safe to also populate owner_name (used by downstream absentee/voter
+        # matching, which key off owner_name, not defendant). Found 2026-09-14:
+        # 486 Anderson rows from this source carried a name nowhere but
+        # defendant, invisible to every owner_name-keyed enricher.
+        owner_name=name,
+        judgment_amount=balance or lien_amt,
+        foreclosure_process="lien",
+        first_seen=filed or datetime.utcnow(),
+        last_seen=datetime.utcnow(),
+        description=desc,
+        raw={
+            # Mirror the SCDOR state-tax-lien shape so enrichment_lien_stack
+            # can index this debtor's balance against matching property owners.
+            "sc_state_tax_lien": {
+                "owner": name,
+                "balance": balance,
+                "source": "sc_dew_lien_registry",
+            },
+            "sc_dew_lien_registry": {
+                "lien_id": lien_id,
+                "lien_type": lien_type,
+                "lien_kind": kind_label,
+                "is_benefit_lien": is_benefit,
+                "status": status,
+                "lien_amount": lien_amt,
+                "balance": balance,
+                "tax_principal": tax_principal,
+                "interest": interest,
+                "penalty": penalty,
+                "cost_fees": cost_fees,
+                "dba_name": (row.get("DBAName") or None),
+                "employer_account_id": row.get("EmployerAccountId") or None,
+                "employer_fein": row.get("EmployerFEIN") or None,
+                "raw_address": row.get("EmployerAddress") or None,
+                "date_filed": filed.isoformat() if filed else None,
+                "date_last_updated": last_updated.isoformat() if last_updated else None,
+                "lien_periods": periods,
+                "in_footprint": in_footprint,
+            },
+        },
+    )
+
+
+def _decode_rows(text: str) -> list[dict]:
+    """Parse the WCF JSON payload into a list of row dicts.
+
+    Tolerant of a TRUNCATED body: a capped stream cuts mid-array, so a plain
+    json.loads fails. We first try strict parse; on failure we scan out every
+    complete top-level {...} object and parse each individually, discarding the
+    final partial one. Returns [] only on genuine garbage."""
+    if not text:
+        return []
+    s = text.strip()
+    # Strict path (complete payload, possibly WCF-wrapped {d:[...]}).
+    try:
+        data = json.loads(s)
+        if isinstance(data, dict):
+            for key in ("d", "SearchTaxLienRegistryResult", "Results", "results"):
+                if isinstance(data.get(key), list):
+                    return data[key]
+            return [data]
+        if isinstance(data, list):
+            return data
+    except (ValueError, TypeError):
+        pass
+    # Tolerant path: extract balanced top-level objects from a truncated array.
+    out: list[dict] = []
+    depth = 0
+    start = -1
+    in_str = False
+    esc = False
+    for i, ch in enumerate(s):
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch == "{":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0 and start >= 0:
+                frag = s[start:i + 1]
+                try:
+                    obj = json.loads(frag)
+                    if isinstance(obj, dict):
+                        out.append(obj)
+                except (ValueError, TypeError):
+                    pass
+                start = -1
+    return out
+
+
+def _is_active(row: dict) -> bool:
+    """True for an unpaid/active lien. Drops satisfied/released rows (RLSD,
+    'Released', 'Satisfied') and rows carrying a satisfaction date — only live
+    unpaid liens are a distress signal."""
+    status = f"{row.get('LienStatus') or ''} {row.get('StatusDescription') or ''}".upper()
+    if any(k in status for k in ("RLSD", "RELEAS", "SATISF", "PAID", "CANCEL", "EXPIRE")):
+        return False
+    if row.get("LienDateStatisfied"):
+        return False
+    return True
+
+
+async def _run_queries(
+    queries: list[dict], *, active_only: bool, max_rows: int,
+) -> list[dict]:
+    """Render the SPA once, then fire each search payload from the page origin.
+
+    Returns deduped raw row dicts across all queries that returned a non-error
+    array. Stops the export-all probe early once it succeeds, and stops the whole
+    sweep once `max_rows` is reached. When `active_only`, satisfied/released
+    liens are dropped (used on the fallback name sweep, which returns the whole
+    registry incl. released rows; the export path is already active-only)."""
+    # DIRECT HTTP FIRST -- the browser is not needed and never was.
+    #
+    # The module docstring says a render is required because the SecurityKey and service
+    # path "sit in the SPA bundle". They do, and the bundle IS readable -- the earlier
+    # probe fetched /main.<hash>.js against the HOST ROOT, got a 404, and concluded the
+    # path was hidden. The bundle lives under the PAGE's directory,
+    # /LienRegistry/main.<hash>.js. Third instance of the same wrong-base URL join on
+    # this project, after the qPayBill detail page and the CCHS ROD landing directory.
+    #
+    # Verified live 2026-09-11: one bare curl POST returned HTTP 200, 17,778,100 bytes,
+    # 29,341 rows in 89 seconds. No browser, no CAPTCHA, no login. The SecurityKey is a
+    # static value every browser hitting the public registry sends -- it is not a
+    # credential and nothing here handles one.
+    #
+    # The render path is KEPT as a fallback rather than deleted: if DEW starts requiring
+    # a real page context, the browser lane is how this keeps working.
+    if os.getenv("DEW_LIEN_FORCE_RENDER", "") not in ("1", "true", "True"):
+        # Auto-refresh the SecurityKey if the hardcoded one has gone stale.
+        # The key rotates when DEW redeploys the SPA; a stale key returns
+        # "Invalid Security Key" (HTTP 200 with an error body, not a 4xx).
+        active_key = SECURITY_KEY
+        for payload in queries:
+            try:
+                async with httpx.AsyncClient(timeout=180.0) as c:
+                    r = await c.post(SVC_URL, json=payload, headers={
+                        "Content-Type": "application/json",
+                        "SecurityKey": active_key,
+                        "User-Agent": _UA_DIRECT,
+                    })
+                r.raise_for_status()
+                # Detect stale key: the response body contains an error message
+                # rather than a JSON array of liens.
+                body_preview = (r.text or "")[:200].lower()
+                if "invalid security key" in body_preview or "invalidsecuritykey" in body_preview.replace(" ", ""):
+                    log.warning("dew_lien.stale_key",
+                                note="SecurityKey rejected — attempting live extraction")
+                    try:
+                        from ...spa_key_extractor import extract_dew_security_key
+                        fresh_key = await extract_dew_security_key()
+                        if fresh_key and fresh_key != active_key:
+                            log.info("dew_lien.key_refreshed",
+                                     old_prefix=active_key[:8],
+                                     new_prefix=fresh_key[:8])
+                            active_key = fresh_key
+                            # Retry with the fresh key in a NEW client — the
+                            # original client's connection may have gone stale
+                            # during the (potentially slow) key extraction.
+                            async with httpx.AsyncClient(timeout=180.0) as c2:
+                                r = await c2.post(SVC_URL, json=payload, headers={
+                                    "Content-Type": "application/json",
+                                    "SecurityKey": active_key,
+                                    "User-Agent": _UA_DIRECT,
+                                })
+                                r.raise_for_status()
+                        else:
+                            log.warning("dew_lien.key_refresh_failed",
+                                        note="falling back to rendered lane")
+                    except Exception as exc:
+                        log.warning("dew_lien.key_extract_error",
+                                    error=str(exc)[:120])
+                # _decode_rows is tolerant of a truncated body and of the
+                # WCF {d:[...]} wrapper, so reuse it rather than re-implementing.
+                rows = _decode_rows(r.text)
+                if rows:
+                    if active_only:
+                        rows = [x for x in rows if _is_active(x)]
+                    if max_rows:
+                        rows = rows[:max_rows]
+                    log.info("dew_lien.direct_ok", rows=len(rows),
+                             bytes=len(r.content), payload=str(payload)[:80],
+                             note="no browser needed; the bundle is at /LienRegistry/, "
+                                  "not the host root")
+                    return rows
+            except Exception as exc:  # noqa: BLE001
+                log.info("dew_lien.direct_failed", error=str(exc)[:120],
+                         note="falling back to the rendered lane")
+                break
+
+    try:
+        from scrapling.fetchers import StealthyFetcher
+    except ImportError:
+        log.warning("dew_lien.scrapling_missing")
+        return []
+
+    holder: dict = {"rows": [], "any_ok": False, "errors": []}
+
+    async def page_action(page):
+        try:
+            await page.wait_for_load_state("networkidle", timeout=25000)
+        except Exception:
+            pass
+        await page.wait_for_timeout(2500)
+        seen_ids: set = set()
+        for payload in queries:
+            try:
+                res = await page.evaluate(_FETCH_JS, payload)
+            except Exception as exc:  # noqa: BLE001
+                holder["errors"].append(f"eval:{type(exc).__name__}")
+                continue
+            if not isinstance(res, dict) or res.get("err"):
+                holder["errors"].append((res or {}).get("err", "no-result"))
+                continue
+            if res.get("status") != 200:
+                holder["errors"].append(f"http:{res.get('status')}")
+                continue
+            if res.get("truncated"):
+                holder["errors"].append(f"truncated@{res.get('len')}b")
+            rows = _decode_rows(res.get("text") or "")
+            # Drop the backend-timeout sentinel (single row, all null + ErrorMessage)
+            real = [
+                r for r in rows
+                if isinstance(r, dict)
+                and (r.get("TaxpayerName") or r.get("DBAName"))
+            ]
+            if active_only:
+                real = [r for r in real if _is_active(r)]
+            if real:
+                holder["any_ok"] = True
+                for r in real:
+                    rid = r.get("LienID")
+                    key = rid if rid else json.dumps(r, sort_keys=True)[:200]
+                    if key in seen_ids:
+                        continue
+                    seen_ids.add(key)
+                    holder["rows"].append(r)
+                    if len(holder["rows"]) >= max_rows:
+                        return page
+                # If this was the full export and it worked, we're done.
+                if payload.get("Export_All_Ind") == "Y":
+                    break
+            else:
+                # Distinguish a clean empty (valid query, 0 matches) from the
+                # backend-timeout sentinel so the report is honest.
+                if any(r.get("ErrorMessage") for r in rows if isinstance(r, dict)):
+                    holder["errors"].append("backend_timeout")
+        return page
+
+    try:
+        await StealthyFetcher.async_fetch(
+            REGISTRY_URL, headless=True, network_idle=True, timeout=600000,
+            page_action=page_action, solve_cloudflare=False,
+        )
+    except Exception as exc:  # noqa: BLE001
+        log.warning("dew_lien.render_failed", error=str(exc)[:160])
+        return []
+    if holder["errors"]:
+        log.info("dew_lien.query_errors", errors=holder["errors"][:8])
+    return holder["rows"]
+
+
+class SCDEWLienRegistry(BaseScraper):
+    slug = "counties_sc.sc_dew_lien_registry"
+    name = "SC DEW Lien Registry (UI tax + benefit liens)"
+    category = "state_lien"
+    expected_min_count = 0   # backend net.tcp service intermittently times out
+    # 2026-06-26: NOT a board source. These are name+balance lien records keyed to
+    # the debtor's EMPLOYER mailing address, not foreclosure properties — emitting
+    # them spawned ~8k standalone rows that bloated the board and dragged enrichment.
+    # disabled=True keeps it off the board (DORMANT in the scrape loop); the
+    # cross-reference enricher (enrichment_dew_liens) calls .fetch() directly to
+    # attach these liens to MATCHING property leads by owner name.
+    disabled = True
+    disabled_reason = "cross-reference only — used by enrichment_dew_liens, not a board source"
+    requires_render = True
+    requires_apify = False
+    timeout_s = 600.0
+
+    #: Hard cap on rows kept per run. The registry is ~190MB / hundreds of
+    #: thousands of liens statewide; these are name cross-ref records, not
+    #: property listings, so we keep a bounded slice rather than the whole set.
+    max_rows = 8000
+
+    async def fetch(self) -> Iterable[Listing]:
+        # 1) Try the single full-registry export first (already active-only).
+        # IPAddress must be a real dotted quad. An EMPTY string is rejected by the
+        # service, which is why the export-all lane had been silently falling through to
+        # the surname sweep and returning ~2,900 rows instead of the full ~29,000.
+        # Verified live 2026-09-11: "127.0.0.1" returns HTTP 200, 17,778,100 bytes,
+        # 29,341 rows.
+        queries: list[dict] = [{"IPAddress": "127.0.0.1", "Export_All_Ind": "Y"}]
+        rows = await _run_queries(queries, active_only=False, max_rows=self.max_rows)
+
+        # 2) If the export timed out / returned nothing, sweep common surnames
+        #    (which return the whole registry) keeping ACTIVE liens only.
+        if not rows:
+            fallback = [
+                {**_EMPTY_MODEL, "LastName": sn} for sn in _FALLBACK_SURNAMES
+            ]
+            rows = await _run_queries(fallback, active_only=True, max_rows=self.max_rows)
+
+        out = self.partial
+        seen: set = set()
+        for row in rows:
+            li = _to_listing(row, self.slug)
+            if li is None:
+                continue
+            key = (li.defendant or "", str(row.get("LienID") or ""))
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(li)
+        log.info("dew_lien.done", count=len(out), rows=len(rows))
+        return out

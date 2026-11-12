@@ -1,0 +1,211 @@
+"""BaseScraper interface — every source module subclasses this."""
+from __future__ import annotations
+
+import asyncio
+from abc import ABC, abstractmethod
+from typing import Iterable
+
+import httpx
+import structlog
+
+from .models import Listing
+
+log = structlog.get_logger()
+
+# Per-run outcome classes so the orchestrator can tell the owner EXACTLY why a
+# source produced nothing — a code bug, a block, a timeout, or a legit empty.
+OUTCOME_OK = "OK"
+OUTCOME_ZERO = "ZERO_RESULT"      # ran clean, genuinely 0 rows
+OUTCOME_TIMEOUT = "TIMEOUT"       # exceeded the soft timeout / network timeout
+OUTCOME_BLOCKED = "BLOCKED"       # 401/403/406/429 or WAF/connection refused
+OUTCOME_ERROR = "ERROR"           # code/parse exception (a real bug)
+OUTCOME_DORMANT = "DORMANT"       # intentionally skipped (off-season)
+OUTCOME_PARTIAL = "PARTIAL"       # timed out, but shipped what it had collected
+
+
+class BaseScraper(ABC):
+    """A single source of foreclosure listings."""
+
+    #: Stable slug, e.g. "law_firms.brock_scott" — also acts as the source attribution.
+    slug: str = ""
+
+    #: Human label for logs / sheet rows.
+    name: str = ""
+
+    #: Categorization for the run report.
+    category: str = ""
+
+    #: Soft timeout for the full scrape, seconds.
+    timeout_s: float = 180.0
+
+    #: Rows collected SO FAR. A scraper that appends here as it goes will have
+    #: that work SHIPPED if the soft timeout fires, instead of the whole run
+    #: being discarded. safe_run resets this before every run, so a scraper that
+    #: never touches it behaves exactly as it always did (empty -> return []).
+    #:
+    #: Lazily created per instance rather than set only in safe_run: tests (and
+    #: __main__ probes) call fetch()/_collect() DIRECTLY, and those must not
+    #: blow up with AttributeError just because safe_run never ran.
+    @property
+    def partial(self) -> list:
+        p = self.__dict__.get("_partial")
+        if p is None:
+            p = []
+            self.__dict__["_partial"] = p
+        return p
+
+    @partial.setter
+    def partial(self, value) -> None:
+        self.__dict__["_partial"] = list(value) if value else []
+
+    #: If True, scraper is skipped automatically on errors instead of failing the run.
+    optional: bool = True
+
+    #: If True, the scraper is intentionally turned OFF — safe_run skips it and
+    #: reports DORMANT (not BLOCKED/ERROR), so a permanently-unreachable-but-kept
+    #: source (e.g. a hard edge-WAF wall with no free access) stops showing up as a
+    #: run failure while its code stays in place per policy. Set disabled_reason.
+    disabled: bool = False
+    disabled_reason: str = ""
+
+    #: Minimum expected listings per run. If a run returns fewer than this AND
+    #: a previous run returned more, treat as a regression (flag in run report).
+    #: Set to 0 for sources that legitimately return 0 sometimes (e.g. annual
+    #: tax sales, currently-empty firms).
+    expected_min_count: int = 0
+
+    #: True if this scraper is known to require Apify (rag-web-browser or paid actor).
+    #: Used for skip-when-budget-exhausted and run-report categorization.
+    requires_apify: bool = False
+
+    #: Months (1-12) this source is active; None = always. Sources whose data is
+    #: published only seasonally (e.g. SC annual delinquent-tax lists post ~Nov)
+    #: set this so off-season runs skip cleanly and auto-resume in-window — no
+    #: wasted fetches against absent data. Override the "current month" for
+    #: testing with env SEASONAL_MONTH_OVERRIDE.
+    active_months: tuple[int, ...] | None = None
+
+    def _in_season(self) -> bool:
+        if self.active_months is None:
+            return True
+        import datetime as _dt
+        import os as _os
+        mo = int(_os.environ.get("SEASONAL_MONTH_OVERRIDE", "0")) or _dt.datetime.utcnow().month
+        return mo in self.active_months
+
+    @abstractmethod
+    async def fetch(self) -> Iterable[Listing]:
+        """Yield Listing objects. Implementations may be async generators or return lists."""
+
+    #: Set by every safe_run() so the orchestrator/report can explain a 0-count.
+    last_outcome: str = OUTCOME_OK
+    last_reason: str = ""
+
+    async def safe_run(self) -> list[Listing]:
+        """Run with timeout + error handling; never raise to the orchestrator.
+
+        Records self.last_outcome / self.last_reason so a 0-count is never
+        ambiguous — the owner sees code-error vs blocked vs timeout vs legit-empty.
+        """
+        from .http_client import reset_block_signal, take_block_signal
+        bound = log.bind(scraper=self.slug)
+        self.last_outcome, self.last_reason = OUTCOME_OK, ""
+        self.partial = []
+        reset_block_signal()
+        if self.disabled:
+            self.last_outcome = OUTCOME_DORMANT
+            self.last_reason = f"disabled: {self.disabled_reason}" if self.disabled_reason else "disabled"
+            bound.info("scraper.disabled", reason=self.disabled_reason)
+            return []
+        if not self._in_season():
+            self.last_outcome = OUTCOME_DORMANT
+            self.last_reason = f"off-season (active months {self.active_months})"
+            bound.info("scraper.dormant_off_season", active_months=self.active_months)
+            return []
+        try:
+            bound.info("scraper.start")
+            results = await asyncio.wait_for(self._collect(), timeout=self.timeout_s)
+            if not results:
+                # The scraper returned empty WITHOUT raising — but if the shared
+                # client saw a block status this run, the scraper swallowed it.
+                # Promote ZERO -> BLOCKED so a silent block is still surfaced.
+                blk = take_block_signal()
+                if blk:
+                    self.last_outcome = OUTCOME_BLOCKED
+                    self.last_reason = f"{blk[1]} (scraper swallowed the error)"
+                else:
+                    self.last_outcome = OUTCOME_ZERO
+                    self.last_reason = "ran clean but returned 0 rows"
+            bound.info("scraper.ok", count=len(results), outcome=self.last_outcome)
+            return results
+        except asyncio.TimeoutError:
+            salvaged = list(getattr(self, "partial", None) or [])
+            if salvaged:
+                # Everything collected before the cutoff is real data. Discarding
+                # it turned a slow source into a silently-zero source.
+                self.last_outcome = OUTCOME_PARTIAL
+                self.last_reason = (
+                    f"exceeded soft timeout {self.timeout_s:.0f}s — "
+                    f"shipped {len(salvaged)} rows collected before the cutoff")
+                bound.warning("scraper.timeout_partial", salvaged=len(salvaged))
+                return salvaged
+            self.last_outcome = OUTCOME_TIMEOUT
+            self.last_reason = f"exceeded soft timeout {self.timeout_s:.0f}s"
+            bound.warning("scraper.timeout")
+            return []
+        except httpx.TimeoutException as exc:
+            salvaged = list(getattr(self, "partial", None) or [])
+            if salvaged:
+                self.last_outcome = OUTCOME_PARTIAL
+                self.last_reason = (
+                    f"network timeout ({type(exc).__name__}) — "
+                    f"shipped {len(salvaged)} rows collected before the cutoff")
+                bound.warning("scraper.net_timeout_partial", salvaged=len(salvaged))
+                return salvaged
+            self.last_outcome = OUTCOME_TIMEOUT
+            self.last_reason = f"network timeout ({type(exc).__name__})"
+            bound.warning("scraper.net_timeout", exc_type=type(exc).__name__)
+            if not self.optional:
+                raise
+            return []
+        except httpx.HTTPStatusError as exc:
+            code = exc.response.status_code if exc.response is not None else None
+            if code in (401, 403, 406, 429):
+                self.last_outcome = OUTCOME_BLOCKED
+                self.last_reason = f"HTTP {code} ({'rate-limited' if code == 429 else 'blocked/forbidden'})"
+            elif code and 500 <= code < 600:
+                self.last_outcome = OUTCOME_BLOCKED
+                self.last_reason = f"HTTP {code} (server error / possible WAF)"
+            else:
+                self.last_outcome = OUTCOME_ERROR
+                self.last_reason = f"HTTP {code}"
+            bound.warning("scraper.http_error", code=code, outcome=self.last_outcome)
+            if not self.optional:
+                raise
+            return []
+        except (httpx.ConnectError, httpx.RemoteProtocolError, httpx.ProxyError) as exc:
+            self.last_outcome = OUTCOME_BLOCKED
+            self.last_reason = f"connection refused/dropped ({type(exc).__name__})"
+            bound.warning("scraper.conn_error", exc_type=type(exc).__name__)
+            if not self.optional:
+                raise
+            return []
+        except Exception as exc:  # noqa: BLE001
+            self.last_outcome = OUTCOME_ERROR
+            self.last_reason = f"{type(exc).__name__}: {str(exc)[:160]}"
+            bound.warning("scraper.error", error=str(exc), exc_type=type(exc).__name__)
+            if not self.optional:
+                raise
+            return []
+
+    async def _collect(self) -> list[Listing]:
+        out: list[Listing] = []
+        result = self.fetch()
+        if hasattr(result, "__aiter__"):
+            async for listing in result:  # type: ignore[union-attr]
+                out.append(listing)
+        else:
+            awaited = await result if asyncio.iscoroutine(result) else result
+            for listing in awaited:
+                out.append(listing)
+        return out

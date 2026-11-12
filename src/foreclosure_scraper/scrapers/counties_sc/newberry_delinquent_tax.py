@@ -1,0 +1,135 @@
+"""Newberry County SC - Delinquent Tax Sale properties.
+
+Newberry County publishes delinquent tax sale properties on its county
+website. Annual tax sale lists with owner names, TMS numbers, addresses.
+
+Free, public, no login.
+
+DISABLED 2026-10-01: confirmed live this page links only a 2-page "Tax Sale
+Information" PDF of general auction procedures (registration, bidding rules)
+-- no per-parcel table, no table markup on the page at all. Newberry's real
+delinquent roll is already covered by counties_sc.qpaybill_delinquent_roll.py
+(QPAYBILL_SUBS["Newberry"] = "newberrytreasurer"). Found via the 2026-10-01
+counties_sc per-source extraction audit. parse_rows()'s shared junk-row gate
+(is_usable_row, see test_sc_tax_table_guards.py) is left in place -- only the
+scraper is disabled. Do not re-enable without a different, real per-parcel
+source at this URL.
+
+RE-VERIFIED LIVE 2026-10-04: PAGE_URL still has 0 `<table>` tags; the only
+"Delinquent Tax" text on the page is the department's own nav-menu link
+label, not a list. qpaybill's Newberry tenant ("newberrytreasurer") is still
+delivering real current rows (live-swept prefix "A": 27 rows, e.g. ABNEY
+ROBERT &, UPPER LN, $564.24 unpaid 2025).
+
+RE-VERIFIED LIVE 2026-10-13: still holds. Rendered PAGE_URL in a real browser
+and read the actual DOM text: Delinquent Tax Collector contact card plus
+"Click the link below for general Tax Sale information" pointing at a PDF --
+no per-parcel table. Also checked the parent /delinquent-tax page and its
+site-nav submenu as the "did the list move somewhere else" check: the
+submenu under Delinquent Tax has exactly two entries, "Setoff Debt
+Collection" and "Tax Sales" (this page) -- no separate parcel-list page
+exists anywhere on newberrycounty.gov. The parent page does show a live 2026
+sale announcement (Nov 9, 2026 sale, pre-registration 10/21-11/6/26) but
+states properties are "advertised... in The Newberry Observer" (a newspaper),
+not published online as a table. newberrytreasurer.qpaybill.com (the
+superseding source) confirmed still live today: 200.
+
+Slug: counties_sc.newberry_delinquent_tax
+Category: county_tax
+ListingType: TAX_SALE
+"""
+from __future__ import annotations
+
+import re
+from datetime import datetime
+from typing import Iterable
+
+import structlog
+
+from ...base_scraper import BaseScraper
+from ...http_client import get_text
+from ...models import Listing, ListingType, PropertyKind
+from ._sc_tax_table import is_usable_row
+
+log = structlog.get_logger()
+
+PAGE_URL = "https://www.newberrycounty.gov/delinquent-tax/tax-sales"
+
+
+class NewberryDelinquentTax(BaseScraper):
+    slug = "counties_sc.newberry_delinquent_tax"
+    name = "Newberry County SC Delinquent Tax Sale"
+    disabled = True
+    disabled_reason = ("target page links only a general-procedures PDF, no per-parcel table - "
+                       "superseded by counties_sc.qpaybill_delinquent_roll (Newberry) - "
+                       "confirmed 2026-10-01, re-confirmed live 2026-10-04 and 2026-10-13")
+    category = "county_tax"
+    timeout_s = 120.0
+    expected_min_count = 0
+    optional = True
+    active_months = (10, 11, 12, 1)
+
+    async def fetch(self) -> Iterable[Listing]:
+        out: list[Listing] = []
+        try:
+            html = await get_text(PAGE_URL, impersonate=True, timeout=40.0)
+        except Exception as exc:
+            log.warning("newberry_tax.fetch_fail", error=str(exc)[:160])
+            return out
+
+        if not html or len(html) < 200:
+            return out
+
+        rows = re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.I | re.S)
+        for row in rows:
+            cells = re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", row, re.I | re.S)
+            if len(cells) < 2:
+                continue
+            clean = [re.sub(r"<[^>]+>", "", c).strip() for c in cells]
+            if any(h in c.lower() for c in clean[:2] for h in ("owner", "name", "tms", "map", "#")):
+                continue
+            if not any(re.search(r"\d", c) for c in clean):
+                continue
+
+            parcel = None
+            for c in clean:
+                m = re.search(r"\b(\d{3}[-\s]?\d{2}[-\s]?\d{2}[-\s]?[\d.]+)\b", c)
+                if m:
+                    parcel = m.group(1).strip()
+                    break
+                m = re.search(r"\b(\d{8,})\b", c)
+                if m and not parcel:
+                    parcel = m.group(1)
+
+            owner = clean[0] if clean else None
+            addr = None
+            for c in clean[1:]:
+                if re.search(r"\d+\s+\w+", c):
+                    addr = c
+                    break
+            if not addr and len(clean) > 1:
+                addr = clean[1] if len(clean[1]) > 5 else None
+
+            # Shared junk-row gate: header/office-hours rows and rows with no TMS
+            # never become leads. See _sc_tax_table for why this is here and not
+            # left to _active_only() in main.py.
+            if not is_usable_row(clean, parcel):
+                continue
+            out.append(Listing(
+                source="counties_sc.newberry_delinquent_tax",
+                source_url=PAGE_URL,
+                listing_type=ListingType.TAX_SALE,
+                property_kind=PropertyKind.UNKNOWN,
+                state="SC",
+                county="Newberry",
+                parcel_id=parcel,
+                defendant=owner,
+                street_address=addr,
+                description=" | ".join(clean[:6]),
+                first_seen=datetime.utcnow(),
+                last_seen=datetime.utcnow(),
+                raw={"newberry_delinquent_tax": {"cells": clean[:10]}},
+            ))
+
+        log.info("newberry_tax.done", count=len(out))
+        return out

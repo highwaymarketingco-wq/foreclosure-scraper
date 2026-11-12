@@ -1,0 +1,160 @@
+"""Chester County SC - Delinquent Tax Sale properties.
+
+Chester County publishes delinquent tax sale properties on its county
+website. The page lists parcels scheduled for tax sale with owner names,
+TMS numbers, and property addresses.
+
+Free, public, no login.
+
+DISABLED 2026-10-01: PAGE_URL now redirects (confirmed live: a GET resolves
+to the county's bare homepage, chestercountysc.gov/ -- a CMS migration dead
+link, not a seasonal empty list). Chester's real delinquent roll is already
+covered by counties_sc.sc_catalis_delinquent_roll.py (CATALIS_COUNTIES
+["Chester"], includes the current-vs-billed owner split and owner mailing
+address). Found via the 2026-10-01 counties_sc per-source extraction audit.
+Do not re-enable without a correct live URL.
+
+RE-VERIFIED 2026-10-03 (extraction-completeness re-audit, batch 8): the
+redirect-to-homepage finding above still holds (live-fetched with the same
+curl_cffi impersonate=True this scraper itself used; canonical link on the
+response is still plain "https://chestercountysc.gov/", a generic homepage,
+no tax-sale content anywhere in the body text). Also checked, for honesty,
+whether the superseding source is actually delivering today: a live scoped
+run of sc_catalis_delinquent_roll.py against Chester hit that host's own
+documented 403-is-a-stop guard immediately (Chester is right after Pickens
+in CATALIS_COUNTIES.SWEEP_ORDER, and that module's own code already treats
+a 403 from this Avenu/Catalis host as a declined request, never to be
+retried or bypassed -- see that module's docstring, dated 2026-09-11). So
+right now, NEITHER this module's own dead URL NOR the superseding source is
+actually yielding Chester delinquent-tax rows -- but re-enabling THIS file
+would not fix that (its own URL is still dead), and the sc_catalis 403 is
+an existing, correctly-handled compliance wall on a DIFFERENT module, not a
+bug in this one. Left disabled.
+
+RE-VERIFIED 2026-10-13 (session-wide "confirmed dead" re-check, prompted by
+this same session finding other sources wrongly marked dead -- so this was
+re-checked by live fetch, not by trusting the note above): the situation
+has CHANGED and the "redirects to homepage" description above is no longer
+what happens. A plain GET to PAGE_URL today returns HTTP 403 with
+`cf-mitigated: challenge` and a Cloudflare "Just a moment..." interstitial
+(Turnstile/JS challenge), not a 301/redirect to chestercountysc.gov/. This
+is site-wide, not path-specific -- the bare homepage and
+/government/treasurer both return the identical 403 challenge page. So the
+whole chestercountysc.gov domain is now behind a Cloudflare bot-challenge,
+which this audit did NOT attempt to solve or bypass (per instructions: a
+WAF/CAPTCHA wall is a stop condition, not something to script around from
+here). A human or a Hermes-assisted session with a real, cookie-persisting
+browser (solving the Turnstile challenge once, then reusing the clearance
+cookie) would be the only way to see what -- if anything -- is now on this
+page; it cannot be confirmed to still be a dead link vs. real content
+behind the gate. Separately, for honesty: chestercountysctax.com (the
+sc_catalis_delinquent_roll.py superseding source for Chester) answered
+live with HTTP 200 just now, i.e. unlike 2026-10-03 it is NOT currently
+403-blocked -- that module may be worth a live re-check for Chester, but
+that file is out of scope for this audit and was not touched. disabled=True
+left as-is; disabled_reason corrected below to describe the WAF wall
+instead of the stale "redirect" description.
+
+Slug: counties_sc.chester_delinquent_tax
+Category: county_tax
+ListingType: TAX_SALE
+"""
+from __future__ import annotations
+
+import re
+from datetime import datetime
+from typing import Iterable
+
+import structlog
+
+from ...base_scraper import BaseScraper
+from ...http_client import get_text
+from ...models import Listing, ListingType, PropertyKind
+
+log = structlog.get_logger()
+
+PAGE_URL = "https://www.chestercountysc.gov/treasurer/delinquent-tax-sale"
+
+
+class ChesterDelinquentTax(BaseScraper):
+    slug = "counties_sc.chester_delinquent_tax"
+    name = "Chester County SC Delinquent Tax Sale"
+    disabled = True
+    disabled_reason = ("site-wide Cloudflare bot-challenge (HTTP 403, cf-mitigated: challenge) as of "
+                       "2026-10-13, was a dead CMS-migration redirect-to-homepage on 2026-10-01/10-03 - "
+                       "requires solving a WAF challenge to reach, not attempted here - "
+                       "superseded by counties_sc.sc_catalis_delinquent_roll (Chester)")
+    category = "county_tax"
+    timeout_s = 120.0
+    expected_min_count = 0
+    optional = True
+    active_months = (10, 11, 12, 1)
+
+    async def fetch(self) -> Iterable[Listing]:
+        out: list[Listing] = []
+        html = None
+        try:
+            html = await get_text(PAGE_URL, impersonate=True, timeout=40.0)
+        except Exception as exc:
+            log.warning("chester_tax.fetch_fail", error=str(exc)[:160])
+        if not html or len(html) < 200:
+            # Fallback: StealthyFetcher (real headless browser)
+            try:
+                from scrapling.fetchers import StealthyFetcher
+                log.info("chester_tax.fallback_browser", url=PAGE_URL)
+                page = await StealthyFetcher.async_fetch(PAGE_URL, timeout=60)
+                html = page.html if hasattr(page, "html") else str(page)
+            except Exception as exc2:
+                log.warning("chester_tax.browser_fail", error=str(exc2)[:160])
+                return out
+        if not html or len(html) < 200:
+            return out
+
+        rows = re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.I | re.S)
+        for row in rows:
+            cells = re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", row, re.I | re.S)
+            if len(cells) < 2:
+                continue
+            clean = [re.sub(r"<[^>]+>", "", c).strip() for c in cells]
+            if any(h in c.lower() for c in clean[:2] for h in ("owner", "name", "tms", "map", "#")):
+                continue
+            if not any(re.search(r"\d", c) for c in clean):
+                continue
+
+            parcel = None
+            for c in clean:
+                m = re.search(r"\b(\d{3}[-\s]?\d{2}[-\s]?\d{2}[-\s]?[\d.]+)\b", c)
+                if m:
+                    parcel = m.group(1).strip()
+                    break
+                m = re.search(r"\b(\d{8,})\b", c)
+                if m and not parcel:
+                    parcel = m.group(1)
+
+            owner = clean[0] if clean else None
+            addr = None
+            for c in clean[1:]:
+                if re.search(r"\d+\s+\w+", c):
+                    addr = c
+                    break
+            if not addr and len(clean) > 1:
+                addr = clean[1] if len(clean[1]) > 5 else None
+
+            out.append(Listing(
+                source="counties_sc.chester_delinquent_tax",
+                source_url=PAGE_URL,
+                listing_type=ListingType.TAX_SALE,
+                property_kind=PropertyKind.UNKNOWN,
+                state="SC",
+                county="Chester",
+                parcel_id=parcel,
+                defendant=owner,
+                street_address=addr,
+                description=" | ".join(clean[:6]),
+                first_seen=datetime.utcnow(),
+                last_seen=datetime.utcnow(),
+                raw={"chester_delinquent_tax": {"cells": clean[:10]}},
+            ))
+
+        log.info("chester_tax.done", count=len(out))
+        return out

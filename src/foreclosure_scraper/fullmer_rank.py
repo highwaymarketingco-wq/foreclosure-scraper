@@ -1,0 +1,596 @@
+"""Fullmer deal-economics rank — ORDERS the board, never trims it.
+
+Companion to `distress_score`, which asks "how many distinct distress signals
+does this property carry?". This module asks the different question Fullmer's
+book and podcast actually answer: **given the mess, do the economics of the deal
+work?**
+
+WHY THIS IS A RANK AND NOT A FILTER
+-----------------------------------
+The book states hard numbers -- CAD value >= $200k, won't touch below $40-50k,
+margin floor $50k -- and it is tempting to wire them in as gates. That would be
+wrong here for two reasons.
+
+1. Those numbers are Bexar County arithmetic, not principles. Bexar's property
+   tax rate is ~2.7%; NC and SC counties run ~0.6-0.9%. His worked example
+   ("$20,000 in back taxes on a $300k house") takes roughly three times as long
+   to accrue in this footprint, so the same margin appears at a much lower
+   property value. A flat $200k floor would delete most of Rutherford, Polk,
+   McDowell, Cherokee, Union and Abbeville outright.
+
+2. He does not delete leads, he ORDERS them. "There are hundreds of other people
+   in my CRM right now." "It takes thirty leads to get a deal." His filter is
+   call order. Ajay, who runs his acquisitions: "the leads aren't usually bad."
+
+So every threshold below contributes POINTS. Nothing is dropped, nothing is
+hidden, and the operator moves their own bar in the dashboard without a re-run.
+
+WHAT IS ACTUALLY TRANSFERABLE
+-----------------------------
+The invariant is not a dollar value, it is this (ep 021): *"You will do the same
+work for 20 grand as you will for 200. It's literally the same signatures, the
+same work, the same sales."* Curative cost is roughly FIXED per deal -- he
+budgets $10-30k legal, PIs at $80-350/hr with a 4-hour minimum, ~10% to sell. His
+$50k margin floor against a $10-30k legal budget is a 2-5x coverage ratio. THAT
+is the rule that travels: margin must cover the fixed curative spend several
+times over. A Spartanburg deal needing $6k of curative earns its place at a much
+smaller margin than a 40-owner Texas parcel needing $30k.
+
+SCOPE NOTE
+----------
+This applies to the DISTRESSED lane (buy cheap, clear title, resell as-is).
+It deliberately does not judge the foreclosure / fix-and-flip lane, which has
+different economics -- Fullmer does no rehab at all ("we don't paint, we don't
+replace the carpet, we don't even patch holes in the drywall").
+
+`rank_board` still stamps every lead (it never drops one), so a foreclosure-lane lead
+(distress_stack.lane == "foreclosure": a sale within 30 days or an open upset-bid window) gets a
+rank that answers the wrong question. It is now MARKED, not hidden: the breakdown carries
+`lane` and `days_to_event`, and a `foreclosure_lane_not_judged` flag, so an ordering that
+wants the deadline first (audit 2026-09-21, F7) can sort on `days_to_event` and treat this rank
+as advisory for those rows.
+"""
+from __future__ import annotations
+
+from typing import Optional
+
+from .enrichment_tax_owed import tax_not_yet_late
+from .mailing_shape import mailing_of
+from .models import Listing
+from .signal_freshness import has_real_probate
+from .verification.verifiers._tax_common import other_lien_listing
+
+# ---------------------------------------------------------------- thresholds
+# Every constant below is a quote, kept as a named POINT weight rather than a
+# gate. Changing a weight re-orders the board; it can never empty it.
+
+# "choose properties that are worth 200 grand or above -- but on the CAD value"
+CAD_STRONG = 200_000.0
+# "fair market value of 30, 40,000 ... even if you give it to me for free, it's
+# not worth it" -- the work does not shrink with the property.
+CAD_WEAK = 50_000.0
+
+# "I want them to be two to three years behind" -- one year is explicitly early:
+# "at first you lie to yourself. You say you'll catch up next month."
+DELINQ_RIPE_YEARS = 2
+
+# Dirty Deeds synthesis (docs/dirty_deeds_synthesis_2026-09-10.md), numeric
+# rules section: "Delinquency is not a 2-3 year window. Make it ... a
+# monotonic ramp with no upper bound. Year 1 is worthless, 2 is interested,
+# 3 better, 4 plus penalties is peak." Ep 054's own priced example paid
+# just under $80,000 on 17 years unpaid specifically BECAUSE it was that old
+# -- a 2-year and a 17-year lead are not the same lead. Before this, the code
+# below scored both as one flat 22-point "delinquent_2yr_plus" cliff, the
+# exact binary window the synthesis calls out. Ramp from DELINQ_RIPE_YEARS
+# up through the "peak" range the same way cad_mid already ramps linearly
+# between CAD_WEAK and CAD_STRONG a few lines down, then plateau -- still
+# monotonic (never scores more years lower), but bounded so one extreme
+# outlier can't swamp the rest of an additive point system.
+DELINQ_RIPE_PEAK_YEARS = 15.0  # ep 054's own quoted 10-20yr fractured-heirship band
+DELINQ_RIPE_BASE_PTS = 22      # unchanged from the old flat award, at year 2
+DELINQ_RIPE_PEAK_PTS = 40      # above cad_strong's 25 -- ripeness this old is the sharpest signal
+
+# The synthesis also asks for DELINQ_RIPE_YEARS/PEAK_YEARS to be "a per-state
+# parameter equal to statutory time-to-auction minus about a year" rather than
+# one flat pair of constants for both states. We deliberately do NOT hardcode
+# a specific NC or SC figure here: NC counties foreclose on their own schedule
+# with no fixed forced-sale year (which is WHY the 10-20yr fractured-heirship
+# band above exists at all), and the synthesis's own "still not known" section
+# says the SC administrative-sale timeline is not yet verified against a named
+# statute. Guessing a number we cannot cite would be exactly the kind of
+# speculative change this pass is supposed to avoid. What IS safe and useful
+# now is the STRUCTURE: an optional per-state override, keyed "NC"/"SC", empty
+# by default so today's scores are byte-for-byte unchanged until real figures
+# come back from counsel.
+DELINQ_RIPE_YEARS_BY_STATE: dict[str, float] = {}
+DELINQ_RIPE_PEAK_YEARS_BY_STATE: dict[str, float] = {}
+
+# "the production dollar filter that actually gets worked: $10,000+ delinquent
+# AND zero payments in the last 24 months" (ep 034). Was $5,000.
+ARREARS_PRODUCTION_FILTER = 10_000.0
+
+# Curative cost, LOCAL estimate -- not his Texas number. Synthesis numeric-rules
+# section: "Curative cost is at least three tiers, not a fixed $10-30k." Tier 1
+# sub-$1,000 (simple release/affidavit: ~$500 dissolved-LLC affidavit, ~$800
+# non-litigated fractional close). Tier 2 low thousands, usually paid on the
+# HUD at closing rather than out of pocket ("$3,250 per probate ... up to ~$15k
+# for three probates"). Tier 3 the ~20% with judicial involvement, where the
+# old $10-30k figure actually belongs (mediation is the cost cliff). This
+# replaces the single flat CURATIVE_COST_BASE the module used to add owner/
+# chain-break increments onto -- that flat number could never reach Tier 3 (its
+# ceiling was $18,000 for the messiest lead it could describe) and never
+# dropped into Tier 1 for a clean one-owner, no-litigation lead either.
+CURATIVE_TIER1_SIMPLE = 800.0          # sub-$1,000: release / affidavit, no probate, no litigation signal
+CURATIVE_TIER2_PER_PROBATE = 3_250.0   # "$3,250 per probate typical"
+CURATIVE_TIER2_CAP = 15_000.0          # "up to ~$15k for three probates"
+CURATIVE_TIER3_JUDICIAL = 18_000.0     # judicial-track floor -- LOCAL/conservative, not the $30k Texas ceiling
+# "margins need to be no lower than 50 grand" against a $10-30k legal budget is
+# 2-5x coverage. We score the RATIO so a cheap-to-cure deal is not punished for
+# being small.
+MARGIN_COVERAGE_GOOD = 4.0
+MARGIN_COVERAGE_MIN = 2.0
+
+# Owner-count value-conditional structure (synthesis numeric-rules section):
+# "four or less is the target, 1-5 the buy box, degrade sharply past 6-7 unless
+# value exceeds roughly $500k, hard pass at 10+ except at $1M-$2.5M value with
+# taxes under $100-200k." This module never hard-passes (it ranks, never
+# filters -- see the module docstring), so "hard pass" becomes "no bonus."
+OWNER_COUNT_DEGRADE_AT = 6
+OWNER_COUNT_HARD_PASS_AT = 10
+OWNER_COUNT_VALUE_EXCEPTION = 500_000.0
+OWNER_COUNT_HARD_PASS_VALUE_LO = 1_000_000.0
+OWNER_COUNT_HARD_PASS_VALUE_HI = 2_500_000.0
+OWNER_COUNT_HARD_PASS_TAX_CAP = 200_000.0
+
+# "I don't like to deal in itsy bitsy tiny crummy markets in the middle of
+# nowhere ... you got no liquidity" (ep 019). Scored, because a thin market is a
+# slower exit, not an impossible one -- he still says "just lower the price".
+LIQUIDITY_POINTS = {"major": 12, "mid": 8, "thin": 3, "unknown": 4}
+
+# Which MSA's buyer pool actually absorbs the exit. Tiered by metro, not county
+# population, because "when I'm done fixing my title problem I want to exit this
+# property and get paid" (ep 019) -- and a 300-person town has one investor who
+# already bought his rent house this year. Counties the operator does not track are
+# left "unknown" rather than penalised; the footprint gate is main.py's job, not
+# this module's, and this module must never be the thing that hides a lead.
+MSA_TIER: dict[tuple[str, str], str] = {
+    # Charlotte-Concord-Gastonia (~2.8M)
+    ("gaston", "NC"): "major", ("lincoln", "NC"): "major", ("cleveland", "NC"): "major",
+    # Asheville (~475K)
+    ("buncombe", "NC"): "mid", ("henderson", "NC"): "mid", ("madison", "NC"): "mid",
+    ("haywood", "NC"): "mid",
+    # Hickory-Lenoir-Morganton (~365K)
+    ("burke", "NC"): "mid",
+    # Greenville-Anderson (~950K) + Spartanburg (~330K)
+    ("greenville", "SC"): "major", ("spartanburg", "SC"): "mid",
+    ("anderson", "SC"): "mid", ("pickens", "SC"): "mid",
+    # Upstate SC rural -- real markets, thin exits
+    ("laurens", "SC"): "thin", ("greenwood", "SC"): "thin", ("cherokee", "SC"): "thin",
+    ("union", "SC"): "thin", ("oconee", "SC"): "thin", ("abbeville", "SC"): "thin",
+    ("newberry", "SC"): "thin",
+    # Rural WNC
+    ("rutherford", "NC"): "thin", ("polk", "NC"): "thin", ("mcdowell", "NC"): "thin",
+    ("transylvania", "NC"): "thin", ("yancey", "NC"): "thin", ("mitchell", "NC"): "thin",
+    ("avery", "NC"): "thin", ("swain", "NC"): "thin", ("jackson", "NC"): "thin",
+    ("macon", "NC"): "thin", ("clay", "NC"): "thin", ("graham", "NC"): "thin",
+    ("cherokee", "NC"): "thin",
+    # Coastal (operator authorised these for foreclosure + all distressed)
+    ("new hanover", "NC"): "major", ("brunswick", "NC"): "mid", ("onslow", "NC"): "mid",
+    ("carteret", "NC"): "thin", ("pender", "NC"): "thin",
+    ("charleston", "SC"): "major", ("berkeley", "SC"): "major",
+    ("dorchester", "SC"): "major", ("horry", "SC"): "major",
+    ("beaufort", "SC"): "mid", ("georgetown", "SC"): "thin", ("colleton", "SC"): "thin",
+}
+
+
+def _num(v) -> Optional[float]:
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return None
+    return f if f > 0 else None
+
+
+def _raw(li: Listing) -> dict:
+    return li.raw if isinstance(li.raw, dict) else {}
+
+
+def cad_value(li: Listing) -> tuple[Optional[float], Optional[str]]:
+    """County 100%-basis appraisal -- Fullmer's primary underwriting number.
+
+    "I go to the CAD to see what the county thinks it's worth ... more often than
+    not it gives me a baseline." Excludes `assessed_value` on purpose: SC assesses
+    at a 4%/6% statutory ratio, so using it is a unit error, not a valuation.
+    """
+    raw = _raw(li)
+    cama = raw.get("cama") if isinstance(raw.get("cama"), dict) else {}
+    for val, label in (
+        (li.market_value, "market_value"),
+        (cama.get("appraised_value"), "cama.appraised_value"),
+        (cama.get("total_value"), "cama.total_value"),
+        (li.tax_value, "tax_value"),
+    ):
+        n = _num(val)
+        if n is not None:
+            return n, label
+    return None, None
+
+
+def _not_late(li: Listing) -> bool:
+    """The row's only unpaid property-tax bill is not late yet (enrichment_tax_owed.tax_not_yet_late,
+    owner + attorney rule 2026-10-07): it feeds neither ripeness nor arrears."""
+    if other_lien_listing(li):
+        return False
+    return tax_not_yet_late(_raw(li), li.state, li.county, li.source)
+
+
+def tax_arrears(li: Listing) -> tuple[Optional[float], bool]:
+    """(dollars, is_county_stated).
+
+    `raw.amount_owed` conflates three different kinds of money -- measured on the
+    live board its `source` is `judgment` (6,172 rows), `tax_owed` (2,202) or
+    `opening_bid` (2,027). Only `tax_owed` is the delinquent-tax arrears figure
+    ep 022 cherry-picks on ("leads that have a pretty high delinquent tax base to
+    them ... this one only had 8K"). A judgment or an opening bid is a real debt
+    but a different lever, so it must not be ranked as arrears.
+    """
+    ao = _raw(li).get("amount_owed")
+    if not isinstance(ao, dict):
+        return None, False
+    if str(ao.get("source") or "") == "tax_owed" and _not_late(li):
+        return None, False          # the only unpaid bill is not late yet: no arrears (tax_calendar)
+    val = _num(ao.get("value"))
+    if val is None:
+        return None, False
+    src = str(ao.get("source") or "")
+    stated = bool(ao.get("is_actual_debt")) and src == "tax_owed"
+    return val, stated
+
+
+def years_delinquent(li: Listing) -> tuple[Optional[float], bool]:
+    """(years, is_two_year_plus). Paths verified against the live board.
+
+    `tax_aging_surfaced.years_delinquent` is present on 33,147 rows but carries
+    source `default` on 30,750 of them -- a placeholder, not a measurement. Only
+    `nc_ptscloud` / `tax_owed` sourced values are real, which is why the ripeness
+    signal is answerable for ~2,400 leads and not 33,000.
+    """
+    raw = _raw(li)
+    if _not_late(li):
+        return None, False          # the only unpaid bill is not late yet: no ripeness (tax_calendar)
+    surf = raw.get("tax_aging_surfaced") if isinstance(raw.get("tax_aging_surfaced"), dict) else {}
+    tad = raw.get("two_year_delinquent") if isinstance(raw.get("two_year_delinquent"), dict) else {}
+    yrs = _num(surf.get("years_delinquent"))
+    if str(surf.get("source") or "") == "default":
+        yrs = None          # placeholder, not a measurement
+    # A scraper's two_year_delinquent flag is len(unpaid years) >= 2, and its unpaid years can
+    # include the current bill that is not late yet (2026-10-07). When tax_aging_surfaced counted
+    # the LATE years from that same year list (basis year_list), its count decides.
+    tad_two = bool(tad.get("is_two_year_plus")) and not (yrs is not None and surf.get("basis") == "year_list")
+    two_plus = tad_two or bool(yrs and yrs >= DELINQ_RIPE_YEARS)
+    return yrs, two_plus
+
+
+def delinq_ripeness_points(yrs: Optional[float], state: str | None = None) -> int:
+    """Monotonic ramp from DELINQ_RIPE_BASE_PTS at DELINQ_RIPE_YEARS up to
+    DELINQ_RIPE_PEAK_PTS at DELINQ_RIPE_PEAK_YEARS, then flat. No numeric
+    year count (raw.two_year_delinquent said yes but tax_aging_surfaced
+    didn't carry a measured value) falls back to the base award -- the old
+    behavior for that case, since there's nothing to ramp on.
+
+    `state` looks up DELINQ_RIPE_YEARS_BY_STATE / DELINQ_RIPE_PEAK_YEARS_BY_STATE
+    first and falls back to the module constants -- both override dicts are
+    empty today, so passing a state is currently a no-op. See the comment on
+    those dicts for why we don't hardcode per-state figures yet.
+    """
+    key = (state or "").strip().upper()
+    ripe_years = DELINQ_RIPE_YEARS_BY_STATE.get(key, DELINQ_RIPE_YEARS)
+    peak_years = DELINQ_RIPE_PEAK_YEARS_BY_STATE.get(key, DELINQ_RIPE_PEAK_YEARS)
+    if yrs is None or yrs < ripe_years:
+        return DELINQ_RIPE_BASE_PTS
+    if yrs >= peak_years:
+        return DELINQ_RIPE_PEAK_PTS
+    span = peak_years - ripe_years
+    if span <= 0:
+        return DELINQ_RIPE_PEAK_PTS
+    frac = (yrs - ripe_years) / span
+    return int(round(DELINQ_RIPE_BASE_PTS + frac * (DELINQ_RIPE_PEAK_PTS - DELINQ_RIPE_BASE_PTS)))
+
+
+def _owner_count(li: Listing) -> int:
+    """How many people we must get to yes.
+
+    Ep 019 makes this the FIRST underwriting question and gives the reason: each
+    owner is roughly a coin flip, so three owners is ~12.5% not ~50%. It cuts both
+    ways -- more owners means more risk AND a cheaper entry per share, because a
+    disengaged co-heir sells an interest for $500-$2,000.
+
+    Prefers a real resolved heir count when one exists: `raw['heir_candidates']`
+    (built by enrichment_heir_candidates.py, the PUBLISHED form -- owner decision
+    2026-10-07) lists named heir/PR candidates with a `relation`; we count entries
+    whose relation is in `PUBLISHABLE_HEIR_RELATIONS` (the same filter
+    call_ready.estate_fact() uses for its published `heirs` count). This was
+    previously wired nowhere in this module despite existing on the board.
+
+    REMAINING GAP (Dirty Deeds synthesis numeric-rules section): "Count probates,
+    not heirs (three post-deceased heirs each with a spouse and three kids is 12
+    heirs and 3 probates)." Even the real heir-candidate count above is a HEIR
+    count, not a PROBATE count -- there is still no probate-count field in this
+    repo, so a row with a large resolved heir list still overstates probate
+    complexity relative to Dirty Deeds' own framing. Only once no heir-candidate
+    data resolves for the row do we fall back to the old proxy: separator-joined
+    NAMES on the county's own owner_name/defendant string, which is closer to
+    "how many parties does the county show" than to a heir enumeration. The
+    "et al"/"heirs" branch below is a bare sentinel (unknown-but-many, scored as
+    4), not a real count, and cannot be corrected into a probate count without
+    new data. Do not reinterpret the sentinel as a literal owner count elsewhere
+    in this module.
+    """
+    from .enrichment_heir_candidates import PUBLISHABLE_HEIR_RELATIONS
+
+    hc = _raw(li).get("heir_candidates")
+    if isinstance(hc, list):
+        resolved = 0
+        for c in hc:
+            if not isinstance(c, dict):
+                continue
+            rel = str(c.get("relation") or "").strip().lower()
+            if rel in PUBLISHABLE_HEIR_RELATIONS:
+                resolved += 1
+        if resolved > 0:
+            return resolved
+
+    parts = []
+    for f in (li.owner_name, li.defendant):
+        s = (f or "").strip()
+        if s:
+            parts.append(s)
+    blob = " ; ".join(parts)
+    if not blob:
+        return 0
+    low = blob.lower()
+    if "et al" in low or "heirs" in low or "unknown heirs" in low:
+        return 4          # "a whole soccer team of folks shared title with you"
+    n = 1
+    for sep in (" and ", " & ", ";"):
+        n += low.count(sep)
+    return n
+
+
+def liquidity_tier(li: Listing, msa_tier: dict) -> str:
+    key = ((li.county or "").replace(" County", "").strip().lower(), (li.state or "").strip().upper())
+    return msa_tier.get(key, "unknown")
+
+
+def _curative_cost_estimate(oc: int, is_probate: bool, is_judicial: bool, deed_chain_summary: dict) -> float:
+    """Three-tier curative estimate (Dirty Deeds synthesis numeric-rules section).
+
+    Tier 1, sub-$1,000: a simple release or affidavit -- no probate signal, no
+    judicial signal. Tier 2, low thousands, usually paid on the HUD at closing
+    rather than out of pocket: "$3,250 per probate ... up to ~$15k for three
+    probates." We do not have a probate-COUNT field (see `_owner_count`'s
+    docstring on the heirs-vs-probates gap), so this scales off owner-count as
+    a bounded proxy, capped at the doc's own 3-probate/~$15k anchor rather than
+    growing unbounded. Tier 3, the ~20% with judicial involvement (named in a
+    tax lawsuit, or a recorded title chain break): this is where the old
+    $10-30k figure actually belongs. Kept at the LOCAL/conservative end of that
+    range -- $18,000 -- not the $30k Texas ceiling the module docstring already
+    flags as unverified for this footprint.
+
+    Replaces the single flat CURATIVE_COST_BASE + owner/chain-break increments
+    this module used before: that flat number topped out at $18,000 for the
+    messiest lead it could describe and never went below $8,000 for a clean
+    one-owner, no-litigation lead either.
+    """
+    if is_judicial or _num((deed_chain_summary or {}).get("chain_breaks")):
+        return CURATIVE_TIER3_JUDICIAL
+    if is_probate:
+        probate_proxy = max(1, min(oc or 1, 5))
+        return min(CURATIVE_TIER2_CAP, CURATIVE_TIER2_PER_PROBATE * probate_proxy)
+    return CURATIVE_TIER1_SIMPLE
+
+
+def score(li: Listing, msa_tier: dict | None = None) -> dict:
+    """Return the rank breakdown for one lead. Pure; mutates nothing."""
+    msa_tier = msa_tier if msa_tier is not None else MSA_TIER
+    pts = 0
+    flags: list[str] = []
+    why: dict[str, int] = {}
+
+    def add(name: str, n: int, flag: str | None = None):
+        nonlocal pts
+        if n:
+            pts += n
+            why[name] = why.get(name, 0) + n
+        if flag:
+            flags.append(flag)
+
+    # --- value tier -------------------------------------------------------
+    cad, cad_src = cad_value(li)
+    if cad is None:
+        add("cad_unknown", 0, "no_county_value")   # honest zero, not a penalty
+    elif cad >= CAD_STRONG:
+        add("cad_strong", 25, "cad_200k_plus")
+    elif cad >= CAD_WEAK:
+        # Linear between the two quoted numbers rather than a cliff.
+        add("cad_mid", int(25 * (cad - CAD_WEAK) / (CAD_STRONG - CAD_WEAK)))
+    else:
+        add("cad_thin", 2, "cad_under_50k")
+
+    # --- ripeness ---------------------------------------------------------
+    yrs, two_plus = years_delinquent(li)
+    if two_plus:
+        add("delinq_ripe", delinq_ripeness_points(yrs, li.state), "delinquent_2yr_plus")
+    elif yrs is not None and yrs >= 1:
+        add("delinq_early", 6, "delinquent_1yr_early")
+
+    # --- arrears size (ep 022's cherry-pick column) -----------------------
+    # Synthesis: "the production dollar filter that actually gets worked:
+    # $10,000+ delinquent AND zero payments in the last 24 months" (ep 034).
+    # We only wire the dollar half -- no scraper yet carries a per-county
+    # last-payment-date (Tier A #6 in the synthesis, "Easy (hold 7 rolls)",
+    # not built) -- so this raises the existing $5,000 tier boundary to match
+    # the quoted $10,000 production number rather than adding an unverifiable
+    # payment-history gate.
+    arrears, stated = tax_arrears(li)
+    if stated and arrears:
+        add("arrears_stated", 8 if arrears >= ARREARS_PRODUCTION_FILTER else 4, "tax_arrears_known")
+    elif arrears:
+        flags.append("arrears_estimated_only")
+
+    # --- named in a tax lawsuit: the single sharpest trigger --------------
+    # "we just went ahead and focused on owners that were in a tax lawsuit at some
+    # level" -- being SERVED is what makes a seller problem-aware. "they get so
+    # scared when they get the tax lawsuit, when they get served with the notice."
+    lt = (li.listing_type or "")
+    lt = getattr(lt, "value", lt)
+    src = (li.source or "").lower()
+    is_tax_lawsuit = bool("tax_foreclos" in src or "tax_suit" in src or (li.case_number and "tax" in src))
+    if is_tax_lawsuit:
+        add("tax_lawsuit", 20, "named_in_tax_lawsuit")
+
+    # --- the mess: "the margin lives in the mess" ------------------------
+    # Synthesis: "four or less is the target, 1-5 the buy box, degrade sharply
+    # past 6-7 unless value exceeds roughly $500k, hard pass at 10+ except at
+    # $1M-$2.5M value with taxes under $100-200k." Before this, oc >= 4 was one
+    # flat, unbounded bucket -- a 4-owner lead and a 27-owner lead scored the
+    # identical +14, the opposite of "degrade" and "hard pass." This module
+    # never filters (see docstring), so "hard pass" below means zero bonus
+    # points, not removal.
+    oc = _owner_count(li)
+    if oc >= OWNER_COUNT_HARD_PASS_AT:
+        if (cad is not None and OWNER_COUNT_HARD_PASS_VALUE_LO <= cad <= OWNER_COUNT_HARD_PASS_VALUE_HI
+                and (arrears is None or arrears < OWNER_COUNT_HARD_PASS_TAX_CAP)):
+            add("many_owners_value_exception", 10, f"multi_owner_~{oc}_value_exception")
+        else:
+            flags.append(f"multi_owner_~{oc}_past_hard_pass_threshold")
+    elif oc >= OWNER_COUNT_DEGRADE_AT:
+        if cad is not None and cad >= OWNER_COUNT_VALUE_EXCEPTION:
+            add("many_owners", 14, f"multi_owner_~{oc}")
+        else:
+            add("many_owners_degraded", 4, f"multi_owner_~{oc}_degraded")
+    elif oc >= 4:
+        add("many_owners", 14, f"multi_owner_~{oc}")
+    elif oc >= 2:
+        add("some_owners", 8, f"multi_owner_{oc}")
+
+    raw = _raw(li)
+    # has_real_probate, not bare presence (audit 2026-10-01): raw['probate'] is an always-
+    # written "notice seen" wrapper on several scrapers, so bare presence awarded the
+    # probate_heirs points on a notice that names no decedent and no case number.
+    blob_probate = any(
+        t in (str(li.owner_name or "") + str(li.defendant or "")).lower()
+        for t in ("estate of", "heirs", "deceased")
+    ) or has_real_probate(raw.get("probate")) or "probate" in src
+    if blob_probate:
+        # "Heirship ... this is where 70% of our deals live."
+        add("probate_heirs", 16, "probate_or_heirs")
+
+    # Owner-name token signal, graded. A county only rewrites the owner of record
+    # when a survivor rings the tax office, so "HEIRS OF" / "ESTATE OF" implies a
+    # death AND an engaged, reachable survivor -- warmer than a raw obituary match.
+    # Graded because the tokens are not equal: a living TRUST is ordinary estate
+    # planning, a solvent owner with a lawyer, which is the opposite of the profile.
+    ons = raw.get("owner_name_signal") if isinstance(raw.get("owner_name_signal"), dict) else {}
+    _g = ons.get("grade")
+    if _g == "strong" and not blob_probate:
+        # Only when no probate source already covers it -- otherwise this
+        # double-counts the same death against probate_heirs above.
+        add("owner_name_death", 12, f"owner_name_{ons.get('primary_token')}")
+    elif _g == "medium":
+        add("owner_name_fracture", 5, f"owner_name_{ons.get('primary_token')}")
+    elif _g == "weak":
+        flags.append(f"owner_name_{ons.get('primary_token')}_weak")
+
+    dc = raw.get("deed_chain") if isinstance(raw.get("deed_chain"), dict) else {}
+    summ = dc.get("summary") if isinstance(dc.get("summary"), dict) else {}
+    if _num(summ.get("chain_breaks")):
+        add("chain_break", 12, "title_chain_break")
+    if _num(li.judgment_amount):
+        add("judgment", 6, "judgment_on_record")
+
+    # --- contactability: a hot lead you can't reach isn't one -------------
+    ds = raw.get("distress_stack") if isinstance(raw.get("distress_stack"), dict) else {}
+    om = mailing_of(raw)     # a bare-string owner_mailing (Spartanburg sources) normalises to {"mailing": ...}
+    # THE THIRD KEY IS WHERE THE SIGNAL ACTUALLY LIVES. Measured on the live board
+    # 2026-09-10: raw["owner_mailing"]["absentee"] is True on 56,091 rows, while the
+    # two keys this scorer originally read (distress_stack.absentee, raw.absentee)
+    # covered 10,647. So 45,450 absentee owners -- 81% of the signal -- were invisible
+    # to the ranking, on a factor the scorer explicitly wants to reward.
+    #
+    # enrichment_owner_mailing is the authority here and it is careful: _is_absentee
+    # tolerates a mailing that carries extra city/state/zip, accepts a token-subset
+    # match so Anderson's 'SPRINGSIDE  300 SPRINGSIDE CIR' situs does not flag its own
+    # owner-occupant, and an authoritative county homestead marker sets owner_occupied
+    # which forces absentee back to False. Its verdict is better than either of the
+    # keys that were being read.
+    if ds.get("absentee") or raw.get("absentee") or om.get("absentee") is True:
+        # "Look for older owners, long-term ownership, high dollar amounts
+        # delinquent, or folks who live out of state."
+        add("absentee", 8, "absentee_owner")
+
+    # --- exit liquidity ---------------------------------------------------
+    tier = liquidity_tier(li, msa_tier)
+    add(f"liquidity_{tier}", LIQUIDITY_POINTS.get(tier, 4))
+
+    # --- does the margin cover the fixed curative spend? ------------------
+    calc = raw.get("calc") if isinstance(raw.get("calc"), dict) else {}
+    margin = _num(calc.get("est_gross_margin")) or _num(raw.get("est_gross_margin"))
+    coverage = None
+    if margin:
+        cost = _curative_cost_estimate(oc, blob_probate, is_tax_lawsuit, summ)
+        coverage = margin / cost
+        if coverage >= MARGIN_COVERAGE_GOOD:
+            add("margin_strong", 15, "margin_covers_curative_4x")
+        elif coverage >= MARGIN_COVERAGE_MIN:
+            add("margin_ok", 8, "margin_covers_curative_2x")
+        else:
+            flags.append("margin_thin_vs_curative")
+
+    lane = ds.get("lane") or "distressed"
+    if lane == "foreclosure":
+        flags.append("foreclosure_lane_not_judged")
+    return {
+        "rank": min(100, pts),
+        "lane": lane,
+        "days_to_event": ds.get("days_to_event"),
+        "why": why,
+        "flags": flags,
+        "cad_value": cad,
+        "cad_source": cad_src,
+        "years_delinquent": yrs,
+        "two_year_plus": two_plus,
+        "tax_arrears": arrears if stated else None,
+        "tax_arrears_estimated": None if stated else arrears,
+        "owner_count": oc or None,
+        "liquidity": tier,
+        "margin_coverage": round(coverage, 2) if coverage else None,
+    }
+
+
+def rank_board(listings: list[Listing], msa_tier: dict | None = None) -> dict:
+    """Stamp `raw['fullmer']` on every lead. Returns distribution stats.
+
+    Removes nothing. The count of listings in must equal the count out -- that is
+    asserted, because a "ranking" pass that silently trims is the exact failure
+    this project keeps hitting.
+    """
+    msa_tier = msa_tier if msa_tier is not None else MSA_TIER
+    before = len(listings)
+    buckets = {"A (70+)": 0, "B (50-69)": 0, "C (30-49)": 0, "D (<30)": 0}
+    for li in listings:
+        r = score(li, msa_tier)
+        if not isinstance(li.raw, dict):
+            li.raw = {}
+        li.raw["fullmer"] = r
+        v = r["rank"]
+        if v >= 70:
+            buckets["A (70+)"] += 1
+        elif v >= 50:
+            buckets["B (50-69)"] += 1
+        elif v >= 30:
+            buckets["C (30-49)"] += 1
+        else:
+            buckets["D (<30)"] += 1
+    assert len(listings) == before, "fullmer_rank must never drop a lead"
+    return {"ranked": before, "buckets": buckets}
