@@ -1,0 +1,19 @@
+{
+  "stats": {
+    "disjoint_groups": 552745,
+    "rule1": 87272,
+    "rule2": 63706,
+    "rule3_fallback": 461491,
+    "unresolvable_skipped": 0,
+    "sms_conflicts_excluded": 2,
+    "only_vm_appended": 112254,
+    "only_vm_collision_skipped": 2846,
+    "both_sides_same_no_write": 317344,
+    "keys_with_patch": 152552
+  },
+  "sms_excluded_keys": [
+    "parcel:NC:buncombe:8790932466",
+    "addr:amy dr|28092"
+  ],
+  "bad_new_rows_sample": []
+}
