@@ -141,6 +141,13 @@ PORTALS: dict[str, Portal] = {
     # candidate, is deliberately NOT added here: same path pattern, but search() 500s on every
     # one of 6 real Greene parcels tried (not a parcel-id-shape issue -- a genuine server-side
     # difference not yet diagnosed). Don't re-add Greene without finding why first.
+    # RE-CONFIRMED 2026-11-13: the GET form page is fine (200, real ParcelIDTextBox, identical
+    # hidden-field shape to Sampson's). The POST 500s identically (same 1,208-byte generic IIS
+    # error page, no app-level detail) on all 6 parcels AND on an empty-parcel search -- so it is
+    # not request-content-dependent at all. Also tried real Referer/Origin/Accept header
+    # variations, same result every time. This is Greene's tenant itself erroring (likely a
+    # backend outage on their side), not anything this module sends. Re-test later by hand; don't
+    # spend more live requests on it without a reason to think the tenant's own state changed.
     "Sampson": Portal("Sampson", "https://sampsonnc.munisselfservice.com"),
 }
 _BY_COUNTY = {k.lower(): v for k, v in PORTALS.items()}
