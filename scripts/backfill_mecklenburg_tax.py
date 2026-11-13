@@ -35,7 +35,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import contextlib
 import os
 import sys
 from pathlib import Path
@@ -111,17 +110,71 @@ def main() -> int:
 
     print(f"Mecklenburg/NC rows on board: {len(board):,}")
 
+    # FIX 2026-11-13: used to accumulate all --rounds worth of changes and write ONCE at the
+    # very end. Live-observed consequence: a full invocation (3 rounds x 300 real parcels,
+    # ~830 real two_year_written hits, the table-index parser bug now fixed) ran its entire
+    # ~30 minutes of live network work successfully, then lost ALL of it -- the single write
+    # attempt waited the full 3600s board_lock budget and still never caught a free window,
+    # because two OTHER wrappers (deed_chain_v2, then gis_attrs_boardwide) kept passing the
+    # lock between themselves the whole time. One lock-contention loss used to cost an entire
+    # invocation's yield; now it costs at most one round's. Flushing per round doesn't touch
+    # the 2026-11-11 fix above (the lock still wraps only the write, never the live fetch loop).
     total_stats: dict = {}
+    total_applied = 0
+    total_lost = 0
     for rnd in range(args.rounds):
         stats = asyncio.run(enrich_mecklenburg_tax(board))
         print(f"  round {rnd + 1}/{args.rounds}: {stats}")
         for k, v in stats.items():
             total_stats[k] = total_stats.get(k, 0) + v
+
+        patches: dict[str, dict] = {}
+        collisions = 0
+        for li, key, b4 in zip(board, keys, before):
+            raw = li.raw if isinstance(li.raw, dict) else {}
+            after = {k: raw.get(k) for k in _WATCH_KEYS}
+            if after == b4:
+                continue
+            if key is None:
+                continue
+            if key_counts.get(key, 0) > 1:
+                collisions += 1
+                continue
+            patches[key] = {"raw": {k: v for k, v in after.items() if v is not None}}
+
+        print(f"  round {rnd + 1} patches staged: {len(patches):,} "
+              f"(dropped as dedupe_key collisions: {collisions:,})")
+
+        if patches and not args.dry_run:
+            # THE LOCK, narrowed to just this write -- see the 2026-11-11 comment above.
+            # patch_existing_rows() self-enforces require_board_lock() regardless, so this is
+            # belt-and-suspenders, not the only thing standing between this script and a
+            # lock-less write.
+            try:
+                with board_lock(REPO, owner="backfill_mecklenburg_tax", wait=3600, poll=10):
+                    wstats = patch_existing_rows(
+                        patches, {"backfill_mecklenburg_tax": f"round={rnd + 1} n={len(patches)}"},
+                        docs_dir=docs)
+                print(f"  round {rnd + 1} patch_existing_rows: {wstats}")
+                total_applied += wstats.get("applied", 0)
+            except BoardLockBusy as exc:
+                print(f"{exc} -- refusing to write ({len(patches):,} patches from round "
+                      f"{rnd + 1} are lost; re-run to redo them).")
+                total_lost += len(patches)
+
+        # Re-snapshot "before" to this round's current state so round N+1's diff only covers
+        # what round N+1 itself changes -- not what this round already wrote (or tried to).
+        for i, li in enumerate(board):
+            raw = li.raw if isinstance(li.raw, dict) else {}
+            before[i] = {k: raw.get(k) for k in _WATCH_KEYS}
+
         if stats.get("eligible", 0) == 0:
             print("  no more eligible rows -- backlog exhausted for this invocation")
             break
 
     print(f"\ncumulative this invocation: {total_stats}")
+    print(f"total applied across all rounds: {total_applied:,}; "
+          f"total lost to lock contention: {total_lost:,}")
 
     if args.dry_run:
         print("\n--dry-run: nothing written (enrich_mecklenburg_tax() still ran live "
@@ -129,38 +182,7 @@ def main() -> int:
               "module; --dry-run here only means the board write is skipped)")
         return 0
 
-    patches: dict[str, dict] = {}
-    collisions = 0
-    for li, key, b4 in zip(board, keys, before):
-        raw = li.raw if isinstance(li.raw, dict) else {}
-        after = {k: raw.get(k) for k in _WATCH_KEYS}
-        if after == b4:
-            continue
-        if key is None:
-            continue
-        if key_counts.get(key, 0) > 1:
-            collisions += 1
-            continue
-        patches[key] = {"raw": {k: v for k, v in after.items() if v is not None}}
-
-    print(f"patches staged: {len(patches):,} (dropped as dedupe_key collisions: {collisions:,})")
-
-    if patches:
-        # THE LOCK, narrowed to just this write -- see the comment above. patch_existing_rows()
-        # self-enforces require_board_lock() regardless, so this is belt-and-suspenders, not
-        # the only thing standing between this script and a lock-less write.
-        lock = contextlib.nullcontext() if args.dry_run else board_lock(
-            REPO, owner="backfill_mecklenburg_tax", wait=3600, poll=10)
-        try:
-            with lock:
-                stats = patch_existing_rows(
-                    patches, {"backfill_mecklenburg_tax": f"n={len(patches)}"}, docs_dir=docs)
-        except BoardLockBusy as exc:
-            print(f"{exc} -- refusing to write ({len(patches):,} patches from this "
-                  f"invocation's live queries are lost; re-run to redo them and retry).")
-            return 1
-        print(f"patch_existing_rows: {stats}")
-    return 0
+    return 1 if total_lost else 0
 
 
 if __name__ == "__main__":
