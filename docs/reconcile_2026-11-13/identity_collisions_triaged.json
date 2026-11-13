@@ -1,11 +1,13 @@
 {
-  "note": "Triage of docs/reconcile_2026-11-13/identity_collisions.json (2026-11-13). likely_false_positive = all addresses share the same street NAME (just different house numbers/units) -- almost certainly one tax parcel covering a multi-building complex (condo/apartment community), NOT a real data bug. real_candidates = genuinely different street names on one parcel key -- worth live-verifying the way the 3 original buncombe_unpaid_bills PINs were fixed. 3 of those 3 are already patched (31 Smokey Mountain Dr / 1 Hourglass Way / 105 Aries Ln) and will still show up here since this file was not regenerated after that fix -- skip them.",
+  "note": "Triage of docs/reconcile_2026-11-13/identity_collisions.json (2026-11-13, refined pass). Four buckets, each a distinct reason the same dedupe_key maps to 2+ different-looking addresses -- most are explainable, NOT a real data bug: (1) likely_false_positive_same_street: every address shares the same street NAME (just different house numbers/units) -- one legal parcel covering a multi-building condo/apartment complex. (2) likely_false_positive_mobile_home: at least one address matches a manufactured-home description pattern (brand + WIDTHxLENGTH + MH + serial#) -- multiple mobile homes legitimately sitting on one land parcel; common in rural SC/NC counties (Dillon county alone: ~50 of these). (3) likely_false_positive_text_blob_address: at least one value is a long (>60 char) free-text blob, not a real address -- a scraper (public-notice/newspaper delinquent-tax-list parsers, e.g. Madison/Pitt/Polk NC) stuffed a whole notice sentence (PARCEL -- OWNER -- COUNTY DELINQUENT TAX $X OWED (PARCEL N)) into street_address when it had no clean address to extract, and multiple bills/years for the same real debt then collide under one key. Not a wrong-pick problem -- the field itself is being misused upstream; fixing it means the scraper, not the merge. (4) real_candidates: none of the above explain it -- genuinely worth live-verifying the way the 3 original buncombe_unpaid_bills PINs were fixed (those 3 are already patched and will still show up here since this file was not regenerated after that fix -- skip them).",
   "counts": {
-    "total": 950,
-    "likely_false_positive": 375,
-    "real_candidates": 575
+    "likely_false_positive_same_street": 375,
+    "likely_false_positive_mobile_home": 50,
+    "likely_false_positive_text_blob_address": 27,
+    "real_candidates": 498
   },
-  "likely_false_positive": {
+  "total": 950,
+  "likely_false_positive_same_street": {
     "addr:n poplar st|NC:lincoln": {
       "N POPLAR ST": [
         "mac",
@@ -4469,6 +4471,948 @@
       ]
     }
   },
+  "likely_false_positive_mobile_home": {
+    "parcel:SC:dillon:0331100014": {
+      "95 MILL/REDMAN 70X14 MH 12992 13829954": [
+        "mac",
+        "vm"
+      ],
+      "97 PIONEER 68X14 MH 12246 PH1306GA10954": [
+        "mac",
+        "vm"
+      ],
+      "94 REDMAN 80X14 MH 13042 13829694": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:0331100010": {
+      "99 FLEETWOOD 60X14 MH 11722 VAFLX19A51522CM12": [
+        "mac",
+        "vm"
+      ],
+      "98 GENERAL 80X14 MH 11336 LHSC510981442": [
+        "mac",
+        "vm"
+      ],
+      "96 FLEETWOOD/EDGEW 70X14 MH 12021 NCFLT41A35603EW12": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:0050000049": {
+      "4053 HWY 57 NORTH": [
+        "mac",
+        "vm"
+      ],
+      "98 REDMAN 76X14 MH 15820 13842484": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:1180000161": {
+      "149 JADE COURT": [
+        "mac",
+        "vm"
+      ],
+      "84 BRID 70X14 MH 14229 GBICM16369": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:0490000190001": {
+      "1436 THOMPSON DRIVE": [
+        "mac",
+        "vm"
+      ],
+      "07 GENERAL 64X28 MH 12917 GMHGA40634281A&B": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:1390000087": {
+      "1739 KEMPER CHURCH ROAD": [
+        "mac",
+        "vm"
+      ],
+      "87 OAKWOOD 70X14 MH 15807 HONC56014CK2506043": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:0501500029": {
+      "820 MT CALVARY ROAD": [
+        "mac",
+        "vm"
+      ],
+      "74 FESTIVAL 70X14 MH 6518 01A204111452030": [
+        "mac",
+        "vm"
+      ],
+      "72 SHALIMAR 60X12 MH 3453 22012": [
+        "mac",
+        "vm"
+      ],
+      "81 HORTON 60X12 MH 13885 0635": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:1240000106": {
+      "2379 HWY 41 SOUTH": [
+        "mac",
+        "vm"
+      ],
+      "89 TITAN 52X28 MH 12639 4997553876A&B": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:0690412023": {
+      "1601 E DARGAN ST": [
+        "mac",
+        "vm"
+      ],
+      "87 CHAMPION 40X28 MH 3748 047766C3263A&B": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:1190000185002": {
+      "1036 OLD EBENEZER ROAD": [
+        "mac",
+        "vm"
+      ],
+      "97 SOUT 80X16 MH 15546 SSLAL35570": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:0321503005": {
+      "2413 FEDERAL ST": [
+        "mac",
+        "vm"
+      ],
+      "99 FLEETWOOD/SPRIN 52X24 MH 16363 GAFLW34A&B71991SH1 2": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:0880000059": {
+      "115 HARTLEY COURT": [
+        "mac",
+        "vm"
+      ],
+      "98 OXFORD 80X24 MH 8915 OHC007371NCAB": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:0480000037": {
+      "2036 BUNKER HILL ROAD": [
+        "mac",
+        "vm"
+      ],
+      "95 GENERAL 56X24 MH 7459 GMHGA337957658A&B": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:1120000143001": {
+      "174 N FORDTOWN ROAD": [
+        "mac",
+        "vm"
+      ],
+      "96 REDMAN 70X14 MH 11715 11429408": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:0050000079": {
+      "4616 CAROLINA CHURCH ROAD": [
+        "mac",
+        "vm"
+      ],
+      "12 SOUTHERN 68X28 MH 14399 SA4058904ALAB": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:0600300039": {
+      "635 MT CALVARY RD": [
+        "mac",
+        "vm"
+      ],
+      "82 REDMAN/VENTURE 68X14 MH 12738 13805870": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:1041103012": {
+      "109 SHORT STREET": [
+        "mac",
+        "vm"
+      ],
+      "87 FLEETWOOD 70X14 MH 15883 NCFLH41A1020RK": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:1180000304": {
+      "330 BRIAR PATCH LANE": [
+        "mac",
+        "vm"
+      ],
+      "95 FLEETWOOD 52X28 MH 12986 NCFLR56A&B10745SW": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:1200000110": {
+      "1451 HAYMOUNT ROAD": [
+        "mac",
+        "vm"
+      ],
+      "01 FLEETWOOD/TIMBE 60X28 MH 16664 NCFLY69AB60023TL12": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:0120000084": {
+      "4443 JUDSON ROAD": [
+        "mac",
+        "vm"
+      ],
+      "84 LIBERTY 80X14 MH 10938 02L22032": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:1250000222001": {
+      "654 S FORDTOWN ROAD": [
+        "mac",
+        "vm"
+      ],
+      "01 FLEETWOOD/WEST 76X16 MH 13459 GAPLY75A37380WT21": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:1240000247": {
+      "1768 SHADY PINE DR": [
+        "mac",
+        "vm"
+      ],
+      "99 FLEETWOOD 70X14 MH 13956 VAFLX19A52060WG22": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:0320000125": {
+      "23 TRU/ MH 48X28 MH 16723 CLH049241TNAB": [
+        "mac",
+        "vm"
+      ],
+      "2810 SINCLAIR ROAD": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:0690215011": {
+      "609 E PALMETTO STREET E SIDE PALMETTO ST 350FT N INT": [
+        "mac",
+        "vm"
+      ],
+      "94 FLEETWOOD 76X14 MH 6633 VAFLP19A35884SP": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:0190000128": {
+      "97 FLEETWOOD 66X14 MH 16305 NCFLV41A46993C012": [
+        "mac",
+        "vm"
+      ],
+      "2921 ZIMP DRIVE PINE RIDGE PHASE 4 LOT #2": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:0331100011": {
+      "96 HBO/OAKWOOD 70X14 MH 11721 HONC03311270": [
+        "mac",
+        "vm"
+      ],
+      "98 PIONEER 80X14 MH 11642 PH1306GA14433": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:0331100063": {
+      "97 GENERAL 70X14 MH 14058 LHSC530960460": [
+        "mac",
+        "vm"
+      ],
+      "86 OAKWOOD 60X14 MH 6699 H0NC16014FK2119767": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:1250000222": {
+      "01 FLEETWOOD/WEST 76X16 MH 13459 GAPLY75A37380WT21": [
+        "mac",
+        "vm"
+      ],
+      "654 S FORDTOWN ROAD": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:1170000007": {
+      "91 FISHER AD#24-00393MH 13831 NCFC5452": [
+        "mac",
+        "vm"
+      ],
+      "96 FLEETWOOD/WESTO 70X14 MH 16451 GAFLS75A63600WE": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:1230000021": {
+      "83 VOGUE FLEETWOOD 52X24 MH 11037 VPNC7237V": [
+        "mac",
+        "vm"
+      ],
+      "1736 ELVINGTON COURT": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:0600300102": {
+      "87 FLEETWOOD 76X14 MH 7448 GAFLCTIAH504502906": [
+        "mac",
+        "vm"
+      ],
+      "2003 CATALPA DR": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:1070000026": {
+      "800 FT NW S-17-45 & APP 1.7 MINE INT SC57 & S-17-45": [
+        "mac",
+        "vm"
+      ],
+      "87 CORONADO 65X14 MH 8547 FLC01AH64109550": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:0800000063": {
+      "03 CHANDELEUR 66X28 MH 12096 CH3AL07220AB": [
+        "mac",
+        "vm"
+      ],
+      "446-A EAST COUNTRYSIDE ROAD TR 11 P 20/42": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:0690804014": {
+      "95 HOMESTEAD/SOUTH 80X14 MH 12640 HMST9659GA": [
+        "mac",
+        "vm"
+      ],
+      "915 PERRY AVE LOT#13 &14": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:0690000178": {
+      "23 TRU/ MH 76X14 MH 16637 CWPO5600TN": [
+        "mac",
+        "vm"
+      ],
+      "85 FRONT 60X14 MH 11932 AJ20872A": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:0690412002": {
+      "97 FLEETWOOD/WESTF 80X16 MH 8217 GAFLT07A38754W212": [
+        "mac",
+        "vm"
+      ],
+      "303 NEW JERUSALEM AD#24-00943": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:1240000129": {
+      "1545 JOANN BRANCH RD": [
+        "mac",
+        "vm"
+      ],
+      "97 BELLCREST/NORTH 80X16 MH 16693 GBHMK50210": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:0760000108": {
+      "285 MEGGS ISLAND ROAD": [
+        "mac",
+        "vm"
+      ],
+      "01 PIONEER 56X28 MH 13005 PH1124GA18091AB": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:0690406030": {
+      "96 FLEETWOOD/WESTO 80X16 MH 7653 GAFLS75A25956WE11": [
+        "mac",
+        "vm"
+      ],
+      "1418 BETHEA STREET S SIDE BETHEA ST 550FT E OF SC": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:1240000175": {
+      "1562 HILLTOP ACRES DRIVE MAY HILLTOP ACRES SUBDIVISION": [
+        "mac",
+        "vm"
+      ],
+      "99 REDMAN 52X24 MH 12782 11433524": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:1360000049": {
+      "2571 OLD RIVER ROAD FORK": [
+        "mac",
+        "vm"
+      ],
+      "92 CLAYTON 60X24 MH 16295 CLR006410TNA&B": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:1180403035": {
+      "94 FLEETWOOD/WESTO 70X14 MH 13708 GAFLR75A22236WE": [
+        "mac",
+        "vm"
+      ],
+      "318 GRAHAM STREET": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:0940000007": {
+      "92 REDMAN/NEWMAN 80X14 MH 15186 13823957": [
+        "mac",
+        "vm"
+      ],
+      "1759 MOTLEY DRIVE LOT #5 MOTLEY DRIVE SUB": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:0200000111": {
+      "93 FLEETWOOD 72X14 MH 16052 NCFLN41A24001V0": [
+        "mac",
+        "vm"
+      ],
+      "1132 HULEE PLACE LOT #18": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:1240000181": {
+      "72 TALL OAKS 60X12 MH 10903 0-1698": [
+        "mac",
+        "vm"
+      ],
+      "1569 JOANNE BRANCH AD#24-01801": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:0690212022": {
+      "77 CHAMPION 40X24 MH 14588 2377160228": [
+        "mac",
+        "vm"
+      ],
+      "811 BYRD COURT 200FT W PALMETTO ST 150FT N PA": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:0690212024": {
+      "73 CHAMPION 65X12 MH 13999 233982D4600": [
+        "mac",
+        "vm"
+      ],
+      "180 FEET SOUTH OF PALMETTO ST": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:0601100010": {
+      "88 CLAYTON/RIDGEWA 70X14 MH 14183 43888": [
+        "mac",
+        "vm"
+      ],
+      "452 DEREK COURT": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:1180000052": {
+      "500 FT E US301 & 8/10 MI S INTUS301 & S-17-524": [
+        "mac",
+        "vm"
+      ],
+      "84 CONNER 60X14 MH 13385 30922": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:dillon:0700700038": {
+      "19 CMH/VICTORY PLU 76X16 MH 15706 SRB032643AL": [
+        "mac",
+        "vm"
+      ],
+      "2127 NELSON DRIVE AD#24-02102S SIDE PHILLIP AVE APP 650FT E": [
+        "mac",
+        "vm"
+      ]
+    }
+  },
+  "likely_false_positive_text_blob_address": {
+    "parcel:NC:brunswick:102506498464": {
+      "355 CYPRESS CT NW": [
+        "mac",
+        "vm"
+      ],
+      "361, RIDGEWOOD DRIVE NORTHWEST, BRUNSWICK COUNTY, NORTH CAROLINA, 28467, UNITED STATES": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:NC:brunswick:215004744677": {
+      "3401 ZACHARYS PATH SE": [
+        "mac",
+        "vm"
+      ],
+      "3307, ZACHARY'S PATH SOUTHEAST, HALF HELL, BRUNSWICK COUNTY, NORTH CAROLINA, 28422, UNITED STATES": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:NC:brunswick:107710365899": {
+      "5002 OCEAN HWY W": [
+        "mac",
+        "vm"
+      ],
+      "4915, OLD SHALLOTTE ROAD NORTHWEST, RUSSTOWN, SHALLOTTE, BRUNSWICK COUNTY, NORTH CAROLINA, 28470, UNITED STATES": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:NC:brunswick:215800981249": {
+      "3109 MALMO LOOP RD NE": [
+        "mac",
+        "vm"
+      ],
+      "6882, KILIANS WAY NORTHEAST, BRUNSWICK COUNTY, NORTH CAROLINA, 28451, UNITED STATES": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:NC:brunswick:103617119422": {
+      "3020 CEDAR CREEK LN": [
+        "mac",
+        "vm"
+      ],
+      "3026, CEDAR CREEK LANE, CAROLINA SHORES, BRUNSWICK COUNTY, NORTH CAROLINA, 28467, UNITED STATES": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:NC:mcdowell:065800349904": {
+      "786, CANNON ROAD, HANKINS, MCDOWELL COUNTY, NORTH CAROLINA, 28752, UNITED STATES": [
+        "mac",
+        "vm"
+      ],
+      "000832 PINE COVE ROAD": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:parcel \u2014 hayes run realty|28753": {
+      "PARCEL \u2014 HAYES RUN REALTY, LLC \u2014 MADISON NC DELINQUENT TAX $3,125 OWED (PARCEL 183)": [
+        "mac",
+        "vm"
+      ],
+      "PARCEL \u2014 HAYES RUN REALTY, LLC \u2014 MADISON NC DELINQUENT TAX $3,140 OWED (PARCEL 183)": [
+        "mac",
+        "vm"
+      ],
+      "PARCEL \u2014 HAYES RUN REALTY, LLC \u2014 MADISON NC DELINQUENT TAX $7,069 OWED (PARCEL 17263)": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:parcel \u2014 sprieser|NC:madison": {
+      "PARCEL \u2014 SPRIESER, GERMAINE E. POLLY BR ROAD \u2014 MADISON NC DELINQUENT TAX $489 OWED (PARCE": [
+        "mac",
+        "vm"
+      ],
+      "PARCEL \u2014 SPRIESER, GERMAINE E. POLLY BR ROAD \u2014 MADISON NC DELINQUENT TAX $492 OWED (PARCE": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:parcel \u2014 ln|NC:pitt": {
+      "PARCEL \u2014 LANE, JUANDINE \u2014 PITT NC DELINQUENT TAX $52 OWED (PARCEL 55422)": [
+        "mac",
+        "vm"
+      ],
+      "PARCEL \u2014 LANE, JAMES HENRY JR \u2014 PITT NC DELINQUENT TAX $60 OWED (PARCEL 23032)": [
+        "mac",
+        "vm"
+      ],
+      "PARCEL \u2014 LANE, JAMES THOMAS \u2014 PITT NC DELINQUENT TAX $7 OWED (PARCEL 53045)": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:pickens:405312867101": {
+      "202, HOLLY AVENUE, SUNNY ACRES, CLEMSON, PICKENS COUNTY, SOUTH CAROLINA, 29631, UNITED STATES": [
+        "mac",
+        "vm"
+      ],
+      "200 HOLLY AVE": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:NC:watauga:2819299700": {
+      "351 SUNRISE VISTA LN": [
+        "mac",
+        "vm"
+      ],
+      "100 LAUREL BRANCH ROAD": [
+        "mac",
+        "vm"
+      ],
+      "673 SF BUILDING AT THE END OF SAMARITAN LN.": [
+        "mac",
+        "vm"
+      ],
+      "35 MORNING DEW LN": [
+        "mac",
+        "vm"
+      ],
+      "85 SWEETGRASS": [
+        "mac",
+        "vm"
+      ],
+      "112 FIRESIDE LANE": [
+        "mac",
+        "vm"
+      ],
+      "5808 HWY 321": [
+        "mac",
+        "vm"
+      ],
+      "500 US HWY": [
+        "mac",
+        "vm"
+      ],
+      "56 LADY SLIPPER LANE": [
+        "mac",
+        "vm"
+      ],
+      "1200 MEAT CAMP BAPTIST CHURCH RD": [
+        "mac",
+        "vm"
+      ],
+      "689 SQFT STICK BUILT HOME IN VILAS NORTH CAROLINA. HOME WAS PARTIALLY CONSTRUCTED WITH ROOF AND ELECTRICAL TRADES ALREADY COMPLETED. HOME NEEDS PLUMBING AND MECHANICAL TRADES": [
+        "mac",
+        "vm"
+      ],
+      "27 PEIDRA RD": [
+        "mac",
+        "vm"
+      ],
+      "9366 LOT 2-B": [
+        "mac",
+        "vm"
+      ],
+      "4 OSCAR RALPH CORNELIOUS GRAND CREEK ROAD": [
+        "mac",
+        "vm"
+      ],
+      "852 BISHOPS RIDGE PWKY, UNIT 106": [
+        "mac",
+        "vm"
+      ],
+      "200 ARCTIC DR": [
+        "mac",
+        "vm"
+      ],
+      "1000 BERRY ROAD": [
+        "mac",
+        "vm"
+      ],
+      "1184 DEERFIELD CHURCH": [
+        "mac",
+        "vm"
+      ],
+      "11 TWIN BRANCHES ROAD": [
+        "mac",
+        "vm"
+      ],
+      "10298 NC HWY": [
+        "mac",
+        "vm"
+      ],
+      "3 LAUREL LANE": [
+        "mac",
+        "vm"
+      ],
+      "244 WALNUT": [
+        "mac",
+        "vm"
+      ],
+      "297 WHITE FOX LN": [
+        "mac",
+        "vm"
+      ],
+      "1736 HICKORY LN BOONE, NC": [
+        "mac",
+        "vm"
+      ],
+      "5 WOODLAND SPRINGS": [
+        "mac",
+        "vm"
+      ],
+      "461 EAGLE PEAK TRAIL": [
+        "mac",
+        "vm"
+      ],
+      "320 LOCUST HILL ROAD": [
+        "mac",
+        "vm"
+      ],
+      "421 S AND N PINE RUN RD.": [
+        "mac",
+        "vm"
+      ],
+      "17 SUNSET RIDGE DRIVE": [
+        "mac",
+        "vm"
+      ],
+      "47 SEC 3 SEVEN DEVILS RESORT": [
+        "mac",
+        "vm"
+      ],
+      "425 JACK BRANCH DRIVE": [
+        "mac",
+        "vm"
+      ],
+      "243 INNOVATION DR": [
+        "mac",
+        "vm"
+      ],
+      "3196 WINKLERS CREEK RD": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:NC:mcdowell:163600894005": {
+      "96 SECLUSION RIDGE": [
+        "mac",
+        "vm"
+      ],
+      "6509, BUCK CREEK ROAD, SUNNYVALE, MCDOWELL COUNTY, NORTH CAROLINA, 28752, UNITED STATES": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:oconee:1460001110": {
+      "898, PLAYGROUND ROAD, WALHALLA, OCONEE COUNTY, SOUTH CAROLINA, 29691, UNITED STATES": [
+        "mac",
+        "vm"
+      ],
+      "311 CAPPS RD": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:oconee:1231101008": {
+      "10139 A CLEMSON BLVD": [
+        "mac",
+        "vm"
+      ],
+      "261, TALONS RIDGE ROAD, OCONEE COUNTY, SOUTH CAROLINA, 29672, UNITED STATES": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:parcel \u2014 ponder|NC:madison": {
+      "PARCEL \u2014 PONDER, AARON LANE \u2014 MADISON NC DELINQUENT TAX $6,718 OWED (PARCEL 15604)": [
+        "mac",
+        "vm"
+      ],
+      "PARCEL \u2014 PONDER, AARON LANE \u2014 MADISON NC DELINQUENT TAX $1,797 OWED (PARCEL 19771)": [
+        "mac",
+        "vm"
+      ],
+      "PARCEL \u2014 PONDER, AARON LANE \u2014 MADISON NC DELINQUENT TAX $5,831 OWED (PARCEL 7580)": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:parcel \u2014 pheasant run|NC:madison": {
+      "PARCEL \u2014 PHEASANT RUN, INC, A NC CORP \u2014 MADISON NC DELINQUENT TAX $270 OWED (PARCEL 25149": [
+        "mac",
+        "vm"
+      ],
+      "PARCEL \u2014 PHEASANT RUN, INC, A NC CORP \u2014 MADISON NC DELINQUENT TAX $339 OWED (PARCEL 25395": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:parcel \u2014 active tax foreclosure \u2014 ln|NC:beaufort": {
+      "PARCEL \u2014 ACTIVE TAX FORECLOSURE \u2014 LANE, JOSEPH G \u2014 BEAUFORT NC DELINQUENT TAX $3,750 OWED": [
+        "mac",
+        "vm"
+      ],
+      "PARCEL \u2014 ACTIVE TAX FORECLOSURE \u2014 LANE, JOSEPH G \u2014 BEAUFORT NC DELINQUENT TAX $5,151 OWED": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:parcel \u2014 ln|NC:beaufort": {
+      "PARCEL \u2014 LANE, RHONDA K \u2014 BEAUFORT NC DELINQUENT TAX $41 OWED (PARCEL 32255)": [
+        "mac",
+        "vm"
+      ],
+      "PARCEL \u2014 LANE, JAMES KENNETH \u2014 BEAUFORT NC DELINQUENT TAX $785 OWED (PARCEL 9410)": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:parcel \u2014 woodruff|NC:beaufort": {
+      "PARCEL \u2014 WOODRUFF, APRIL LANE \u2014 BEAUFORT NC DELINQUENT TAX $221 OWED (PARCEL 21056)": [
+        "mac",
+        "vm"
+      ],
+      "PARCEL \u2014 WOODRUFF, APRIL LANE \u2014 BEAUFORT NC DELINQUENT TAX $270 OWED (PARCEL 21057)": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:parcel \u2014 griffin|NC:beaufort": {
+      "PARCEL \u2014 GRIFFIN, JOSEPH LANE \u2014 BEAUFORT NC DELINQUENT TAX $239 OWED (PARCEL 45610)": [
+        "mac",
+        "vm"
+      ],
+      "PARCEL \u2014 GRIFFIN, JOSEPH LANE \u2014 BEAUFORT NC DELINQUENT TAX $77 OWED (PARCEL 45611)": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:parcel \u2014 city of high point \u2014 guilford nc delinquent tax $11|NC:guilford": {
+      "PARCEL \u2014 CITY OF HIGH POINT \u2014 GUILFORD NC DELINQUENT TAX $11,038 OWED (PARCEL 172214)": [
+        "mac",
+        "vm"
+      ],
+      "PARCEL \u2014 CITY OF HIGH POINT \u2014 GUILFORD NC DELINQUENT TAX $11,427 OWED (PARCEL 172699)": [
+        "mac",
+        "vm"
+      ],
+      "PARCEL \u2014 CITY OF HIGH POINT \u2014 GUILFORD NC DELINQUENT TAX $11,031 OWED (PARCEL 172214)": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:parcel \u2014 ln|NC:guilford": {
+      "PARCEL \u2014 LANE, RUBY A \u2014 GUILFORD NC DELINQUENT TAX $13,774 OWED (PARCEL 191664)": [
+        "mac",
+        "vm"
+      ],
+      "PARCEL \u2014 LANE, MARY MAGDALENE \u2014 GUILFORD NC DELINQUENT TAX $40,840 OWED (PARCEL 190536)": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:parcel \u2014 city of high point \u2014 guilford nc delinquent tax $16|NC:guilford": {
+      "PARCEL \u2014 CITY OF HIGH POINT \u2014 GUILFORD NC DELINQUENT TAX $16,220 OWED (PARCEL 173847)": [
+        "mac",
+        "vm"
+      ],
+      "PARCEL \u2014 CITY OF HIGH POINT \u2014 GUILFORD NC DELINQUENT TAX $16,219 OWED (PARCEL 173847)": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:parcel \u2014 city of high point \u2014 guilford nc delinquent tax $12|NC:guilford": {
+      "PARCEL \u2014 CITY OF HIGH POINT \u2014 GUILFORD NC DELINQUENT TAX $12,069 OWED (PARCEL 173988)": [
+        "mac",
+        "vm"
+      ],
+      "PARCEL \u2014 CITY OF HIGH POINT \u2014 GUILFORD NC DELINQUENT TAX $12,193 OWED (PARCEL 175080)": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:parcel \u2014 st louis|NC:guilford": {
+      "PARCEL \u2014 ST LOUIS, PATSY MAE COLLINS \u2014 GUILFORD NC DELINQUENT TAX $4,387 OWED (PARCEL 161": [
+        "mac",
+        "vm"
+      ],
+      "PARCEL \u2014 ST LOUIS, PATSY MAE \u2014 GUILFORD NC DELINQUENT TAX $2,680 OWED (PARCEL 161423)": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:parcel \u2014 nichols|NC:pitt": {
+      "PARCEL \u2014 NICHOLS, TERESA LANE \u2014 PITT NC DELINQUENT TAX $4,396 OWED (PARCEL 53778)": [
+        "mac",
+        "vm"
+      ],
+      "PARCEL \u2014 NICHOLS, TERESA LANE \u2014 PITT NC DELINQUENT TAX $11,077 OWED (PARCEL 62119)": [
+        "mac",
+        "vm"
+      ],
+      "PARCEL \u2014 NICHOLS, TERESA LANE \u2014 PITT NC DELINQUENT TAX $4,469 OWED (PARCEL 53778)": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:parcel \u2014 pl|NC:pitt": {
+      "PARCEL \u2014 PLACE, LEIGH SWITZER \u2014 PITT NC DELINQUENT TAX $1,820 OWED (PARCEL 54026)": [
+        "mac",
+        "vm"
+      ],
+      "PARCEL \u2014 PLACE, LEIGH SWITZER \u2014 PITT NC DELINQUENT TAX $242 OWED (PARCEL 55736)": [
+        "mac",
+        "vm"
+      ],
+      "PARCEL \u2014 PLACE, LEIGH SWITZER \u2014 PITT NC DELINQUENT TAX $3,482 OWED (PARCEL 4113)": [
+        "mac",
+        "vm"
+      ],
+      "PARCEL \u2014 PLACE, LEIGH SWITZER \u2014 PITT NC DELINQUENT TAX $241 OWED (PARCEL 55736)": [
+        "mac",
+        "vm"
+      ]
+    }
+  },
   "real_candidates": {
     "parcel:NC:buncombe:9780107010": {
       "7970 MISSION CENTER CT UNIT B": [
@@ -4628,56 +5572,6 @@
         "vm"
       ]
     },
-    "parcel:NC:brunswick:102506498464": {
-      "355 CYPRESS CT NW": [
-        "mac",
-        "vm"
-      ],
-      "361, RIDGEWOOD DRIVE NORTHWEST, BRUNSWICK COUNTY, NORTH CAROLINA, 28467, UNITED STATES": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:NC:brunswick:215004744677": {
-      "3401 ZACHARYS PATH SE": [
-        "mac",
-        "vm"
-      ],
-      "3307, ZACHARY'S PATH SOUTHEAST, HALF HELL, BRUNSWICK COUNTY, NORTH CAROLINA, 28422, UNITED STATES": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:NC:brunswick:107710365899": {
-      "5002 OCEAN HWY W": [
-        "mac",
-        "vm"
-      ],
-      "4915, OLD SHALLOTTE ROAD NORTHWEST, RUSSTOWN, SHALLOTTE, BRUNSWICK COUNTY, NORTH CAROLINA, 28470, UNITED STATES": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:NC:brunswick:215800981249": {
-      "3109 MALMO LOOP RD NE": [
-        "mac",
-        "vm"
-      ],
-      "6882, KILIANS WAY NORTHEAST, BRUNSWICK COUNTY, NORTH CAROLINA, 28451, UNITED STATES": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:NC:brunswick:103617119422": {
-      "3020 CEDAR CREEK LN": [
-        "mac",
-        "vm"
-      ],
-      "3026, CEDAR CREEK LANE, CAROLINA SHORES, BRUNSWICK COUNTY, NORTH CAROLINA, 28467, UNITED STATES": [
-        "mac",
-        "vm"
-      ]
-    },
     "parcel:NC:brunswick:103513244140": {
       "20 THICKETWOOD DR": [
         "mac",
@@ -4770,16 +5664,6 @@
         "vm"
       ],
       "1303 RUSTIC TRL.": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:NC:mcdowell:065800349904": {
-      "786, CANNON ROAD, HANKINS, MCDOWELL COUNTY, NORTH CAROLINA, 28752, UNITED STATES": [
-        "mac",
-        "vm"
-      ],
-      "000832 PINE COVE ROAD": [
         "mac",
         "vm"
       ]
@@ -4992,44 +5876,6 @@
         "vm"
       ]
     },
-    "addr:parcel \u2014 hayes run realty|28753": {
-      "PARCEL \u2014 HAYES RUN REALTY, LLC \u2014 MADISON NC DELINQUENT TAX $3,125 OWED (PARCEL 183)": [
-        "mac",
-        "vm"
-      ],
-      "PARCEL \u2014 HAYES RUN REALTY, LLC \u2014 MADISON NC DELINQUENT TAX $3,140 OWED (PARCEL 183)": [
-        "mac",
-        "vm"
-      ],
-      "PARCEL \u2014 HAYES RUN REALTY, LLC \u2014 MADISON NC DELINQUENT TAX $7,069 OWED (PARCEL 17263)": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:parcel \u2014 sprieser|NC:madison": {
-      "PARCEL \u2014 SPRIESER, GERMAINE E. POLLY BR ROAD \u2014 MADISON NC DELINQUENT TAX $489 OWED (PARCE": [
-        "mac",
-        "vm"
-      ],
-      "PARCEL \u2014 SPRIESER, GERMAINE E. POLLY BR ROAD \u2014 MADISON NC DELINQUENT TAX $492 OWED (PARCE": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:parcel \u2014 ln|NC:pitt": {
-      "PARCEL \u2014 LANE, JUANDINE \u2014 PITT NC DELINQUENT TAX $52 OWED (PARCEL 55422)": [
-        "mac",
-        "vm"
-      ],
-      "PARCEL \u2014 LANE, JAMES HENRY JR \u2014 PITT NC DELINQUENT TAX $60 OWED (PARCEL 23032)": [
-        "mac",
-        "vm"
-      ],
-      "PARCEL \u2014 LANE, JAMES THOMAS \u2014 PITT NC DELINQUENT TAX $7 OWED (PARCEL 53045)": [
-        "mac",
-        "vm"
-      ]
-    },
     "parcel:NC:buncombe:9730858891": {
       "1440 MERRIMON AVE": [
         "mac",
@@ -5124,16 +5970,6 @@
         "vm"
       ],
       "178 FREEDOM FOREST DR": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:pickens:405312867101": {
-      "202, HOLLY AVENUE, SUNNY ACRES, CLEMSON, PICKENS COUNTY, SOUTH CAROLINA, 29631, UNITED STATES": [
-        "mac",
-        "vm"
-      ],
-      "200 HOLLY AVE": [
         "mac",
         "vm"
       ]
@@ -5452,140 +6288,6 @@
         "vm"
       ],
       "21 WREN GLEN CT.": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:NC:watauga:2819299700": {
-      "351 SUNRISE VISTA LN": [
-        "mac",
-        "vm"
-      ],
-      "100 LAUREL BRANCH ROAD": [
-        "mac",
-        "vm"
-      ],
-      "673 SF BUILDING AT THE END OF SAMARITAN LN.": [
-        "mac",
-        "vm"
-      ],
-      "35 MORNING DEW LN": [
-        "mac",
-        "vm"
-      ],
-      "85 SWEETGRASS": [
-        "mac",
-        "vm"
-      ],
-      "112 FIRESIDE LANE": [
-        "mac",
-        "vm"
-      ],
-      "5808 HWY 321": [
-        "mac",
-        "vm"
-      ],
-      "500 US HWY": [
-        "mac",
-        "vm"
-      ],
-      "56 LADY SLIPPER LANE": [
-        "mac",
-        "vm"
-      ],
-      "1200 MEAT CAMP BAPTIST CHURCH RD": [
-        "mac",
-        "vm"
-      ],
-      "689 SQFT STICK BUILT HOME IN VILAS NORTH CAROLINA. HOME WAS PARTIALLY CONSTRUCTED WITH ROOF AND ELECTRICAL TRADES ALREADY COMPLETED. HOME NEEDS PLUMBING AND MECHANICAL TRADES": [
-        "mac",
-        "vm"
-      ],
-      "27 PEIDRA RD": [
-        "mac",
-        "vm"
-      ],
-      "9366 LOT 2-B": [
-        "mac",
-        "vm"
-      ],
-      "4 OSCAR RALPH CORNELIOUS GRAND CREEK ROAD": [
-        "mac",
-        "vm"
-      ],
-      "852 BISHOPS RIDGE PWKY, UNIT 106": [
-        "mac",
-        "vm"
-      ],
-      "200 ARCTIC DR": [
-        "mac",
-        "vm"
-      ],
-      "1000 BERRY ROAD": [
-        "mac",
-        "vm"
-      ],
-      "1184 DEERFIELD CHURCH": [
-        "mac",
-        "vm"
-      ],
-      "11 TWIN BRANCHES ROAD": [
-        "mac",
-        "vm"
-      ],
-      "10298 NC HWY": [
-        "mac",
-        "vm"
-      ],
-      "3 LAUREL LANE": [
-        "mac",
-        "vm"
-      ],
-      "244 WALNUT": [
-        "mac",
-        "vm"
-      ],
-      "297 WHITE FOX LN": [
-        "mac",
-        "vm"
-      ],
-      "1736 HICKORY LN BOONE, NC": [
-        "mac",
-        "vm"
-      ],
-      "5 WOODLAND SPRINGS": [
-        "mac",
-        "vm"
-      ],
-      "461 EAGLE PEAK TRAIL": [
-        "mac",
-        "vm"
-      ],
-      "320 LOCUST HILL ROAD": [
-        "mac",
-        "vm"
-      ],
-      "421 S AND N PINE RUN RD.": [
-        "mac",
-        "vm"
-      ],
-      "17 SUNSET RIDGE DRIVE": [
-        "mac",
-        "vm"
-      ],
-      "47 SEC 3 SEVEN DEVILS RESORT": [
-        "mac",
-        "vm"
-      ],
-      "425 JACK BRANCH DRIVE": [
-        "mac",
-        "vm"
-      ],
-      "243 INNOVATION DR": [
-        "mac",
-        "vm"
-      ],
-      "3196 WINKLERS CREEK RD": [
         "mac",
         "vm"
       ]
@@ -7996,16 +8698,6 @@
         "vm"
       ]
     },
-    "parcel:NC:mcdowell:163600894005": {
-      "96 SECLUSION RIDGE": [
-        "mac",
-        "vm"
-      ],
-      "6509, BUCK CREEK ROAD, SUNNYVALE, MCDOWELL COUNTY, NORTH CAROLINA, 28752, UNITED STATES": [
-        "mac",
-        "vm"
-      ]
-    },
     "parcel:NC:mcdowell:172000771425": {
       "109 SHORT DRIVE": [
         "mac",
@@ -8252,16 +8944,6 @@
         "vm"
       ]
     },
-    "parcel:SC:oconee:1460001110": {
-      "898, PLAYGROUND ROAD, WALHALLA, OCONEE COUNTY, SOUTH CAROLINA, 29691, UNITED STATES": [
-        "mac",
-        "vm"
-      ],
-      "311 CAPPS RD": [
-        "mac",
-        "vm"
-      ]
-    },
     "parcel:NC:gaston:3546716618": {
       "303 SULLIVAN AVE": [
         "mac",
@@ -8398,54 +9080,6 @@
         "vm"
       ],
       "420 W FRANKLIN BLVD": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:0331100014": {
-      "95 MILL/REDMAN 70X14 MH 12992 13829954": [
-        "mac",
-        "vm"
-      ],
-      "97 PIONEER 68X14 MH 12246 PH1306GA10954": [
-        "mac",
-        "vm"
-      ],
-      "94 REDMAN 80X14 MH 13042 13829694": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:0331100010": {
-      "99 FLEETWOOD 60X14 MH 11722 VAFLX19A51522CM12": [
-        "mac",
-        "vm"
-      ],
-      "98 GENERAL 80X14 MH 11336 LHSC510981442": [
-        "mac",
-        "vm"
-      ],
-      "96 FLEETWOOD/EDGEW 70X14 MH 12021 NCFLT41A35603EW12": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:0050000049": {
-      "4053 HWY 57 NORTH": [
-        "mac",
-        "vm"
-      ],
-      "98 REDMAN 76X14 MH 15820 13842484": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:1180000161": {
-      "149 JADE COURT": [
-        "mac",
-        "vm"
-      ],
-      "84 BRID 70X14 MH 14229 GBICM16369": [
         "mac",
         "vm"
       ]
@@ -8734,94 +9368,6 @@
         "vm"
       ]
     },
-    "parcel:SC:dillon:0490000190001": {
-      "1436 THOMPSON DRIVE": [
-        "mac",
-        "vm"
-      ],
-      "07 GENERAL 64X28 MH 12917 GMHGA40634281A&B": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:1390000087": {
-      "1739 KEMPER CHURCH ROAD": [
-        "mac",
-        "vm"
-      ],
-      "87 OAKWOOD 70X14 MH 15807 HONC56014CK2506043": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:0501500029": {
-      "820 MT CALVARY ROAD": [
-        "mac",
-        "vm"
-      ],
-      "74 FESTIVAL 70X14 MH 6518 01A204111452030": [
-        "mac",
-        "vm"
-      ],
-      "72 SHALIMAR 60X12 MH 3453 22012": [
-        "mac",
-        "vm"
-      ],
-      "81 HORTON 60X12 MH 13885 0635": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:1240000106": {
-      "2379 HWY 41 SOUTH": [
-        "mac",
-        "vm"
-      ],
-      "89 TITAN 52X28 MH 12639 4997553876A&B": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:0690412023": {
-      "1601 E DARGAN ST": [
-        "mac",
-        "vm"
-      ],
-      "87 CHAMPION 40X28 MH 3748 047766C3263A&B": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:1190000185002": {
-      "1036 OLD EBENEZER ROAD": [
-        "mac",
-        "vm"
-      ],
-      "97 SOUT 80X16 MH 15546 SSLAL35570": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:0321503005": {
-      "2413 FEDERAL ST": [
-        "mac",
-        "vm"
-      ],
-      "99 FLEETWOOD/SPRIN 52X24 MH 16363 GAFLW34A&B71991SH1 2": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:0880000059": {
-      "115 HARTLEY COURT": [
-        "mac",
-        "vm"
-      ],
-      "98 OXFORD 80X24 MH 8915 OHC007371NCAB": [
-        "mac",
-        "vm"
-      ]
-    },
     "parcel:SC:dillon:0790000018": {
       "927 SKILLET RD": [
         "mac",
@@ -8832,102 +9378,12 @@
         "vm"
       ]
     },
-    "parcel:SC:dillon:0480000037": {
-      "2036 BUNKER HILL ROAD": [
-        "mac",
-        "vm"
-      ],
-      "95 GENERAL 56X24 MH 7459 GMHGA337957658A&B": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:1120000143001": {
-      "174 N FORDTOWN ROAD": [
-        "mac",
-        "vm"
-      ],
-      "96 REDMAN 70X14 MH 11715 11429408": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:0050000079": {
-      "4616 CAROLINA CHURCH ROAD": [
-        "mac",
-        "vm"
-      ],
-      "12 SOUTHERN 68X28 MH 14399 SA4058904ALAB": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:0600300039": {
-      "635 MT CALVARY RD": [
-        "mac",
-        "vm"
-      ],
-      "82 REDMAN/VENTURE 68X14 MH 12738 13805870": [
-        "mac",
-        "vm"
-      ]
-    },
     "parcel:SC:dillon:1040000071": {
       "811 ALLENTOWN DR": [
         "mac",
         "vm"
       ],
       "809 & 811 ALLENTOWN DRIVE LOT #2": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:1041103012": {
-      "109 SHORT STREET": [
-        "mac",
-        "vm"
-      ],
-      "87 FLEETWOOD 70X14 MH 15883 NCFLH41A1020RK": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:1180000304": {
-      "330 BRIAR PATCH LANE": [
-        "mac",
-        "vm"
-      ],
-      "95 FLEETWOOD 52X28 MH 12986 NCFLR56A&B10745SW": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:1200000110": {
-      "1451 HAYMOUNT ROAD": [
-        "mac",
-        "vm"
-      ],
-      "01 FLEETWOOD/TIMBE 60X28 MH 16664 NCFLY69AB60023TL12": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:0120000084": {
-      "4443 JUDSON ROAD": [
-        "mac",
-        "vm"
-      ],
-      "84 LIBERTY 80X14 MH 10938 02L22032": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:1250000222001": {
-      "654 S FORDTOWN ROAD": [
-        "mac",
-        "vm"
-      ],
-      "01 FLEETWOOD/WEST 76X16 MH 13459 GAPLY75A37380WT21": [
         "mac",
         "vm"
       ]
@@ -8952,32 +9408,12 @@
         "vm"
       ]
     },
-    "parcel:SC:dillon:1240000247": {
-      "1768 SHADY PINE DR": [
-        "mac",
-        "vm"
-      ],
-      "99 FLEETWOOD 70X14 MH 13956 VAFLX19A52060WG22": [
-        "mac",
-        "vm"
-      ]
-    },
     "parcel:SC:dillon:1070000337": {
       "1637 LESTER ROAD": [
         "mac",
         "vm"
       ],
       "98 FLEETWOOD/FESTI AD#24-01061MH 14032 NCFLW41A39838FE13": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:oconee:1231101008": {
-      "10139 A CLEMSON BLVD": [
-        "mac",
-        "vm"
-      ],
-      "261, TALONS RIDGE ROAD, OCONEE COUNTY, SOUTH CAROLINA, 29672, UNITED STATES": [
         "mac",
         "vm"
       ]
@@ -9132,156 +9568,6 @@
         "vm"
       ],
       "1546 MONTCLAIR LN": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:parcel \u2014 ponder|NC:madison": {
-      "PARCEL \u2014 PONDER, AARON LANE \u2014 MADISON NC DELINQUENT TAX $6,718 OWED (PARCEL 15604)": [
-        "mac",
-        "vm"
-      ],
-      "PARCEL \u2014 PONDER, AARON LANE \u2014 MADISON NC DELINQUENT TAX $1,797 OWED (PARCEL 19771)": [
-        "mac",
-        "vm"
-      ],
-      "PARCEL \u2014 PONDER, AARON LANE \u2014 MADISON NC DELINQUENT TAX $5,831 OWED (PARCEL 7580)": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:parcel \u2014 pheasant run|NC:madison": {
-      "PARCEL \u2014 PHEASANT RUN, INC, A NC CORP \u2014 MADISON NC DELINQUENT TAX $270 OWED (PARCEL 25149": [
-        "mac",
-        "vm"
-      ],
-      "PARCEL \u2014 PHEASANT RUN, INC, A NC CORP \u2014 MADISON NC DELINQUENT TAX $339 OWED (PARCEL 25395": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:parcel \u2014 active tax foreclosure \u2014 ln|NC:beaufort": {
-      "PARCEL \u2014 ACTIVE TAX FORECLOSURE \u2014 LANE, JOSEPH G \u2014 BEAUFORT NC DELINQUENT TAX $3,750 OWED": [
-        "mac",
-        "vm"
-      ],
-      "PARCEL \u2014 ACTIVE TAX FORECLOSURE \u2014 LANE, JOSEPH G \u2014 BEAUFORT NC DELINQUENT TAX $5,151 OWED": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:parcel \u2014 ln|NC:beaufort": {
-      "PARCEL \u2014 LANE, RHONDA K \u2014 BEAUFORT NC DELINQUENT TAX $41 OWED (PARCEL 32255)": [
-        "mac",
-        "vm"
-      ],
-      "PARCEL \u2014 LANE, JAMES KENNETH \u2014 BEAUFORT NC DELINQUENT TAX $785 OWED (PARCEL 9410)": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:parcel \u2014 woodruff|NC:beaufort": {
-      "PARCEL \u2014 WOODRUFF, APRIL LANE \u2014 BEAUFORT NC DELINQUENT TAX $221 OWED (PARCEL 21056)": [
-        "mac",
-        "vm"
-      ],
-      "PARCEL \u2014 WOODRUFF, APRIL LANE \u2014 BEAUFORT NC DELINQUENT TAX $270 OWED (PARCEL 21057)": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:parcel \u2014 griffin|NC:beaufort": {
-      "PARCEL \u2014 GRIFFIN, JOSEPH LANE \u2014 BEAUFORT NC DELINQUENT TAX $239 OWED (PARCEL 45610)": [
-        "mac",
-        "vm"
-      ],
-      "PARCEL \u2014 GRIFFIN, JOSEPH LANE \u2014 BEAUFORT NC DELINQUENT TAX $77 OWED (PARCEL 45611)": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:parcel \u2014 city of high point \u2014 guilford nc delinquent tax $11|NC:guilford": {
-      "PARCEL \u2014 CITY OF HIGH POINT \u2014 GUILFORD NC DELINQUENT TAX $11,038 OWED (PARCEL 172214)": [
-        "mac",
-        "vm"
-      ],
-      "PARCEL \u2014 CITY OF HIGH POINT \u2014 GUILFORD NC DELINQUENT TAX $11,427 OWED (PARCEL 172699)": [
-        "mac",
-        "vm"
-      ],
-      "PARCEL \u2014 CITY OF HIGH POINT \u2014 GUILFORD NC DELINQUENT TAX $11,031 OWED (PARCEL 172214)": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:parcel \u2014 ln|NC:guilford": {
-      "PARCEL \u2014 LANE, RUBY A \u2014 GUILFORD NC DELINQUENT TAX $13,774 OWED (PARCEL 191664)": [
-        "mac",
-        "vm"
-      ],
-      "PARCEL \u2014 LANE, MARY MAGDALENE \u2014 GUILFORD NC DELINQUENT TAX $40,840 OWED (PARCEL 190536)": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:parcel \u2014 city of high point \u2014 guilford nc delinquent tax $16|NC:guilford": {
-      "PARCEL \u2014 CITY OF HIGH POINT \u2014 GUILFORD NC DELINQUENT TAX $16,220 OWED (PARCEL 173847)": [
-        "mac",
-        "vm"
-      ],
-      "PARCEL \u2014 CITY OF HIGH POINT \u2014 GUILFORD NC DELINQUENT TAX $16,219 OWED (PARCEL 173847)": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:parcel \u2014 city of high point \u2014 guilford nc delinquent tax $12|NC:guilford": {
-      "PARCEL \u2014 CITY OF HIGH POINT \u2014 GUILFORD NC DELINQUENT TAX $12,069 OWED (PARCEL 173988)": [
-        "mac",
-        "vm"
-      ],
-      "PARCEL \u2014 CITY OF HIGH POINT \u2014 GUILFORD NC DELINQUENT TAX $12,193 OWED (PARCEL 175080)": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:parcel \u2014 st louis|NC:guilford": {
-      "PARCEL \u2014 ST LOUIS, PATSY MAE COLLINS \u2014 GUILFORD NC DELINQUENT TAX $4,387 OWED (PARCEL 161": [
-        "mac",
-        "vm"
-      ],
-      "PARCEL \u2014 ST LOUIS, PATSY MAE \u2014 GUILFORD NC DELINQUENT TAX $2,680 OWED (PARCEL 161423)": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:parcel \u2014 nichols|NC:pitt": {
-      "PARCEL \u2014 NICHOLS, TERESA LANE \u2014 PITT NC DELINQUENT TAX $4,396 OWED (PARCEL 53778)": [
-        "mac",
-        "vm"
-      ],
-      "PARCEL \u2014 NICHOLS, TERESA LANE \u2014 PITT NC DELINQUENT TAX $11,077 OWED (PARCEL 62119)": [
-        "mac",
-        "vm"
-      ],
-      "PARCEL \u2014 NICHOLS, TERESA LANE \u2014 PITT NC DELINQUENT TAX $4,469 OWED (PARCEL 53778)": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:parcel \u2014 pl|NC:pitt": {
-      "PARCEL \u2014 PLACE, LEIGH SWITZER \u2014 PITT NC DELINQUENT TAX $1,820 OWED (PARCEL 54026)": [
-        "mac",
-        "vm"
-      ],
-      "PARCEL \u2014 PLACE, LEIGH SWITZER \u2014 PITT NC DELINQUENT TAX $242 OWED (PARCEL 55736)": [
-        "mac",
-        "vm"
-      ],
-      "PARCEL \u2014 PLACE, LEIGH SWITZER \u2014 PITT NC DELINQUENT TAX $3,482 OWED (PARCEL 4113)": [
-        "mac",
-        "vm"
-      ],
-      "PARCEL \u2014 PLACE, LEIGH SWITZER \u2014 PITT NC DELINQUENT TAX $241 OWED (PARCEL 55736)": [
         "mac",
         "vm"
       ]
@@ -12046,292 +12332,12 @@
         "vm"
       ]
     },
-    "parcel:SC:dillon:0320000125": {
-      "23 TRU/ MH 48X28 MH 16723 CLH049241TNAB": [
-        "mac",
-        "vm"
-      ],
-      "2810 SINCLAIR ROAD": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:0690215011": {
-      "609 E PALMETTO STREET E SIDE PALMETTO ST 350FT N INT": [
-        "mac",
-        "vm"
-      ],
-      "94 FLEETWOOD 76X14 MH 6633 VAFLP19A35884SP": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:0190000128": {
-      "97 FLEETWOOD 66X14 MH 16305 NCFLV41A46993C012": [
-        "mac",
-        "vm"
-      ],
-      "2921 ZIMP DRIVE PINE RIDGE PHASE 4 LOT #2": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:0331100011": {
-      "96 HBO/OAKWOOD 70X14 MH 11721 HONC03311270": [
-        "mac",
-        "vm"
-      ],
-      "98 PIONEER 80X14 MH 11642 PH1306GA14433": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:0331100063": {
-      "97 GENERAL 70X14 MH 14058 LHSC530960460": [
-        "mac",
-        "vm"
-      ],
-      "86 OAKWOOD 60X14 MH 6699 H0NC16014FK2119767": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:1250000222": {
-      "01 FLEETWOOD/WEST 76X16 MH 13459 GAPLY75A37380WT21": [
-        "mac",
-        "vm"
-      ],
-      "654 S FORDTOWN ROAD": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:1170000007": {
-      "91 FISHER AD#24-00393MH 13831 NCFC5452": [
-        "mac",
-        "vm"
-      ],
-      "96 FLEETWOOD/WESTO 70X14 MH 16451 GAFLS75A63600WE": [
-        "mac",
-        "vm"
-      ]
-    },
     "parcel:SC:dillon:1330000101": {
       "1413 PRESTWOOD COU AD#24-00402SHAN-RON ACRES LOT 3": [
         "mac",
         "vm"
       ],
       "94 FLEETWOOD/TRACE AD#24-01663MH 12931 GAFLR54A&B74276ET": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:1230000021": {
-      "83 VOGUE FLEETWOOD 52X24 MH 11037 VPNC7237V": [
-        "mac",
-        "vm"
-      ],
-      "1736 ELVINGTON COURT": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:0600300102": {
-      "87 FLEETWOOD 76X14 MH 7448 GAFLCTIAH504502906": [
-        "mac",
-        "vm"
-      ],
-      "2003 CATALPA DR": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:1070000026": {
-      "800 FT NW S-17-45 & APP 1.7 MINE INT SC57 & S-17-45": [
-        "mac",
-        "vm"
-      ],
-      "87 CORONADO 65X14 MH 8547 FLC01AH64109550": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:0800000063": {
-      "03 CHANDELEUR 66X28 MH 12096 CH3AL07220AB": [
-        "mac",
-        "vm"
-      ],
-      "446-A EAST COUNTRYSIDE ROAD TR 11 P 20/42": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:0690804014": {
-      "95 HOMESTEAD/SOUTH 80X14 MH 12640 HMST9659GA": [
-        "mac",
-        "vm"
-      ],
-      "915 PERRY AVE LOT#13 &14": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:0690000178": {
-      "23 TRU/ MH 76X14 MH 16637 CWPO5600TN": [
-        "mac",
-        "vm"
-      ],
-      "85 FRONT 60X14 MH 11932 AJ20872A": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:0690412002": {
-      "97 FLEETWOOD/WESTF 80X16 MH 8217 GAFLT07A38754W212": [
-        "mac",
-        "vm"
-      ],
-      "303 NEW JERUSALEM AD#24-00943": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:1240000129": {
-      "1545 JOANN BRANCH RD": [
-        "mac",
-        "vm"
-      ],
-      "97 BELLCREST/NORTH 80X16 MH 16693 GBHMK50210": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:0760000108": {
-      "285 MEGGS ISLAND ROAD": [
-        "mac",
-        "vm"
-      ],
-      "01 PIONEER 56X28 MH 13005 PH1124GA18091AB": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:0690406030": {
-      "96 FLEETWOOD/WESTO 80X16 MH 7653 GAFLS75A25956WE11": [
-        "mac",
-        "vm"
-      ],
-      "1418 BETHEA STREET S SIDE BETHEA ST 550FT E OF SC": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:1240000175": {
-      "1562 HILLTOP ACRES DRIVE MAY HILLTOP ACRES SUBDIVISION": [
-        "mac",
-        "vm"
-      ],
-      "99 REDMAN 52X24 MH 12782 11433524": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:1360000049": {
-      "2571 OLD RIVER ROAD FORK": [
-        "mac",
-        "vm"
-      ],
-      "92 CLAYTON 60X24 MH 16295 CLR006410TNA&B": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:1180403035": {
-      "94 FLEETWOOD/WESTO 70X14 MH 13708 GAFLR75A22236WE": [
-        "mac",
-        "vm"
-      ],
-      "318 GRAHAM STREET": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:0940000007": {
-      "92 REDMAN/NEWMAN 80X14 MH 15186 13823957": [
-        "mac",
-        "vm"
-      ],
-      "1759 MOTLEY DRIVE LOT #5 MOTLEY DRIVE SUB": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:0200000111": {
-      "93 FLEETWOOD 72X14 MH 16052 NCFLN41A24001V0": [
-        "mac",
-        "vm"
-      ],
-      "1132 HULEE PLACE LOT #18": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:1240000181": {
-      "72 TALL OAKS 60X12 MH 10903 0-1698": [
-        "mac",
-        "vm"
-      ],
-      "1569 JOANNE BRANCH AD#24-01801": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:0690212022": {
-      "77 CHAMPION 40X24 MH 14588 2377160228": [
-        "mac",
-        "vm"
-      ],
-      "811 BYRD COURT 200FT W PALMETTO ST 150FT N PA": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:0690212024": {
-      "73 CHAMPION 65X12 MH 13999 233982D4600": [
-        "mac",
-        "vm"
-      ],
-      "180 FEET SOUTH OF PALMETTO ST": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:0601100010": {
-      "88 CLAYTON/RIDGEWA 70X14 MH 14183 43888": [
-        "mac",
-        "vm"
-      ],
-      "452 DEREK COURT": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:1180000052": {
-      "500 FT E US301 & 8/10 MI S INTUS301 & S-17-524": [
-        "mac",
-        "vm"
-      ],
-      "84 CONNER 60X14 MH 13385 30922": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:dillon:0700700038": {
-      "19 CMH/VICTORY PLU 76X16 MH 15706 SRB032643AL": [
-        "mac",
-        "vm"
-      ],
-      "2127 NELSON DRIVE AD#24-02102S SIDE PHILLIP AVE APP 650FT E": [
         "mac",
         "vm"
       ]
