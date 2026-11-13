@@ -1,8 +1,8 @@
 {
- "board_rows": 472777,
+ "board_rows": 584996,
  "by_category": {
-  "uncovered": 181443,
-  "wall": 20358
+  "uncovered": 288962,
+  "wall": 20360
  },
  "format_version": 1,
  "kind": "wall_punchlist_summary",
@@ -61,8 +61,8 @@
    "generated_at": "2026-10-17T14:28:27Z"
   },
   "tax_lien": {
-   "entries": 68815,
-   "generated_at": "2026-11-07T01:51:12Z"
+   "entries": 79430,
+   "generated_at": "2026-11-13T13:35:00Z"
   },
   "tax_lien_johnston_static": {
    "entries": 8,
@@ -73,10 +73,10 @@
    "generated_at": "2026-10-17T14:28:27Z"
   }
  },
- "listings": 201801,
+ "listings": 309322,
  "uncovered": {
   "by_scraper_source": {
-   "city_websites.charlotte_open_data": 5436,
+   "city_websites.charlotte_open_data": 5342,
    "counties_generic.arcgis_distress.columbia_code_vacant_boarded": 972,
    "counties_generic.arcgis_distress.durham_open_code_violations": 1034,
    "counties_generic.arcgis_distress.greensboro_code_housing": 603,
@@ -86,53 +86,53 @@
    "counties_generic.arcgis_distress.spartanburg_infill_eligible": 1062,
    "counties_generic.arcgis_distress.spartanburg_property_cleanup": 2050,
    "counties_generic.epa_frs.acres": 1551,
-   "counties_generic.epa_frs.sems": 2008,
+   "counties_generic.epa_frs.sems": 2007,
    "counties_generic.state_contamination.nc_dam_safety": 7544,
    "counties_generic.state_contamination.nc_inactive_hazardous": 1487,
-   "counties_generic.state_contamination.nc_ust_incidents": 38328,
+   "counties_generic.state_contamination.nc_ust_incidents": 38324,
    "counties_nc.albemarle_observer_tax_lists": 5939,
    "counties_nc.asheville_helene": 698,
-   "counties_nc.gaston_vacant": 21247,
-   "counties_nc.gastonia_code_enforcement": 1125,
+   "counties_nc.gaston_vacant": 20414,
+   "counties_nc.gastonia_code_enforcement": 1087,
    "counties_nc.lincoln_vacant": 14878,
-   "counties_nc.nc_county_pdf_delinquent_tax": 3201,
-   "counties_nc.polk_tax": 1622,
+   "counties_nc.nc_county_pdf_delinquent_tax": 3200,
+   "counties_nc.polk_tax": 2618,
    "counties_nc.transylvania_vacant": 10883,
    "counties_sc.charleston_delinquent_tax": 1757,
    "counties_sc.charleston_tax_sale_xlsx": 2393,
+   "counties_sc.lexington_homestead": 28099,
    "counties_sc.sc_heir_estate_parcel_cache": 8528,
    "counties_sc.sc_probate_net": 507,
-   "counties_sc.sc_probate_notices.yourpickenscounty": 442,
-   "counties_sc.sc_public_index": 2674,
+   "counties_sc.sc_public_index": 2518,
    "counties_sc.sc_public_notices": 643,
    "counties_sc.sc_ust_registry": 15582,
    "counties_sc.spartanburg_condemned": 1492,
-   "counties_sc.spartanburg_vacant": 4220,
+   "counties_sc.spartanburg_vacant": 4221,
+   "counties_sc.york_homestead": 78965,
    "courtlistener.recap": 730,
-   "national.distressed": 4777,
-   "national.hud_reac_inspection": 816,
+   "national.distressed": 4773,
+   "national.hud_reac_inspection": 815,
    "national.jail_bookings": 2236,
-   "national.landandfarm": 461,
    "national.landwatch": 578,
    "national.sc_public_index": 1587,
    "national.usda_properties": 766
   },
   "top_counties": {
-   "NC:cumberland": 2185,
    "NC:durham": 2925,
-   "NC:forsyth": 2407,
-   "NC:gaston": 24302,
+   "NC:forsyth": 2408,
+   "NC:gaston": 23423,
    "NC:guilford": 4621,
-   "NC:lincoln": 16835,
+   "NC:lincoln": 16825,
    "NC:mcdowell": 2950,
-   "NC:mecklenburg": 9669,
+   "NC:mecklenburg": 9573,
+   "NC:polk": 3050,
    "NC:transylvania": 11368,
-   "NC:wake": 3880,
+   "NC:wake": 3883,
    "SC:charleston": 7698,
-   "SC:colleton": 2200,
-   "SC:pickens": 2399,
-   "SC:richland": 2201,
-   "SC:spartanburg": 11121
+   "SC:lexington": 29108,
+   "SC:pickens": 2294,
+   "SC:spartanburg": 11122,
+   "SC:york": 79901
   }
  },
  "wall": {
@@ -182,7 +182,8 @@
    "national.hubzu": 2,
    "national.landandfarm": 8,
    "national.landwatch": 1,
-   "national.sc_public_index": 448,
+   "national.sc_public_index": 449,
+   "national.sc_public_index.judgment_lien": 1,
    "national.servicelink_auction": 1,
    "national.trulia": 1,
    "national.usda_properties": 1,
@@ -193,7 +194,7 @@
    "reo.vrm_va_reo": 2
   },
   "by_signal": {
-   "court_wall": 6733,
+   "court_wall": 6735,
    "divorce": 4903,
    "lien_registry_wall": 8722
   },
@@ -203,10 +204,10 @@
    "nc_sp": 161,
    "sc_lien_registries": 8722,
    "sc_notice_body": 118,
-   "sc_publicindex": 3967
+   "sc_publicindex": 3969
   },
   "by_wall_state": {
-   "not_yet_labelled": 18702,
+   "not_yet_labelled": 18704,
    "recorded": 1656
   },
   "top_counties": {

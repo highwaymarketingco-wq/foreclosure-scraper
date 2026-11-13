@@ -89,3 +89,11 @@ docs/parcel_photos/
 
 # Responsible-disclosure drafts name exposed endpoints; the repo is PUBLIC. Keep local (2026-09-20).
 docs/pii_disclosure_drafts_*.md
+
+# transient per-PID staging artifacts from write_parts()/patch_existing_rows() -- never
+# meant to be committed; a mid-write snapshot here is torn by definition
+docs/*.[0-9]*.tmp
+docs/.write_parts_staging.*/
+# monolithic un-sharded combined board file -- source of truth is listings_part_*.json.gz;
+# exceeds GitHub 100MB limit, should never be tracked (caught 2026-11-13, broke a push)
+docs/listings.json.gz
