@@ -1,10 +1,10 @@
 {
-  "note": "Triage of docs/reconcile_2026-11-13/identity_collisions.json (2026-11-13, refined pass). Four buckets, each a distinct reason the same dedupe_key maps to 2+ different-looking addresses -- most are explainable, NOT a real data bug: (1) likely_false_positive_same_street: every address shares the same street NAME (just different house numbers/units) -- one legal parcel covering a multi-building condo/apartment complex. (2) likely_false_positive_mobile_home: at least one address matches a manufactured-home description pattern (brand + WIDTHxLENGTH + MH + serial#) -- multiple mobile homes legitimately sitting on one land parcel; common in rural SC/NC counties (Dillon county alone: ~50 of these). (3) likely_false_positive_text_blob_address: at least one value is a long (>60 char) free-text blob, not a real address -- a scraper (public-notice/newspaper delinquent-tax-list parsers, e.g. Madison/Pitt/Polk NC) stuffed a whole notice sentence (PARCEL -- OWNER -- COUNTY DELINQUENT TAX $X OWED (PARCEL N)) into street_address when it had no clean address to extract, and multiple bills/years for the same real debt then collide under one key. Not a wrong-pick problem -- the field itself is being misused upstream; fixing it means the scraper, not the merge. (4) real_candidates: none of the above explain it -- genuinely worth live-verifying the way the 3 original buncombe_unpaid_bills PINs were fixed (those 3 are already patched and will still show up here since this file was not regenerated after that fix -- skip them).",
+  "note": "Triage of docs/reconcile_2026-11-13/identity_collisions.json (2026-11-13, pass 2 -- adds street-suffix-abbreviation normalization that pass 1 was missing, e.g. 'Ln.'/'Lane', 'Ct.'/'Ct', 'Ave.'/'Avenue' now compare equal). Four buckets, same meaning as pass 1: (1) likely_false_positive_same_street: every address normalizes to the same street name -- one legal parcel covering a multi-building condo/apartment complex. (2) likely_false_positive_mobile_home: manufactured-home description pattern -- multiple mobile homes on one land parcel. (3) likely_false_positive_text_blob_address: a scraper stuffed a whole notice sentence into street_address -- a scraper fix, not a merge decision. (4) real_candidates: none of the above explain it -- worth live-verifying per cluster.",
   "counts": {
-    "likely_false_positive_same_street": 375,
+    "likely_false_positive_same_street": 497,
     "likely_false_positive_mobile_home": 50,
     "likely_false_positive_text_blob_address": 27,
-    "real_candidates": 498
+    "real_candidates": 376
   },
   "total": 950,
   "likely_false_positive_same_street": {
@@ -14,6 +14,16 @@
         "vm"
       ],
       "NORTH POPLAR ST": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:main st|SC:laurens": {
+      "MAIN STREET": [
+        "mac",
+        "vm"
+      ],
+      "MAIN ST": [
         "mac",
         "vm"
       ]
@@ -362,6 +372,16 @@
         "vm"
       ]
     },
+    "parcel:NC:rutherford:1613365795": {
+      "902 LAWING MILL ROAD": [
+        "mac",
+        "vm"
+      ],
+      "898 LAWING MILL RD": [
+        "mac",
+        "vm"
+      ]
+    },
     "parcel:NC:henderson:9587775455": {
       "36 BIRCHVIEW LN": [
         "mac",
@@ -382,6 +402,36 @@
         "vm"
       ],
       "101 RING AVE": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:NC:mecklenburg:02119164": {
+      "12917 EASTFIELD ROAD": [
+        "mac",
+        "vm"
+      ],
+      "12901 EASTFIELD RD": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:NC:macon:6516063667": {
+      "1754 HIGH WATER TRL": [
+        "mac",
+        "vm"
+      ],
+      "1284 HIGH WATER TRAIL": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:NC:buncombe:9655599210": {
+      "70 PARK AVE.": [
+        "mac",
+        "vm"
+      ],
+      "74 PARK AVE": [
         "mac",
         "vm"
       ]
@@ -416,6 +466,16 @@
         "vm"
       ],
       "180 TOMAHAWK TRAIL": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:NC:buncombe:9685893201": {
+      "25 ERIN GLEN CT": [
+        "mac",
+        "vm"
+      ],
+      "49 ERIN GLEN COURT": [
         "mac",
         "vm"
       ]
@@ -478,6 +538,26 @@
         "vm"
       ]
     },
+    "parcel:NC:cabarrus:5622128160": {
+      "3341 CLOVERLEAF PARKWAY": [
+        "mac",
+        "vm"
+      ],
+      "3333 CLOVERLEAF PKWY": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:NC:stanly:557501467287": {
+      "502 N CENTRAL AVE.": [
+        "mac",
+        "vm"
+      ],
+      "504 N. CENTRAL AVE": [
+        "mac",
+        "vm"
+      ]
+    },
     "parcel:NC:rutherford:1529412972": {
       "708 OLD STONECUTTER RD": [
         "mac",
@@ -514,6 +594,16 @@
         "vm"
       ],
       "8935 NORTHPOINTE EXECUTIVE PARK DR": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:NC:buncombe:9699807496": {
+      "121 LYTLE COVE RD": [
+        "mac",
+        "vm"
+      ],
+      "105 LYTLE COVE ROAD": [
         "mac",
         "vm"
       ]
@@ -646,6 +736,16 @@
         "vm"
       ]
     },
+    "parcel:NC:henderson:9577161766": {
+      "248 IRONWOOD DR.": [
+        "mac",
+        "vm"
+      ],
+      "159 IRONWOOD DR": [
+        "mac",
+        "vm"
+      ]
+    },
     "parcel:NC:cabarrus:5529687026": {
       "100 CONCORD CHASE CIR SW": [
         "mac",
@@ -768,6 +868,44 @@
         "vm"
       ]
     },
+    "parcel:NC:guilford:7821375832": {
+      "122 OAKDALE FOREST LN.": [
+        "mac",
+        "vm"
+      ],
+      "120 OAKDALE FOREST LANE": [
+        "mac",
+        "vm"
+      ],
+      "118 OAKDALE FOREST LANE": [
+        "mac",
+        "vm"
+      ],
+      "116 OAKDALE FOREST LANE": [
+        "mac",
+        "vm"
+      ],
+      "114 OAKDALE FOREST LANE": [
+        "mac",
+        "vm"
+      ],
+      "112 OAKDALE FOREST LANE": [
+        "mac",
+        "vm"
+      ],
+      "110 OAKDALE FOREST LN.": [
+        "mac",
+        "vm"
+      ],
+      "108 OAKDALE FOREST LN.": [
+        "mac",
+        "vm"
+      ],
+      "106 OAKDALE FOREST LN.": [
+        "mac",
+        "vm"
+      ]
+    },
     "parcel:NC:richmond:746201376955": {
       "254 OLD CHERAW HIGHWAY": [
         "mac",
@@ -798,6 +936,54 @@
         "vm"
       ]
     },
+    "parcel:NC:brunswick:234gn012": {
+      "2913 WEST YACHT DRIVE": [
+        "mac",
+        "vm"
+      ],
+      "2905 WEST YACHT DR": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:NC:yadkin:486601190846": {
+      "1017 BROOKS DRIVE": [
+        "mac",
+        "vm"
+      ],
+      "1013 BROOKS DR": [
+        "mac",
+        "vm"
+      ],
+      "1009 BROOKS DRIVE": [
+        "mac",
+        "vm"
+      ],
+      "1005 BROOKS DRIVE": [
+        "mac",
+        "vm"
+      ],
+      "1020 BROOKS DRIVE": [
+        "mac",
+        "vm"
+      ],
+      "1016 BROOKS DRIVE": [
+        "mac",
+        "vm"
+      ],
+      "1012 BROOKS DRIVE": [
+        "mac",
+        "vm"
+      ],
+      "1004 BROOKS DRIVE": [
+        "mac",
+        "vm"
+      ],
+      "1021 BROOKS DRIVE": [
+        "mac",
+        "vm"
+      ]
+    },
     "parcel:NC:onslow:302e19": {
       "208 EAST PEYTON PLACE": [
         "mac",
@@ -824,6 +1010,16 @@
         "vm"
       ],
       "4445 PAPA JOE HENDRICK BLVD": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:NC:mecklenburg:07103311": {
+      "444 WALNUT AVE": [
+        "mac",
+        "vm"
+      ],
+      "442 WALNUT AV": [
         "mac",
         "vm"
       ]
@@ -924,6 +1120,16 @@
         "vm"
       ],
       "527 HEWETT LANDING DR": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:NC:chatham:0080815": {
+      "4792 R JORDAN RD": [
+        "mac",
+        "vm"
+      ],
+      "4784 R JORDAN RD.": [
         "mac",
         "vm"
       ]
@@ -1036,6 +1242,36 @@
         "vm"
       ]
     },
+    "parcel:NC:guilford:7970133282": {
+      "8300 MAPLEWAY LANE": [
+        "mac",
+        "vm"
+      ],
+      "8302 MAPLEWAY LN.": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:NC:mecklenburg:02509122": {
+      "9320 CENTER LAKE DRIVE": [
+        "mac",
+        "vm"
+      ],
+      "9325 CENTER LAKE DR.": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:NC:harnett:0624355943": {
+      "224 RIVER RD.": [
+        "mac",
+        "vm"
+      ],
+      "310 RIVER ROAD": [
+        "mac",
+        "vm"
+      ]
+    },
     "parcel:NC:harnett:0569463958": {
       "4186 ROSS RD": [
         "mac",
@@ -1056,6 +1292,20 @@
         "vm"
       ],
       "40 CATTAIL": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:NC:guilford:7910134066": {
+      "8121 ASPERY CT.": [
+        "mac",
+        "vm"
+      ],
+      "8117 ASPERY CT": [
+        "mac",
+        "vm"
+      ],
+      "8113 ASPERY CT": [
         "mac",
         "vm"
       ]
@@ -1086,6 +1336,56 @@
         "vm"
       ],
       "207 LAKEWOOD DR": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:NC:catawba:370207688575": {
+      "236 2ND ST SE": [
+        "mac",
+        "vm"
+      ],
+      "234 2ND ST SE": [
+        "mac",
+        "vm"
+      ],
+      "232 2ND ST SE": [
+        "mac",
+        "vm"
+      ],
+      "230 2ND ST SE": [
+        "mac",
+        "vm"
+      ],
+      "228 2ND ST SE": [
+        "mac",
+        "vm"
+      ],
+      "226 2ND ST SE": [
+        "mac",
+        "vm"
+      ],
+      "224 2ND ST SE": [
+        "mac",
+        "vm"
+      ],
+      "222 2ND ST SE": [
+        "mac",
+        "vm"
+      ],
+      "220 2ND ST SE": [
+        "mac",
+        "vm"
+      ],
+      "218 2ND ST SE": [
+        "mac",
+        "vm"
+      ],
+      "216 2ND ST SE": [
+        "mac",
+        "vm"
+      ],
+      "210 2ND ST. SE": [
         "mac",
         "vm"
       ]
@@ -1196,6 +1496,16 @@
         "vm"
       ],
       "211 BROOKHAVEN": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:NC:new hanover:r05407024006": {
+      "2209 GIBSON AVE": [
+        "mac",
+        "vm"
+      ],
+      "2207 GIBSON AV": [
         "mac",
         "vm"
       ]
@@ -1316,6 +1626,16 @@
         "vm"
       ]
     },
+    "parcel:NC:onslow:321116": {
+      "234 FLOWERS LANE": [
+        "mac",
+        "vm"
+      ],
+      "230 FLOWERS LN": [
+        "mac",
+        "vm"
+      ]
+    },
     "parcel:NC:alamance:8854540055": {
       "2854 LONGPINE RD": [
         "mac",
@@ -1340,6 +1660,26 @@
         "vm"
       ],
       "1105 MCQUAY STREET": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:NC:duplin:330617110136": {
+      "103 W CAVENAUGH ST.": [
+        "mac",
+        "vm"
+      ],
+      "101 W CAVENAUGH ST": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:NC:guilford:7801421723": {
+      "1185 E LEXINGTON AVE.": [
+        "mac",
+        "vm"
+      ],
+      "1137 E LEXINGTON AVE": [
         "mac",
         "vm"
       ]
@@ -1388,6 +1728,26 @@
         "vm"
       ],
       "45 SADDLE WAY": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:NC:guilford:8816899930": {
+      "3795 HIGH ROCK RD": [
+        "mac",
+        "vm"
+      ],
+      "3765 HIGH ROCK ROAD": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:NC:montgomery:657420909625": {
+      "121 BONEY POINT RD": [
+        "mac",
+        "vm"
+      ],
+      "125 BONEY POINT ROAD": [
         "mac",
         "vm"
       ]
@@ -1460,6 +1820,16 @@
         "vm"
       ]
     },
+    "parcel:NC:new hanover:3147307386": {
+      "5305 WRIGHTSVILLE AVE": [
+        "mac",
+        "vm"
+      ],
+      "5301 WRIGHTSVILLE AVENUE": [
+        "mac",
+        "vm"
+      ]
+    },
     "parcel:NC:wake:1716319406": {
       "4407 BLAND ROAD": [
         "mac",
@@ -1528,6 +1898,30 @@
         "vm"
       ]
     },
+    "parcel:NC:guilford:6890069540": {
+      "1666 BRUMLEY CT.": [
+        "mac",
+        "vm"
+      ],
+      "1664 BRUMLEY CT": [
+        "mac",
+        "vm"
+      ],
+      "1662 BRUMLEY CT.": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:NC:brunswick:2130003809": {
+      "4753 PINE LAKE DR.": [
+        "mac",
+        "vm"
+      ],
+      "4741 PINE LAKE DR": [
+        "mac",
+        "vm"
+      ]
+    },
     "parcel:NC:alamance:8844180325": {
       "281 DUNVEGAN LANE": [
         "mac",
@@ -1556,12 +1950,42 @@
         "vm"
       ]
     },
+    "parcel:NC:iredell:4773360251": {
+      "259 IDAHO ROAD": [
+        "mac",
+        "vm"
+      ],
+      "273 IDAHO RD": [
+        "mac",
+        "vm"
+      ]
+    },
     "parcel:NC:pender:3218067449": {
       "4446 WALKERTOWN RD": [
         "mac",
         "vm"
       ],
       "446 WALKERTOWN RD": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:NC:mecklenburg:17706302": {
+      "4350 CONGRESS STREET": [
+        "mac",
+        "vm"
+      ],
+      "4250 CONGRESS ST.": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:NC:orange:9798549464": {
+      "335 W BARBEE CHAPEL ROAD": [
+        "mac",
+        "vm"
+      ],
+      "301 W. BARBEE CHAPEL RD": [
         "mac",
         "vm"
       ]
@@ -1606,6 +2030,16 @@
         "vm"
       ],
       "2182 RAVEN ROCK ROAD": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:NC:new hanover:r05409005018": {
+      "555 CASTLE STREET": [
+        "mac",
+        "vm"
+      ],
+      "553 CASTLE ST": [
         "mac",
         "vm"
       ]
@@ -1662,12 +2096,42 @@
         "vm"
       ]
     },
+    "parcel:NC:watauga:2910600777": {
+      "376 WATAUGA VILLAGE DRIVE": [
+        "mac",
+        "vm"
+      ],
+      "370 WATAUGA VILLAGE DR": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:NC:mecklenburg:11710232": {
+      "2810 WILLOW ST": [
+        "mac",
+        "vm"
+      ],
+      "2814 WILLOW ST.": [
+        "mac",
+        "vm"
+      ]
+    },
     "parcel:NC:moore:862119514325": {
       "225 E MOORE STREET": [
         "mac",
         "vm"
       ],
       "223 E MOORE STREET": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:NC:mecklenburg:22909103": {
+      "9812 REA RD": [
+        "mac",
+        "vm"
+      ],
+      "9628 REA ROAD": [
         "mac",
         "vm"
       ]
@@ -1816,6 +2280,16 @@
         "vm"
       ]
     },
+    "parcel:NC:duplin:237700569326": {
+      "275 CORINTH CHURCH ROAD": [
+        "mac",
+        "vm"
+      ],
+      "269 CORINTH CHURCH RD": [
+        "mac",
+        "vm"
+      ]
+    },
     "parcel:NC:onslow:351k37": {
       "169 PINE GROVE": [
         "mac",
@@ -1856,6 +2330,32 @@
         "vm"
       ],
       "401 BAHAMA LOOP": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:NC:moore:856700251590": {
+      "145 BARBER RD.": [
+        "mac",
+        "vm"
+      ],
+      "323 BARBER RD": [
+        "mac",
+        "vm"
+      ],
+      "209 BARBER RD": [
+        "mac",
+        "vm"
+      ],
+      "231 BARBER RD": [
+        "mac",
+        "vm"
+      ],
+      "255 BARBER RD": [
+        "mac",
+        "vm"
+      ],
+      "355 BARBER RD": [
         "mac",
         "vm"
       ]
@@ -2024,6 +2524,16 @@
         "vm"
       ]
     },
+    "parcel:NC:wayne:26702666505": {
+      "164 FRIENDLY DR": [
+        "mac",
+        "vm"
+      ],
+      "180 FRIENDLY DRIVE": [
+        "mac",
+        "vm"
+      ]
+    },
     "parcel:NC:mecklenburg:14911123": {
       "4309 MURRAYHILL ROAD": [
         "mac",
@@ -2080,6 +2590,20 @@
         "vm"
       ],
       "2446 H BULLARD RD": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:NC:harnett:9564125374": {
+      "3347 HILLMON GROVE RD": [
+        "mac",
+        "vm"
+      ],
+      "1135 HILLMON GROVE ROAD": [
+        "mac",
+        "vm"
+      ],
+      "1163 HILLMON GROVE ROAD": [
         "mac",
         "vm"
       ]
@@ -2328,12 +2852,32 @@
         "vm"
       ]
     },
+    "parcel:SC:spartanburg:1440217500": {
+      "18 S. MAIN STREET": [
+        "mac",
+        "vm"
+      ],
+      "20 S MAIN ST": [
+        "mac",
+        "vm"
+      ]
+    },
     "parcel:SC:anderson:1210002006": {
       "224 HUDSON CIR": [
         "mac",
         "vm"
       ],
       "218 HUDSON CIR": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:SC:anderson:400503031": {
+      "721 GREENVILLE STREET": [
+        "mac",
+        "vm"
+      ],
+      "719 GREENVILLE ST": [
         "mac",
         "vm"
       ]
@@ -2860,6 +3404,36 @@
         "vm"
       ]
     },
+    "addr:parcel \u2014 polk county delinquent tax \u2014 silver creek rd|NC:polk": {
+      "PARCEL \u2014 POLK COUNTY DELINQUENT TAX \u2014 SILVER CREEK RD": [
+        "mac",
+        "vm"
+      ],
+      "PARCEL \u2014 POLK COUNTY DELINQUENT TAX \u2014 SILVER CREEK ROAD": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:parcel \u2014 polk county delinquent tax \u2014 walker rd|NC:polk": {
+      "PARCEL \u2014 POLK COUNTY DELINQUENT TAX \u2014 WALKER RD": [
+        "mac",
+        "vm"
+      ],
+      "PARCEL \u2014 POLK COUNTY DELINQUENT TAX \u2014 WALKER ROAD": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:stewart dairy rd|29645": {
+      "STEWART DAIRY RD": [
+        "mac",
+        "vm"
+      ],
+      "STEWART DAIRY ROAD": [
+        "mac",
+        "vm"
+      ]
+    },
     "parcel:NC:moore:857700640239": {
       "40 TYSONS TRAIL": [
         "mac",
@@ -2894,6 +3468,34 @@
         "vm"
       ]
     },
+    "parcel:NC:mecklenburg:06906238": {
+      "2705 DUNDEEN STREET": [
+        "mac",
+        "vm"
+      ],
+      "2701 DUNDEEN ST": [
+        "mac",
+        "vm"
+      ],
+      "2703 DUNDEEN ST": [
+        "mac",
+        "vm"
+      ],
+      "2707 DUNDEEN ST": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:wilkinsville hwy|29340": {
+      "WILKINSVILLE HWY": [
+        "mac",
+        "vm"
+      ],
+      "WILKINSVILLE HIGHWAY": [
+        "mac",
+        "vm"
+      ]
+    },
     "addr:tbd norton rd|29581": {
       "TBD NORTON RD, LOT#WP000": [
         "mac",
@@ -2904,6 +3506,16 @@
         "vm"
       ],
       "TBD NORTON RD, LOT#WP002": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:NC:rutherford:1614549022": {
+      "543 OWENS CHAPEL ROAD": [
+        "mac",
+        "vm"
+      ],
+      "593 OWENS CHAPEL RD": [
         "mac",
         "vm"
       ]
@@ -3318,6 +3930,66 @@
         "vm"
       ]
     },
+    "addr:n roxboro st|NC:durham": {
+      "N. ROXBORO ST.": [
+        "mac",
+        "vm"
+      ],
+      "N. ROXBORO ST": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:marshall st|29829": {
+      "MARSHALL STREET": [
+        "mac",
+        "vm"
+      ],
+      "MARSHALL ST": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:commerce st|28762": {
+      "COMMERCE ST": [
+        "mac",
+        "vm"
+      ],
+      "COMMERCE ST.": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:stoney mountain rd|28739": {
+      "STONEY MOUNTAIN RD": [
+        "mac",
+        "vm"
+      ],
+      "STONEY MOUNTAIN ROAD": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:cedar creek rd|28302": {
+      "CEDAR CREEK RD": [
+        "mac",
+        "vm"
+      ],
+      "CEDAR CREEK ROAD": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:hwy 17 n|28519": {
+      "HWY 17 N": [
+        "mac",
+        "vm"
+      ],
+      "HWY 17 N.": [
+        "mac",
+        "vm"
+      ]
+    },
     "addr:hwy 70 w|28144": {
       "HWY 70 W": [
         "mac",
@@ -3338,12 +4010,32 @@
         "vm"
       ]
     },
+    "addr:fields st|27828": {
+      "FIELDS ST": [
+        "mac",
+        "vm"
+      ],
+      "FIELDS STREET": [
+        "mac",
+        "vm"
+      ]
+    },
     "addr:hwy 268 e|28659": {
       "HWY 268 E": [
         "mac",
         "vm"
       ],
       "HIGHWAY 268 E": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:hwy 301 n|27893": {
+      "HWY 301 N": [
+        "mac",
+        "vm"
+      ],
+      "HWY 301 N.": [
         "mac",
         "vm"
       ]
@@ -3358,12 +4050,32 @@
         "vm"
       ]
     },
+    "addr:airport rd|28144": {
+      "AIRPORT RD": [
+        "mac",
+        "vm"
+      ],
+      "AIRPORT RD.": [
+        "mac",
+        "vm"
+      ]
+    },
     "addr:hwy 21|28166": {
       "HWY 21": [
         "mac",
         "vm"
       ],
       "HIGHWAY 21": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:silversteen ave|NC:transylvania": {
+      "SILVERSTEEN AVE": [
+        "mac",
+        "vm"
+      ],
+      "SILVERSTEEN AVENUE": [
         "mac",
         "vm"
       ]
@@ -3378,6 +4090,36 @@
         "vm"
       ]
     },
+    "addr:manning dr|27514": {
+      "MANNING DR": [
+        "mac",
+        "vm"
+      ],
+      "MANNING DRIVE": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:old laurel hill church rd|28352": {
+      "OLD LAUREL HILL CHURCH RD": [
+        "mac",
+        "vm"
+      ],
+      "OLD LAUREL HILL CHURCH ROAD": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:vance st|28043": {
+      "VANCE ST": [
+        "mac",
+        "vm"
+      ],
+      "VANCE ST.": [
+        "mac",
+        "vm"
+      ]
+    },
     "addr:hwy 268 e|28621": {
       "HWY 268 E": [
         "mac",
@@ -3388,12 +4130,52 @@
         "vm"
       ]
     },
+    "addr:tuckaseegee rd|28120": {
+      "TUCKASEEGEE RD": [
+        "mac",
+        "vm"
+      ],
+      "TUCKASEEGEE ROAD": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:brickyard rd|28128": {
+      "BRICKYARD RD": [
+        "mac",
+        "vm"
+      ],
+      "BRICKYARD ROAD": [
+        "mac",
+        "vm"
+      ]
+    },
     "addr:hwy 321 & 20th st|28658": {
       "HIGHWAY 321 & 20TH STREET": [
         "mac",
         "vm"
       ],
       "HWY 321 & 20TH STREET": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:se quadrant of us 158 & acorn hill rd|28401": {
+      "SOUTHEAST QUADRANT OF US 158 & ACORN HILL ROAD": [
+        "mac",
+        "vm"
+      ],
+      "SE QUADRANT OF US 158 & ACORN HILL RD": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:riverside dr|NC:surry": {
+      "RIVERSIDE DR.": [
+        "mac",
+        "vm"
+      ],
+      "RIVERSIDE DRIVE": [
         "mac",
         "vm"
       ]
@@ -3414,6 +4196,26 @@
         "vm"
       ],
       "HIGHWAY 89": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:shacktown rd|27379": {
+      "SHACKTOWN RD.": [
+        "mac",
+        "vm"
+      ],
+      "SHACKTOWN RD": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:old liberty rd|27203": {
+      "OLD LIBERTY ROAD": [
+        "mac",
+        "vm"
+      ],
+      "OLD LIBERTY RD.": [
         "mac",
         "vm"
       ]
@@ -3468,12 +4270,92 @@
         "vm"
       ]
     },
+    "addr:main st|27379": {
+      "MAIN ST.": [
+        "mac",
+        "vm"
+      ],
+      "MAIN STREET": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:new st|27288": {
+      "NEW ST.": [
+        "mac",
+        "vm"
+      ],
+      "NEW STREET": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:armory rd|NC:wilkes": {
+      "ARMORY ROAD": [
+        "mac",
+        "vm"
+      ],
+      "ARMORY RD.": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:quarry rd|27215": {
+      "QUARRY RD.": [
+        "mac",
+        "vm"
+      ],
+      "QUARRY ROAD": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:old hwy 421 e|27379": {
+      "OLD HWY 421 E": [
+        "mac",
+        "vm"
+      ],
+      "OLD HWY. 421 E.": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:main st|27573": {
+      "MAIN STREET": [
+        "mac",
+        "vm"
+      ],
+      "MAIN ST.": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:merry hill rd|27983": {
+      "MERRY HILL ROAD": [
+        "mac",
+        "vm"
+      ],
+      "MERRY HILL RD": [
+        "mac",
+        "vm"
+      ]
+    },
     "addr:hwy 64|27928": {
       "HWY 64": [
         "mac",
         "vm"
       ],
       "HIGHWAY 64": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:hwy 264 e|27834": {
+      "HWY 264 E": [
+        "mac",
+        "vm"
+      ],
+      "HWY 264 E.": [
         "mac",
         "vm"
       ]
@@ -3498,6 +4380,16 @@
         "vm"
       ]
     },
+    "addr:prison camp rd|27892": {
+      "PRISON CAMP RD": [
+        "mac",
+        "vm"
+      ],
+      "PRISON CAMP ROAD": [
+        "mac",
+        "vm"
+      ]
+    },
     "addr:hwy 79|NC:scotland": {
       "HIGHWAY 79": [
         "mac",
@@ -3508,12 +4400,42 @@
         "vm"
       ]
     },
+    "addr:river rd|NC:cumberland": {
+      "RIVER ROAD": [
+        "mac",
+        "vm"
+      ],
+      "RIVER RD": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:hwy 15-501 s|NC:moore": {
+      "HWY 15-501 S": [
+        "mac",
+        "vm"
+      ],
+      "HWY 15-501 S.": [
+        "mac",
+        "vm"
+      ]
+    },
     "addr:hwy 301|28358": {
       "HWY 301": [
         "mac",
         "vm"
       ],
       "HIGHWAY 301": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:morganton rd|NC:moore": {
+      "MORGANTON RD": [
+        "mac",
+        "vm"
+      ],
+      "MORGANTON ROAD": [
         "mac",
         "vm"
       ]
@@ -3538,12 +4460,96 @@
         "vm"
       ]
     },
+    "addr:hwy 21 s|28010": {
+      "HWY 21 S": [
+        "mac",
+        "vm"
+      ],
+      "HWY 21 S.": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:w \"c\" st|28081": {
+      "WEST \"C\" ST.": [
+        "mac",
+        "vm"
+      ],
+      "WEST \"C\" STREET": [
+        "mac",
+        "vm"
+      ]
+    },
     "addr:hwy 70 e|28677": {
       "HWY 70 EAST": [
         "mac",
         "vm"
       ],
       "HIGHWAY 70 EAST": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:brawley school rd|28117": {
+      "BRAWLEY SCHOOL RD": [
+        "mac",
+        "vm"
+      ],
+      "BRAWLEY SCHOOL ROAD": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:airport rd|28147": {
+      "AIRPORT RD.": [
+        "mac",
+        "vm"
+      ],
+      "AIRPORT RD": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:bringle ferry rd|28144": {
+      "BRINGLE FERRY RD.": [
+        "mac",
+        "vm"
+      ],
+      "BRINGLE FERRY ROAD": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:fairgrove church rd|28602": {
+      "FAIRGROVE CHURCH RD": [
+        "mac",
+        "vm"
+      ],
+      "FAIRGROVE CHURCH ROAD": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:mchugh blvd|28542": {
+      "MCHUGH BOULEVARD": [
+        "mac",
+        "vm"
+      ],
+      "MCHUGH BLVD.": [
+        "mac",
+        "vm"
+      ],
+      "MCHUGH BLVD": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:onslow pines rd|NC:onslow": {
+      "ONSLOW PINES ROAD": [
+        "mac",
+        "vm"
+      ],
+      "ONSLOW PINES RD": [
         "mac",
         "vm"
       ]
@@ -3628,12 +4634,56 @@
         "vm"
       ]
     },
+    "addr:hwy 158 e|27949": {
+      "HIGHWAY 158 E": [
+        "mac",
+        "vm"
+      ],
+      "HWY 158 E.": [
+        "mac",
+        "vm"
+      ]
+    },
     "addr:hwy 21 s|28675": {
       "HWY 21 S": [
         "mac",
         "vm"
       ],
       "HIGHWAY 21 S": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:altapass rd|28777": {
+      "ALTAPASS RD": [
+        "mac",
+        "vm"
+      ],
+      "ALTAPASS ROAD": [
+        "mac",
+        "vm"
+      ],
+      "ALTAPASS RD.": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:hooper's creek rd|28732": {
+      "HOOPER'S CREEK RD": [
+        "mac",
+        "vm"
+      ],
+      "HOOPER'S CREEK ROAD": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:staton rd|28712": {
+      "STATON RD": [
+        "mac",
+        "vm"
+      ],
+      "STATON ROAD": [
         "mac",
         "vm"
       ]
@@ -3658,12 +4708,82 @@
         "vm"
       ]
     },
+    "addr:tarawa blvd|28542": {
+      "TARAWA BOULEVARD": [
+        "mac",
+        "vm"
+      ],
+      "TARAWA BLVD": [
+        "mac",
+        "vm"
+      ]
+    },
     "addr:hwy 601|27028": {
       "HWY 601": [
         "mac",
         "vm"
       ],
       "HIGHWAY 601": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:main st|28451": {
+      "MAIN STREET": [
+        "mac",
+        "vm"
+      ],
+      "MAIN ST.": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:ash st|28542": {
+      "ASH STREET": [
+        "mac",
+        "vm"
+      ],
+      "ASH ST.": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:queen st|28530": {
+      "QUEEN STREET": [
+        "mac",
+        "vm"
+      ],
+      "QUEEN ST": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:sutton rd|27801": {
+      "SUTTON ROAD": [
+        "mac",
+        "vm"
+      ],
+      "SUTTON RD.": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:falls ave|28630": {
+      "FALLS AVENUE": [
+        "mac",
+        "vm"
+      ],
+      "FALLS AVE": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:main st|NC:graham": {
+      "MAIN STREET": [
+        "mac",
+        "vm"
+      ],
+      "MAIN ST.": [
         "mac",
         "vm"
       ]
@@ -3698,6 +4818,84 @@
         "vm"
       ]
     },
+    "addr:emanuel church rd|28613": {
+      "EMANUEL CHURCH ROAD": [
+        "mac",
+        "vm"
+      ],
+      "EMANUEL CHURCH RD": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:s main ave|28650": {
+      "SOUTH MAIN AVE": [
+        "mac",
+        "vm"
+      ],
+      "SOUTH MAIN AVE.": [
+        "mac",
+        "vm"
+      ],
+      "SOUTH MAIN AVENUE": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:airport rd|28501": {
+      "AIRPORT RD": [
+        "mac",
+        "vm"
+      ],
+      "AIRPORT RD.": [
+        "mac",
+        "vm"
+      ],
+      "AIRPORT ROAD": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:mebane oaks rd|27302": {
+      "MEBANE OAKS ROAD": [
+        "mac",
+        "vm"
+      ],
+      "MEBANE OAKS RD.": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:walker ave|27403": {
+      "WALKER AVE.": [
+        "mac",
+        "vm"
+      ],
+      "WALKER AVENUE": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:s point rd|28012": {
+      "SOUTH POINT ROAD": [
+        "mac",
+        "vm"
+      ],
+      "SOUTH POINT RD.": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:main st|27910": {
+      "MAIN ST.": [
+        "mac",
+        "vm"
+      ],
+      "MAIN STREET": [
+        "mac",
+        "vm"
+      ]
+    },
     "addr:hwy 12|27943": {
       "HIGHWAY 12": [
         "mac",
@@ -3718,12 +4916,82 @@
         "vm"
       ]
     },
+    "addr:sunset ave|28328": {
+      "SUNSET AVE.": [
+        "mac",
+        "vm"
+      ],
+      "SUNSET AVENUE": [
+        "mac",
+        "vm"
+      ]
+    },
     "addr:hwy 64/264|27954": {
       "HWY 64/264": [
         "mac",
         "vm"
       ],
       "HIGHWAY 64/264": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:old hwy 421|27055": {
+      "OLD HWY. 421": [
+        "mac",
+        "vm"
+      ],
+      "OLD HWY 421": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:county sch rd|27292": {
+      "COUNTY SCH RD": [
+        "mac",
+        "vm"
+      ],
+      "COUNTY SCH ROAD": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:seacrest ave|28110": {
+      "SEACREST AVE": [
+        "mac",
+        "vm"
+      ],
+      "SEACREST AVE.": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:gonzalez blvd|28542": {
+      "GONZALEZ BOULEVARD": [
+        "mac",
+        "vm"
+      ],
+      "GONZALEZ BLVD.": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:holcomb blvd|28542": {
+      "HOLCOMB BOULEVARD": [
+        "mac",
+        "vm"
+      ],
+      "HOLCOMB BLVD": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:island rd|28531": {
+      "ISLAND ROAD": [
+        "mac",
+        "vm"
+      ],
+      "ISLAND RD.": [
         "mac",
         "vm"
       ]
@@ -3742,12 +5010,116 @@
         "vm"
       ]
     },
+    "addr:dougherty dr|28307": {
+      "DOUGHERTY DR.": [
+        "mac",
+        "vm"
+      ],
+      "DOUGHERTY DR": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:sharp dr|28307": {
+      "SHARP DR.": [
+        "mac",
+        "vm"
+      ],
+      "SHARP DRIVE": [
+        "mac",
+        "vm"
+      ],
+      "SHARP DR": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:irwin rd|28307": {
+      "IRWIN RD": [
+        "mac",
+        "vm"
+      ],
+      "IRWIN ROAD": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:eastern blvd|NC:cumberland": {
+      "EASTERN BLVD": [
+        "mac",
+        "vm"
+      ],
+      "EASTERN BLVD.": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:adjacent to roosevelt blvd|28533": {
+      "ADJACENT TO ROOSEVELT BLVD.": [
+        "mac",
+        "vm"
+      ],
+      "ADJACENT TO ROOSEVELT BLVD": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:tarawa ter blvd|28542": {
+      "TARAWA TERRACE BOULEVARD": [
+        "mac",
+        "vm"
+      ],
+      "TARAWA TERRACE BLVD": [
+        "mac",
+        "vm"
+      ]
+    },
+    "parcel:NC:mecklenburg:13310112": {
+      "5939 REDDMAN ROAD": [
+        "mac",
+        "vm"
+      ],
+      "5945 REDDMAN RD": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:hwy 64 & davie academy rd|27028": {
+      "HWY 64 & DAVIE ACADEMY RD.": [
+        "mac",
+        "vm"
+      ],
+      "HWY 64 & DAVIE ACADEMY ROAD": [
+        "mac",
+        "vm"
+      ]
+    },
     "parcel:NC:gaston:3563106130": {
       "4415 BEATY ROAD": [
         "mac",
         "vm"
       ],
       "4411 BEATY ROAD": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:patterson ave|NC:forsyth": {
+      "PATTERSON AVE": [
+        "mac",
+        "vm"
+      ],
+      "PATTERSON AVE.": [
+        "mac",
+        "vm"
+      ]
+    },
+    "addr:browns hill rd|NC:stanly": {
+      "BROWNS HILL RD": [
+        "mac",
+        "vm"
+      ],
+      "BROWNS HILL ROAD": [
         "mac",
         "vm"
       ]
@@ -5648,16 +7020,6 @@
         "vm"
       ]
     },
-    "addr:main st|SC:laurens": {
-      "MAIN STREET": [
-        "mac",
-        "vm"
-      ],
-      "MAIN ST": [
-        "mac",
-        "vm"
-      ]
-    },
     "parcel:NC:lincoln:3634167811": {
       "2436 INDUSTRIAL PARK RD": [
         "mac",
@@ -5944,16 +7306,6 @@
         "vm"
       ]
     },
-    "parcel:NC:rutherford:1613365795": {
-      "902 LAWING MILL ROAD": [
-        "mac",
-        "vm"
-      ],
-      "898 LAWING MILL RD": [
-        "mac",
-        "vm"
-      ]
-    },
     "parcel:NC:henderson:9578514232": {
       "1611 OLD SPARTANBURG RD": [
         "mac",
@@ -6014,16 +7366,6 @@
         "vm"
       ]
     },
-    "parcel:NC:mecklenburg:02119164": {
-      "12917 EASTFIELD ROAD": [
-        "mac",
-        "vm"
-      ],
-      "12901 EASTFIELD RD": [
-        "mac",
-        "vm"
-      ]
-    },
     "parcel:NC:yancey:072400158114": {
       "31 RUNNING CEDAR": [
         "mac",
@@ -6042,16 +7384,6 @@
         "vm"
       ],
       "177 WALNUT TREE LANE": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:NC:macon:6516063667": {
-      "1754 HIGH WATER TRL": [
-        "mac",
-        "vm"
-      ],
-      "1284 HIGH WATER TRAIL": [
         "mac",
         "vm"
       ]
@@ -6086,16 +7418,6 @@
         "vm"
       ]
     },
-    "parcel:NC:buncombe:9655599210": {
-      "70 PARK AVE.": [
-        "mac",
-        "vm"
-      ],
-      "74 PARK AVE": [
-        "mac",
-        "vm"
-      ]
-    },
     "parcel:NC:cabarrus:5621381422": {
       "301 MEDICAL PARK CONCORD": [
         "mac",
@@ -6116,16 +7438,6 @@
         "vm"
       ],
       "282 COUNTY RE": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:NC:buncombe:9685893201": {
-      "25 ERIN GLEN CT": [
-        "mac",
-        "vm"
-      ],
-      "49 ERIN GLEN COURT": [
         "mac",
         "vm"
       ]
@@ -6178,26 +7490,6 @@
         "vm"
       ]
     },
-    "parcel:NC:cabarrus:5622128160": {
-      "3341 CLOVERLEAF PARKWAY": [
-        "mac",
-        "vm"
-      ],
-      "3333 CLOVERLEAF PKWY": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:NC:stanly:557501467287": {
-      "502 N CENTRAL AVE.": [
-        "mac",
-        "vm"
-      ],
-      "504 N. CENTRAL AVE": [
-        "mac",
-        "vm"
-      ]
-    },
     "parcel:NC:henderson:9662776272": {
       "156 W GARDEN TRL": [
         "mac",
@@ -6214,16 +7506,6 @@
         "vm"
       ],
       "128 LANGTREE SHORE DR": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:NC:buncombe:9699807496": {
-      "121 LYTLE COVE RD": [
-        "mac",
-        "vm"
-      ],
-      "105 LYTLE COVE ROAD": [
         "mac",
         "vm"
       ]
@@ -6288,16 +7570,6 @@
         "vm"
       ],
       "21 WREN GLEN CT.": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:NC:henderson:9577161766": {
-      "248 IRONWOOD DR.": [
-        "mac",
-        "vm"
-      ],
-      "159 IRONWOOD DR": [
         "mac",
         "vm"
       ]
@@ -7228,44 +8500,6 @@
         "vm"
       ]
     },
-    "parcel:NC:guilford:7821375832": {
-      "122 OAKDALE FOREST LN.": [
-        "mac",
-        "vm"
-      ],
-      "120 OAKDALE FOREST LANE": [
-        "mac",
-        "vm"
-      ],
-      "118 OAKDALE FOREST LANE": [
-        "mac",
-        "vm"
-      ],
-      "116 OAKDALE FOREST LANE": [
-        "mac",
-        "vm"
-      ],
-      "114 OAKDALE FOREST LANE": [
-        "mac",
-        "vm"
-      ],
-      "112 OAKDALE FOREST LANE": [
-        "mac",
-        "vm"
-      ],
-      "110 OAKDALE FOREST LN.": [
-        "mac",
-        "vm"
-      ],
-      "108 OAKDALE FOREST LN.": [
-        "mac",
-        "vm"
-      ],
-      "106 OAKDALE FOREST LN.": [
-        "mac",
-        "vm"
-      ]
-    },
     "parcel:NC:wake:0731762529": {
       "62529 POE FARM ROAD": [
         "mac",
@@ -7330,60 +8564,12 @@
         "vm"
       ]
     },
-    "parcel:NC:brunswick:234gn012": {
-      "2913 WEST YACHT DRIVE": [
-        "mac",
-        "vm"
-      ],
-      "2905 WEST YACHT DR": [
-        "mac",
-        "vm"
-      ]
-    },
     "parcel:NC:new hanover:r04720010011": {
       "23 NORTH FRONT STREET": [
         "mac",
         "vm"
       ],
       "16 PRINCESS ST": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:NC:yadkin:486601190846": {
-      "1017 BROOKS DRIVE": [
-        "mac",
-        "vm"
-      ],
-      "1013 BROOKS DR": [
-        "mac",
-        "vm"
-      ],
-      "1009 BROOKS DRIVE": [
-        "mac",
-        "vm"
-      ],
-      "1005 BROOKS DRIVE": [
-        "mac",
-        "vm"
-      ],
-      "1020 BROOKS DRIVE": [
-        "mac",
-        "vm"
-      ],
-      "1016 BROOKS DRIVE": [
-        "mac",
-        "vm"
-      ],
-      "1012 BROOKS DRIVE": [
-        "mac",
-        "vm"
-      ],
-      "1004 BROOKS DRIVE": [
-        "mac",
-        "vm"
-      ],
-      "1021 BROOKS DRIVE": [
         "mac",
         "vm"
       ]
@@ -7468,16 +8654,6 @@
         "vm"
       ]
     },
-    "parcel:NC:mecklenburg:07103311": {
-      "444 WALNUT AVE": [
-        "mac",
-        "vm"
-      ],
-      "442 WALNUT AV": [
-        "mac",
-        "vm"
-      ]
-    },
     "parcel:NC:new hanover:3178677969": {
       "52 BEACH DR": [
         "mac",
@@ -7516,16 +8692,6 @@
         "vm"
       ],
       "01918 TBD PRICE ROAD": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:NC:chatham:0080815": {
-      "4792 R JORDAN RD": [
-        "mac",
-        "vm"
-      ],
-      "4784 R JORDAN RD.": [
         "mac",
         "vm"
       ]
@@ -7588,16 +8754,6 @@
         "vm"
       ]
     },
-    "parcel:NC:guilford:7970133282": {
-      "8300 MAPLEWAY LANE": [
-        "mac",
-        "vm"
-      ],
-      "8302 MAPLEWAY LN.": [
-        "mac",
-        "vm"
-      ]
-    },
     "parcel:NC:harnett:0651853585": {
       "1348 MATTHEWS RD": [
         "mac",
@@ -7630,26 +8786,6 @@
         "vm"
       ],
       "1004 W CUMBERLAND ST": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:NC:mecklenburg:02509122": {
-      "9320 CENTER LAKE DRIVE": [
-        "mac",
-        "vm"
-      ],
-      "9325 CENTER LAKE DR.": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:NC:harnett:0624355943": {
-      "224 RIVER RD.": [
-        "mac",
-        "vm"
-      ],
-      "310 RIVER ROAD": [
         "mac",
         "vm"
       ]
@@ -7720,20 +8856,6 @@
         "vm"
       ]
     },
-    "parcel:NC:guilford:7910134066": {
-      "8121 ASPERY CT.": [
-        "mac",
-        "vm"
-      ],
-      "8117 ASPERY CT": [
-        "mac",
-        "vm"
-      ],
-      "8113 ASPERY CT": [
-        "mac",
-        "vm"
-      ]
-    },
     "parcel:NC:cabarrus:5529471071": {
       "471 FAITH DR CONCORD": [
         "mac",
@@ -7744,56 +8866,6 @@
         "vm"
       ],
       "469 FAITH DR SW": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:NC:catawba:370207688575": {
-      "236 2ND ST SE": [
-        "mac",
-        "vm"
-      ],
-      "234 2ND ST SE": [
-        "mac",
-        "vm"
-      ],
-      "232 2ND ST SE": [
-        "mac",
-        "vm"
-      ],
-      "230 2ND ST SE": [
-        "mac",
-        "vm"
-      ],
-      "228 2ND ST SE": [
-        "mac",
-        "vm"
-      ],
-      "226 2ND ST SE": [
-        "mac",
-        "vm"
-      ],
-      "224 2ND ST SE": [
-        "mac",
-        "vm"
-      ],
-      "222 2ND ST SE": [
-        "mac",
-        "vm"
-      ],
-      "220 2ND ST SE": [
-        "mac",
-        "vm"
-      ],
-      "218 2ND ST SE": [
-        "mac",
-        "vm"
-      ],
-      "216 2ND ST SE": [
-        "mac",
-        "vm"
-      ],
-      "210 2ND ST. SE": [
         "mac",
         "vm"
       ]
@@ -7844,16 +8916,6 @@
         "vm"
       ],
       "43 SIDBURY LANDING": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:NC:new hanover:r05407024006": {
-      "2209 GIBSON AVE": [
-        "mac",
-        "vm"
-      ],
-      "2207 GIBSON AV": [
         "mac",
         "vm"
       ]
@@ -7924,42 +8986,12 @@
         "vm"
       ]
     },
-    "parcel:NC:onslow:321116": {
-      "234 FLOWERS LANE": [
-        "mac",
-        "vm"
-      ],
-      "230 FLOWERS LN": [
-        "mac",
-        "vm"
-      ]
-    },
     "parcel:NC:davidson:672401474840": {
       "706 HYDE ST": [
         "mac",
         "vm"
       ],
       "701 S PENNINGTON ST": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:NC:duplin:330617110136": {
-      "103 W CAVENAUGH ST.": [
-        "mac",
-        "vm"
-      ],
-      "101 W CAVENAUGH ST": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:NC:guilford:7801421723": {
-      "1185 E LEXINGTON AVE.": [
-        "mac",
-        "vm"
-      ],
-      "1137 E LEXINGTON AVE": [
         "mac",
         "vm"
       ]
@@ -7980,36 +9012,6 @@
         "vm"
       ],
       "335 CHURCH CT": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:NC:guilford:8816899930": {
-      "3795 HIGH ROCK RD": [
-        "mac",
-        "vm"
-      ],
-      "3765 HIGH ROCK ROAD": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:NC:montgomery:657420909625": {
-      "121 BONEY POINT RD": [
-        "mac",
-        "vm"
-      ],
-      "125 BONEY POINT ROAD": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:NC:new hanover:3147307386": {
-      "5305 WRIGHTSVILLE AVE": [
-        "mac",
-        "vm"
-      ],
-      "5301 WRIGHTSVILLE AVENUE": [
         "mac",
         "vm"
       ]
@@ -8036,40 +9038,6 @@
         "vm"
       ]
     },
-    "parcel:NC:guilford:6890069540": {
-      "1666 BRUMLEY CT.": [
-        "mac",
-        "vm"
-      ],
-      "1664 BRUMLEY CT": [
-        "mac",
-        "vm"
-      ],
-      "1662 BRUMLEY CT.": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:NC:brunswick:2130003809": {
-      "4753 PINE LAKE DR.": [
-        "mac",
-        "vm"
-      ],
-      "4741 PINE LAKE DR": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:NC:iredell:4773360251": {
-      "259 IDAHO ROAD": [
-        "mac",
-        "vm"
-      ],
-      "273 IDAHO RD": [
-        "mac",
-        "vm"
-      ]
-    },
     "parcel:NC:guilford:7875911963": {
       "816 WILLARD ST": [
         "mac",
@@ -8084,32 +9052,12 @@
         "vm"
       ]
     },
-    "parcel:NC:mecklenburg:17706302": {
-      "4350 CONGRESS STREET": [
-        "mac",
-        "vm"
-      ],
-      "4250 CONGRESS ST.": [
-        "mac",
-        "vm"
-      ]
-    },
     "parcel:NC:avery:185819502193": {
       "250 RIDGE VIEW UNIT 71": [
         "mac",
         "vm"
       ],
       "315 RIDGEVIEW ROAD": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:NC:orange:9798549464": {
-      "335 W BARBEE CHAPEL ROAD": [
-        "mac",
-        "vm"
-      ],
-      "301 W. BARBEE CHAPEL RD": [
         "mac",
         "vm"
       ]
@@ -8134,16 +9082,6 @@
         "vm"
       ],
       "500 NORWALK ST": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:NC:new hanover:r05409005018": {
-      "555 CASTLE STREET": [
-        "mac",
-        "vm"
-      ],
-      "553 CASTLE ST": [
         "mac",
         "vm"
       ]
@@ -8188,36 +9126,6 @@
         "vm"
       ],
       "6500 CSX WY": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:NC:watauga:2910600777": {
-      "376 WATAUGA VILLAGE DRIVE": [
-        "mac",
-        "vm"
-      ],
-      "370 WATAUGA VILLAGE DR": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:NC:mecklenburg:11710232": {
-      "2810 WILLOW ST": [
-        "mac",
-        "vm"
-      ],
-      "2814 WILLOW ST.": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:NC:mecklenburg:22909103": {
-      "9812 REA RD": [
-        "mac",
-        "vm"
-      ],
-      "9628 REA ROAD": [
         "mac",
         "vm"
       ]
@@ -8280,42 +9188,6 @@
         "vm"
       ]
     },
-    "parcel:NC:duplin:237700569326": {
-      "275 CORINTH CHURCH ROAD": [
-        "mac",
-        "vm"
-      ],
-      "269 CORINTH CHURCH RD": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:NC:moore:856700251590": {
-      "145 BARBER RD.": [
-        "mac",
-        "vm"
-      ],
-      "323 BARBER RD": [
-        "mac",
-        "vm"
-      ],
-      "209 BARBER RD": [
-        "mac",
-        "vm"
-      ],
-      "231 BARBER RD": [
-        "mac",
-        "vm"
-      ],
-      "255 BARBER RD": [
-        "mac",
-        "vm"
-      ],
-      "355 BARBER RD": [
-        "mac",
-        "vm"
-      ]
-    },
     "parcel:NC:watauga:2809562997": {
       "97000 TBD LEISURE ACRES LANE": [
         "mac",
@@ -8336,16 +9208,6 @@
         "vm"
       ]
     },
-    "parcel:NC:wayne:26702666505": {
-      "164 FRIENDLY DR": [
-        "mac",
-        "vm"
-      ],
-      "180 FRIENDLY DRIVE": [
-        "mac",
-        "vm"
-      ]
-    },
     "parcel:NC:new hanover:r08200005054002": {
       "7171 CAROLINA BEACH RD": [
         "mac",
@@ -8362,20 +9224,6 @@
         "vm"
       ],
       "209 GREGSON DR": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:NC:harnett:9564125374": {
-      "3347 HILLMON GROVE RD": [
-        "mac",
-        "vm"
-      ],
-      "1135 HILLMON GROVE ROAD": [
-        "mac",
-        "vm"
-      ],
-      "1163 HILLMON GROVE ROAD": [
         "mac",
         "vm"
       ]
@@ -8544,26 +9392,6 @@
         "vm"
       ],
       "8517 ANCHOR ST": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:spartanburg:1440217500": {
-      "18 S. MAIN STREET": [
-        "mac",
-        "vm"
-      ],
-      "20 S MAIN ST": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:SC:anderson:400503031": {
-      "721 GREENVILLE STREET": [
-        "mac",
-        "vm"
-      ],
-      "719 GREENVILLE ST": [
         "mac",
         "vm"
       ]
@@ -9238,60 +10066,12 @@
         "vm"
       ]
     },
-    "addr:parcel \u2014 polk county delinquent tax \u2014 silver creek rd|NC:polk": {
-      "PARCEL \u2014 POLK COUNTY DELINQUENT TAX \u2014 SILVER CREEK RD": [
-        "mac",
-        "vm"
-      ],
-      "PARCEL \u2014 POLK COUNTY DELINQUENT TAX \u2014 SILVER CREEK ROAD": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:parcel \u2014 polk county delinquent tax \u2014 walker rd|NC:polk": {
-      "PARCEL \u2014 POLK COUNTY DELINQUENT TAX \u2014 WALKER RD": [
-        "mac",
-        "vm"
-      ],
-      "PARCEL \u2014 POLK COUNTY DELINQUENT TAX \u2014 WALKER ROAD": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:stewart dairy rd|29645": {
-      "STEWART DAIRY RD": [
-        "mac",
-        "vm"
-      ],
-      "STEWART DAIRY ROAD": [
-        "mac",
-        "vm"
-      ]
-    },
     "parcel:NC:buncombe:9607990465": {
       "37 POPLAR ACRES DR": [
         "mac",
         "vm"
       ],
       "671 MONTE VISTA ROAD": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:NC:mecklenburg:06906238": {
-      "2705 DUNDEEN STREET": [
-        "mac",
-        "vm"
-      ],
-      "2701 DUNDEEN ST": [
-        "mac",
-        "vm"
-      ],
-      "2703 DUNDEEN ST": [
-        "mac",
-        "vm"
-      ],
-      "2707 DUNDEEN ST": [
         "mac",
         "vm"
       ]
@@ -9320,16 +10100,6 @@
         "vm"
       ]
     },
-    "addr:wilkinsville hwy|29340": {
-      "WILKINSVILLE HWY": [
-        "mac",
-        "vm"
-      ],
-      "WILKINSVILLE HIGHWAY": [
-        "mac",
-        "vm"
-      ]
-    },
     "addr:tbd calvary church rd|29581": {
       "TBD CALVARY CHURCH RD": [
         "mac",
@@ -9344,16 +10114,6 @@
         "vm"
       ],
       "TBD CALVARY CHURCH RD, LOT#WP001": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:NC:rutherford:1614549022": {
-      "543 OWENS CHAPEL ROAD": [
-        "mac",
-        "vm"
-      ],
-      "593 OWENS CHAPEL RD": [
         "mac",
         "vm"
       ]
@@ -10204,16 +10964,6 @@
         "vm"
       ]
     },
-    "addr:n roxboro st|NC:durham": {
-      "N. ROXBORO ST.": [
-        "mac",
-        "vm"
-      ],
-      "N. ROXBORO ST": [
-        "mac",
-        "vm"
-      ]
-    },
     "parcel:NC:buncombe:9629496747": {
       "59 LEES CREEK RD": [
         "mac",
@@ -10254,16 +11004,6 @@
         "vm"
       ]
     },
-    "addr:marshall st|29829": {
-      "MARSHALL STREET": [
-        "mac",
-        "vm"
-      ],
-      "MARSHALL ST": [
-        "mac",
-        "vm"
-      ]
-    },
     "addr:hwy 70 a|28613": {
       "HWY 70 A": [
         "mac",
@@ -10274,16 +11014,6 @@
         "vm"
       ],
       "HIGHWAY 70 A": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:commerce st|28762": {
-      "COMMERCE ST": [
-        "mac",
-        "vm"
-      ],
-      "COMMERCE ST.": [
         "mac",
         "vm"
       ]
@@ -10306,42 +11036,12 @@
         "vm"
       ]
     },
-    "addr:stoney mountain rd|28739": {
-      "STONEY MOUNTAIN RD": [
-        "mac",
-        "vm"
-      ],
-      "STONEY MOUNTAIN ROAD": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:cedar creek rd|28302": {
-      "CEDAR CREEK RD": [
-        "mac",
-        "vm"
-      ],
-      "CEDAR CREEK ROAD": [
-        "mac",
-        "vm"
-      ]
-    },
     "addr:hwy 70 w|28655": {
       "HWY 70 W": [
         "mac",
         "vm"
       ],
       "HWY 70 WEST": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:hwy 17 n|28519": {
-      "HWY 17 N": [
-        "mac",
-        "vm"
-      ],
-      "HWY 17 N.": [
         "mac",
         "vm"
       ]
@@ -10376,36 +11076,6 @@
         "vm"
       ]
     },
-    "addr:fields st|27828": {
-      "FIELDS ST": [
-        "mac",
-        "vm"
-      ],
-      "FIELDS STREET": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:hwy 301 n|27893": {
-      "HWY 301 N": [
-        "mac",
-        "vm"
-      ],
-      "HWY 301 N.": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:airport rd|28144": {
-      "AIRPORT RD": [
-        "mac",
-        "vm"
-      ],
-      "AIRPORT RD.": [
-        "mac",
-        "vm"
-      ]
-    },
     "addr:hwy 221 n|28752": {
       "HWY 221 N": [
         "mac",
@@ -10434,26 +11104,6 @@
         "vm"
       ]
     },
-    "addr:silversteen ave|NC:transylvania": {
-      "SILVERSTEEN AVE": [
-        "mac",
-        "vm"
-      ],
-      "SILVERSTEEN AVENUE": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:manning dr|27514": {
-      "MANNING DR": [
-        "mac",
-        "vm"
-      ],
-      "MANNING DRIVE": [
-        "mac",
-        "vm"
-      ]
-    },
     "addr:hwy 74 w|28472": {
       "HWY 74 W": [
         "mac",
@@ -10470,26 +11120,6 @@
         "vm"
       ],
       "HWY 74 WEST": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:old laurel hill church rd|28352": {
-      "OLD LAUREL HILL CHURCH RD": [
-        "mac",
-        "vm"
-      ],
-      "OLD LAUREL HILL CHURCH ROAD": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:vance st|28043": {
-      "VANCE ST": [
-        "mac",
-        "vm"
-      ],
-      "VANCE ST.": [
         "mac",
         "vm"
       ]
@@ -10538,42 +11168,12 @@
         "vm"
       ]
     },
-    "addr:tuckaseegee rd|28120": {
-      "TUCKASEEGEE RD": [
-        "mac",
-        "vm"
-      ],
-      "TUCKASEEGEE ROAD": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:brickyard rd|28128": {
-      "BRICKYARD RD": [
-        "mac",
-        "vm"
-      ],
-      "BRICKYARD ROAD": [
-        "mac",
-        "vm"
-      ]
-    },
     "addr:hwy 70 e|28602": {
       "HIGHWAY 70 EAST": [
         "mac",
         "vm"
       ],
       "HWY 70 E": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:se quadrant of us 158 & acorn hill rd|28401": {
-      "SOUTHEAST QUADRANT OF US 158 & ACORN HILL ROAD": [
-        "mac",
-        "vm"
-      ],
-      "SE QUADRANT OF US 158 & ACORN HILL RD": [
         "mac",
         "vm"
       ]
@@ -10618,36 +11218,6 @@
         "vm"
       ],
       "HWY 421 N": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:riverside dr|NC:surry": {
-      "RIVERSIDE DR.": [
-        "mac",
-        "vm"
-      ],
-      "RIVERSIDE DRIVE": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:shacktown rd|27379": {
-      "SHACKTOWN RD.": [
-        "mac",
-        "vm"
-      ],
-      "SHACKTOWN RD": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:old liberty rd|27203": {
-      "OLD LIBERTY ROAD": [
-        "mac",
-        "vm"
-      ],
-      "OLD LIBERTY RD.": [
         "mac",
         "vm"
       ]
@@ -10702,36 +11272,6 @@
         "vm"
       ]
     },
-    "addr:main st|27379": {
-      "MAIN ST.": [
-        "mac",
-        "vm"
-      ],
-      "MAIN STREET": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:new st|27288": {
-      "NEW ST.": [
-        "mac",
-        "vm"
-      ],
-      "NEW STREET": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:armory rd|NC:wilkes": {
-      "ARMORY ROAD": [
-        "mac",
-        "vm"
-      ],
-      "ARMORY RD.": [
-        "mac",
-        "vm"
-      ]
-    },
     "addr:hwy 8|27016": {
       "HWY 8": [
         "mac",
@@ -10748,26 +11288,6 @@
         "vm"
       ],
       "HWY 29 S": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:quarry rd|27215": {
-      "QUARRY RD.": [
-        "mac",
-        "vm"
-      ],
-      "QUARRY ROAD": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:old hwy 421 e|27379": {
-      "OLD HWY 421 E": [
-        "mac",
-        "vm"
-      ],
-      "OLD HWY. 421 E.": [
         "mac",
         "vm"
       ]
@@ -10792,16 +11312,6 @@
         "vm"
       ],
       "HWY 57 NORTH": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:main st|27573": {
-      "MAIN STREET": [
-        "mac",
-        "vm"
-      ],
-      "MAIN ST.": [
         "mac",
         "vm"
       ]
@@ -10840,26 +11350,6 @@
         "vm"
       ]
     },
-    "addr:merry hill rd|27983": {
-      "MERRY HILL ROAD": [
-        "mac",
-        "vm"
-      ],
-      "MERRY HILL RD": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:hwy 264 e|27834": {
-      "HWY 264 E": [
-        "mac",
-        "vm"
-      ],
-      "HWY 264 E.": [
-        "mac",
-        "vm"
-      ]
-    },
     "addr:hwy 264 e|27889": {
       "HWY 264 E": [
         "mac",
@@ -10876,16 +11366,6 @@
         "vm"
       ],
       "2717A WEST VERNON AVE": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:prison camp rd|27892": {
-      "PRISON CAMP RD": [
-        "mac",
-        "vm"
-      ],
-      "PRISON CAMP ROAD": [
         "mac",
         "vm"
       ]
@@ -10914,32 +11394,12 @@
         "vm"
       ]
     },
-    "addr:river rd|NC:cumberland": {
-      "RIVER ROAD": [
-        "mac",
-        "vm"
-      ],
-      "RIVER RD": [
-        "mac",
-        "vm"
-      ]
-    },
     "addr:hwy 301 s|NC:cumberland": {
       "HWY 301 SOUTH": [
         "mac",
         "vm"
       ],
       "HWY 301 S": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:hwy 15-501 s|NC:moore": {
-      "HWY 15-501 S": [
-        "mac",
-        "vm"
-      ],
-      "HWY 15-501 S.": [
         "mac",
         "vm"
       ]
@@ -11004,16 +11464,6 @@
         "vm"
       ]
     },
-    "addr:morganton rd|NC:moore": {
-      "MORGANTON RD": [
-        "mac",
-        "vm"
-      ],
-      "MORGANTON ROAD": [
-        "mac",
-        "vm"
-      ]
-    },
     "addr:hwy 74 w|NC:richmond": {
       "HWY 74 W": [
         "mac",
@@ -11062,52 +11512,12 @@
         "vm"
       ]
     },
-    "addr:hwy 21 s|28010": {
-      "HWY 21 S": [
-        "mac",
-        "vm"
-      ],
-      "HWY 21 S.": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:w \"c\" st|28081": {
-      "WEST \"C\" ST.": [
-        "mac",
-        "vm"
-      ],
-      "WEST \"C\" STREET": [
-        "mac",
-        "vm"
-      ]
-    },
     "parcel:NC:gaston:3545168923": {
       "1304 1/2 W 2ND AVE": [
         "mac",
         "vm"
       ],
       "1314 W SECOND AVE, GASTONIA, NC 28052": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:brawley school rd|28117": {
-      "BRAWLEY SCHOOL RD": [
-        "mac",
-        "vm"
-      ],
-      "BRAWLEY SCHOOL ROAD": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:airport rd|28147": {
-      "AIRPORT RD.": [
-        "mac",
-        "vm"
-      ],
-      "AIRPORT RD": [
         "mac",
         "vm"
       ]
@@ -11122,32 +11532,12 @@
         "vm"
       ]
     },
-    "addr:bringle ferry rd|28144": {
-      "BRINGLE FERRY RD.": [
-        "mac",
-        "vm"
-      ],
-      "BRINGLE FERRY ROAD": [
-        "mac",
-        "vm"
-      ]
-    },
     "addr:hwy 321 n|28093": {
       "HIGHWAY 321 NORTH": [
         "mac",
         "vm"
       ],
       "HWY 321 N": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:fairgrove church rd|28602": {
-      "FAIRGROVE CHURCH RD": [
-        "mac",
-        "vm"
-      ],
-      "FAIRGROVE CHURCH ROAD": [
         "mac",
         "vm"
       ]
@@ -11168,20 +11558,6 @@
         "vm"
       ],
       "HWY 53": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:mchugh blvd|28542": {
-      "MCHUGH BOULEVARD": [
-        "mac",
-        "vm"
-      ],
-      "MCHUGH BLVD.": [
-        "mac",
-        "vm"
-      ],
-      "MCHUGH BLVD": [
         "mac",
         "vm"
       ]
@@ -11210,16 +11586,6 @@
         "vm"
       ],
       "HWY 70 E.": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:onslow pines rd|NC:onslow": {
-      "ONSLOW PINES ROAD": [
-        "mac",
-        "vm"
-      ],
-      "ONSLOW PINES RD": [
         "mac",
         "vm"
       ]
@@ -11292,16 +11658,6 @@
         "vm"
       ]
     },
-    "addr:hwy 158 e|27949": {
-      "HIGHWAY 158 E": [
-        "mac",
-        "vm"
-      ],
-      "HWY 158 E.": [
-        "mac",
-        "vm"
-      ]
-    },
     "parcel:NC:henderson:9568599771": {
       "800 NORTH JUSTICE STREET": [
         "mac",
@@ -11322,30 +11678,6 @@
         "vm"
       ]
     },
-    "addr:altapass rd|28777": {
-      "ALTAPASS RD": [
-        "mac",
-        "vm"
-      ],
-      "ALTAPASS ROAD": [
-        "mac",
-        "vm"
-      ],
-      "ALTAPASS RD.": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:hooper's creek rd|28732": {
-      "HOOPER'S CREEK RD": [
-        "mac",
-        "vm"
-      ],
-      "HOOPER'S CREEK ROAD": [
-        "mac",
-        "vm"
-      ]
-    },
     "addr:hwy 74 e|28139": {
       "HWY 74 EAST": [
         "mac",
@@ -11356,52 +11688,12 @@
         "vm"
       ]
     },
-    "addr:staton rd|28712": {
-      "STATON RD": [
-        "mac",
-        "vm"
-      ],
-      "STATON ROAD": [
-        "mac",
-        "vm"
-      ]
-    },
     "addr:hwy 117 n|NC:duplin": {
       "HWY 117 N": [
         "mac",
         "vm"
       ],
       "HWY 117 NORTH": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:tarawa blvd|28542": {
-      "TARAWA BOULEVARD": [
-        "mac",
-        "vm"
-      ],
-      "TARAWA BLVD": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:main st|28451": {
-      "MAIN STREET": [
-        "mac",
-        "vm"
-      ],
-      "MAIN ST.": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:ash st|28542": {
-      "ASH STREET": [
-        "mac",
-        "vm"
-      ],
-      "ASH ST.": [
         "mac",
         "vm"
       ]
@@ -11430,16 +11722,6 @@
         "vm"
       ]
     },
-    "addr:queen st|28530": {
-      "QUEEN STREET": [
-        "mac",
-        "vm"
-      ],
-      "QUEEN ST": [
-        "mac",
-        "vm"
-      ]
-    },
     "addr:hwy 258|28574": {
       "HWY 258": [
         "mac",
@@ -11450,42 +11732,12 @@
         "vm"
       ]
     },
-    "addr:sutton rd|27801": {
-      "SUTTON ROAD": [
-        "mac",
-        "vm"
-      ],
-      "SUTTON RD.": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:falls ave|28630": {
-      "FALLS AVENUE": [
-        "mac",
-        "vm"
-      ],
-      "FALLS AVE": [
-        "mac",
-        "vm"
-      ]
-    },
     "addr:hwy 268 w|28697": {
       "HWY. 268 W": [
         "mac",
         "vm"
       ],
       "HWY 268 W": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:main st|NC:graham": {
-      "MAIN STREET": [
-        "mac",
-        "vm"
-      ],
-      "MAIN ST.": [
         "mac",
         "vm"
       ]
@@ -11540,44 +11792,6 @@
         "vm"
       ]
     },
-    "addr:emanuel church rd|28613": {
-      "EMANUEL CHURCH ROAD": [
-        "mac",
-        "vm"
-      ],
-      "EMANUEL CHURCH RD": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:s main ave|28650": {
-      "SOUTH MAIN AVE": [
-        "mac",
-        "vm"
-      ],
-      "SOUTH MAIN AVE.": [
-        "mac",
-        "vm"
-      ],
-      "SOUTH MAIN AVENUE": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:airport rd|28501": {
-      "AIRPORT RD": [
-        "mac",
-        "vm"
-      ],
-      "AIRPORT RD.": [
-        "mac",
-        "vm"
-      ],
-      "AIRPORT ROAD": [
-        "mac",
-        "vm"
-      ]
-    },
     "addr:hwy 301 s|28301": {
       "HWY 301 SOUTH": [
         "mac",
@@ -11602,42 +11816,12 @@
         "vm"
       ]
     },
-    "addr:mebane oaks rd|27302": {
-      "MEBANE OAKS ROAD": [
-        "mac",
-        "vm"
-      ],
-      "MEBANE OAKS RD.": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:walker ave|27403": {
-      "WALKER AVE.": [
-        "mac",
-        "vm"
-      ],
-      "WALKER AVENUE": [
-        "mac",
-        "vm"
-      ]
-    },
     "addr:main st|28610": {
       "MAIN STREET, HWY 64/70": [
         "mac",
         "vm"
       ],
       "MAIN STREET": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:s point rd|28012": {
-      "SOUTH POINT ROAD": [
-        "mac",
-        "vm"
-      ],
-      "SOUTH POINT RD.": [
         "mac",
         "vm"
       ]
@@ -11652,32 +11836,12 @@
         "vm"
       ]
     },
-    "addr:main st|27910": {
-      "MAIN ST.": [
-        "mac",
-        "vm"
-      ],
-      "MAIN STREET": [
-        "mac",
-        "vm"
-      ]
-    },
     "addr:hwy 321 n|NC:caldwell": {
       "HWY 321 NORTH": [
         "mac",
         "vm"
       ],
       "HWY 321 N.": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:sunset ave|28328": {
-      "SUNSET AVE.": [
-        "mac",
-        "vm"
-      ],
-      "SUNSET AVENUE": [
         "mac",
         "vm"
       ]
@@ -11702,26 +11866,6 @@
         "vm"
       ]
     },
-    "addr:old hwy 421|27055": {
-      "OLD HWY. 421": [
-        "mac",
-        "vm"
-      ],
-      "OLD HWY 421": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:county sch rd|27292": {
-      "COUNTY SCH RD": [
-        "mac",
-        "vm"
-      ],
-      "COUNTY SCH ROAD": [
-        "mac",
-        "vm"
-      ]
-    },
     "addr:hwy 17|28443": {
       "HWY. 17": [
         "mac",
@@ -11738,16 +11882,6 @@
         "vm"
       ],
       "HWY 87 S": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:seacrest ave|28110": {
-      "SEACREST AVE": [
-        "mac",
-        "vm"
-      ],
-      "SEACREST AVE.": [
         "mac",
         "vm"
       ]
@@ -11772,76 +11906,12 @@
         "vm"
       ]
     },
-    "addr:gonzalez blvd|28542": {
-      "GONZALEZ BOULEVARD": [
-        "mac",
-        "vm"
-      ],
-      "GONZALEZ BLVD.": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:holcomb blvd|28542": {
-      "HOLCOMB BOULEVARD": [
-        "mac",
-        "vm"
-      ],
-      "HOLCOMB BLVD": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:island rd|28531": {
-      "ISLAND ROAD": [
-        "mac",
-        "vm"
-      ],
-      "ISLAND RD.": [
-        "mac",
-        "vm"
-      ]
-    },
     "parcel:NC:gaston:3555240087": {
       "729 EAST GARRISON BLVD": [
         "mac",
         "vm"
       ],
       "725 E GARRISON BLVD, GASTONIA, NC 28054": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:dougherty dr|28307": {
-      "DOUGHERTY DR.": [
-        "mac",
-        "vm"
-      ],
-      "DOUGHERTY DR": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:sharp dr|28307": {
-      "SHARP DR.": [
-        "mac",
-        "vm"
-      ],
-      "SHARP DRIVE": [
-        "mac",
-        "vm"
-      ],
-      "SHARP DR": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:irwin rd|28307": {
-      "IRWIN RD": [
-        "mac",
-        "vm"
-      ],
-      "IRWIN ROAD": [
         "mac",
         "vm"
       ]
@@ -11856,46 +11926,6 @@
         "vm"
       ]
     },
-    "addr:eastern blvd|NC:cumberland": {
-      "EASTERN BLVD": [
-        "mac",
-        "vm"
-      ],
-      "EASTERN BLVD.": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:adjacent to roosevelt blvd|28533": {
-      "ADJACENT TO ROOSEVELT BLVD.": [
-        "mac",
-        "vm"
-      ],
-      "ADJACENT TO ROOSEVELT BLVD": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:tarawa ter blvd|28542": {
-      "TARAWA TERRACE BOULEVARD": [
-        "mac",
-        "vm"
-      ],
-      "TARAWA TERRACE BLVD": [
-        "mac",
-        "vm"
-      ]
-    },
-    "parcel:NC:mecklenburg:13310112": {
-      "5939 REDDMAN ROAD": [
-        "mac",
-        "vm"
-      ],
-      "5945 REDDMAN RD": [
-        "mac",
-        "vm"
-      ]
-    },
     "parcel:NC:gaston:3545491046": {
       "218 NORTH RANSOM STREET": [
         "mac",
@@ -11906,42 +11936,12 @@
         "vm"
       ]
     },
-    "addr:hwy 64 & davie academy rd|27028": {
-      "HWY 64 & DAVIE ACADEMY RD.": [
-        "mac",
-        "vm"
-      ],
-      "HWY 64 & DAVIE ACADEMY ROAD": [
-        "mac",
-        "vm"
-      ]
-    },
     "addr:hwy 74 e|NC:union": {
       "HWY 74 E": [
         "mac",
         "vm"
       ],
       "HIGHWAY 74 EAST": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:patterson ave|NC:forsyth": {
-      "PATTERSON AVE": [
-        "mac",
-        "vm"
-      ],
-      "PATTERSON AVE.": [
-        "mac",
-        "vm"
-      ]
-    },
-    "addr:browns hill rd|NC:stanly": {
-      "BROWNS HILL RD": [
-        "mac",
-        "vm"
-      ],
-      "BROWNS HILL ROAD": [
         "mac",
         "vm"
       ]
