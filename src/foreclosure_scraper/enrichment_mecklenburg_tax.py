@@ -222,30 +222,41 @@ def _parse_bill_rows(html: str) -> list[dict]:
     cell POSITION (the grid has no header row): cell 0 Bill Number (embeds the tax year), cell 2
     Parcel Number, cell 3 Owner Name as of that bill, cell 4 Property Address, cell 5 a mailing/
     status note, cell 6 the dollar balance. The 'Total:' footer row is dropped because its cell 0
-    never matches the Bill-Number shape -- not by position, so it can't be mistaken for a year."""
+    never matches the Bill-Number shape -- not by position, so it can't be mistaken for a year.
+
+    FIX 2026-11-13: used to assume the bills grid is always tables[4] (treating fewer than 5
+    tables as proof of "no data"). Live-verified that's false -- e.g. parcel 02951502 (real,
+    18 bill rows, GOODALL KIMBERLY A) renders with only 4 tables total, grid at tables[3], on a
+    page that is NOT a "NO DATA FOUND" answer. That false "no data" tripped
+    enrichment_mecklenburg_tax's circuit breaker on a large, unpredictable fraction of otherwise-
+    healthy parcels (mecklenburg_mydt.circuit_open, zero real writes). Fixed by scanning every
+    table on the page and keeping whichever one actually contains the most bill-shaped rows,
+    instead of trusting a fixed index -- robust to any extra/missing table elsewhere on the page."""
     tables = re.findall(r"<table[^>]*>(.*?)</table>", html, re.S)
-    if len(tables) < 5:
-        return []  # a "NO DATA FOUND" answer never renders the results table at all
-    out: list[dict] = []
-    for row in re.findall(r"<tr[^>]*>(.*?)</tr>", tables[4], re.S):
-        cells = [re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", c)).strip()
-                 for c in re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", row, re.S)]
-        if len(cells) < 7:
-            continue
-        m = _BILL_ROW_RE.match(cells[0])
-        if not m:
-            continue
-        amt_m = _AMOUNT_RE.search(cells[6])
-        out.append({
-            "year": int(m.group(2)),
-            "bill_number": cells[0],
-            "parcel": cells[2].strip(),
-            "owner": cells[3].strip(),
-            "address": cells[4].strip(),
-            "note": cells[5].strip(),
-            "balance": float(amt_m.group(1).replace(",", "")) if amt_m else 0.0,
-        })
-    return out
+    best: list[dict] = []
+    for table in tables:
+        candidate: list[dict] = []
+        for row in re.findall(r"<tr[^>]*>(.*?)</tr>", table, re.S):
+            cells = [re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", c)).strip()
+                     for c in re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", row, re.S)]
+            if len(cells) < 7:
+                continue
+            m = _BILL_ROW_RE.match(cells[0])
+            if not m:
+                continue
+            amt_m = _AMOUNT_RE.search(cells[6])
+            candidate.append({
+                "year": int(m.group(2)),
+                "bill_number": cells[0],
+                "parcel": cells[2].strip(),
+                "owner": cells[3].strip(),
+                "address": cells[4].strip(),
+                "note": cells[5].strip(),
+                "balance": float(amt_m.group(1).replace(",", "")) if amt_m else 0.0,
+            })
+        if len(candidate) > len(best):
+            best = candidate
+    return best
 
 
 async def _fetch_parcel_bills(client: httpx.AsyncClient, parcel: str) -> tuple[Optional[list[dict]], str]:
