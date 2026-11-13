@@ -63,6 +63,46 @@ on GET never takes the new branch. rod/cchs.py's _get_search_text (used by _cchs
 sweep_loss_instruments and search_by_name for its own overlapping us4 tenants -- Lincoln,
 Madison, Henderson, Duplin) got the identical fix for the identical reason; its us5 tenants
 (Burke, Cleveland) were re-confirmed unaffected in the same live sweep.
+
+THIRD NAMED EXCEPTION (2026-11-13): all 12 us4 tenants (the 10 above plus Tyrrell and
+Washington) answer the search POST with the server's own literal "session_expired" body, even
+with a valid cookie the server itself just issued. Root-caused: realestatesearch.asp's own JS
+reads a search_token param from `window.parent.searchToken` before every search POST --
+confirmed on Hertford's page source, byte-identical to Henderson's -- a variable the page
+itself never defines (grepped the whole page and all 9 loaded <script src> files: jquery,
+jquery.cookie, AutoComplete, Slider, OpenDocumentImage, Sarissa, Querystring -- none of them
+set it; jquery.cookie is loaded but never actually called for this). It's meant to come from
+the PARENT frame, i.e. whatever page legitimately embeds realestatesearch.asp in an iframe --
+NOT from a cookie, NOT from a URL param on this page.
+
+FOUND the real parent-page flow (Hertford, used as the representative tenant): the county's own
+site (e.g. hertfordrod.net) frames `us4.courthousecomputersystems.com/<county>nc/` (lowercase,
+NO "NW" suffix -- a different, NOT-Cloudflare-gated static site: home.asp, fees.asp, etc., 200
+on a plain fetch). Its "Search Online" link goes to `disclaimer.asp` (a real GS 132-1.8
+statutory disclaimer, not a formality page) whose only exit is a
+`javascript:window.open("<base>/<County>NCNW/application.asp?resize=true", "ccsimage", ...)`
+link -- a fullscreen popup, almost certainly the real app shell that frames realestatesearch.asp
+and sets window.searchToken for it.
+
+That `application.asp` is where this dead-ends for good: live-tested 2026-11-13 with cookies and
+Referer carried faithfully through the full real chain (frameset -> <county>nc/ -> disclaimer.asp
+-> application.asp), across query-param variations (?resize=true, ?resize=false, no query), slug
+casing (hertfordncnw vs HertfordNCNW), and retries -- EVERY attempt gets an identical Cloudflare
+Turnstile challenge page (CSP references challenges.cloudflare.com, "Just a moment..." title).
+Turnstile needs a real browser to solve a live interactive challenge; curl_cffi/httpx impersonation
+only fakes the TLS/HTTP fingerprint, it cannot execute or solve it. Real browser automation is not
+an alternative either -- this exact vendor's Cloudflare deployment already fingerprints and blocks
+CDP-controlled browsers outright (confirmed live on both Burke/us5 and Henderson/us4 this same
+session). No alternate parent page exists either: default.asp/index.asp/main.asp/shell.asp/
+frame.asp/menu.asp/search.asp/app.asp are all 404 under the NCNW slug, and the slug's bare root
+403s (not even a Turnstile challenge, just blocked).
+
+Bottom line: the 12 us4 tenants' search_token requirement is NOT a code bug and NOT a missing
+click-through (disclaimer-clicking itself is just a GET, authorized and attempted) -- it is a
+hard Cloudflare Turnstile wall on the one page that would legitimately hand us the token, with no
+HTTP-replicable or automatable path around it found. Don't re-attempt this without a genuinely new
+idea (a different, non-browser way to solve Turnstile, or finding this token is reused/predictable
+some other way) -- the disclaimer-flow investigation itself is exhausted.
 """
 from __future__ import annotations
 
