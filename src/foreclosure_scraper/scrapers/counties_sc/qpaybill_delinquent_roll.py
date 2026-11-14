@@ -1298,15 +1298,50 @@ def _to_listings(county: str, rows: list[dict]) -> list[Listing]:
     two rows for the same id. Emitting them separately would put the same property
     on the board twice and hide the strongest signal in the data; aggregating makes
     years_delinquent and the total balance explicit.
+
+    FIX 2026-11-14: "ident" (the grid's "Identification No.") is NOT always a unique
+    per-property id -- live-verified on Spartanburg: bulk tax-sale-buyer entities (e.g.
+    "STIBAL & COMPANY") hold multiple genuinely different real properties that the
+    portal's own page tags with the IDENTICAL Identification No. (confirmed: 420 Larry Dr
+    and 415 Larry Dr, different bill/notice numbers, different amounts, same
+    "7-08-04-001.00"). Grouping by ident alone silently merged those into one Listing,
+    keeping only the first address and burying the other property entirely. Fixed by
+    sub-splitting an ident's rows by DISTINCT non-null `address` when more than one real
+    address shares that ident -- a genuine multi-year delinquency on ONE property always
+    has the same address across its rows, so this changes nothing for that (overwhelmingly
+    common) case and only splits apart the bulk-buyer collision case this was built to miss.
+    A row with no address at all inside a split group is ambiguous (can't tell which real
+    property it belongs to) and is deliberately dropped rather than guessed onto either side.
     """
     by_ident: dict[str, list[dict]] = defaultdict(list)
     for r in rows:
         by_ident[r["ident"]].append(r)
 
+    by_group: dict[tuple, list[dict]] = {}
+    dropped_ambiguous = 0
+    for ident, group in by_ident.items():
+        distinct_addrs = {g["address"] for g in group if g.get("address")}
+        if len(distinct_addrs) <= 1:
+            by_group[(ident,)] = group
+            continue
+        # Bulk-buyer collision: this ident covers 2+ genuinely different real addresses.
+        # Split by address; a row with no address here can't be placed, so it's dropped
+        # (not merged onto an arbitrary side) rather than guessed.
+        for g in group:
+            addr = g.get("address")
+            if not addr:
+                dropped_ambiguous += 1
+                continue
+            by_group.setdefault((ident, addr), []).append(g)
+    if dropped_ambiguous:
+        log.warning("qpaybill_roll.shared_ident_split_dropped_ambiguous",
+                    county=county, dropped=dropped_ambiguous)
+
     out: list[Listing] = []
     now = datetime.utcnow()
     account_only = county in ACCOUNT_ID_ONLY
-    for ident, group in by_ident.items():
+    for group_key, group in by_group.items():
+        ident = group_key[0]
         group.sort(key=lambda g: (g.get("year") or ""))
         all_years = sorted({g["year"] for g in group if g.get("year")})
         # A CURRENT-YEAR bill is not a delinquency. See _delinquent_years().
