@@ -169,6 +169,71 @@ def test_duplin_is_registered_on_the_same_vendor_as_its_newer_siblings():
     assert duplin.cells == p.CELLS
 
 
+def test_duplin_bare_digit_parcel_is_reformatted_to_its_native_map_lot_id():
+    """Root-caused 2026-11-15 (feedback_duplin_harnett_parcel_id_format_mismatch_2026-10-31.md):
+    Duplin board rows carry a bare 5-6 digit parcel_id (almost certainly
+    counties_nc.nc_civicplus_tax_sale's "Parcel ID#<digits>" prose extraction) that is this
+    portal's own native 'MM-LLLL--' map-lot number with the dash stripped -- confirmed live
+    against the real portal for all 5 of that memory's example ids. searches() must reformat it
+    before posting, since the real backend answers zero records for the bare digits (confirmed
+    live) and FakePortal's own alnum-loose matching below cannot catch a regression here."""
+    assert p.PORTALS["Duplin"].native_map_lot_dash is True
+    assert p.Portal("Other", "https://x", "ParcelNumber").native_map_lot_dash is False
+    for raw, native in (("111401", "11-1401--"), ("07862", "07-862--"),
+                        ("072369", "07-2369--"), ("13761", "13-761--"),
+                        ("072778", "07-2778--")):
+        assert p._native_map_lot(raw) == native
+    row = {"state": "NC", "county": "Duplin", "listing_type": "tax_sale",
+          "source": "counties_nc.nc_civicplus_tax_sale", "parcel_id": "111401",
+          "street_address": None, "owner_name": None, "raw": {}}
+    assert p.searches(row, p.PORTALS["Duplin"])[0] == ("ParcelNumber", "11-1401--", "board_parcel")
+    # a value that is not a bare 5-6 digit run passes through untouched: the 12-digit GIS PIN
+    # most Duplin rows actually carry (a different id namespace, not a formatting variant --
+    # enrichment_duplin_rollback_exposure.py's own live-matched pair proves no digit-substring
+    # relationship holds), and the rare already-correct dashed legacy form.
+    for untouched in ("247514336558", "09-747--"):
+        assert p._native_map_lot(untouched) == untouched
+
+
+def test_duplin_tolerates_its_own_embedded_space_inside_the_native_id_token():
+    """Duplin's ViewTaxBill prints its own native id with padding SPACES inside the dash-
+    segmented token itself ('11-1401-  -', '09- 747-  -', live-captured 2026-11-15) -- the
+    generic " " not in p id check would otherwise drop it as if it were a situs line. Gated to
+    native_map_lot_dash portals only: Onslow's identical-looking description must NOT pick up
+    this relaxation (nothing on this vendor's other counties prints a dash inside an id this
+    way, and the "-" in p guard is what keeps a real situs out even on Duplin itself)."""
+    desc = "11-1401-  -<br/>238802690974<br />205 BRYANT NEWKIRK RD<br />5.060 AC"
+    d = p.parse_description(desc, p.PORTALS["Duplin"])
+    assert d["ids"] == ["11-1401--", "238802690974"]
+    assert d["situs"] == "205 BRYANT NEWKIRK RD" and d["real"] is True
+    # the same text, on a portal without the flag, drops the space-padded token as before
+    assert p.parse_description(desc, p.PORTALS["Onslow"])["ids"] == ["238802690974"]
+    assert p.parse_description(desc)["ids"] == ["238802690974"]              # portal=None too
+
+
+def test_duplin_bare_digit_row_confirms_end_to_end():
+    """The same shape as test_confirmed_on_the_rows_own_map_number, for Duplin's bare-digit
+    case (owner/address synthetic, per this file's own TEST-marker convention -- only the
+    parcel-id shape itself, '111401'/'11-1401--', is the real bug, live-confirmed
+    2026-11-15): a FakePortal reaches `confirmed` off a row whose own parcel_id is the bare
+    '111401' form the real sweep was failing on."""
+    duplin_base = p.PORTALS["Duplin"].base
+    situs = "205 TEST BRYANT NEWKIRK RD HUBERT NC 28539-0000"
+    bills = [bill(2026, 32635, ["11-1401-  -", "238802690974"], situs, balance=320.45,
+                  original=320.45, owner="TESTOWNER CHASTEN"),
+            bill(2025, 2529769, ["11-1401-  -", "238802690974"], situs, balance=355.09,
+                 original=324.45, owner="TESTOWNER CHASTEN")]
+    portal = FakePortal(duplin_base, bills)
+    row = {"state": "NC", "county": "Duplin", "listing_type": "tax_sale",
+          "source": "counties_nc.nc_civicplus_tax_sale", "parcel_id": "111401",
+          "street_address": "205 TEST BRYANT NEWKIRK RD", "owner_name": "TESTOWNER CHASTEN",
+          "raw": {}}
+    r = run(row, portal)
+    assert r.verdict == "confirmed", r.evidence
+    assert r.evidence["tax_parcel"] == "11-1401--"
+    assert r.evidence["searched"][0] == {"by": "ParcelNumber", "from": "board_parcel", "bills": 2}
+
+
 def test_applies_to_the_configured_counties_only():
     assert p.applies(onslow_roll_row())
     assert p.applies(onslow_roll_row(county="Graham", raw={"two_year_delinquent": {"is_two_year_plus": True}}))
