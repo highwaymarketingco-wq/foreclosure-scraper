@@ -221,6 +221,49 @@ def _synth_for_listing(li: Listing, repeated: dict | None = None) -> str | None:
         if found:
             return found
 
+    # 2026-11-15 (text-blob-address / no-zip identity-collision scan, see
+    # project_vm_push_credentials_missing_and_board_divergence_2026-11-13.md,
+    # "Known text-blob-address scraper bug"). These three NC delinquent-tax
+    # sources carry no situs at all on their own data (each scraper's own
+    # docstring says so; GIS/parcel_id is meant to backfill the address
+    # later). Once the address-pattern search just above has already failed
+    # to find a real house-numbered address in `desc`, what's left is either
+    # a bare road name with no house number (Polk's own search/detail pages,
+    # e.g. "DUBLIN LN") or a per-record boilerplate sentence that repeats
+    # verbatim for every unaddressed parcel in one town (the ptscloud CSV's
+    # own "0 NO 911 ADDRESS ASSIGNED <TOWN>, NC <ZIP>"). The "tax" branch
+    # below (and the generic desc[:80] catch-all further down) would
+    # otherwise wrap that same text into street_address regardless, and
+    # dedupe_key()'s address branch then merges every DIFFERENT real parcel
+    # that happens to share it. Confirmed live: Polk's "Dublin Ln" key alone
+    # covered 15 distinct real taxdetail.php?id records; board-wide this
+    # shape accounted for 69 keys / 192 rows, 100% from these three sources.
+    # Leave street_address null instead so dedupe_key() falls through to
+    # whatever identity each row actually has. For Polk that's source_url,
+    # which is already per-record (taxdetail.php?id=N) -- nothing else is
+    # needed. The other two share ONE source_url per county, but that is
+    # NOT a new gap this leaves open: dedupe.py already has a dedicated,
+    # tested mechanism for exactly this shape (its own "roll URL keys"
+    # section, board_persist._SOURCE_PARCEL_FIELDS lists both sources by
+    # name) that reads the id each row's OWN source published even after
+    # validation.py nulled it for being too short (dedupe.nulled_source_
+    # parcel(), raw['parcel_id_nulled']) and only merges two same-URL rows
+    # when nothing else disagrees (dedupe.url_key_conflict()). Giving these
+    # two sources their own extra case_number here (an earlier draft of
+    # this fix did) bypasses that mechanism instead of relying on it, and
+    # breaks the published-row / grandfather-restore contract
+    # (test_grandfather_restored_parcel.py, test_withdrawn_tag_sticky.py)
+    # that depends on them reaching the plain url: key -- see
+    # test_address_synthesis_no_situs_tax.py for the two layers composing
+    # correctly as they are.
+    _NO_SITUS_TAX_SOURCES = (
+        "counties_nc.polk_tax",
+        "counties_nc.nc_ptscloud_delinquent_tax",
+        "counties_nc.nc_county_pdf_delinquent_tax",
+    )
+    if any(s in src for s in _NO_SITUS_TAX_SOURCES):
+        return None
+
     # SC Public Index / NC eCourts lis pendens — synthesize from case#
     if "lis_pendens" in src or "ecourts" in src or "public_index" in src:
         if case and defendant:
