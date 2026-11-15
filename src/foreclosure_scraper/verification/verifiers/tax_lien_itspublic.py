@@ -226,6 +226,31 @@ class Portal:
     #: search OwnerLastName/OwnerFirstName instead, binding the result with the row's own known
     #: parcel numbers (searches(), verify()'s `want` rule already does this for AccountNumber)
     name_search: bool = False
+    #: the board's parcel_id sometimes arrives as this portal's own native map-lot number with
+    #: the connecting dash stripped out (Duplin: a bare '111401' for its native 'MM-LLLL--' id,
+    #: e.g. '11-1401--') -- root-caused and confirmed live 2026-11-15 against the real portal for
+    #: every example failing id in feedback_duplin_harnett_parcel_id_format_mismatch_2026-10-31.md
+    #: ('111401'->'11-1401--' 8 bills/CHASTEN EVELYN A, '07862'->'07-862--' 15 bills/DAVIS MILTON
+    #: & OTHERS, '072369'->'07-2369--' 15 bills, '13761'->'13-761--' 15 bills/DAVIS RUDOLPH,
+    #: '072778'->'07-2778--' 15 bills/DAVIS RUFFIN MARK; searching the bare digits, or the dash
+    #: with no trailing pad, answers zero every time -- only the full padded form resolves). The
+    #: bare digits are this SAME number, dash removed, almost certainly from this project's other
+    #: Duplin producer (counties_nc.nc_civicplus_tax_sale's "Parcel ID#<digits>" prose extraction
+    #: off the county's own tax-foreclosure notices) rather than this module's own roll scraper
+    #: (which already keeps the dash, parse_description_cols()). See _native_map_lot() (searches())
+    #: and parse_description()'s id loop below, which tolerates this same portal's own
+    #: embedded-space rendering of that id ('11-1401-  -', '09- 747-  -') so a bill found under
+    #: the reformatted search is still recognized as carrying the row's own known parcel number
+    #: (both ends of this flag are needed together; reformatting the search alone finds the right
+    #: bill but parse_description would still fail to bind it, and vice versa). Does not touch
+    #: the 12-digit GIS PIN most Duplin board rows actually carry (a different id NAMESPACE for
+    #: the same parcel, not a formatting variant of this one -- confirmed by
+    #: enrichment_duplin_rollback_exposure.py's own live-matched pair, parcel_id 247514330584 =
+    #: tenant parcel '01-1919- -': no digit-substring or pad/unpad relationship between them, so
+    #: there is no safe transform for that format here) or the rare rows that already carry the
+    #: correct dashed form -- both pass through _native_map_lot() unchanged (5-6 bare digits only,
+    #: the evidenced shape; not generalized beyond it).
+    native_map_lot_dash: bool = False
 
 
 PORTALS: dict[str, Portal] = {
@@ -330,11 +355,17 @@ def applies(row: dict) -> bool:
     # hatch for a county whose rows are returning real but useless parcel_not_found answers
     # on nearly every candidate (confirmed live: Duplin, sweep #26 of the 2026-10-29
     # tax_lien verification cycle, 18/635 confirmed -- see
-    # feedback_duplin_harnett_parcel_id_format_mismatch_2026-10-31.md). The board carries
-    # at least 3 different parcel_id shapes for Duplin and which producer's short-digit
-    # form actually maps to this portal's ParcelNumber field was not yet traced -- this
-    # just stops it from crowding out every other county's overdue backlog while that's
-    # unresolved, same pattern as avalon_tax.py's AVALON_TAX_SKIP. Default (unset) behavior
+    # feedback_duplin_harnett_parcel_id_format_mismatch_2026-10-31.md). Root-caused
+    # 2026-11-15: the board carries at least 3 different parcel_id shapes for Duplin -- a
+    # 12-digit GIS PIN (a different id NAMESPACE, not fixable here, see
+    # Portal.native_map_lot_dash), a rare already-correct dashed legacy form, and a bare
+    # 5-6 digit form (almost certainly counties_nc.nc_civicplus_tax_sale's "Parcel ID#"
+    # prose extraction off the county's own notices, this portal's own native map-lot
+    # number with its dash stripped) -- fixed for that last, evidenced shape
+    # (Portal.native_map_lot_dash, _native_map_lot()). Kept as a general-purpose escape
+    # hatch (same pattern as avalon_tax.py's AVALON_TAX_SKIP) for whatever is still
+    # unresolved on this or another county -- Harnett's own share of this bug, if any, was
+    # not traced this session and has no confirmed transform yet. Default (unset) behavior
     # is completely unchanged.
     skip = {c.strip().lower() for c in
             (os.environ.get("ITSPUBLIC_SKIP_COUNTIES") or "").split(",") if c.strip()}
@@ -352,6 +383,25 @@ def _key(p: Any) -> str:
     all: Transylvania's roll prints "Escrow :" where a business bill has no parcel)."""
     k = tc.alnum(p)
     return "" if not k or set(k) <= {"0"} or not re.search(r"\d", k) else k
+
+
+#: a bare board parcel_id this short is Duplin's own 'MM-LLLL' map-lot number with the dash
+#: removed (Portal.native_map_lot_dash) -- every evidenced example is 5 or 6 digits; a longer
+#: run (the 12-digit GIS PIN) or one that already has a dash is left alone (_native_map_lot)
+_BARE_DIGIT_PARCEL = re.compile(r"^\d{5,6}$")
+
+
+def _native_map_lot(pid: str) -> str:
+    """pid reformatted into Duplin's own ITSPublicDL ParcelNumber search shape when it is a
+    bare 5-6 digit run (Portal.native_map_lot_dash): the first two digits are the map number,
+    the rest are the lot, joined by the dash the portal's own numbering always carries, with a
+    trailing '--' for its two always-empty block/suffix segments -- '111401' -> '11-1401--'.
+    Confirmed live 2026-11-15: the bare digits alone, and a dash with no trailing pad, both
+    answer zero records on the real portal; only this exact padded form resolves (see
+    Portal.native_map_lot_dash's docstring for the live-verified examples). Anything else
+    (the 12-digit PIN, an already-dashed value) is returned unchanged -- a narrow, evidenced
+    transform, not a guess at the general case."""
+    return f"{pid[:2]}-{pid[2:]}--" if _BARE_DIGIT_PARCEL.match(pid) else pid
 
 
 def _roll_parcels(roll: Roll, blk: dict, keys: Optional[tuple[str, ...]] = None) -> list[str]:
@@ -448,6 +498,8 @@ def searches(row: Any, portal: Portal) -> list[tuple[str, str, str]]:
     else:
         pid = str(tc.g(row, "parcel_id") or "").strip()
         if _key(pid):
+            if portal.native_map_lot_dash:
+                pid = _native_map_lot(pid)
             out.append((portal.parcel_field, tc.alnum(pid) if portal.parcel_alnum else pid,
                         "board_parcel"))
         rb = _own_roll(row)
@@ -525,6 +577,15 @@ def parse_description(desc_html: Any, portal: Optional[Portal] = None) -> dict:
     for p in body:
         if " " not in p and re.search(r"\d", p) and _ID.match(p.upper()) and len(p) <= 24:
             ids.append(p)
+        elif (portal is not None and portal.native_map_lot_dash and "-" in p and len(p) <= 24
+              and _ID.match(re.sub(r"\s+", "", p).upper())):
+            # this portal pads its own native id with spaces INSIDE the dash-segmented token
+            # itself (Duplin: "11-1401-  -", "09- 747-  -") -- still the parcel id, not a
+            # situs, once those internal spaces are ignored (Portal.native_map_lot_dash); the
+            # "-" in p requirement keeps this from ever matching a real situs line (none in
+            # this vendor's data carries a dash) the way blindly space-stripping every token
+            # would (a street address stripped of spaces is still a plain alnum run too)
+            ids.append(re.sub(r"\s+", "", p))
         elif map_ref is not None and map_ref.search(p):
             continue
         elif situs is None and re.search(r"[A-Za-z]", p):
@@ -591,7 +652,9 @@ _NEWER_BUILD = {
 }
 #: form fields beyond the common ones, read from each page's own .search-value inputs
 _NEWER_EXTRA = {"Granville": dict(model_fields=("AlternateParcelIdentifier",), account_search=False),
-                "Alleghany": dict(model_fields=("AlternateParcelIdentifier",))}
+                "Alleghany": dict(model_fields=("AlternateParcelIdentifier",)),
+                # root-caused 2026-11-15, see Portal.native_map_lot_dash's docstring
+                "Duplin": dict(native_map_lot_dash=True)}
 for _county, (_base, _cells) in _NEWER_BUILD.items():
     PORTALS.setdefault(_county, Portal(_county, _base, "ParcelNumber", full_model=True,
                                        real_without_units=True, cells=_cells,
