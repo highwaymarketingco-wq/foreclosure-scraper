@@ -1312,6 +1312,21 @@ def _to_listings(county: str, rows: list[dict]) -> list[Listing]:
     common) case and only splits apart the bulk-buyer collision case this was built to miss.
     A row with no address at all inside a split group is ambiguous (can't tell which real
     property it belongs to) and is deliberately dropped rather than guessed onto either side.
+
+    FIX 2026-11-15: the distinct-address check above compares by `_road_core`, not the raw
+    address string -- LIVE-CONFIRMED false-split on Sumter while spot-checking fe7c557a
+    against other counties: ident "4000026797" (owner H L ENGLISH) carries address
+    "29 SECOND AVE" on its 2024-2026 rows and "29 SECOND AVENUE" on its 2022-2023 rows.
+    All five rows' own detail pages carry the IDENTICAL legal description ("1973 OAKMONT
+    14063...", a single mobile home), the same map_number and the same buildings count --
+    conclusively ONE real parcel, not two. Raw-string comparison treated the abbreviation
+    drift as a second address and produced two duplicate Listings for one genuine five-year
+    delinquency -- the mirror-image of the bug this split exists to catch. `_road_core`
+    (already used below by `_owner_mailing_not_situs` for this exact class of noise) collapses
+    both spellings to the same key; a genuinely different house number -- the real bulk-buyer
+    case this split was built for (Spartanburg's "420 LARRY DR" vs "415 LARRY DR", and a second
+    live instance found the same spot-check, Darlington ident "218-05-02-095": "3319 FIELDCREST
+    DR" vs "3323 FIELDCREST DR") -- still produces a different key, so that split is unaffected.
     """
     by_ident: dict[str, list[dict]] = defaultdict(list)
     for r in rows:
@@ -1320,19 +1335,20 @@ def _to_listings(county: str, rows: list[dict]) -> list[Listing]:
     by_group: dict[tuple, list[dict]] = {}
     dropped_ambiguous = 0
     for ident, group in by_ident.items():
-        distinct_addrs = {g["address"] for g in group if g.get("address")}
+        distinct_addrs = {_road_core(g["address"]) for g in group if g.get("address")}
         if len(distinct_addrs) <= 1:
             by_group[(ident,)] = group
             continue
         # Bulk-buyer collision: this ident covers 2+ genuinely different real addresses.
-        # Split by address; a row with no address here can't be placed, so it's dropped
-        # (not merged onto an arbitrary side) rather than guessed.
+        # Split by address (by _road_core, so cosmetic abbreviation drift on ONE real
+        # property doesn't look like a second one); a row with no address here can't be
+        # placed, so it's dropped (not merged onto an arbitrary side) rather than guessed.
         for g in group:
             addr = g.get("address")
             if not addr:
                 dropped_ambiguous += 1
                 continue
-            by_group.setdefault((ident, addr), []).append(g)
+            by_group.setdefault((ident, _road_core(addr)), []).append(g)
     if dropped_ambiguous:
         log.warning("qpaybill_roll.shared_ident_split_dropped_ambiguous",
                     county=county, dropped=dropped_ambiguous)
