@@ -157,6 +157,69 @@ def test_a_parcel_county_does_claim_its_parcel():
 
 
 # ---------------------------------------------------------------------------
+# Shared Identification No. across genuinely different real properties
+# (fe7c557a, 2026-11-14) and the false-split it must NOT produce for a single
+# property whose situs text merely drifted between tax years (2026-11-15)
+# ---------------------------------------------------------------------------
+
+def test_bulk_buyer_shared_ident_splits_into_distinct_listings():
+    """Genuinely different real properties sharing one Identification No. (Spartanburg's
+    STIBAL & COMPANY, live-verified 2026-11-14 -- 420 Larry Dr and 415 Larry Dr, different
+    bill amounts, same "7-08-04-001.00") must NOT be merged into one Listing: that silently
+    buried the second property under the first one's address."""
+    out = _to_listings("Spartanburg", [
+        _row("7-08-04-001.00", "2024", 232.39, owner="STIBAL & COMPANY", addr="420 LARRY DR"),
+        _row("7-08-04-001.00", "2024", 463.22, owner="STIBAL & COMPANY", addr="415 LARRY DR"),
+    ])
+    assert len(out) == 2
+    assert {li.street_address for li in out} == {"420 LARRY DR", "415 LARRY DR"}
+    assert all(li.parcel_id == "7-08-04-001.00" for li in out)
+
+
+def test_abbreviation_drift_on_one_real_property_does_not_false_split():
+    """A single real parcel whose situs was re-keyed "AVE" in some tax years and "AVENUE"
+    in others must still aggregate into ONE Listing, not be mistaken for the bulk-buyer
+    collision above and split into two duplicate board rows.
+
+    Live-verified 2026-11-15 while spot-checking fe7c557a against other counties: Sumter
+    ident "4000026797" (owner H L ENGLISH) carries exactly this drift, and all five years'
+    own detail pages share one legal description ("1973 OAKMONT 14063..."), one map_number
+    and one building count -- conclusively a single 1973 mobile home, not two parcels."""
+    out = _to_listings("Sumter", [
+        _row("4000026797", "2024", 253.28, owner="H L ENGLISH", addr="29 SECOND AVE"),
+        _row("4000026797", "2023", 251.16, owner="H L ENGLISH", addr="29 SECOND AVENUE"),
+        _row("4000026797", "2022", 249.20, owner="H L ENGLISH", addr="29 SECOND AVENUE"),
+    ])
+    assert len(out) == 1
+    assert out[0].raw["qpaybill_roll"]["years_delinquent"] == 3
+    assert out[0].raw["qpaybill_roll"]["balance_owed"] == pytest.approx(753.64)
+
+
+def test_different_house_number_on_the_same_street_still_splits():
+    """_road_core only collapses abbreviation/direction noise, never a different house
+    number -- a second live case found during the same spot-check (Darlington ident
+    "218-05-02-095": "3319 FIELDCREST DR" vs "3323 FIELDCREST DR") must still split."""
+    out = _to_listings("Darlington", [
+        _row("218-05-02-095", "2023", 186.60, owner="YANEZ-MARIN J TERESO", addr="3319 FIELDCREST DR"),
+        _row("218-05-02-095", "2022", 330.23, owner="YANEZ-MARIN J TERESO", addr="3323 FIELDCREST DR"),
+    ])
+    assert len(out) == 2
+    assert {li.street_address for li in out} == {"3319 FIELDCREST DR", "3323 FIELDCREST DR"}
+
+
+def test_an_addressless_row_inside_a_real_split_is_dropped_not_guessed():
+    """A row with no address at all can't be placed on either side of a genuine
+    bulk-buyer split, so it's dropped (logged) rather than guessed onto one property."""
+    out = _to_listings("Spartanburg", [
+        _row("7-08-04-001.00", "2024", 232.39, owner="STIBAL & COMPANY", addr="420 LARRY DR"),
+        _row("7-08-04-001.00", "2024", 463.22, owner="STIBAL & COMPANY", addr="415 LARRY DR"),
+        _row("7-08-04-001.00", "2024", 10.0, owner="STIBAL & COMPANY", addr=None),
+    ])
+    assert len(out) == 2
+    assert sum(li.raw["qpaybill_roll"]["rows"] for li in out) == 2
+
+
+# ---------------------------------------------------------------------------
 # Enumeration invariants
 # ---------------------------------------------------------------------------
 
