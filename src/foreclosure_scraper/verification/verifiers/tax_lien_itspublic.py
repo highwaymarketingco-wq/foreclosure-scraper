@@ -251,6 +251,27 @@ class Portal:
     #: correct dashed form -- both pass through _native_map_lot() unchanged (5-6 bare digits only,
     #: the evidenced shape; not generalized beyond it).
     native_map_lot_dash: bool = False
+    #: same bug CLASS as native_map_lot_dash, different vendor instance and different native
+    #: punctuation (Harnett, cama.harnett.org/ITSPublicHT: a SPACE-segmented map-block[-lot] id,
+    #: not a dash one) -- root-caused and confirmed live 2026-11-15, see
+    #: feedback_duplin_harnett_parcel_id_format_mismatch_2026-10-31.md's own Harnett half.
+    #: counties_nc/nc_its_public_tax.py's OWN roll scraper (parse_description_cols()) strips ALL
+    #: internal whitespace from this portal's native id before it ever reaches the board --
+    #: EVERY one of Harnett's 1,343 nc_its_public_tax board rows (full board scan, zero
+    #: exceptions) is a bare digit run of exactly 10, 12, 14 or 16 digits. Live-verified for 8
+    #: real board rows, 2026-11-15: cross-checked each one's TRUE native id against the SAME
+    #: host's BasicSearch/ViewParcel product (enrichment_harnett_rollback_exposure.py's own
+    #: owner+address match, e.g. '0995580013' is really '099558    0013', '010505000801' is
+    #: really '010505    0008 01') -- the bare digits alone answer zero live on TaxBillSearch
+    #: for all 8 (confirmed), the reformatted id answers the row's own real, correctly-owned,
+    #: correctly-sitused bills for all 8 (also confirmed, address and owner both checked, plus a
+    #: '999999    9999' negative control answering zero to rule out an unfiltered default list).
+    #: See _native_map_lot_space() (searches()) and parse_description()'s id loop, which -- like
+    #: native_map_lot_dash's own embedded-space tolerance -- recognizes this portal's own
+    #: space-padded id token in a found bill's description so the match still binds (both ends
+    #: needed together, same reason native_map_lot_dash needs both of its own). Not generalized
+    #: beyond the evidenced 10/12/14/16-digit shape.
+    native_map_lot_space: bool = False
 
 
 PORTALS: dict[str, Portal] = {
@@ -362,11 +383,15 @@ def applies(row: dict) -> bool:
     # 5-6 digit form (almost certainly counties_nc.nc_civicplus_tax_sale's "Parcel ID#"
     # prose extraction off the county's own notices, this portal's own native map-lot
     # number with its dash stripped) -- fixed for that last, evidenced shape
-    # (Portal.native_map_lot_dash, _native_map_lot()). Kept as a general-purpose escape
-    # hatch (same pattern as avalon_tax.py's AVALON_TAX_SKIP) for whatever is still
-    # unresolved on this or another county -- Harnett's own share of this bug, if any, was
-    # not traced this session and has no confirmed transform yet. Default (unset) behavior
-    # is completely unchanged.
+    # (Portal.native_map_lot_dash, _native_map_lot()). Harnett's own share of this same bug
+    # class, ALSO root-caused 2026-11-15 (same memory file): unlike Duplin, every one of its
+    # 1,343 nc_its_public_tax rows is the SAME shape, a bare 10/12/14/16-digit run of this
+    # portal's own native SPACE-segmented map-block[-lot] id with the spaces stripped by the
+    # roll scraper itself (Portal.native_map_lot_space, _native_map_lot_space()) -- no
+    # unrelated id namespace found on this county, so no skip was ever needed for it. Kept as
+    # a general-purpose escape hatch (same pattern as avalon_tax.py's AVALON_TAX_SKIP) for
+    # whatever is still unresolved on these or another county. Default (unset) behavior is
+    # completely unchanged.
     skip = {c.strip().lower() for c in
             (os.environ.get("ITSPUBLIC_SKIP_COUNTIES") or "").split(",") if c.strip()}
     if skip and str(row.get("county") or "").strip().lower() in skip:
@@ -402,6 +427,38 @@ def _native_map_lot(pid: str) -> str:
     (the 12-digit PIN, an already-dashed value) is returned unchanged -- a narrow, evidenced
     transform, not a guess at the general case."""
     return f"{pid[:2]}-{pid[2:]}--" if _BARE_DIGIT_PARCEL.match(pid) else pid
+
+
+#: Harnett's own evidenced bare board parcel_id shape (Portal.native_map_lot_space): the WHOLE
+#: nc_its_public_tax roll is one of exactly these 4 lengths, zero exceptions (full board scan,
+#: 2026-11-15) -- a run of any other length is left alone (returned unchanged, single-element).
+_BARE_DIGIT_PARCEL_HARNETT = re.compile(r"^\d{10}$|^\d{12}$|^\d{14}$|^\d{16}$")
+
+
+def _native_map_lot_space(pid: str) -> list[str]:
+    """pid reformatted into Harnett's own cama.harnett.org/ITSPublicHT ParcelNumber search
+    shape(s) (Portal.native_map_lot_space), when it is a bare 10/12/14/16-digit run; otherwise
+    [pid] unchanged. The native id is a MAP number left-justified in a 10-character field
+    (space-padded on the right when shorter), directly followed by a 4-digit BLOCK number,
+    OPTIONALLY followed by one space and a 2-digit LOT/unit number ('130630    0049',
+    '010505    0008 01') -- live-verified 2026-11-15 against 8 real board rows, cross-checked
+    against the SAME host's BasicSearch/ViewParcel product for each one's true native id (see
+    Portal.native_map_lot_space's own docstring for the evidence).
+
+    The MAP number's own length varies (6, 8 or 10 digits in every example seen), so a bare
+    digit run alone cannot say whether its own trailing 2 digits are a LOT suffix or the tail of
+    BLOCK -- both readings are returned (LOT-present first: 6 of the 8 live examples carried
+    one), and verify()'s existing owner/address-bound confirmation (the SAME safety net every
+    other candidate in this module already relies on) is what decides which, never a guess
+    trusted alone. A wrong reading answers zero live (confirmed on every evidenced length this
+    was tried against) or, if it ever did land on a different real parcel, would simply fail
+    that bind and fall through to unconfirmed -- the same outcome any other mismatched candidate
+    already gets."""
+    if not _BARE_DIGIT_PARCEL_HARNETT.match(pid):
+        return [pid]
+    lot, block6, map6 = pid[-2:], pid[-6:-2], pid[:-6]
+    block4, map4 = pid[-4:], pid[:-4]
+    return [f"{map6:<10}{block6} {lot}", f"{map4:<10}{block4}"]
 
 
 def _roll_parcels(roll: Roll, blk: dict, keys: Optional[tuple[str, ...]] = None) -> list[str]:
@@ -499,9 +556,16 @@ def searches(row: Any, portal: Portal) -> list[tuple[str, str, str]]:
         pid = str(tc.g(row, "parcel_id") or "").strip()
         if _key(pid):
             if portal.native_map_lot_dash:
-                pid = _native_map_lot(pid)
-            out.append((portal.parcel_field, tc.alnum(pid) if portal.parcel_alnum else pid,
-                        "board_parcel"))
+                out.append((portal.parcel_field, _native_map_lot(pid), "board_parcel"))
+            elif portal.native_map_lot_space:
+                # two candidate readings (LOT-present / no-LOT): see
+                # _native_map_lot_space()'s own docstring for why one bare digit run cannot
+                # say which reading is right -- verify()'s own owner/address bind decides.
+                for cand in _native_map_lot_space(pid):
+                    out.append((portal.parcel_field, cand, "board_parcel"))
+            else:
+                out.append((portal.parcel_field, tc.alnum(pid) if portal.parcel_alnum else pid,
+                            "board_parcel"))
         rb = _own_roll(row)
         if rb is not None:
             roll, blk = rb
@@ -511,9 +575,15 @@ def searches(row: Any, portal: Portal) -> list[tuple[str, str, str]]:
             acct = str(blk.get(roll.account_key) or "").strip() if roll.account_key else ""
             if _key(acct) and portal.account_search:
                 out.append(("AccountNumber", acct, "roll_account"))
+    # exact-value dedup, not alnum: native_map_lot_space emits two DELIBERATELY different
+    # readings of the same bare board value (_native_map_lot_space) that must both survive to
+    # be tried -- they share one alnum key (same digits, only the space position differs) but
+    # are never the same string. An alnum key still collapsed every PRE-existing case fed here
+    # (board_parcel/roll_block always write the identical literal string for the same value),
+    # so this is strictly a superset, never fewer entries surviving than before.
     seen, keep = set(), []
     for f, v, src in out:
-        k = (f, tc.alnum(v))
+        k = (f, v)
         if k in seen:
             continue
         seen.add(k)
@@ -586,6 +656,16 @@ def parse_description(desc_html: Any, portal: Optional[Portal] = None) -> dict:
             # this vendor's data carries a dash) the way blindly space-stripping every token
             # would (a street address stripped of spaces is still a plain alnum run too)
             ids.append(re.sub(r"\s+", "", p))
+        elif (portal is not None and portal.native_map_lot_space and " " in p and len(p) <= 24
+              and not re.search(r"[A-Za-z]", p) and _ID.match(re.sub(r"\s+", "", p).upper())):
+            # Harnett's own native MAP-BLOCK[-LOT] id is printed WITH its real internal padding
+            # spaces (Portal.native_map_lot_space, "010505    0008 01") -- still the parcel id,
+            # not a situs, once those spaces are ignored. No letters ever appear in this
+            # vendor's own digit-only id token, and every situs on this vendor's data has
+            # letters (a street name, the city, "NC"), so "no letters" alone is enough to keep
+            # this from ever eating a real situs line the way blindly space-stripping every
+            # token would (a street address stripped of spaces is still a plain alnum run too).
+            ids.append(re.sub(r"\s+", "", p))
         elif map_ref is not None and map_ref.search(p):
             continue
         elif situs is None and re.search(r"[A-Za-z]", p):
@@ -654,7 +734,9 @@ _NEWER_BUILD = {
 _NEWER_EXTRA = {"Granville": dict(model_fields=("AlternateParcelIdentifier",), account_search=False),
                 "Alleghany": dict(model_fields=("AlternateParcelIdentifier",)),
                 # root-caused 2026-11-15, see Portal.native_map_lot_dash's docstring
-                "Duplin": dict(native_map_lot_dash=True)}
+                "Duplin": dict(native_map_lot_dash=True),
+                # root-caused 2026-11-15, see Portal.native_map_lot_space's docstring
+                "Harnett": dict(native_map_lot_space=True)}
 for _county, (_base, _cells) in _NEWER_BUILD.items():
     PORTALS.setdefault(_county, Portal(_county, _base, "ParcelNumber", full_model=True,
                                        real_without_units=True, cells=_cells,

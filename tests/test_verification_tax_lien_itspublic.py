@@ -234,6 +234,102 @@ def test_duplin_bare_digit_row_confirms_end_to_end():
     assert r.evidence["searched"][0] == {"by": "ParcelNumber", "from": "board_parcel", "bills": 2}
 
 
+def test_harnett_is_registered_with_native_map_lot_space_only():
+    """Harnett was already wired onto this same ITS.net newer build (2026-10-09, same as Duplin's
+    own siblings) -- native_map_lot_space is the only thing this follow-up fix adds to it."""
+    harnett = p.PORTALS["Harnett"]
+    assert harnett.base == "https://cama.harnett.org/ITSPublicHT"
+    assert harnett.parcel_field == "ParcelNumber" and harnett.full_model is True
+    assert harnett.native_map_lot_space is True
+    assert harnett.native_map_lot_dash is False
+    assert p.Portal("Other", "https://x", "ParcelNumber").native_map_lot_space is False
+    assert p.PORTALS["Duplin"].native_map_lot_space is False       # the two flags never overlap
+
+
+def test_harnett_bare_digit_parcel_is_reformatted_to_its_native_map_lot_id():
+    """Root-caused 2026-11-15 (feedback_duplin_harnett_parcel_id_format_mismatch_2026-10-31.md's
+    own Harnett half): EVERY one of Harnett's 1,343 nc_its_public_tax board rows (full board
+    scan, zero exceptions) is a bare 10/12/14/16-digit run -- counties_nc/nc_its_public_tax.py's
+    own parse_description_cols() strips ALL internal whitespace from this portal's native,
+    space-segmented map-block[-lot] id before it ever reaches the board. Live-verified 2026-11-
+    15 for 8 real board rows, cross-checked against the SAME host's BasicSearch/ViewParcel
+    product for each one's true native id (enrichment_harnett_rollback_exposure.py's own
+    owner+address match), then against TaxBillSearch itself: the bare digits alone answer zero
+    live for all 8 (confirmed), the reformatted id answers the row's own real bills for all 8
+    (also confirmed, owner AND situs both checked, plus a negative control)."""
+    # map length varies (6, 8 or 10 digits in the 8 live examples) so one bare run alone cannot
+    # say whether its own trailing 2 digits are a LOT or the tail of BLOCK -- both readings are
+    # offered; the live-confirmed native form is always one of them.
+    GROUND_TRUTH = (
+        ("0995580013",       "099558    0013"),      # ADAMS KELLY RONNELL, 63 MURCHISONTOWN RD
+        ("1306300049",       "130630    0049"),       # AGUILAR CELESTINO MORALES
+        ("010505000801",     "010505    0008 01"),    # ADKINS ALBERT E JR, 4795 RAY RD
+        ("130630004901",     "130630    0049 01"),    # AGUILAR CELESTINO MORALES (2nd parcel)
+        ("09957503018512",   "09957503  0185 12"),    # ALLEN RALPH G, 166 CONNECTICUT WAY
+        ("03958601037126",   "03958601  0371 26"),    # ANAYA BRAULIO R TRUJILLO
+        ("0406742010000101", "04067420100001 01"),    # ARNETTE HARRY L, 39 E LILLINGTON ST
+        ("0215160846000101", "02151608460001 01"),    # CHAVIS JOHNNY, 901 E EDGERTON ST
+    )
+    for raw, native in GROUND_TRUTH:
+        assert native in p._native_map_lot_space(raw), (raw, native)
+    row = {"state": "NC", "county": "Harnett", "listing_type": "tax_sale",
+          "source": "counties_nc.nc_its_public_tax", "parcel_id": "010505000801",
+          "street_address": None, "owner_name": None, "raw": {}}
+    assert p.searches(row, p.PORTALS["Harnett"])[:2] == [
+        ("ParcelNumber", "010505    0008 01", "board_parcel"),
+        ("ParcelNumber", "01050500  0801", "board_parcel"),
+    ]
+    # a value that is not a bare 10/12/14/16-digit run passes through untouched: Duplin's own
+    # bare-5-6-digit shape, an already-correctly-spaced value, and a run one digit short of (or
+    # past) every evidenced Harnett width -- a 12-digit run IS this shape (whichever county a
+    # value happens to describe, this function only ever sees Harnett's own board rows in
+    # practice, via searches()'s own portal.native_map_lot_space gate).
+    for untouched in ("111401", "110662 0022 37", "99999999999", "9999999999999999999"):
+        assert p._native_map_lot_space(untouched) == [untouched]
+
+
+def test_harnett_tolerates_its_own_native_space_padded_id_in_description():
+    """Harnett's TaxBillSearch prints its OWN native space-segmented id first, with its real
+    internal padding spaces intact, then a second, differently-formatted secondary id (live-
+    captured 2026-11-15, ADKINS ALBERT E JR's real bill) -- the generic " " not in p id check
+    would otherwise drop the first token entirely (no letters, so it also fails the situs
+    check), leaving only the second id bound to a search that was never for it. Gated to
+    native_map_lot_space portals only: the identical-looking text on a portal without the flag
+    must still drop that first token exactly as before (nothing on this vendor's OTHER counties
+    carries a digits-only, space-segmented token, so there is nothing for this gate to
+    misclassify there in practice -- the check below only proves the gate is real)."""
+    desc = "010505    0008 01<br/>0505-65-8009.000<br /><br />"
+    d = p.parse_description(desc, p.PORTALS["Harnett"])
+    assert d["ids"] == ["010505000801", "0505-65-8009.000"]
+    assert d["real"] is True
+    # the same text, on a portal without the flag, drops the space-padded token as before
+    assert p.parse_description(desc, p.PORTALS["Onslow"])["ids"] == ["0505-65-8009.000"]
+    assert p.parse_description(desc)["ids"] == ["0505-65-8009.000"]           # portal=None too
+
+
+def test_harnett_bare_digit_row_confirms_end_to_end():
+    """The same shape as test_duplin_bare_digit_row_confirms_end_to_end, for Harnett's own
+    bare-digit case (owner/address synthetic; only the parcel-id shape itself,
+    '010505000801'/'010505    0008 01', is the real bug, live-confirmed 2026-11-15, real row
+    ADKINS ALBERT E JR / 4795 RAY RD): a FakePortal reaches `confirmed` off a row whose own
+    parcel_id is the bare form the real sweep was failing on, binding on the FIRST (LOT-present)
+    reading -- the one that was actually right for this row live."""
+    harnett_base = p.PORTALS["Harnett"].base
+    situs = "4795 TEST RAY RD SPRING LAKE NC 28390-0000"
+    bills = [bill(2026, 71001, ["010505    0008 01", "0505-65-8009.000"], situs, balance=410.22,
+                  original=410.22, owner="TESTOWNER ADKINS"),
+            bill(2025, 6901234, ["010505    0008 01", "0505-65-8009.000"], situs, balance=388.07,
+                 original=388.07, owner="TESTOWNER ADKINS")]
+    portal = FakePortal(harnett_base, bills)
+    row = {"state": "NC", "county": "Harnett", "listing_type": "tax_sale",
+          "source": "counties_nc.nc_its_public_tax", "parcel_id": "010505000801",
+          "street_address": "4795 TEST RAY RD", "owner_name": "TESTOWNER ADKINS", "raw": {}}
+    r = run(row, portal)
+    assert r.verdict == "confirmed", r.evidence
+    assert r.evidence["tax_parcel"] == "010505000801"
+    assert r.evidence["searched"][0] == {"by": "ParcelNumber", "from": "board_parcel", "bills": 2}
+
+
 def test_applies_to_the_configured_counties_only():
     assert p.applies(onslow_roll_row())
     assert p.applies(onslow_roll_row(county="Graham", raw={"two_year_delinquent": {"is_two_year_plus": True}}))
