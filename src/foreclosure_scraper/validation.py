@@ -162,6 +162,31 @@ _PARCEL_BAD_PATTERNS = (
 #: Duplin ids, 540 distinct Person ids, both 100% covered by the patterns below with zero misses).
 #: Duplin's own portal id is a block-lot form ('11-4--', '01-7--'); Person's is an alphanumeric
 #: map-sheet id ('A8013C', '1034', 'A98169', '49').
+#:
+#: 2026-11-15 (28-key mixed/residual triage, counties_sc.qpaybill_delinquent_roll): Newberry's
+#: own "Map Number" (qpaybill_delinquent_roll.py's detail-page map_number, e.g. '639-90', '25-1',
+#: '140-25') is the SC counterpart of Duplin's block-lot shape -- normalizes to 3-5 digits, always
+#: under the 7-char floor, and was the FIRST SC county measured here (every other qpaybill county
+#: was out of scope for this pass; not measured either way). Consequence of the gap, root-caused
+#: against the live portal (newberrytreasurer.qpaybill.com): with parcel_id nulled, EVERY Newberry
+#: qpaybill row with no zip and no house number in its address (a common shape for rural road-only
+#: situs on this roll) fell to dedupe_key()'s weak addr:<road>|SC:newberry branch. Two same-parcel
+#: re-scrapes a month apart (e.g. ident '639-90', owner CALDWELL KINNEY D, 'KIBLERS BRIDGE RD')
+#: then could not re-merge -- not a qpaybill_delinquent_roll.py bug (unrelated to fe7c557a's
+#: bulk-buyer shared-ident fix or 9ff67c2e's _road_core fix, both inside _to_listings() -- these
+#: rows carry ONE ident each, never shared or split): dedupe.identity_conflict() only credits
+#: AGREEING source-parcel evidence (sp) when the bucketing key itself carries PARCEL evidence
+#: (dedupe.key_evidence()), which needs a non-null parcel_id -- sp agreement alone, read straight
+#: off raw['qpaybill_roll']['identification_no'], never unblocks an addr:-branch "unnumbered"
+#: refusal. 28 keys, 57 rows, all Newberry (board-wide no-zip/no-house-number scan,
+#: 2026-11-15) -- live-verified 5 owners, 100+ idents, confirmed every short id is Newberry's
+#: real, currently-in-use map number. Two of the 28 keys were worse than a stale duplicate: a
+#: SAME named road legitimately carries 2-3 DIFFERENT real parcels with no house number to
+#: disambiguate (PEARSON ident 574-2 'HWY 353' vs CURRY ident 687-12 'HWY 33', both live-confirmed
+#: real 2026 bills sharing one addr: key; REYNOLDS idents 140-25/140-26/140-28, three live-
+#: confirmed real parcels on 'ROCKY CREEK RD') -- restoring parcel_id separates these into their
+#: own correct parcel: keys (dedupe_key()'s own _normalize_parcel has no length floor) rather than
+#: forcing them through one ambiguous, unmergeable address key.
 COUNTY_NATIVE_SHORT_PARCEL = {
     ("NC", "Cleveland"): re.compile(r"^\d{4,5}$"),
     ("NC", "Onslow"): re.compile(r"^(?:\d{6}|\d{1,4}[A-Z]?-\d{1,3}(?:\.[0-9A-Z]{1,2})?)$", re.I),
@@ -169,6 +194,7 @@ COUNTY_NATIVE_SHORT_PARCEL = {
     ("NC", "Rowan"): re.compile(r"^\d{6}$"),
     ("NC", "Duplin"): re.compile(r"^\d{1,3}-\d{1,3}-{0,2}$"),
     ("NC", "Person"): re.compile(r"^(?=.*\d)[A-Z0-9]{2,6}$", re.I),
+    ("SC", "Newberry"): re.compile(r"^\d{1,3}(?:-\d{1,3}){1,3}$"),
 }
 
 

@@ -121,6 +121,55 @@ def test_different_ids_from_two_different_sources_are_two_id_systems_not_two_pro
     assert len(out) == 1
 
 
+# ---------------------------------------------------------------- Newberry qpaybill (2026-11-15)
+# counties_sc.qpaybill_delinquent_roll's board-wide no-zip/no-house-number triage (28 keys, 57
+# rows, all Newberry): validation.py nulled Newberry's own short "Map Number" (never added to
+# COUNTY_NATIVE_SHORT_PARCEL), so every Newberry roll row with no zip and a rural road-only situs
+# (no house number) fell to dedupe_key()'s weak addr:<road>|SC:newberry branch. Two snapshots of
+# the SAME real parcel, scraped a month apart, then could NOT re-merge into one row (every re-scrape
+# published a new permanent duplicate) -- NOT a qpaybill_delinquent_roll.py bug and unrelated to
+# fe7c557a (Spartanburg bulk-buyer shared-ident false-merge) or 9ff67c2e (Sumter address-
+# abbreviation false-split), both inside that module's own _to_listings(): these rows each carry
+# ONE ident, never shared or split by that function. Idents/owners/addresses below are real,
+# live-verified against newberrytreasurer.qpaybill.com on 2026-11-15.
+def _nb_row(parcel, addr, owner, amount, **kw) -> Listing:
+    return row(parcel, addr, zip_code=None, owner=owner,
+               source="counties_sc.qpaybill_delinquent_roll", county="Newberry", state="SC",
+               raw={"qpaybill_roll": {"identification_no": parcel, "owner": owner,
+                                      "property_address": addr, "balance_owed": amount}},
+               **kw)
+
+
+def test_same_newberry_ident_rescraped_a_month_later_still_merges():
+    """The clean-duplicate shape: 26 of the 28 keys, one ident, one real property, two scrape
+    snapshots (balance grew from accruing penalty/interest) -- once parcel_id survives validation,
+    dedupe_key()'s parcel: branch (its own _normalize_parcel has no length floor, unlike
+    placeholder_twins.MIN_PARCEL_LEN) unites them, and identity_conflict() allows the merge because
+    the bucketing evidence is PARCEL, not ADDRESS -- it never reaches the 'unnumbered' refusal."""
+    a = _nb_row("639-90", "KIBLERS BRIDGE RD", "CALDWELL KINNEY D", 2491.72)
+    b = _nb_row("639-90", "KIBLERS BRIDGE RD", "CALDWELL KINNEY D", 2581.72)
+    out = D.dedupe([a, b])
+    assert len(out) == 1
+    assert out[0].parcel_id == "639-90"
+
+
+def test_different_newberry_idents_on_one_unnumbered_road_stay_separate():
+    """The genuine-collision shape: 2 of the 28 keys are NOT a stale duplicate -- one named road
+    with no house number legitimately carries 2-3 different real parcels. Real pair: Gail K
+    Reynolds owns three distinct delinquent Rocky Creek Rd parcels (140-25/140-26/140-28); this
+    checks two of them. Once each keeps its own real ident, they land in different parcel: buckets
+    and are never even compared, let alone merged -- the fix SEPARATES this pair instead of
+    leaving it on one ambiguous, silently-overwritten addr: key."""
+    a = _nb_row("140-26", "ROCKY CREEK RD", "REYNOLDS GAIL K", 173.35)
+    b = _nb_row("140-28", "ROCKY CREEK RD", "REYNOLDS GAIL K", 177.52)
+    out = D.dedupe([a, b])
+    assert len(out) == 2
+    assert parcels(out) == ["140-26", "140-28"]
+    for li in out:                                  # each keeps its own bill, not the other's
+        src = next(r for r in (a, b) if r.parcel_id == li.parcel_id)
+        assert li.raw["qpaybill_roll"]["balance_owed"] == src.raw["qpaybill_roll"]["balance_owed"]
+
+
 def test_a_resolver_attached_id_is_no_evidence():
     a = row("320042", "146 WALDO LN", "28018")
     b = row("1626363", "146 WALDO LN", "28018", raw={"parcel_from_address": {"source": "gis"}})

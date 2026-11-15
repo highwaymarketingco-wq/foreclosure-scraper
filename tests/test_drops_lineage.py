@@ -71,12 +71,20 @@ def test_county_native_shapes():
     assert county_native_short_parcel("NC", "Person", "A8013C")
     assert county_native_short_parcel("NC", "Person", "1034")
     assert county_native_short_parcel("NC", "Person", "49")
+    # 2026-11-15 (28-key mixed/residual triage, counties_sc.qpaybill_delinquent_roll): Newberry's
+    # own "Map Number" -- live-verified against newberrytreasurer.qpaybill.com (5 owner-name
+    # searches, 100+ idents, all 2-4 dash-separated digit groups).
+    assert county_native_short_parcel("SC", "Newberry", "639-90")
+    assert county_native_short_parcel("SC", "Newberry", "25-1")
+    assert county_native_short_parcel("SC", "Newberry", "140-25")
+    assert county_native_short_parcel("sc", "newberry", "6-5-47")   # 3-segment shape, also live
     # measured NOT to be the county's parcel number
     assert not county_native_short_parcel("NC", "Catawba", "65771")       # a tax account
     assert not county_native_short_parcel("NC", "Guilford", "183753")     # PTS id, 0% in the layer
     assert not county_native_short_parcel("NC", "Cleveland", "123")       # too short for the shape
     assert not county_native_short_parcel("NC", "Rutherford", "418758")   # owner chose PIN + alias
     assert not county_native_short_parcel("SC", "Cleveland", "12345")
+    assert not county_native_short_parcel("NC", "Newberry", "639-90")     # right shape, wrong state
 
 
 def test_a_county_native_short_id_is_kept():
@@ -99,6 +107,21 @@ def test_duplin_and_person_its_tax_ids_are_kept_end_to_end():
     assert per.parcel_id == "A8013C"
     assert stats["parcel_kept_county_native"] == 2
     assert stats["parcel_nulled_too_short"] == 0
+
+
+def test_newberry_qpaybill_map_number_is_kept_end_to_end():
+    """2026-11-15, 28-key mixed/residual triage: same shape as Duplin/Person above, this time for
+    counties_sc.qpaybill_delinquent_roll -- a row carrying only Newberry's short native map number
+    must come out of validate() with parcel_id intact, so dedupe_key() lands on the parcel: branch
+    instead of the weak addr: one (see test_dedupe_short_parcels.py for the merge-level fix this
+    unblocks)."""
+    li = _li(source="counties_sc.qpaybill_delinquent_roll", county="Newberry", state="SC",
+             parcel_id="639-90")
+    stats = validate([li])
+    assert li.parcel_id == "639-90"
+    assert stats["parcel_kept_county_native"] == 1
+    assert stats["parcel_nulled_too_short"] == 0
+    assert "parcel_id_nulled" not in li.raw
 
 
 def test_other_short_ids_are_still_nulled_and_recorded():
