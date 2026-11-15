@@ -527,6 +527,49 @@ def test_onemap_rows_request_and_keep_the_parcel_facts(monkeypatch):
     assert out[0].acreage == 2.5 and out[0].legal_description == "LOT 4 SAMPLE ACRES"
 
 
+def test_greene_county_prefers_altparno_over_the_shared_parno(monkeypatch):
+    """Greene County NC's own `parno` is not per-parcel-unique on the live statewide
+    layer (confirmed 2026-11-15: one value, "3698035243", shared by 48 real Greene
+    parcels -- see project_vm_push_credentials_missing_and_board_divergence_2026-11-13.md).
+    `altparno` IS unique there, so Greene rows must publish parcel_id from altparno,
+    never the raw shared parno, or Listing.dedupe_key() collapses many real parcels
+    onto one key."""
+    async def fake_page(http, url, where, out_fields="*", count=25, offset=0, order_by=""):
+        row = {"ownname": "BRAXTON HEIRS", "ownname2": None, "parno": "3698035243",
+               "altparno": "0622120", "siteadd": "120 WARREN LN", "parval": 47510.0,
+               "gisacres": 0.47, "saledate": None, "legdecfull": None, "structyear": 0}
+        return [row], False
+
+    monkeypatch.setattr(m, "_query_page", fake_page)
+    s = m.NCHeirEstateParcels()
+    out = asyncio.run(s._process_county(
+        _SchemaHttp([{"name": "parval", "type": "esriFieldTypeDouble"}]),
+        "NC", "Greene", m._NC_ONEMAP_SPEC))
+    assert len(out) == 1
+    assert out[0].parcel_id == "0622120"      # the unique altparno, not the shared parno
+    assert out[0].raw["heir_estate"]["parcel_facts"]["altparno"] == "0622120"
+
+
+def test_other_nc_counties_still_publish_the_raw_parno_even_with_an_altparno_present(monkeypatch):
+    """The Greene fix must stay Greene-only: a DIFFERENT county's row that happens to
+    also carry a (here, irrelevant) altparno value must keep publishing parcel_id from
+    the raw parno exactly as before -- 145 other NC counties' parno IS unique, confirmed
+    live 2026-11-15, and switching them to altparno was never asked for or verified."""
+    async def fake_page(http, url, where, out_fields="*", count=25, offset=0, order_by=""):
+        row = {"ownname": "SAMPLE PAT HEIRS", "ownname2": None, "parno": "1234567890",
+               "altparno": "9999999", "siteadd": "1 TEST ST", "parval": 150000.0,
+               "gisacres": 2.5, "saledate": None, "legdecfull": None, "structyear": 0}
+        return [row], False
+
+    monkeypatch.setattr(m, "_query_page", fake_page)
+    s = m.NCHeirEstateParcels()
+    out = asyncio.run(s._process_county(
+        _SchemaHttp([{"name": "parval", "type": "esriFieldTypeDouble"}]),
+        "NC", "Ashe", m._NC_ONEMAP_SPEC))
+    assert len(out) == 1
+    assert out[0].parcel_id == "1234567890"   # unchanged: Ashe is not Greene
+
+
 def test_polk_rows_keep_tax_owed_deed_and_record_card():
     spec = m.COUNTY_GIS["NC:Polk"]
     facts = m._parcel_facts(spec, {"TMS": "P1-2", "TOTAL_TAX_OWED": 525.01, "DEEDED_ACRES": 3.1,

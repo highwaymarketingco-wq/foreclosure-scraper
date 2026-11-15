@@ -93,6 +93,41 @@ its OWN signal, not noise -- see the 2026-11-10 note above _EXCLUDE below.
   registries was originally found -- not a registry-widening fix. See the
   sibling sc_heir_estate_parcel_cache.py's own 2026-11-10 note for the SC
   parcel_cache-side half of this same audit.
+
+  2026-11-15 GREENE COUNTY FIX — `parno` (the statewide fallback's parcel
+  field, see `_NC_ONEMAP_SPEC`/`COUNTY_GIS["NC:Cleveland"]`) is NOT a
+  per-parcel-unique id on Greene County's own NC OneMap rows, unlike every
+  other NC county sampled this project. Confirmed live: one value alone,
+  "3698035243", is shared by 48 real Greene parcels; a full-county scan
+  found 90 distinct parno values shared by 2+ parcels each (worst: 104-way),
+  425 real parcels affected in all out of Greene's 12,720. Because
+  `Listing.dedupe_key()`'s parcel branch keys on state+county+parcel_id,
+  every affected row collapsed multiple real, differently-addressed Greene
+  parcels onto ONE dedupe_key — which both loses rows to the board's own
+  dedup and, separately, made `enrichment_gis_attrs.py`'s
+  `parcel_cache.lookup()` (keyed the same way, since `parcel_cache.
+  nc_onemap_cfg()` indexes a Greene parcel under every one of
+  parno/altparno/nparno) hand back whichever of the colliding real parcels
+  happened to be cached first, silently overwriting `owner_name` (and, on
+  at least one row, `defendant`/`description` too, via a separate same-key
+  ingest-merge collision) with a DIFFERENT real parcel's owner. `altparno`
+  IS reliably unique on the same live sample (only 4 small, non-numeric-id
+  exceptions out of 12,720, none overlapping the affected parcels), so
+  `_process_county()` now prefers `facts["altparno"]` over the raw `parno`
+  for `parcel_id` — GATED to county=="Greene" only (checked case-insensitively
+  against this exact `state`/`county`, both already plain strings here, not
+  a title-cased/aliased form), so no other NC county's parcel_id assignment
+  changes. The already-published board rows this collision had corrupted
+  were separately live-verified and backfilled (not by this scraper —
+  patch_existing_rows() cannot apply a different value to each of several
+  rows sharing one key — see scripts/backfill_greene_parno_altparno.py and
+  project_vm_push_credentials_missing_and_board_divergence_2026-11-13.md for
+  the full account). `parcel_cache.py`'s own id_fields-ordering / first-match
+  tie-break for Greene is UNTOUCHED here — a broader, riskier change (it is
+  shared by every cached county) flagged for its own pass, not made without
+  its own sign-off; promoting parcel_id to the unique altparno here already
+  closes the practical hole for every row this scraper publishes going
+  forward, including against that lookup.
 """
 from __future__ import annotations
 
@@ -625,6 +660,21 @@ class NCHeirEstateParcels(BaseScraper):
                 if cv and str(cv).strip():
                     care_of = re.sub(r"\s+", " ", _html(str(cv))).strip() or None
             facts = _parcel_facts(spec, attrs)
+            # GREENE COUNTY NC ONLY — `parno` is not a per-parcel-unique id on Greene's own
+            # NC OneMap rows (confirmed live 2026-11-15, see
+            # project_vm_push_credentials_missing_and_board_divergence_2026-11-13.md): one
+            # value, "3698035243", is shared by 48 real Greene parcels, and a full county
+            # scan found 90 distinct parno values shared by 2+ parcels each (worst: 104-way),
+            # 425 real parcels affected in all. Every OTHER NC county sampled this project
+            # (Buncombe/McDowell/Lincoln/Cleveland/etc.) has a unique parno -- this is
+            # Greene-specific, not a statewide layer defect, so the override is gated by
+            # county and touches no other county's parcel_id. `altparno` IS reliably unique
+            # on the same live sample (12,720 Greene parcels: only 4 small, non-numeric-id
+            # exceptions, none overlapping these affected parcels), so prefer it here, and
+            # only here, whenever the row actually carries one.
+            if (state == "NC" and county.strip().lower() == "greene"
+                    and facts.get("altparno")):
+                parcel = facts["altparno"]
             legal = next((str(facts[k]) for k in _LEGAL_FIELDS if facts.get(k)), None)
             # LIFE ESTATE is a living-owner signal, not a decedent one: tag it distinctly
             # everywhere the decedent/heir path tags a row below, instead of reusing
