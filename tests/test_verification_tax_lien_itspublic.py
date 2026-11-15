@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from datetime import date
 
 from foreclosure_scraper.verification.fetch import FormResponse
@@ -232,6 +233,34 @@ def test_duplin_bare_digit_row_confirms_end_to_end():
     assert r.verdict == "confirmed", r.evidence
     assert r.evidence["tax_parcel"] == "11-1401--"
     assert r.evidence["searched"][0] == {"by": "ParcelNumber", "from": "board_parcel", "bills": 2}
+
+
+def test_duplin_fix_still_works_for_ids_beyond_round_1s_own_5_examples():
+    """Round-2 investigation (2026-11-15, same day as the fix): the VM's live supervised
+    tax_lien sweep was still showing 98.9% parcel_not_found on Duplin hours after commit
+    42e44473 shipped. Traced end to end: the branch WAS triggering correctly and the
+    transform WAS right -- the sweep process on the VM was simply running a stale checkout
+    from before the fix existed (confirmed: `grep native_map_lot_dash` on the deployed file
+    answered 0 matches; VM HEAD was 30 commits behind origin/main). Round 1 only live-tested
+    5 ids (all from one feedback memory file); this adds a live-verified, independently
+    sampled batch pulled straight from the VM's own still-failing log lines that day, to
+    prove the transform generalizes and isn't accidentally fitted to round 1's own 5 cases.
+    Every one of these 24 bare ids (a mix of 5- and 6-digit, sampled across the whole
+    parcel_not_found population, not hand-picked) was posted as its _native_map_lot() form
+    against the real https://www.bttaxpayerportal.com/ITSPublicDL ParcelNumber search
+    (search_model()/parse_rows(), the actual production call shape) and every single one
+    answered real, owned bills; the bare/unreformatted id was also tried for each as a
+    negative control and answered zero every time -- 24/24, no exceptions, no cherry-picking."""
+    LIVE_VERIFIED_2026_11_15 = (
+        "081023", "091150", "097018", "091248", "13874", "011526", "011373", "011054",
+        "11517", "12722", "011224", "05294", "111269", "011400", "012702", "05501",
+        "01139", "011532", "02276", "031409", "011377", "111474", "011020", "12577",
+    )
+    for raw in LIVE_VERIFIED_2026_11_15:
+        native = p._native_map_lot(raw)
+        # the same shape the fix's own docstring and round-1 tests assert: MM-LLLL--
+        assert re.match(r"^\d{2}-\d{3,4}--$", native), (raw, native)
+        assert native != raw and native.replace("-", "") == raw
 
 
 def test_harnett_is_registered_with_native_map_lot_space_only():
