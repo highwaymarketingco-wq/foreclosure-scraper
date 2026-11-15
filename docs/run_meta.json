@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-11-15T21:02:37.414748Z",
+  "run_time": "2026-11-15T21:10:37.885662Z",
   "total": 584996,
   "by_source": {
     "national.auction_bank_reo": 3,
@@ -522,7 +522,7 @@
     "counties_sc.berkeley_paystar_tax: got 25, expected ≥ 500"
   ],
   "errors": null,
-  "notes": "backfill_lincoln_pin_parcel_id: 15808 rows patched ({'counties_generic.arcgis_distress.lincoln_county_owned': 31, 'counties_nc.lincoln_vacant': 15777})",
+  "notes": "Live-verified 2026-11-15 against NC OneMap NC1Map_Parcels (cntyname='Jones' AND altparno='536838504500'): siteadd='164 GUY LINK LN MAYSVILLE NC 28555', ownname='SCOTT, NOVELLA HEIRS'. Corrects the board's stale 'counties_nc.nc_its_public_tax' situs '160 GUY LINK LN' for the same owner/parcel.",
   "detail_count": 584996,
   "detail_digest": "cbfecfd77d9be490",
   "board_parts": {
@@ -737,8 +737,8 @@
         "start": 287500,
         "end": 299000,
         "records": 11500,
-        "bytes": 4465546,
-        "sha256": "0e93efb082735f044490f19315637ab2684157d111d69de7fcfbe17007819299"
+        "bytes": 4465549,
+        "sha256": "aed170e02b2ae9f4fd8d0805d2c3e20e7f97e15bbdfa5803623f0bb6363657c5"
       },
       {
         "name": "listings_part_026.json.gz",
@@ -954,7 +954,7 @@
     }
   },
   "health_as_of": "2026-10-16T20:24:46.640274Z",
-  "health_age_hours": 720.63,
+  "health_age_hours": 720.76,
   "health_stale": true,
   "source_last_success": {
     "city_websites.charlotte_open_data": "2026-10-16T20:24:46.640274Z",
