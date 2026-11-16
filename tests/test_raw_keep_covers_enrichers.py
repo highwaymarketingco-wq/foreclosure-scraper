@@ -504,7 +504,12 @@ def test_the_keys_the_pipeline_reads_back_are_published():
     """Pins the keys a later step or the next run reads off a reloaded board."""
     from foreclosure_scraper.web_artifact import _slim_raw
     for k in ("parcel_id_alias", "burke_spine", "withdrawn_case_type_other",
-              "_land_buildability_checked", "situs_nulled", "lincoln_bulk"):
+              "_land_buildability_checked", "situs_nulled", "lincoln_bulk",
+              # 2026-11-16: enrichment_florence_tax_inquiry.py's own 14-day recheck stamp
+              # (needs()/_recently_checked() read raw['florence_tax_inquiry']['fetched_at']
+              # back off a reloaded board) -- without this entry every regular run would
+              # re-fetch the whole eligible population from web.florenceco.org forever.
+              "florence_tax_inquiry"):
         assert k in RAW_KEEP, k
     kept = _slim_raw({"gis": {"owner": "X", "absentee": True, "vacant": False, "queried": 1},
                       "parcel_id_alias": {"short": "12345", "long": "1234567890"}})

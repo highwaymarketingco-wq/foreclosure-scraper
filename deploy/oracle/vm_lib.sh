@@ -148,6 +148,16 @@ vm_load_env() {
   export FORECLOSURE_GIS_FILL_BUDGET_S="${FORECLOSURE_GIS_FILL_BUDGET_S:-3600}"
   export OBITUARY_LOOKUPS="${OBITUARY_LOOKUPS:-0}"
   export FORECLOSURE_MECKLENBURG_DELINQUENT="${FORECLOSURE_MECKLENBURG_DELINQUENT:-0}"
+  # 2026-11-16 (gap_matrix tax_aging_surfaced + two_year_delinquent, Florence SC, shared root
+  # cause, ~3,883 est rows each): the treasurer's own tax-inquiry CGI at web.florenceco.org
+  # (enrichment_florence_tax_inquiry.py), already wired into main.py 2026-11-10 but left OFF
+  # pending a live check -- live-verified before turning this on (18/18 real parcels, 0 portal
+  # failures). Plain HTTP, MIN_GAP_S=2.0 one request at a time, 3 requests/parcel, capped at
+  # 2,000 parcels a run (its own module default); the sibling restate into
+  # raw['two_year_delinquent'] (enrichment_florence_two_year_delinquent.py) is already on by
+  # its own default and needs no flag here. See scripts/backfill_florence_tax_inquiry.py for
+  # the one-time catch-up of rows already on the board.
+  export FORECLOSURE_FLORENCE_TAX_INQUIRY="${FORECLOSURE_FLORENCE_TAX_INQUIRY:-1}"
   # Richland map-viewer reader: about 4 s a row on one host; 500 fits the 2,400 s resolver cap (the 10/8
   # run read 300 and left 1,775 Richland rows waiting).
   export RICHLAND_PARCEL_MAX="${RICHLAND_PARCEL_MAX:-500}"

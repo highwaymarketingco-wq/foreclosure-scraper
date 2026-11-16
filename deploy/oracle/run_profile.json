@@ -56,7 +56,8 @@
   "FORECLOSURE_COUNTY_MARRIAGE_SWEEP": "1",
   "FORECLOSURE_COUNTY_SWEEP_BUDGET_S": "900",
   "FORECLOSURE_SC_COUNTYFUSION_ROD": "1",
-  "FORECLOSURE_NC_LRSEARCH_ROD": "1"
+  "FORECLOSURE_NC_LRSEARCH_ROD": "1",
+  "FORECLOSURE_FLORENCE_TAX_INQUIRY": "1"
  },
  "flags_notes": {
   "VISION_PROVIDER": "vm_lib.sh picks gemini when a Gemini key file exists, else anthropic; the declared value is vm_lib.sh's text default",
@@ -76,7 +77,8 @@
   "FORECLOSURE_COUNTY_MARRIAGE_SWEEP": "Beaufort NC Marriages index swept by date (about 275 licences a year) and matched to person owners; part of the same pass",
   "FORECLOSURE_COUNTY_SWEEP_BUDGET_S": "each county's register reads inside the sweep pass (a cold Sumter sweep took 395 s on 2026-10-09, the others 30 to 55 s; later runs read only the new end)",
   "FORECLOSURE_SC_COUNTYFUSION_ROD": "Sumter by owner name through GovOS CountyFusion (rod/sc_countyfusion): no-credential 'Login as Guest' and a plain Accept click-through, about 5 s a lookup once the session is held; 30 lookups a run (FORECLOSURE_SC_COUNTYFUSION_ROD_MAX)",
-  "FORECLOSURE_NC_LRSEARCH_ROD": "Beaufort by owner name through CCS LRSearch (rod/nc_lrsearch): open, no login or CAPTCHA; 30 lookups a run (FORECLOSURE_NC_LRSEARCH_ROD_MAX)"
+  "FORECLOSURE_NC_LRSEARCH_ROD": "Beaufort by owner name through CCS LRSearch (rod/nc_lrsearch): open, no login or CAPTCHA; 30 lookups a run (FORECLOSURE_NC_LRSEARCH_ROD_MAX)",
+  "FORECLOSURE_FLORENCE_TAX_INQUIRY": "Florence SC treasurer's own tax-inquiry CGI (web.florenceco.org, enrichment_florence_tax_inquiry.py): the sole producer for gap_matrix's Florence tax_aging_surfaced and two_year_delinquent columns (shared root cause); live-verified 2026-11-16 before flipping on, catch-up backfill in scripts/backfill_florence_tax_inquiry.py"
  },
  "must_not_set": {
   "GRANDFATHER_CARRIED": {
