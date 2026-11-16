@@ -286,6 +286,7 @@ from .scrapers.national.jail_bookings import (
     _fetch_citizen_connect,
     _fetch_tyler_detail,
     _fetch_tyler_inmate_inquiry,
+    _fetch_york_webforms,
     _fetch_randolph_webforms,
     _fetch_davidson_dhtmlx,
     _fetch_cumberland_webforms,
@@ -426,6 +427,21 @@ ROSTERS = [
     ("NC", "Davie", "zuercher", "davie-so-nc"),       # verified live 2026-11-11: 59 in custody
     ("NC", "Nash", "zuercher", "nash-911-nc"),        # verified live 2026-11-11: 287 in custody
     ("NC", "Pender", "zuercher", "pender-so-nc"),     # verified live 2026-11-11: 87 in custody
+    # ROSTER SYNC 2026-11-16 (gap_matrix jail_booking/jail_booking_new "no source known" sweep).
+    # York SC was the single largest cell in that bucket (jail_booking_new, 80,799
+    # est_rows_affected) even though its own fetcher (_fetch_york_webforms) has been live in
+    # national.jail_bookings.ROSTERS since 2026-10-22 -- it was simply never imported/wired into
+    # THIS module's ROSTERS/dispatch, so York's own property owners never got matched against
+    # York's own roster (same-county "jail_booking") and no other county's roster could ever
+    # flag a York resident booked elsewhere (cross-county "jail_booking_new"). Zero new fetcher
+    # code -- see jail_booking_family_research memory note for the rest of this sweep's results.
+    ("SC", "York", "york_webforms",
+     "https://inmatesinjail.yorkcountygov.com/detentioncenter/inmatesinjail.aspx"),
+    # Stokes NC -- Southern Software Citizen Connect, found the same pass (see
+    # national.jail_bookings.ROSTERS' own Stokes entry for the live-verification detail:
+    # AgencyID=StokesCoNC, 114 in custody, full DOB). Zero new fetcher code here either --
+    # _fetch_citizen_connect is already imported above.
+    ("NC", "Stokes", "citizen_connect", "StokesCoNC|"),
 ]
 
 # (state, county, vendor, target) for the PER-NAME search vendors — no bulk
@@ -859,6 +875,8 @@ async def _load_roster(state: str, county: str, vendor: str, target: str,
         recs = await _fetch_citizen_connect(target)
     elif vendor == "tyler_inmate_inquiry":
         recs = await _fetch_tyler_inmate_inquiry(target)
+    elif vendor == "york_webforms":
+        recs = await _fetch_york_webforms(target)
     elif vendor == "mcso_json":
         recs = await _fetch_mcso_json(target)
     elif vendor == "catawba_gridview":
