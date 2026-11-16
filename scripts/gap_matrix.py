@@ -603,9 +603,14 @@ _S = "signal"
 SC_QUIET_TITLE = (("SC", "SC estate notices via Column (column_legal_notices, SC estate lane)"),)
 NC_QUIET_TITLE_SOURCE = ()      # was: NC notices known, no parser. scrapers/public_notices/nc_heir_notices.py reads them
 NC_QUIET_TITLE_WALL = (("NC", "no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled"),)
-SC_QUIET_TITLE_WALL = (("SC", "Column's SC estate lane only queries 19 of 46 counties per run; the "
-                              "other 27 were probed 2026-10-02 and RE-PROBED 2026-10-23 (both times "
-                              "found empty) -- periodic recheck, not a technical wall"),)
+SC_QUIET_TITLE_WALL = (("SC", "Column's SC estate lane only queries 21 of 46 counties per run "
+                              "(19 by exact county match + Orangeburg/Calhoun recovered from a "
+                              "shared newspaper-region tag, fixed 2026-11-16); the other 25 were "
+                              "probed 2026-10-02, RE-PROBED 2026-10-23, and RE-PROBED AGAIN "
+                              "2026-11-16 -- all three times found empty (the 3rd pass checked "
+                              "the server's own total_results over a 10-year window for the "
+                              "biggest rows, York and Lexington included) -- periodic recheck, "
+                              "not a technical wall"),)
 NC_QUIET_TITLE_READ = (("NC", "NC quiet-title / heir notices via Column (nc_heir_notices, notices searched by text)"),)
 
 
@@ -622,15 +627,17 @@ def _nc_without_column_paper() -> tuple:
 
 def _sc_without_column_probate() -> tuple:
     """The SC counties column_legal_notices's SC estate lane never queries (its fetch() loop is
-    scoped to SC_FOOTPRINT + SC_DISTRESSED_ONLY + SC_PROBATE_EXTRA_COUNTIES, 19 of 46 counties;
-    the rest were probed 2026-10-02 and re-probed 2026-10-23, both times zero notices): there the
-    source is a verdict (walled), not a gap."""
+    scoped to SC_FOOTPRINT + SC_DISTRESSED_ONLY + SC_PROBATE_EXTRA_COUNTIES + the real counties
+    recovered from SC_PROBATE_REGION_TAGS, 21 of 46 counties; the rest were probed 2026-10-02,
+    re-probed 2026-10-23, and re-probed again 2026-11-16 -- all three times zero notices): there
+    the source is a verdict (walled), not a gap."""
     try:
         from foreclosure_scraper.scrapers.newspapers.column_legal_notices import (
-            SC_FOOTPRINT, SC_DISTRESSED_ONLY, SC_PROBATE_EXTRA_COUNTIES,
+            SC_FOOTPRINT, SC_DISTRESSED_ONLY, SC_PROBATE_EXTRA_COUNTIES, SC_PROBATE_COVERED_COUNTIES,
         )
         from foreclosure_scraper.validation import SC_COUNTIES
-        active = set(SC_FOOTPRINT) | set(SC_DISTRESSED_ONLY) | set(SC_PROBATE_EXTRA_COUNTIES)
+        active = (set(SC_FOOTPRINT) | set(SC_DISTRESSED_ONLY) | set(SC_PROBATE_EXTRA_COUNTIES)
+                  | set(SC_PROBATE_COVERED_COUNTIES))
         return tuple(("SC", c) for c in SC_COUNTIES if c not in active)
     except Exception:  # noqa: BLE001 - without the module every SC county reads as unreached
         return ()

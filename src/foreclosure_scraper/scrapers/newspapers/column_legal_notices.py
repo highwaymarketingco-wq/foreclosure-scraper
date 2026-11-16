@@ -57,6 +57,18 @@ notice classes:
       (steps 1/4) are untouched. See the constants' own comments for the probe
       methodology and the full zero-hit list.
 
+  (6) SC PROBATE-LANE REGION-TAG FIX (added 2026-11-16, step (3b)): a 3rd re-probe of
+      the counties still outside SC_FOOTPRINT/SC_DISTRESSED_ONLY/SC_PROBATE_EXTRA_COUNTIES
+      reconfirmed 24 of them (York and Lexington -- the two biggest -- included) as a
+      genuine, three-times-verified true negative: Column has NO estate/probate newspaper
+      coverage there at all (checked via the server's own total_results over a 10-year
+      window, not just our 365-day one). But it also found that the estate/probate lane
+      has the SAME "county is a newspaper coverage region, not a county" quirk already
+      documented for the foreclosure lane (step 4) -- just never handled here. Fixed by
+      querying the one real region tag directly (SC_PROBATE_REGION_TAGS) and recovering
+      the true county from the notice body (_sc_estate_county). See that constant's own
+      comment for the full probe evidence.
+
 Endpoint behavior (verified live 2026-06-26):
   - POST https://us-central1-enotice-production.cloudfunctions.net/api/search/public-notices
   - body keys: search (""), allFilters (array of single-key objects:
@@ -167,6 +179,40 @@ NC_ESTATE_EXTRA_COUNTIES = (
 #: case 2026-CP-02-02482, a quiet-title/lis-pendens action naming heirs by publication,
 #: real parcel (TMS 104-15-07-023) and address (707 Washington Circle). Added here.
 SC_PROBATE_EXTRA_COUNTIES = ("Darlington", "Greenville", "Chesterfield", "Aiken")
+
+#: RE-PROBED AGAIN 2026-11-16 (3rd pass; same "stale scope, needs periodic recheck" lane).
+#: Re-ran the identical probe against all 27 counties still empty after the 2026-10-23 pass
+#: (gap_matrix's own stale_scope bucket, section 4: York/Lexington/Sumter/Orangeburg/...).
+#: This time went further than a 365-day window: for the biggest rows (York, Lexington,
+#: Sumter, Orangeburg, Berkeley, Williamsburg) the server's OWN `total_results` was checked
+#: over a full 10-YEAR lookback (not just our client-side window), and county-name variants
+#: ("York County", "YORK") were tried too, ruling out a casing/format mismatch. 25 of the 27
+#: are still genuinely, totally empty -- York and Lexington (the two biggest, 81,350 and
+#: 31,402 est_rows) included. That part of the "stale_scope" label was WRONG to call fixable:
+#: these 25 are not a stale list, they are a verified-three-times-running true negative, and
+#: no county-list edit here can change that (see SC_PROBATE_REGION_TAGS below for the part
+#: that WAS real).
+#:
+#: But a statewide (no county filter) probe surfaced something the per-county exact-match
+#: loop structurally cannot see, for 2 of those 27 (Orangeburg, Calhoun -- Bamberg stayed
+#: empty, see below): Column tags some SC probate/estate notices
+#: by NEWSPAPER COVERAGE REGION, not county -- the exact same quirk already documented and
+#: handled for the SC FORECLOSURE lane (step 4 below, "Orangeburg, Bamberg and Calhoun") --
+#: but that handling was never extended to this estate/probate lane (step 3). Querying that
+#: literal region-tag string directly (SC_PROBATE_REGION_TAGS below) returns 353 real notices
+#: over 5 years / 126 over 365 days, text-resolved (see _sc_estate_county) to Orangeburg (340),
+#: Calhoun (12), and one stray Williamsburg quiet-title notice (geotagged into this feed even
+#: though Williamsburg is not a nominal tag member). Bamberg -- the tag's 3rd nominal member
+#: -- returned zero real notices of its own in the same 5-year sample: still a true negative,
+#: left out of SC_PROBATE_COVERED_COUNTIES below on purpose (the tag is watched for it, the
+#: data just isn't there yet).
+SC_PROBATE_REGION_TAGS: dict[str, tuple[str, ...]] = {
+    "Orangeburg, Bamberg and Calhoun": ("Orangeburg", "Bamberg", "Calhoun"),
+}
+#: Real, text-verified county coverage added by SC_PROBATE_REGION_TAGS (Bamberg excluded --
+#: see the comment above). Folded into gap_matrix's "which SC counties does this lane cover"
+#: computation alongside SC_FOOTPRINT/SC_DISTRESSED_ONLY/SC_PROBATE_EXTRA_COUNTIES.
+SC_PROBATE_COVERED_COUNTIES = ("Orangeburg", "Calhoun")
 
 NC_FORECLOSURE_TYPE = "Foreclosure Sale"
 
@@ -1092,6 +1138,39 @@ def estate_county(text: str, tag_county: str) -> str:
     return m.group(1).title() if m else tag_county
 
 
+#: SC probate-caption county patterns (2026-11-16, see SC_PROBATE_REGION_TAGS's own
+#: comment). Tried in order; the first two cover "IN THE PROBATE COURT OF <county> ..."
+#: and "COUNTY OF <county>" captions, the third the reversed "<county> County Probate
+#: Court" phrasing. Live-verified against all 353 "Orangeburg, Bamberg and Calhoun"-tagged
+#: notices over a 5-year window: 353/353 resolved (340 Orangeburg, 12 Calhoun, 1 via the
+#: quiet-title property-address pattern below -- a stray Williamsburg hit).
+_SC_ESTATE_COUNTY_RES = (
+    re.compile(r"Probate\s+Court\s+of\s+([A-Za-z]+)\s+(?:County|in\s+the)", re.I),
+    re.compile(r"COUNTY\s+OF\s+([A-Z][A-Za-z]+)\b", re.I),
+    re.compile(r"([A-Za-z]+)\s+County\s+Probate\s+Court", re.I),
+)
+
+
+def _sc_estate_county(text: str, tag_county: str) -> str:
+    """County for an SC estate/probate notice when `tag_county` may be a combined
+    NEWSPAPER-COVERAGE-REGION string (e.g. "Orangeburg, Bamberg and Calhoun") rather than
+    one real county -- the same quirk already documented for the SC foreclosure lane
+    (_sc_foreclosure_fields / step 4 of fetch()), just never extended to this lane before.
+    Tries the quiet-title property-address pattern first (most precise: it names the
+    PROPERTY's county, not just whichever county the caption happens to open with on a
+    multi-decedent notice), then the probate-caption patterns. Falls back to the raw tag
+    when nothing matches -- never emit a confidently wrong county."""
+    t = _norm(text or "")
+    m = _QT_PROPERTY_RE.search(t)
+    if m:
+        return m.group(2).strip().title()
+    for pat in _SC_ESTATE_COUNTY_RES:
+        m = pat.search(t)
+        if m:
+            return m.group(1).strip().title()
+    return tag_county
+
+
 # --------------------------------------------------------------------------- #
 # API call
 # --------------------------------------------------------------------------- #
@@ -1361,6 +1440,19 @@ class ColumnLegalNotices(BaseScraper):
                 for it in items:
                     li = self._sc_probate_listing(it, county)
                     if li is not None:
+                        out.append(li)
+            # (3b) SC estate/probate filings tagged under a combined NEWSPAPER-COVERAGE
+            # REGION rather than one county (2026-11-16, see SC_PROBATE_REGION_TAGS's own
+            # comment) -- the exact-match loop above cannot see these; one query per literal
+            # region-tag string, then recover the REAL county from the notice body.
+            for tag in SC_PROBATE_REGION_TAGS:
+                items = await _query(
+                    c, _SC, tag, SC_PROBATE_TYPE, from_ms, now_ms
+                )
+                for it in items:
+                    li = self._sc_probate_listing(it, tag)
+                    if li is not None:
+                        li.county = _sc_estate_county(it.get("text") or "", tag)
                         out.append(li)
 
             # (4) SC FORECLOSURE SALES — STATEWIDE, deliberately without a county filter.
