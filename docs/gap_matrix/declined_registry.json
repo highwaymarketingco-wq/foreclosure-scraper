@@ -406,6 +406,111 @@
       "state": "SC", "county": "Horry", "column": "lt_tax_sale_overage",
       "reason": "project_tax_sale_overage_gap_likely_mostly_false_2026-11-12 (web-searched that date): no Horry-specific overage roster or claim page turned up at all, beyond generic/unrelated results. Registry entry added retroactively 2026-11-16 (the original check never wrote one); not independently re-verified this session.",
       "confirmed_date": "2026-11-12", "confidence": "medium"
+    },
+    {
+      "state": "SC", "county": "Colleton", "column": "lt_tax_sale_overage",
+      "reason": "Round 7 (follow-on to project_sourced_not_built_round6_survey_2026-11-16, which named this as one of the remaining ~21 ungrepped SC counties). Live-fetched https://colletoncounty.org/node/700 2026-11-16 (HTTP 200): page describes tax-sale bidder terms and redemption, including a VOIDED-sale bidder refund ('the successful bidder will be refunded the bid amount and the actual interest earned by the county') -- a bidder refund, not an owner overage. Zero mention of 'overage' or 'excess funds' anywhere on the page; no linked roster. Same shape as the 16 SC counties already declined for this column.",
+      "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "SC", "county": "Cherokee", "column": "lt_tax_sale_overage",
+      "reason": "Round 7. Live-fetched https://cherokeecountysc.gov/delinquent-tax/tax-collection-and-tax-sale-procedures/ 2026-11-16 (HTTP 200): describes the sale process and notes the statutory advertisement 'includes the delinquent taxpayer's name' -- a pre-sale notice, not a post-sale overage roster. Zero mention of 'overage' or 'excess funds'. The county's own PDFs found alongside this page (Tax-Sale-List-2024-1.pdf, 2024-TAX-SALE-FOR-WEBSITE.pdf, Bidders2025.pdf) are delinquent-tax-SALE rosters only, confirmed by filename/title, not an overage list.",
+      "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "SC", "county": "Williamsburg", "column": "lt_tax_sale_overage",
+      "reason": "Round 7. Web-searched 2026-11-16: no official Williamsburg County overage page or PDF surfaced in any result. Only a third-party tax-sale-resources directory page (contact only: TaxCollector@williamsburgcounty.sc.gov) and a public-records recorded-document search link turned up -- neither is an overage roster. Not independently page-fetched this session.",
+      "confirmed_date": "2026-11-16", "confidence": "medium"
+    },
+    {
+      "state": "SC", "county": "Darlington", "column": "lt_tax_sale_overage",
+      "reason": "Round 7. Live-fetched https://darcosc.com/departments/tax_collector.php 2026-11-16 (HTTP 200): describes the December 2026 sale's logistics only (location Darlington Middle School Gym, bidder-number assignment, 10am start). Zero mention of 'overage' or 'excess funds'; no linked roster.",
+      "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "SC", "county": "Barnwell", "column": "lt_tax_sale_overage",
+      "reason": "Round 7. Web-searched 2026-11-16: no official Barnwell County overage page surfaced; only a directory listing giving the Tax Collector's office address/phone (57 Wall Street, Room 121). No roster found anywhere. Not independently page-fetched this session.",
+      "confirmed_date": "2026-11-16", "confidence": "medium"
+    },
+    {
+      "state": "SC", "county": "Beaufort", "column": "lt_tax_sale_overage",
+      "reason": "Round 7. beaufortcountysc.gov returned HTTP 403 to this session's fetch, so live-fetched the Treasurer's own operating site instead, https://bt843.squarespace.com 2026-11-16 (HTTP 200): zero mention of 'overage' or 'excess funds' anywhere on its news/announcements (only general redemption-deadline procedural posts, e.g. 'Redemption Deadline Coming Up', 'Upcoming Delinquent Tax Sale'). A supplementary web search of the Treasurer's own 2017-2022 PDF announcements confirms Beaufort defines and explains 'overage' (bid exceeding the minimum bid, payable to the owner of record when the redemption period ends) but never links to a published roster of who is currently owed one -- consistent with the existing declined_registry entry for this same host under multi_year_delinquent_tax, which found the Treasurer site and its PublicAccessNow search widget unreadable for bulk per-parcel data; here the narrower finding is that no overage-specific roster exists on the Treasurer's own site at all, apart from that separate access problem.",
+      "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "SC", "county": "Clarendon", "column": "lt_tax_sale_overage",
+      "reason": "Round 7. Web-searched 2026-11-16: no official Clarendon County overage page surfaced; only a directory listing for the County Treasurer (411 Sunset Drive, Manning). No roster found anywhere. Not independently page-fetched this session.",
+      "confirmed_date": "2026-11-16", "confidence": "medium"
+    },
+    {
+      "state": "SC", "county": "Dillon", "column": "lt_tax_sale_overage",
+      "reason": "Round 7. Web-searched 2026-11-16: no official Dillon County overage page surfaced; only directory contact listings for the Treasurer/Tax Collector and the Clerk of Court. No roster found anywhere. Not independently page-fetched this session.",
+      "confirmed_date": "2026-11-16", "confidence": "medium"
+    },
+    {
+      "state": "SC", "county": "Union", "column": "lt_tax_sale_overage",
+      "reason": "Round 7. Live-fetched https://gearupunionsc.com/departments/delinquent-tax-office/ 2026-11-16 (HTTP 200): describes the November 2025 sale and a separate post-sale list of properties that did NOT sell (available from the Auditor's Office starting January 2026) -- an unsold-property list, not an overage roster. Zero mention of 'overage' or 'excess funds'.",
+      "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "SC", "county": "Marlboro", "column": "lt_tax_sale_overage",
+      "reason": "Round 7. Web-searched 2026-11-16: no official Marlboro County overage page, PDF, or even a distinct county-contact directory entry surfaced -- only generic/statewide statute references. No roster found anywhere. Not independently page-fetched this session.",
+      "confirmed_date": "2026-11-16", "confidence": "medium"
+    },
+    {
+      "state": "SC", "county": "Greenwood", "column": "lt_tax_sale_overage",
+      "reason": "Round 7. Live-fetched https://www.greenwoodcounty-sc.gov/tax-collector 2026-11-16 (HTTP 200): page is a short redirect notice ('All redemptions and tax sale matters are now handled by the Tax Office, located in Room 101 of the Courthouse') plus accepted-payment-method rules. Zero mention of 'overage' or 'excess funds'; no linked roster.",
+      "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "SC", "county": "Lancaster", "column": "lt_tax_sale_overage",
+      "reason": "Round 7. Web-searched 2026-11-16: no official Lancaster County overage page or PDF surfaced; only a third-party tax-sale-resources directory page (no roster). A direct fetch attempt at a guessed county-treasurer URL this session returned HTTP 404, so the county's own site was not independently confirmed beyond search snippets.",
+      "confirmed_date": "2026-11-16", "confidence": "medium"
+    },
+    {
+      "state": "SC", "county": "Newberry", "column": "lt_tax_sale_overage",
+      "reason": "Round 7. Live-fetched https://newberrycounty.gov/delinquent-tax/tax-sales 2026-11-16 (HTTP 200): page is only a link to a general 'Tax Sale information' PDF plus the Delinquent Tax Collector's phone number. Zero mention of 'overage' or 'excess funds'; no linked roster.",
+      "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "SC", "county": "Edgefield", "column": "lt_tax_sale_overage",
+      "reason": "Round 7. Web-searched 2026-11-16: no official Edgefield County overage page surfaced; only a directory contact listing for the Tax Collector (129 Courthouse Square). A third-party aggregator's summary mentioned 'Berkeley County publishes an unclaimed overage list' as a format example -- Berkeley is a DIFFERENT, already-declined county (2026-11-10 entry), cited there only as an illustration, not evidence of an Edgefield roster. Not independently page-fetched this session.",
+      "confirmed_date": "2026-11-16", "confidence": "medium"
+    },
+    {
+      "state": "SC", "county": "Chesterfield", "column": "lt_tax_sale_overage",
+      "reason": "Round 7. Live-fetched https://www.chesterfieldcountysc.com/tax-collector 2026-11-16 (HTTP 200): describes newspaper advertisement of delinquent properties and the one-year redemption window only. Zero mention of 'overage' or 'excess funds'; no linked roster.",
+      "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "SC", "county": "Abbeville", "column": "lt_tax_sale_overage",
+      "reason": "Round 7. Live-fetched https://abbevillecountysc.com/delinquent-tax-collector/ 2026-11-16 (HTTP 200): describes the first-Monday-in-November sale, advertisement in The Press & Banner, and interest-tiered redemption only. Zero mention of 'overage' or 'excess funds'. The county's separate Forfeited Land Commission page (sealed bids on forfeited/unsold land) is also not an overage roster -- a different disposition mechanism entirely.",
+      "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "SC", "county": "Allendale", "column": "lt_tax_sale_overage",
+      "reason": "Round 7. Web-searched 2026-11-16: no official Allendale County overage page surfaced; only a paid third-party tax-sale-resources page (no visible roster) and a directory contact listing for the Tax Collector. Not independently page-fetched this session.",
+      "confirmed_date": "2026-11-16", "confidence": "medium"
+    },
+    {
+      "state": "SC", "county": "Lee", "column": "lt_tax_sale_overage",
+      "reason": "Round 7. Web-searched 2026-11-16: no official Lee County overage page surfaced; only a paid third-party tax-sale-resources page (subscription-gated, no visible roster) and generic statewide statute references. Not independently page-fetched this session.",
+      "confirmed_date": "2026-11-16", "confidence": "medium"
+    },
+    {
+      "state": "SC", "county": "Saluda", "column": "lt_tax_sale_overage",
+      "reason": "Round 7. Live-fetched https://saludacounty.sc.gov/departments/tax-collector/delinquent-tax-sale 2026-11-16 (HTTP 200): lists the 2025 sale's property-list PDFs (delinquent-tax-SALE rosters, e.g. 'TS Final List', 'TS Week 2 properties') and bidder-registration dates only. Zero mention of 'overage' or 'excess funds'; no linked overage roster.",
+      "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "SC", "county": "McCormick", "column": "lt_tax_sale_overage",
+      "reason": "Round 7. Live-fetched https://mccormickcountysc.org/departments/treasurer.php 2026-11-16 (HTTP 200): describes the first-Monday-in-October sale and advertisement in The McCormick Messenger only. Zero mention of 'overage' or 'excess funds'; no linked roster.",
+      "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "SC", "county": "Chester", "column": "lt_tax_sale_overage",
+      "reason": "Round 7. Web-searched 2026-11-16: no official Chester County overage page surfaced; a direct fetch attempt at a guessed county-site URL this session failed outright (DNS: www.chestercountysc.org does not resolve). Search results surfaced only a directory contact listing for the Tax Collector (1476 J.A. Cochran Bypass) and generic/other-county references (Berkeley's list cited elsewhere only as a format example). Not independently page-fetched this session.",
+      "confirmed_date": "2026-11-16", "confidence": "medium"
     }
   ]
 }
