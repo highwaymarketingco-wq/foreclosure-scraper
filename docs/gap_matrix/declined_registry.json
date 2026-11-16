@@ -1153,6 +1153,286 @@
       "reason": "Web-searched 2026-11-16 and attempted 4 common self-hosted ArcGIS REST catalog URL guesses (gis./tcgis./maps.transylvaniacounty.org, gis.cityofbrevard.com) for the county and the City of Brevard: none resolved/connected, and no official open-data hub or live GIS REST catalog surfaced in search results for either (only a 2011-2014 NCSU Libraries archive and paid parcel-data resellers). Weaker evidence than a confirmed dead/walled endpoint -- absence of a found host, not a live-verified negative -- so a future pass that finds the county's real GIS subdomain should re-check before trusting this entry.",
       "confirmed_date": "2026-11-16",
       "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Wake",
+      "column": "condemned",
+      "reason": "ArcGIS Online catalog thoroughly searched (Wake County vacant/condemned/minimum housing/unsafe building, Raleigh minimum housing/unsafe building/code enforcement): the one 'Vacant Property' Feature Service found (Ray.Aull@raleighnc.gov, services.arcgis.com/v400IkDOw1ad7Yad/.../Vacant_Property) is Wake County's vacant-LAND roll for a 'BRT Framework' (LAND_CLASS='Vacant', BLDG_VAL=0 on every one of 10 sampled rows, no YEAR_BUILT/HEATEDAREA) -- the vacant_lot column's domain, not a structure. The city's real 311 system, 'Ask Raleigh Requests' (services.arcgis.com/v400IkDOw1ad7Yad/.../Ask_Raleigh_Requests), has an 'Unsafe or Unit Housing Conditions' service category (178 historical / 81 open requests, live-current through 2026-11-14) but its own published definition is explicitly a self-reported CONCERN ('Let us know if your residence MAY NOT MEET the minimum standards...'), not a confirmed city determination -- no case-detail/description field exists on the layer to distinguish a real finding from an unconfirmed complaint, so it is weaker evidence than a condemnation claim. wake_code_cases.py's own case-tracking feed (fixed this pass for the vacancy/vacant columns) has zero rows in its current live 144-case window that name a condemnation distinct from 'vacant'/'abandoned' evidence.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Horry",
+      "column": "condemned",
+      "reason": "Live-probed gisportal.horrycounty.org's dedicated CodeEnforcement folder (3 public services: Energov_iGapps, EnerGovEnterpriseProjection, EnerGovLite) -- all reference-only (Address Points, Parcels, Zoning, 'Code Inspection Zones Res.' as a polygon boundary layer, not case points). The real case-data variant seen referenced elsewhere, EnerGovEnterpriseProjection_MIL1, is token-walled: HTTP 499 'Token Required', live-confirmed. No ArcGIS Online item for the county/Myrtle Beach/Conway named condemned or code enforcement either.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "New Hanover",
+      "column": "condemned",
+      "reason": "County's own EnerGov permits layer (gis.nhcgov.com/server/rest/services/Thematic/EnergovPermitsPlans/MapServer/0) live-enumerated: 122 distinct PERMIT_TYPE values, every one a building/trade/fire PERMIT category (NHC Residential Electrical, NHC Commercial Building, ...), zero code-enforcement/violation/unsafe-housing category. City of Wilmington's own named EnerGov code-enforcement service (geohub.wilmingtonnc.gov/hosting/rest/services/EnerGov/EnerGovTest) is UNREACHABLE: connection timeout on both resolved IPs (12.219.179.108, 96.10.2.140) for the entire host, not just this path, live-confirmed. Wilmington's vacant-property-registration ordinance (civil fines, $500/30-day registration requirement) is real law but no published registry/dataset of the registered properties was found.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Randolph",
+      "column": "condemned",
+      "reason": "Live-probed gis.randolphcountync.gov: the TylerEPL folder (the real permitting/code system, by name) is token-walled, HTTP 499 'Token Required'. The only PUBLIC case-tracking layer on this host, Planning/LandUseCases, is Rezoning hearings only (3 total live rows, CASETYPE/VOTES/HEARINGDT fields confirm a planning-board hearing tracker, not code enforcement).",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Cumberland",
+      "column": "condemned",
+      "reason": "A real Minimum Housing (Court)/(Demolition) code-case dataset genuinely exists and is active through 2026 for Cumberland County -- confirmed via the county's own Tyler 'Citizen Connect'/'Community Insights' citizen portal (cumberlandcounty-nc-cc.connect.socrata.com), whose embedded app.js reveals a real Socrata dataset id (dj4g-hwak, case numbers 'MHEC-YYYY-NNNN', e.g. MHEC-2026-0917 'In Progress' opened 2026-08-18 at 1310 Atomic Dr). But the ONLY public access point, that portal's /api/tickets/search_tickets.json proxy, returns a hard-capped, non-paginated, ALWAYS-IDENTICAL 100-row-per-dataset slice interleaved with 3 unrelated datasets (zoning plans, building permits, inspections) -- live-confirmed: offset/limit/page params are silently ignored, and two calls made minutes apart returned the exact same 400 row IDs byte-for-byte. The search_string param matches only an opaque internal GUID field, not category or case number, so it cannot be used to select Minimum Housing rows specifically either. The raw underlying Socrata resource (cumberlandcounty.data.socrata.com/resource/dj4g-hwak.json) requires login. Not a workable standing source for a production scraper as it stands -- revisit if the county ever publishes dj4g-hwak as a real public Socrata dataset or the portal adds pagination.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Rowan",
+      "column": "condemned",
+      "reason": "Live-enumerated gis.rowancountync.gov's Energov folder in full: both services (Energov_main_10_4_s077 and ENERGOVTEST) carry the identical 32-layer set, all reference (Address Points, Parcels, Zoning boundaries, flood, subdivisions, historic-landmark district boundaries). The two layers that sounded promising by name are both something else on inspection: 'MHPcases' is Mobile Home PARK licensing (fields ZONING/PARKNAME/Spaces, not Minimum Housing), and 'Zoningcases' is rezoning/conditional-use-district approval tracking (fields APPROVAL/CUD/VOTES-free but CASE_/COMMENTS only). gis.salisburync.gov's own EnerGov MapServer (the city) is reference-only too (10 layers: addresses, parcels, districts, neighborhoods, flood, historic districts, streets, city limits) -- no case layer on either host.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Pitt",
+      "column": "condemned",
+      "reason": "Live-enumerated gis.pittcountync.gov's EPLAN/New_EPLAN service (the one folder on this host whose name suggests e-permitting/code case data) in full: 72 layers, every one a reference/basemap layer (well locations, septic districts, per-town zoning boundaries for 9 towns, school districts, fire/rescue districts, historic district boundaries, parcels). 'EPLAN' names the basemap the e-planning PORTAL draws on, not case data served through this GIS server. No other code-enforcement/condemned/vacant-named folder exists on this host (PittOpenData/GUC/OPIS/OPISMobile folders checked too, all parcels/zoning/infrastructure/elections/education).",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Greenville",
+      "column": "condemned",
+      "reason": "gcgis.org's full folder listing has no 'CodeEnforcement' folder at all (11 folders: Address_Locators, CADFileCheck, Cogo_Traverse, Data_Capture, GCGIA, GreenvilleNJ, OpenStreetMap, SmartGov, Stormwater, Surfaces, Utilities) -- unlike Horry/Randolph, which at least have one (even if token-walled). The one plausible lead by vendor name, SmartGov, is a single parcel-LOOKUP connector service (SmartGov_ParcelConnector, 29 layers, all parcels/zoning/FEMA/boundaries -- feeds parcel geometry INTO the county's SmartGov permitting system, not a case-data output). The two producers already wired here (greenville_unpaid_tax_parcels, greenville_city_demolition_permits) are tax/permit-only by design, confirmed deliberately not condemned in that file's own 2026-11-10 comment.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Pickens",
+      "column": "condemned",
+      "reason": "The GISpickens ArcGIS Online org (340 items enumerated) has two real citizen-reporting Feature Services, live-checked by schema: 'Requests_reporter' is road-maintenance only (reqtype domain: Tree/Debris/Pot hole/Culvert Blockage/Culvert Damaged/Guard Rail/Other) and 'CitizenProblems_litter' is litter/dumping/signage only (probtype domain: Litter on Roadway/Illegal Dumping of Solid waste/Vehicle with Unsecured Load/Signs in Road Right-of-Way/Other) -- neither has a housing/structure/vacant/condemned category. The existing pickens_flood_damage producer in this ledger is a flood-damage CAMA join, unrelated to code enforcement.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Onslow",
+      "column": "condemned",
+      "reason": "Live-enumerated gismaps.onslowcountync.gov's GISWebsite/GISWebsiteLayers service (the county's main public GIS layer set) in full: 40 layers, every one reference (streets, flood zones/FIRM panels, soils, per-jurisdiction zoning including a dedicated 'Zoning (City of Jacksonville)' sublayer, voluntary ag districts, airports) -- no code-enforcement/condemned/vacant-named layer anywhere in the set. No separate City of Jacksonville EnerGov/code-enforcement host was found by search either.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Orangeburg",
+      "column": "condemned",
+      "reason": "Live-reconfirmed 2026-11-16 (python3 scripts/check_orangeburg_gis.py, run directly): gis2.orangeburgcounty.org (the county's ONLY on-prem GIS host -- land use, CAMA/value, and presumably any EnerGov/code-enforcement layer that would live on the same server) and its sibling arcserver2.orangeburgcounty.org are BOTH down at the TCP connect stage -- a whole-server/firewall outage, not one bad hostname or a DNS-guess miss, consistent with every check of this host since 2026-10-07 (county_records_matrix.json SC/Orangeburg.gis; cross-confirmed the same day by another agent's round-9 lt_elderly_disabled research, commit 1e5814b8). The county's AGOL hosted account (80 items, enumerated that same pass) mirrors only a Tax Parcel Map and Roads layer as _WFL1 replicas -- no code-enforcement/condemned/vacant data is mirrored there either. Nothing to build until this on-prem server comes back; monitor via that script, not a fresh guess.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Beaufort",
+      "column": "condemned",
+      "reason": "Web-searched 2026-11-16: an older news item states Beaufort County itself has no minimum housing code in its unincorporated areas (unconfirmed current); the City of Washington, the county seat, is reported (2026 local news) to be stepping up enforcement against vacant/abandoned houses that fail minimum-housing/building codes, but no GIS layer, open-data portal, or downloadable case list was found for the city's program. 2 self-hosted ArcGIS subdomain guesses for the county's own GIS host (beaufortcountync.gov, gis.beaufortcountync.gov) returned 404/no-connection. Weaker evidence than the live-fetched dead ends elsewhere in this batch.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Horry",
+      "column": "vacancy",
+      "reason": "Live-probed gisportal.horrycounty.org's dedicated CodeEnforcement folder (3 public services: Energov_iGapps, EnerGovEnterpriseProjection, EnerGovLite) -- all reference-only (Address Points, Parcels, Zoning, 'Code Inspection Zones Res.' as a polygon boundary layer, not case points). The real case-data variant seen referenced elsewhere, EnerGovEnterpriseProjection_MIL1, is token-walled: HTTP 499 'Token Required', live-confirmed. No ArcGIS Online item for the county/Myrtle Beach/Conway named condemned or code enforcement either.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "New Hanover",
+      "column": "vacancy",
+      "reason": "County's own EnerGov permits layer (gis.nhcgov.com/server/rest/services/Thematic/EnergovPermitsPlans/MapServer/0) live-enumerated: 122 distinct PERMIT_TYPE values, every one a building/trade/fire PERMIT category (NHC Residential Electrical, NHC Commercial Building, ...), zero code-enforcement/violation/unsafe-housing category. City of Wilmington's own named EnerGov code-enforcement service (geohub.wilmingtonnc.gov/hosting/rest/services/EnerGov/EnerGovTest) is UNREACHABLE: connection timeout on both resolved IPs (12.219.179.108, 96.10.2.140) for the entire host, not just this path, live-confirmed. Wilmington's vacant-property-registration ordinance (civil fines, $500/30-day registration requirement) is real law but no published registry/dataset of the registered properties was found.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Randolph",
+      "column": "vacancy",
+      "reason": "Live-probed gis.randolphcountync.gov: the TylerEPL folder (the real permitting/code system, by name) is token-walled, HTTP 499 'Token Required'. The only PUBLIC case-tracking layer on this host, Planning/LandUseCases, is Rezoning hearings only (3 total live rows, CASETYPE/VOTES/HEARINGDT fields confirm a planning-board hearing tracker, not code enforcement).",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Cumberland",
+      "column": "vacancy",
+      "reason": "A real Minimum Housing (Court)/(Demolition) code-case dataset genuinely exists and is active through 2026 for Cumberland County -- confirmed via the county's own Tyler 'Citizen Connect'/'Community Insights' citizen portal (cumberlandcounty-nc-cc.connect.socrata.com), whose embedded app.js reveals a real Socrata dataset id (dj4g-hwak, case numbers 'MHEC-YYYY-NNNN', e.g. MHEC-2026-0917 'In Progress' opened 2026-08-18 at 1310 Atomic Dr). But the ONLY public access point, that portal's /api/tickets/search_tickets.json proxy, returns a hard-capped, non-paginated, ALWAYS-IDENTICAL 100-row-per-dataset slice interleaved with 3 unrelated datasets (zoning plans, building permits, inspections) -- live-confirmed: offset/limit/page params are silently ignored, and two calls made minutes apart returned the exact same 400 row IDs byte-for-byte. The search_string param matches only an opaque internal GUID field, not category or case number, so it cannot be used to select Minimum Housing rows specifically either. The raw underlying Socrata resource (cumberlandcounty.data.socrata.com/resource/dj4g-hwak.json) requires login. Not a workable standing source for a production scraper as it stands -- revisit if the county ever publishes dj4g-hwak as a real public Socrata dataset or the portal adds pagination.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Rowan",
+      "column": "vacancy",
+      "reason": "Live-enumerated gis.rowancountync.gov's Energov folder in full: both services (Energov_main_10_4_s077 and ENERGOVTEST) carry the identical 32-layer set, all reference (Address Points, Parcels, Zoning boundaries, flood, subdivisions, historic-landmark district boundaries). The two layers that sounded promising by name are both something else on inspection: 'MHPcases' is Mobile Home PARK licensing (fields ZONING/PARKNAME/Spaces, not Minimum Housing), and 'Zoningcases' is rezoning/conditional-use-district approval tracking (fields APPROVAL/CUD/VOTES-free but CASE_/COMMENTS only). gis.salisburync.gov's own EnerGov MapServer (the city) is reference-only too (10 layers: addresses, parcels, districts, neighborhoods, flood, historic districts, streets, city limits) -- no case layer on either host.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Pitt",
+      "column": "vacancy",
+      "reason": "Live-enumerated gis.pittcountync.gov's EPLAN/New_EPLAN service (the one folder on this host whose name suggests e-permitting/code case data) in full: 72 layers, every one a reference/basemap layer (well locations, septic districts, per-town zoning boundaries for 9 towns, school districts, fire/rescue districts, historic district boundaries, parcels). 'EPLAN' names the basemap the e-planning PORTAL draws on, not case data served through this GIS server. No other code-enforcement/condemned/vacant-named folder exists on this host (PittOpenData/GUC/OPIS/OPISMobile folders checked too, all parcels/zoning/infrastructure/elections/education).",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Greenville",
+      "column": "vacancy",
+      "reason": "gcgis.org's full folder listing has no 'CodeEnforcement' folder at all (11 folders: Address_Locators, CADFileCheck, Cogo_Traverse, Data_Capture, GCGIA, GreenvilleNJ, OpenStreetMap, SmartGov, Stormwater, Surfaces, Utilities) -- unlike Horry/Randolph, which at least have one (even if token-walled). The one plausible lead by vendor name, SmartGov, is a single parcel-LOOKUP connector service (SmartGov_ParcelConnector, 29 layers, all parcels/zoning/FEMA/boundaries -- feeds parcel geometry INTO the county's SmartGov permitting system, not a case-data output). The two producers already wired here (greenville_unpaid_tax_parcels, greenville_city_demolition_permits) are tax/permit-only by design, confirmed deliberately not condemned in that file's own 2026-11-10 comment.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Pickens",
+      "column": "vacancy",
+      "reason": "The GISpickens ArcGIS Online org (340 items enumerated) has two real citizen-reporting Feature Services, live-checked by schema: 'Requests_reporter' is road-maintenance only (reqtype domain: Tree/Debris/Pot hole/Culvert Blockage/Culvert Damaged/Guard Rail/Other) and 'CitizenProblems_litter' is litter/dumping/signage only (probtype domain: Litter on Roadway/Illegal Dumping of Solid waste/Vehicle with Unsecured Load/Signs in Road Right-of-Way/Other) -- neither has a housing/structure/vacant/condemned category. The existing pickens_flood_damage producer in this ledger is a flood-damage CAMA join, unrelated to code enforcement.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Onslow",
+      "column": "vacancy",
+      "reason": "Live-enumerated gismaps.onslowcountync.gov's GISWebsite/GISWebsiteLayers service (the county's main public GIS layer set) in full: 40 layers, every one reference (streets, flood zones/FIRM panels, soils, per-jurisdiction zoning including a dedicated 'Zoning (City of Jacksonville)' sublayer, voluntary ag districts, airports) -- no code-enforcement/condemned/vacant-named layer anywhere in the set. No separate City of Jacksonville EnerGov/code-enforcement host was found by search either.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Orangeburg",
+      "column": "vacancy",
+      "reason": "Live-reconfirmed 2026-11-16 (python3 scripts/check_orangeburg_gis.py, run directly): gis2.orangeburgcounty.org (the county's ONLY on-prem GIS host -- land use, CAMA/value, and presumably any EnerGov/code-enforcement layer that would live on the same server) and its sibling arcserver2.orangeburgcounty.org are BOTH down at the TCP connect stage -- a whole-server/firewall outage, not one bad hostname or a DNS-guess miss, consistent with every check of this host since 2026-10-07 (county_records_matrix.json SC/Orangeburg.gis; cross-confirmed the same day by another agent's round-9 lt_elderly_disabled research, commit 1e5814b8). The county's AGOL hosted account (80 items, enumerated that same pass) mirrors only a Tax Parcel Map and Roads layer as _WFL1 replicas -- no code-enforcement/condemned/vacant data is mirrored there either. Nothing to build until this on-prem server comes back; monitor via that script, not a fresh guess.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Beaufort",
+      "column": "vacancy",
+      "reason": "Web-searched 2026-11-16: an older news item states Beaufort County itself has no minimum housing code in its unincorporated areas (unconfirmed current); the City of Washington, the county seat, is reported (2026 local news) to be stepping up enforcement against vacant/abandoned houses that fail minimum-housing/building codes, but no GIS layer, open-data portal, or downloadable case list was found for the city's program. 2 self-hosted ArcGIS subdomain guesses for the county's own GIS host (beaufortcountync.gov, gis.beaufortcountync.gov) returned 404/no-connection. Weaker evidence than the live-fetched dead ends elsewhere in this batch.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Horry",
+      "column": "vacant",
+      "reason": "Live-probed gisportal.horrycounty.org's dedicated CodeEnforcement folder (3 public services: Energov_iGapps, EnerGovEnterpriseProjection, EnerGovLite) -- all reference-only (Address Points, Parcels, Zoning, 'Code Inspection Zones Res.' as a polygon boundary layer, not case points). The real case-data variant seen referenced elsewhere, EnerGovEnterpriseProjection_MIL1, is token-walled: HTTP 499 'Token Required', live-confirmed. No ArcGIS Online item for the county/Myrtle Beach/Conway named condemned or code enforcement either.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "New Hanover",
+      "column": "vacant",
+      "reason": "County's own EnerGov permits layer (gis.nhcgov.com/server/rest/services/Thematic/EnergovPermitsPlans/MapServer/0) live-enumerated: 122 distinct PERMIT_TYPE values, every one a building/trade/fire PERMIT category (NHC Residential Electrical, NHC Commercial Building, ...), zero code-enforcement/violation/unsafe-housing category. City of Wilmington's own named EnerGov code-enforcement service (geohub.wilmingtonnc.gov/hosting/rest/services/EnerGov/EnerGovTest) is UNREACHABLE: connection timeout on both resolved IPs (12.219.179.108, 96.10.2.140) for the entire host, not just this path, live-confirmed. Wilmington's vacant-property-registration ordinance (civil fines, $500/30-day registration requirement) is real law but no published registry/dataset of the registered properties was found.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Randolph",
+      "column": "vacant",
+      "reason": "Live-probed gis.randolphcountync.gov: the TylerEPL folder (the real permitting/code system, by name) is token-walled, HTTP 499 'Token Required'. The only PUBLIC case-tracking layer on this host, Planning/LandUseCases, is Rezoning hearings only (3 total live rows, CASETYPE/VOTES/HEARINGDT fields confirm a planning-board hearing tracker, not code enforcement).",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Cumberland",
+      "column": "vacant",
+      "reason": "A real Minimum Housing (Court)/(Demolition) code-case dataset genuinely exists and is active through 2026 for Cumberland County -- confirmed via the county's own Tyler 'Citizen Connect'/'Community Insights' citizen portal (cumberlandcounty-nc-cc.connect.socrata.com), whose embedded app.js reveals a real Socrata dataset id (dj4g-hwak, case numbers 'MHEC-YYYY-NNNN', e.g. MHEC-2026-0917 'In Progress' opened 2026-08-18 at 1310 Atomic Dr). But the ONLY public access point, that portal's /api/tickets/search_tickets.json proxy, returns a hard-capped, non-paginated, ALWAYS-IDENTICAL 100-row-per-dataset slice interleaved with 3 unrelated datasets (zoning plans, building permits, inspections) -- live-confirmed: offset/limit/page params are silently ignored, and two calls made minutes apart returned the exact same 400 row IDs byte-for-byte. The search_string param matches only an opaque internal GUID field, not category or case number, so it cannot be used to select Minimum Housing rows specifically either. The raw underlying Socrata resource (cumberlandcounty.data.socrata.com/resource/dj4g-hwak.json) requires login. Not a workable standing source for a production scraper as it stands -- revisit if the county ever publishes dj4g-hwak as a real public Socrata dataset or the portal adds pagination.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Rowan",
+      "column": "vacant",
+      "reason": "Live-enumerated gis.rowancountync.gov's Energov folder in full: both services (Energov_main_10_4_s077 and ENERGOVTEST) carry the identical 32-layer set, all reference (Address Points, Parcels, Zoning boundaries, flood, subdivisions, historic-landmark district boundaries). The two layers that sounded promising by name are both something else on inspection: 'MHPcases' is Mobile Home PARK licensing (fields ZONING/PARKNAME/Spaces, not Minimum Housing), and 'Zoningcases' is rezoning/conditional-use-district approval tracking (fields APPROVAL/CUD/VOTES-free but CASE_/COMMENTS only). gis.salisburync.gov's own EnerGov MapServer (the city) is reference-only too (10 layers: addresses, parcels, districts, neighborhoods, flood, historic districts, streets, city limits) -- no case layer on either host.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Pitt",
+      "column": "vacant",
+      "reason": "Live-enumerated gis.pittcountync.gov's EPLAN/New_EPLAN service (the one folder on this host whose name suggests e-permitting/code case data) in full: 72 layers, every one a reference/basemap layer (well locations, septic districts, per-town zoning boundaries for 9 towns, school districts, fire/rescue districts, historic district boundaries, parcels). 'EPLAN' names the basemap the e-planning PORTAL draws on, not case data served through this GIS server. No other code-enforcement/condemned/vacant-named folder exists on this host (PittOpenData/GUC/OPIS/OPISMobile folders checked too, all parcels/zoning/infrastructure/elections/education).",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Greenville",
+      "column": "vacant",
+      "reason": "gcgis.org's full folder listing has no 'CodeEnforcement' folder at all (11 folders: Address_Locators, CADFileCheck, Cogo_Traverse, Data_Capture, GCGIA, GreenvilleNJ, OpenStreetMap, SmartGov, Stormwater, Surfaces, Utilities) -- unlike Horry/Randolph, which at least have one (even if token-walled). The one plausible lead by vendor name, SmartGov, is a single parcel-LOOKUP connector service (SmartGov_ParcelConnector, 29 layers, all parcels/zoning/FEMA/boundaries -- feeds parcel geometry INTO the county's SmartGov permitting system, not a case-data output). The two producers already wired here (greenville_unpaid_tax_parcels, greenville_city_demolition_permits) are tax/permit-only by design, confirmed deliberately not condemned in that file's own 2026-11-10 comment.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Pickens",
+      "column": "vacant",
+      "reason": "The GISpickens ArcGIS Online org (340 items enumerated) has two real citizen-reporting Feature Services, live-checked by schema: 'Requests_reporter' is road-maintenance only (reqtype domain: Tree/Debris/Pot hole/Culvert Blockage/Culvert Damaged/Guard Rail/Other) and 'CitizenProblems_litter' is litter/dumping/signage only (probtype domain: Litter on Roadway/Illegal Dumping of Solid waste/Vehicle with Unsecured Load/Signs in Road Right-of-Way/Other) -- neither has a housing/structure/vacant/condemned category. The existing pickens_flood_damage producer in this ledger is a flood-damage CAMA join, unrelated to code enforcement.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Onslow",
+      "column": "vacant",
+      "reason": "Live-enumerated gismaps.onslowcountync.gov's GISWebsite/GISWebsiteLayers service (the county's main public GIS layer set) in full: 40 layers, every one reference (streets, flood zones/FIRM panels, soils, per-jurisdiction zoning including a dedicated 'Zoning (City of Jacksonville)' sublayer, voluntary ag districts, airports) -- no code-enforcement/condemned/vacant-named layer anywhere in the set. No separate City of Jacksonville EnerGov/code-enforcement host was found by search either.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Orangeburg",
+      "column": "vacant",
+      "reason": "Live-reconfirmed 2026-11-16 (python3 scripts/check_orangeburg_gis.py, run directly): gis2.orangeburgcounty.org (the county's ONLY on-prem GIS host -- land use, CAMA/value, and presumably any EnerGov/code-enforcement layer that would live on the same server) and its sibling arcserver2.orangeburgcounty.org are BOTH down at the TCP connect stage -- a whole-server/firewall outage, not one bad hostname or a DNS-guess miss, consistent with every check of this host since 2026-10-07 (county_records_matrix.json SC/Orangeburg.gis; cross-confirmed the same day by another agent's round-9 lt_elderly_disabled research, commit 1e5814b8). The county's AGOL hosted account (80 items, enumerated that same pass) mirrors only a Tax Parcel Map and Roads layer as _WFL1 replicas -- no code-enforcement/condemned/vacant data is mirrored there either. Nothing to build until this on-prem server comes back; monitor via that script, not a fresh guess.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Beaufort",
+      "column": "vacant",
+      "reason": "Web-searched 2026-11-16: an older news item states Beaufort County itself has no minimum housing code in its unincorporated areas (unconfirmed current); the City of Washington, the county seat, is reported (2026 local news) to be stepping up enforcement against vacant/abandoned houses that fail minimum-housing/building codes, but no GIS layer, open-data portal, or downloadable case list was found for the city's program. 2 self-hosted ArcGIS subdomain guesses for the county's own GIS host (beaufortcountync.gov, gis.beaufortcountync.gov) returned 404/no-connection. Weaker evidence than the live-fetched dead ends elsewhere in this batch.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Lincoln",
+      "column": "condemned",
+      "reason": "lincoln_code_violations.py's only structural-category field, VIOLATETYPE, is confirmed NULL on every row (round 8, 2026-10-02, re-confirmed); the only text evidence is free-text VIOLATEDESC. Live-resampled 2026-11-16: of the current 63 open cases, none names a formal condemnation action distinct from the broad 'dilapidated' catch-all (_SEVERE's deteriorat/condemn/uninhabit/unfit match, which also catches ordinary 'uninhabitable'-adjective complaints that never rose to an actual condemnation order). This codebase's own established rule (this file's 2026-11-16 docstring; durham_unsafe_building's narrower Topic-based split; spartanburg_condemned.py's condition_rating-vs-condemned split) is that this broad a match is too weak to assert raw['condemned'] -- only the narrower 'Abandoned structure' phrase (already wired to vacancy/vacant, not condemned) clears that bar here.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     }
   ]
 }

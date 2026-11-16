@@ -74,7 +74,13 @@ _STRUCT = {
     "collapse": re.compile(r"collap", re.I),
     "unsafe": re.compile(r"unsafe|hazard|life safety|dangerous", re.I),
     "dilapidated": re.compile(r"dilapidat|deteriorat|condemn|uninhabit|unfit", re.I),
-    "vacant": re.compile(r"vacant|abandon|boarded", re.I),
+    # 2026-11-16 (round 9): live-sampled 144 open cases -- the plain `vacant|abandon|boarded`
+    # version matched "Use of VACANT LOT to park and store commercial tow trucks" (VIO-008568-2026,
+    # a zoning/land-use complaint about an otherwise-ordinary vacant parcel, not a distressed
+    # structure). The negative lookahead excludes exactly that phrasing while still matching
+    # "abandon"/"boarded" unconditionally (always structure-specific here) and any other "vacant"
+    # use ("vacant house", "vacant and boarded", a bare "vacant structure").
+    "vacant": re.compile(r"abandon|boarded|vacant(?!\s+(lot|land|parcel))", re.I),
     "septic_failure": re.compile(r"septic|wastewater|malfunction|o&m|failure", re.I),
     "repair": re.compile(r"repair", re.I),
 }
@@ -133,6 +139,25 @@ def to_listing(a: dict, *, now: Optional[datetime] = None) -> Optional[Listing]:
     }
     if severe:
         raw["distressed"] = True
+    if "vacant" in tags:
+        # 2026-11-16 (round 9, vacant_structure "no source known" breadth pass): this case was
+        # already classified "vacant" (DESCRIPTION matched vacant|abandon|boarded -- see _STRUCT
+        # above) and fed into code_enforcement.violation_types/vacancy_adjacent, but never
+        # mirrored into raw["vacancy"]/raw["gis"]["vacant"], the two keys gap_matrix.py's
+        # "vacancy"/"vacant" columns actually check -- same omission, same fix, as
+        # lincoln_code_violations.py's "Abandoned structure" rows (round 8, same day). Of the 144
+        # live open cases sampled 2026-11-16, the ONLY candidate (VIO-008568-2026, "Use of vacant
+        # LOT to park and store commercial tow trucks") was a false positive from the old
+        # `vacant|abandon|boarded` regex matching "vacant lot" -- fixed at the regex itself (see
+        # _STRUCT["vacant"]'s own 2026-11-16 note), so live yield here is 0 today, not fabricated.
+        # This is the mechanism being correctly wired for the next rolling-window case that
+        # actually names an abandoned/boarded/vacant STRUCTURE, same "rare, thin" character this
+        # column's own Spec.ambiguity note already documents. Does NOT set raw["condemned"] --
+        # "vacant"/"abandoned" is not a condemnation claim, same distinction drawn for Lincoln and
+        # for durham_unsafe_building's narrower "dilapidated"-family exclusion elsewhere in this
+        # same pass.
+        raw["vacancy"] = {"vacant": True, "boarded_up": None, "utility_status": None, "source": SLUG}
+        raw.setdefault("gis", {})["vacant"] = True
     return Listing(
         source=SLUG, source_url=PAGE,
         listing_type=ListingType.DISTRESSED, property_kind=PropertyKind.UNKNOWN,

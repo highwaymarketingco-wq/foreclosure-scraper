@@ -862,12 +862,18 @@ SPECS: dict[str, Spec] = {
                    # lincoln_code_violations.py added 2026-11-16 alongside the identical fix to
                    # the 'vacancy' Spec above -- same raw["gis"]["vacant"] mirror, same 2-row
                    # "Abandoned structure" subset (see that Spec's own comment for detail).
+                   # wake_code_cases.py added 2026-11-16 (round 9, same day, same bug class): its
+                   # 'vacant' classification tag (DESCRIPTION matched vacant|abandon|boarded) was
+                   # already computed and fed vacancy_adjacent, but never mirrored into either of
+                   # this column's two real keys -- thin (1 of 144 live open cases sampled), but
+                   # real -- single-county text match, live-verified correct before this edit.
                    producers=("enrichment_arcgis.py", "scrapers/counties_sc/spartanburg_vacant.py",
                               "nc_lincoln_bulk.py", "scrapers/counties_nc/gastonia_code_enforcement.py",
                               "scrapers/counties_nc/kinston_proposed_demolition.py",
                               "scrapers/counties_nc/rocky_mount_blight_survey.py",
                               "scrapers/counties_generic/arcgis_distress_layers.py",
-                              "scrapers/counties_nc/lincoln_code_violations.py"),
+                              "scrapers/counties_nc/lincoln_code_violations.py",
+                              "scrapers/counties_nc/wake_code_cases.py"),
                    doc="raw.vacant present (a city/county vacant-structure registry); the real "
                        "check elsewhere in this file is raw['gis']['vacant'] specifically"),
     "storm_damage": Spec(_S, "county", "disaster", applies="storm_scope",
@@ -1055,12 +1061,32 @@ SPECS: dict[str, Spec] = {
                     # raw.vacancy/raw["gis"]["vacant"] on that subset (was computing `severe`/
                     # `distressed` from the same VIOLATEDESC match already, just never wrote either
                     # of this column's two keys). Real but small: 2 live rows, Lincoln NC.
+                    #
+                    # 2026-11-16 (round 9): scrapers/counties_sc/spartanburg_vacant.py was ALSO
+                    # missing from this tuple -- same bug class again, third time found in this
+                    # one column. The module has written a real raw["vacancy"] = {"vacant": True,
+                    # "boarded_up": None, "utility_status": None, "source": "spartanburg_city_
+                    # registry"} on every one of its ~5,000 rows since its own 2026-11-11
+                    # "vacant column breadth pass" docstring note (see that file directly above its
+                    # raw["vacancy"] assignment) -- the EXACT dict shape _gate_vacancy() checks --
+                    # but was only ever in the SIBLING "vacant" column's producers tuple below, not
+                    # this one. It is already in this column's own _VACANT_COHORT_REL-style precise
+                    # path for "vacant" (confirmed correct there, single-county hardcoded literal);
+                    # no such refinement exists for "vacancy" because none was needed -- the plain
+                    # counties_named_in() blanket text-grep over this one file alone already
+                    # resolves to the exact correct {('SC', 'Spartanburg')}, live-verified directly
+                    # against built_in_code()'s own helper before this edit. This is why Spartanburg
+                    # vacancy (19,381 rows, the single biggest "no source known" cell in this whole
+                    # ledger family after Wake) was reading unbuilt despite already-running,
+                    # already-correct code -- zero new scraping, pure producers-tuple omission.
                     producers=("scrapers/counties_nc/hendersonville_vacant_structures.py",
                                "scrapers/counties_nc/rocky_mount_blight_survey.py",
                                "scrapers/counties_nc/kinston_proposed_demolition.py",
                                "scrapers/counties_nc/gastonia_code_enforcement.py",
                                "scrapers/counties_generic/arcgis_distress_layers.py",
-                               "scrapers/counties_nc/lincoln_code_violations.py"),
+                               "scrapers/counties_nc/lincoln_code_violations.py",
+                               "scrapers/counties_sc/spartanburg_vacant.py",
+                               "scrapers/counties_nc/wake_code_cases.py"),
                     doc="raw.vacancy.vacant/boarded_up/utility_status truthy; checked = vacancy wrapper",
                     ambiguity="a code-officer vacant-structure registry is a rare open-data product; only "
                              "4 tiny city/county sources exist in all of NC+SC as of 2026-11-10 (was 3 at "

@@ -534,13 +534,22 @@ def test_arcgis_distress_layers_credit_respects_process_and_condemned_fields():
     was REMOVED 2026-10-28 -- the file's own dated comment explains why (a 665-row "active" set
     whose newest case number was 2+ years stale, the sync had simply stopped) -- so this test went
     stale against that change rather than being updated alongside it. Guilford is correctly absent
-    now; it has no other code_enforcement producer anywhere in the codebase."""
+    now; it has no other code_enforcement producer anywhere in the codebase.
+
+    2026-11-16 UPDATE (round 9): Durham now ALSO sets condemned=True (and vacancy=True, checked by
+    the sibling vacancy test below) via the new durham_unsafe_building entry -- its own Topic='Unsafe
+    Building' subset of the SAME durham_open_code_violations service/sub-layer, peeled into a
+    mutually-exclusive where-filtered entry (46 live cases, 2026-11-16). Not a mislabel fix like the
+    others above; this is new real evidence for a genuinely condemnation-equivalent NC Minimum
+    Housing Code action (see that Layer's own docstring)."""
     credit = gm._arcgis_distress_layers_credit()
-    # only York's rockhill_code_demolition sets condemned=True in this entire file
-    assert credit["condemned"] == {("SC", "York")}
+    # York's rockhill_code_demolition + Durham's new durham_unsafe_building (2026-11-16) are the
+    # only two entries setting condemned=True in this entire file.
+    assert credit["condemned"] == {("SC", "York"), ("NC", "Durham")}
     # the 4 real process="code_enforcement" layers left after greensboro_code_housing's 2026-10-28
     # removal (columbia_code_vacant_boarded, durham_open_code_violations, lincoln_code_violations,
-    # rockhill_code_housing/_exterior_major)
+    # rockhill_code_housing/_exterior_major) -- durham_unsafe_building shares Durham's existing
+    # membership in this SET, so it adds no new county here.
     assert credit["code_enforcement"] == {
         ("SC", "Richland"), ("NC", "Durham"), ("NC", "Lincoln"), ("SC", "York"),
     }
@@ -557,7 +566,11 @@ def test_built_in_code_drops_arcgis_distress_layers_false_credit_for_condemned_a
     test_arcgis_distress_layers_credit_respects_process_and_condemned_fields's dated note above).
     Gaston also joined this test's world: gastonia_code_enforcement.py (missing from the condemned/
     code_enforcement producer tuples until the 2026-11-10 coverage-gap pass) now genuinely credits
-    it for both."""
+    it for both.
+
+    2026-11-16 UPDATE (round 9): Durham moved from "code_enforcement only, no condemned" to "both",
+    via the new durham_unsafe_building entry (real evidence, not a mislabel fix -- see the sibling
+    test above)."""
     built = gm.built_in_code()
     # false positives removed: named in the file, but on an unrelated-process entry only
     for st, co in (("NC", "Transylvania"), ("NC", "Buncombe"), ("NC", "Burke"), ("NC", "New Hanover"),
@@ -578,10 +591,12 @@ def test_built_in_code_drops_arcgis_distress_layers_false_credit_for_condemned_a
     assert ("NC", "Gaston") in built["code_enforcement"]          # gastonia_code_enforcement.py (added 2026-11-10)
     assert ("NC", "Lincoln") in built["code_enforcement"]         # lincoln_code_violations (this file)
     assert ("NC", "Durham") in built["code_enforcement"]          # durham_open_code_violations (this file)
+    assert ("NC", "Durham") in built["condemned"]                 # durham_unsafe_building (added 2026-11-16)
     assert ("NC", "Buncombe") in built["code_enforcement"]        # asheville_code_enforcement.py (a DIFFERENT file)
-    # Lincoln/Durham DO have a real code_enforcement producer but, same as Richland, no
-    # condemned=True entry -- the narrower, opposite-direction half of the same mislabel
-    for st, co in (("NC", "Lincoln"), ("NC", "Durham"), ("SC", "Richland")):
+    # Lincoln DOES have a real code_enforcement producer but, same as Richland, no
+    # condemned=True entry -- the narrower, opposite-direction half of the same mislabel. Durham
+    # dropped out of this set 2026-11-16 (see above): it now has a real condemned entry too.
+    for st, co in (("NC", "Lincoln"), ("SC", "Richland")):
         assert (st, co) not in built["condemned"], f"{st}/{co} has a code_enforcement entry, not a condemned one"
 
 
@@ -621,7 +636,16 @@ def test_built_in_code_drops_vacant_cohort_false_credit():
     Lenoir, rocky_mount_blight_survey.py/Nash+Edgecombe) a raw['gis']['vacant'] mirror of the
     raw['vacancy'] wrapper each already wrote -- their blanket text-match credit was already
     correct (each file only ever names its own real county/counties), so they are new true
-    positives here too, not a refinement like Richland/York's."""
+    positives here too, not a refinement like Richland/York's.
+
+    2026-11-16 UPDATE (round 9): Durham joins the real-producer list via the new
+    durham_unsafe_building entry's vacancy=True opt-in (same mechanism as Richland/York, not a
+    text-match refinement -- see test_arcgis_distress_layers_credit_respects_process_and_condemned_
+    fields's own 2026-11-16 note). Wake also joins -- unlike Durham, this one IS the ordinary
+    blanket-text-match path (wake_code_cases.py literally names "Wake", same mechanism as
+    nc_lincoln_bulk.py/Lincoln already in this same `other_files` list), now a true positive since
+    wake_code_cases.py's own fix this round made it a real (if currently thin) writer of
+    raw["gis"]["vacant"]."""
     built = gm.built_in_code()
     # false positives removed: named only via enrichment_arcgis.py's unrelated GIS registries
     for st, co in (("NC", "Mecklenburg"), ("NC", "Buncombe"), ("NC", "Henderson"), ("NC", "Burke"),
@@ -635,8 +659,10 @@ def test_built_in_code_drops_vacant_cohort_false_credit():
     assert ("SC", "Spartanburg") in built["vacant"]      # spartanburg_vacant.py (single-county, correct as-is)
     assert ("SC", "Richland") in built["vacant"]          # arcgis_distress_layers.py: columbia_code_vacant_boarded
     assert ("SC", "York") in built["vacant"]              # arcgis_distress_layers.py: rockhill_code_demolition
+    assert ("NC", "Durham") in built["vacant"]            # arcgis_distress_layers.py: durham_unsafe_building (2026-11-16)
     assert ("NC", "Lincoln") in built["vacant"]           # nc_lincoln_bulk.py -- untouched, not part of this bug
-    assert len(built["vacant"]) == 8
+    assert ("NC", "Wake") in built["vacant"]              # wake_code_cases.py -- blanket text match (2026-11-16)
+    assert len(built["vacant"]) == 10
 
 
 def test_sc_heir_estate_parcel_cache_credit_reads_real_registry_not_text():
@@ -1363,3 +1389,79 @@ def test_email_not_declined_for_nc():
     for county in ("Mecklenburg", "Wake", "Forsyth"):
         got = gm.declined_override("NC", county, "email", "no source known")
         assert got == "no source known", (county, got)
+
+
+# ---------------------------------------------------------------- 2026-11-16 round 9: vacant_structure continued
+
+def test_vacancy_producers_also_cover_spartanburg_vacant():
+    """spartanburg_vacant.py has written a real raw['vacancy'] = {'vacant': True, 'boarded_up':
+    None, 'utility_status': None, 'source': 'spartanburg_city_registry'} on every one of its
+    ~5,000 rows since its own 2026-11-11 docstring note, the exact dict shape _gate_vacancy()
+    checks -- but was only ever in the sibling 'vacant' column's producers tuple, never this
+    one. Same bug class as the 2026-11-16 arcgis_distress_layers.py/lincoln_code_violations.py
+    fixes just above in this same producers tuple, found a third time in the same column.
+    Unlike 'vacant' (which needs _VACANT_COHORT_REL's precise-credit swap because this same
+    file's blanket grep would otherwise need disambiguating from enrichment_arcgis.py's
+    unrelated 69-county over-match), 'vacancy' has no such refinement and needs none: this file
+    alone, text-grepped, already resolves to exactly {('SC','Spartanburg')}."""
+    producers = gm.SPECS["vacancy"].producers
+    assert any("spartanburg_vacant" in p for p in producers)
+
+
+def test_spartanburg_vacant_credited_for_vacancy_column():
+    """Live built_in_code() check: Spartanburg SC must flip to built for 'vacancy' (the fix),
+    while 'vacant' (already correct before this round) and an unrelated county stay exactly as
+    they were -- this is a producers-tuple addition, not a change to how either column is
+    computed."""
+    built = gm.built_in_code()
+    assert ("SC", "Spartanburg") in built["vacancy"]
+    assert ("SC", "Spartanburg") in built["vacant"]        # unchanged, still correct
+    # an unrelated county (no vacancy producer of its own -- declined this same round, see
+    # declined_registry.json) stays absent; NOT Wake, which separately joins built["vacancy"]
+    # this round via its own wake_code_cases.py fix (see the dedicated test below)
+    assert ("SC", "Horry") not in built["vacancy"]          # no blanket over-credit introduced
+
+
+def test_wake_code_cases_credited_for_vacancy_and_vacant_not_condemned():
+    """Live built_in_code() check for the wake_code_cases.py fix: Wake flips to built for
+    'vacancy'/'vacant' (the mirror added this round) but stays absent from 'condemned' (declined
+    separately -- see the registry entry)."""
+    built = gm.built_in_code()
+    assert ("NC", "Wake") in built["vacancy"]
+    assert ("NC", "Wake") in built["vacant"]
+    assert ("NC", "Wake") not in built["condemned"]
+
+
+def test_durham_unsafe_building_credited_for_all_three_vacant_structure_columns():
+    """Live built_in_code() check for the new durham_unsafe_building Layer entry: Durham flips to
+    built for condemned/vacancy/vacant together, the one new source this round that earns all
+    three at once (same shape rockhill_code_demolition already does for York SC)."""
+    built = gm.built_in_code()
+    assert ("NC", "Durham") in built["condemned"]
+    assert ("NC", "Durham") in built["vacancy"]
+    assert ("NC", "Durham") in built["vacant"]
+
+
+def test_round9_declined_entries_cover_every_researched_county_and_column():
+    """2026-11-16 round 9: 12 more vacant_structure counties researched live (round 8 did 10 the
+    same day). 11 came back genuine dead ends across all three columns (condemned/vacancy/vacant)
+    -- Horry/New Hanover/Randolph/Cumberland/Rowan/Pitt NC+SC and Greenville/Pickens SC plus Onslow/
+    Orangeburg/Beaufort (lighter, web-search-only evidence, same bar as round 8's Lexington/
+    Transylvania) -- plus Wake's condemned column specifically (its vacancy/vacant columns got a
+    real fix instead, see the test above) and Lincoln's condemned column (vacancy/vacant already
+    fixed round 8; condemned stays correctly open for the same reason that round's own fix didn't
+    claim it). Each entry needs its own evidence -- this just pins that none were missed or
+    mis-keyed."""
+    three_col = ("condemned", "vacancy", "vacant")
+    for state, county in (
+        ("SC", "Horry"), ("NC", "New Hanover"), ("NC", "Randolph"), ("NC", "Cumberland"),
+        ("NC", "Rowan"), ("NC", "Pitt"), ("SC", "Greenville"), ("SC", "Pickens"),
+        ("NC", "Onslow"), ("SC", "Orangeburg"), ("NC", "Beaufort"),
+    ):
+        for col in three_col:
+            got = gm.declined_override(state, county, col, "no source known")
+            assert got is not None and got.startswith("declined ("), (state, county, col, got)
+    assert gm.declined_override("NC", "Wake", "condemned", "no source known").startswith("declined (")
+    assert gm.declined_override("NC", "Lincoln", "condemned", "no source known").startswith("declined (")
+    # a column NOT researched/declined for one of these counties is untouched (column-scoped)
+    assert gm.declined_override("SC", "Horry", "probate", "no source known") == "no source known"

@@ -635,15 +635,53 @@ LAYERS: tuple[Layer, ...] = (
         url=("https://webgis2.durhamnc.gov/server/rest/services/"
              "ProjectServices/NIS_LUCodeViolations/MapServer/0"),
         listing_type=ListingType.DISTRESSED,
+        # 2026-11-16 (round 9, vacant_structure "no source known" breadth pass): excludes
+        # Topic='Unsafe Building' -- peeled into its own durham_unsafe_building entry
+        # immediately below, mutually exclusive with this where-clause (same clean split
+        # rockhill_code_housing/rockhill_code_demolition already use for one service, two
+        # sub-layers -- here it's the same sub-layer, split by Topic instead). Without this
+        # exclusion the two entries would double-fetch the same 46 cases.
+        where="Topic <> 'Unsafe Building'",
         fields=("CaseNum", "PropertyStatus", "Topic", "AddressNum", "Street",
                 "AptSuite", "PropertyCity", "PropertyState", "PropertyZip"),
         situs_parts=("AddressNum", "Street"), city="PropertyCity", zip_="PropertyZip",
         detail="Topic", process="code_enforcement",
         # Topic breakdown (see comment above): Repair Only/Repair or Demolish/
-        # Unsafe Building/B-C Abatement are structural-condition categories;
-        # Weedy/Junked Lot, Vehicle, Weedy Chronic Violator are yard-nuisance,
-        # not admitted as severe (see Layer.ce_severe_re docstring).
+        # B-C Abatement are structural-condition categories; Weedy/Junked Lot, Vehicle,
+        # Weedy Chronic Violator are yard-nuisance, not admitted as severe (see
+        # Layer.ce_severe_re docstring). 'Unsafe Building' moved out above.
         ce_severe_re=re.compile(r"repair|demolish|unsafe|abatement", re.I),
+        source_page="https://www.durhamnc.gov/1303/Custom-Maps-and-Data-Layers",
+    ),
+    # 2026-11-16 (round 9): Durham's own "Unsafe Building" topic on the SAME service/
+    # sub-layer as durham_open_code_violations above (NIS_LUCodeViolations/MapServer/0),
+    # peeled into its own where-filtered entry -- 46 live cases, case numbers running
+    # 22-0137 to 26-2759 (live-verified 2026-11-16, a real multi-year registry, not a
+    # one-day snapshot). "Unsafe Building" is this codebase's own established term for a
+    # condemnation-equivalent action under NC's Minimum Housing Code (G.S. 160D-1203: the
+    # city orders a dwelling declared unfit vacated pending repair or demolition) -- see
+    # city_websites/asheville_min_housing.py's own docstring title, "Minimum Housing /
+    # Unsafe Building condemnations", naming the same two terms together as one action.
+    # This is meaningfully stronger, narrower evidence than the broader "Repair or
+    # Demolish (>50%)" topic (an UNDECIDED outcome -- the case could still resolve as a
+    # repair, so it stays in the sibling entry above, admitted only as `severe`, never as
+    # condemned) -- same discipline as not claiming condemned from Lincoln's/Wake's
+    # broader "dilapidated"-family text match elsewhere in this pass. condemned=True +
+    # vacancy=True, matching rockhill_code_demolition's own reasoning exactly (an active
+    # demolition/condemnation case is at least as strong "confirmed vacant" evidence as
+    # charlotte_open_data.py's order-to-vacate signal).
+    Layer(
+        slug="durham_unsafe_building",
+        state="NC", county="Durham",
+        url=("https://webgis2.durhamnc.gov/server/rest/services/"
+             "ProjectServices/NIS_LUCodeViolations/MapServer/0"),
+        listing_type=ListingType.DISTRESSED,
+        where="Topic='Unsafe Building'",
+        fields=("CaseNum", "PropertyStatus", "Topic", "AddressNum", "Street",
+                "AptSuite", "PropertyCity", "PropertyState", "PropertyZip"),
+        situs_parts=("AddressNum", "Street"), city="PropertyCity", zip_="PropertyZip",
+        detail="Topic", process="code_enforcement",
+        condemned=True, vacancy=True,
         source_page="https://www.durhamnc.gov/1303/Custom-Maps-and-Data-Layers",
     ),
     # City of Rock Hill (York County) "Open Cases" code-enforcement service -- a MapServer split
