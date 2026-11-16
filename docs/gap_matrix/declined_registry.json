@@ -361,6 +361,51 @@
       "state": "SC", "county": "Beaufort", "column": "multi_year_delinquent_tax",
       "reason": "Not a CAPTCHA/403/robots wall and not 'no data exists' -- a materially different shape: every candidate on/around beaufortcountytreasurer.com was reachable, but none of them is a bulk roll this project's httpx/curl_cffi tooling can read. (1) The Treasurer's own Squarespace site publishes no delinquent list itself: its 'Delinquent Taxes' news category (sept-2022/sept-2023 'property-advertising', aug-2022 'delinquent-timeline') is procedural only -- the posts' own text states the actual advertisement runs 'in the local newspaper and online... every Sunday for three consecutive weeks', i.e. a third-party newspaper's site, not this county domain, and no PDF/Dropbox link to any list was found on any of these pages (checked all three plus the category page and research-and-data page directly). (2) sc-beaufort-county.governmax.com is dead: the root 404/connect path now fails outright (SSL TLSV1_UNRECOGNIZED_NAME, hostname no longer recognized) and /svc/ times out -- both re-confirmed live 2026-11-16, matching and now exceeding the matrix's own 2026-10-07 'timed out' note. (3) The one real per-parcel tool linked from the Treasurer's own page ('Real Property Info' -> sc-beaufort.publicaccessnow.com/Searches/Real.aspx, Aumentum/PublicAccessNow on ASP.NET WebForms + DNN) answers 200 with NO CAPTCHA/Turnstile/reCAPTCHA signature of any kind (no cf-ray header, no challenge markup, no cloudflare/turnstile/grecaptcha text anywhere) and no robots block -- but the server-rendered HTML carries only bare WebForms/DNN scaffolding (__VIEWSTATE/__EVENTVALIDATION/etc.), zero search-form fields, confirmed twice (a fresh client, and a session with cookies established via a prior Home.aspx GET in the same client). The real search widget is client-JS-rendered; a plain GET/POST never sees it. This is the same vendor family sc_tax_walled.py already flags Turnstile-gated for Charleston (sc-charleston.publicaccessnow.com) -- though Beaufort's own instance shows none of that signature itself, so the two may not share the identical gate -- but the practical result is the same either way: unreadable with this project's httpx/curl_cffi-only convention (no browser automation for agents). Needs either real browser automation (Playwright) to drive Real.aspx, or identifying and scraping the specific Beaufort-area newspaper that actually carries the statutory ad across years -- both materially bigger than a backfill/reader-add, not attempted here. Sibling columns on this same host (rollback_exposure, tax_aging_surfaced, two_year_delinquent, lt_tax_sale, lt_tax_sale_overage, atty_tax_verified_confirmed) were not independently re-checked and likely share this exact blocker, but are outside this entry's scope.",
       "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "SC", "county": "Sumter", "column": "lt_tax_sale_overage",
+      "reason": "Live-fetched https://sumtercountysc.gov/departments/s_-_z/treasurer/delinquent_tax.php 2026-11-16 (HTTP 200): the page covers the upcoming delinquent TAX SALE (who owes taxes, registration, dates) only -- zero mention of 'overage' or 'excess funds' anywhere, no linked roster of claimable surplus. Same shape as the 7 SC counties already declined for this column 2026-11-10 (Oconee/Greenville/Bamberg/Jasper/Berkeley/Dorchester/Kershaw): a published delinquent-tax-SALE list exists; a published OVERAGE list does not.",
+      "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "SC", "county": "Florence", "column": "lt_tax_sale_overage",
+      "reason": "Live-fetched https://www.florencecountysc.gov/offices/delinquent-tax 2026-11-16 (HTTP 200, after a 301 from florenceco.org -- the gap list's own 'source' host): describes the 2026 tax sale, registration and redemption only; zero mention of 'overage' or 'excess funds' anywhere on the page. No linked roster found.",
+      "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "SC", "county": "Lexington", "column": "lt_tax_sale_overage",
+      "reason": "Web-searched 2026-11-16: lex-co.sc.gov publishes many delinquent-tax-SALE listing PDFs (owner/parcel/amount OWED, by year) but no overage/surplus roster turned up in any result or page title; the one Lexington overage document found (a court order, ActualFiledOrder.pdf) describes a single claimant's case, not a published list. Not independently re-fetched page-by-page this session (30+ PDFs feed the site's own tax-sale list) -- re-verify directly before building if this is picked up again.",
+      "confirmed_date": "2026-11-16", "confidence": "medium"
+    },
+    {
+      "state": "SC", "county": "Pickens", "column": "lt_tax_sale_overage",
+      "reason": "Web-searched 2026-11-16: no Pickens County overage/excess-funds list found. The county's own tax-sale-auction pages and third-party tax-sale-resource sites publish the delinquent SALE roster, not overage; the SC State Treasurer's separate general unclaimed-property program (a different, non-tax-sale-specific database) has a Pickens page but that is not this column's source. Not independently page-fetched this session.",
+      "confirmed_date": "2026-11-16", "confidence": "medium"
+    },
+    {
+      "state": "SC", "county": "Aiken", "column": "lt_tax_sale_overage",
+      "reason": "Web-searched 2026-11-16: no Aiken County overage list found; aikencountysctax.com (this column's own source) and the City of Aiken's separate delinquent-tax-sale page both describe the sale/redemption process only. A direct WebFetch of the City of Aiken's own delinquent-tax-sale page (a related but distinct city-level sale, not the county source) confirmed zero mention of 'overage'/'excess funds'; the county-level aikencountysctax.com page itself was not independently re-fetched this session.",
+      "confirmed_date": "2026-11-16", "confidence": "medium"
+    },
+    {
+      "state": "SC", "county": "Marion", "column": "lt_tax_sale_overage",
+      "reason": "Web-searched 2026-11-16: no Marion County overage/excess-funds list found anywhere; only third-party tax-sale-auction directory pages (sale listings, not overage) turned up. Not independently page-fetched this session.",
+      "confirmed_date": "2026-11-16", "confidence": "medium"
+    },
+    {
+      "state": "SC", "county": "Hampton", "column": "lt_tax_sale_overage",
+      "reason": "Web-searched 2026-11-16: no Hampton County overage/excess-funds list found anywhere; only third-party tax-sale-auction directory pages (sale listings, not overage) turned up. Not independently page-fetched this session.",
+      "confirmed_date": "2026-11-16", "confidence": "medium"
+    },
+    {
+      "state": "SC", "county": "Spartanburg", "column": "lt_tax_sale_overage",
+      "reason": "project_tax_sale_overage_gap_likely_mostly_false_2026-11-12 (web-searched that date): Spartanburg publishes 'INSTRUCTIONS FOR FILING CLAIM' and a blank 'Overage Form (to be filed after Tax Deed has been recorded)' -- a claim-filing process, not a roster of who is owed money. Registry entry added retroactively 2026-11-16 (the original check never wrote one); not independently re-verified this session.",
+      "confirmed_date": "2026-11-12", "confidence": "medium"
+    },
+    {
+      "state": "SC", "county": "Horry", "column": "lt_tax_sale_overage",
+      "reason": "project_tax_sale_overage_gap_likely_mostly_false_2026-11-12 (web-searched that date): no Horry-specific overage roster or claim page turned up at all, beyond generic/unrelated results. Registry entry added retroactively 2026-11-16 (the original check never wrote one); not independently re-verified this session.",
+      "confirmed_date": "2026-11-12", "confidence": "medium"
     }
   ]
 }
