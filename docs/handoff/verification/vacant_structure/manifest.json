@@ -1,59 +1,60 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 28,
-  "refuted": 1,
-  "rows": 50,
-  "stale": 2,
+  "confirmed": 425,
+  "refuted": 2,
+  "rows": 450,
+  "stale": 4,
   "unconfirmed": 19,
   "wall": 0
  },
- "generated_at": "2026-10-17T14:28:27Z",
+ "generated_at": "2026-11-16T21:00:28Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-10-17T14:28:27Z",
+  "at": "2026-11-16T21:00:28Z",
   "county": null,
   "host": "SMB-LTSEO05",
-  "max_rows": 300,
+  "max_rows": 400,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "berkeleycountysc.paystar.io": 10,
-    "cama.harnett.org": 3,
-    "services1.arcgis.com": 31,
-    "spartanburgcountytax.qpaybill.com": 4,
-    "tax.buncombenc.gov": 41,
-    "tax.transylvaniacounty.org": 56,
-    "taxbill.catawbacountync.gov": 555
+    "gis.charlottenc.gov": 1,
+    "maps.spartanburgcounty.org": 1,
+    "rockhillgis.cityofrockhill.com": 3,
+    "services.arcgis.com": 6,
+    "www.greenwoodsc.gov": 221
    }
   },
   "result": {
-   "budget_stop": 1
+   "checked": 400,
+   "confirmed": 397,
+   "refuted": 1,
+   "stale": 2
   },
-  "seconds": 1513,
+  "seconds": 441,
   "selection": {
-   "applies": 52,
-   "due_new": 2,
+   "applies": 1723,
+   "due_new": 1673,
    "due_retry": 3,
-   "due_version": 44,
-   "not_due_ttl": 3
+   "due_ttl": 3,
+   "due_version": 44
   },
   "source": null,
   "tier": null
  },
- "rows": 50,
+ "rows": 450,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 64231,
+   "bytes": 435294,
    "file": "000.json",
-   "rows": 50,
-   "sha256": "d444a0da5faff03a945e66e4ea99939822fb2981301456add46a7ac95a3982c1"
+   "rows": 450,
+   "sha256": "81533c1225b5f083b96ee7a404083db384123602bf7532469a56f97975d68696"
   }
  ],
  "signal": "vacant_structure",
