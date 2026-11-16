@@ -112,6 +112,19 @@ WHAT A RECORD CARRIES
     AccountNumber -- aggregated here into one Listing per parcel (sc_catalis_
     delinquent_roll.aggregate_bills's exact pattern), balances summed, years listed.
 
+ROLLBACK-TAX SIGNAL CHECK (2026-11-16, gap_matrix rollback_exposure "sourced-not-built"
+    sweep). qPayBill's own grid carries a free-text Description cell that sometimes reads
+    "<year> ROLLBACK TAX..." (enrichment_qpaybill_tax.py / qpaybill_delinquent_roll.py's
+    2026-11-16 rollback detector) -- checked live whether this vendor's Bill[] records carry
+    anything equivalent. They do not: live-pulled a 25-bill detail sample plus a 2,000-bill
+    scan of every FieldValue for the literal text "ROLLBACK" (2,025 real bills total, zero
+    hits). The full field list, confirmed live that day, is exactly the 13 fields this
+    module already extracts (see "WHAT A RECORD CARRIES" above) -- there is no BillType/
+    LevyType/Description/Code field on this vendor at all, so there is nothing further to
+    extract. Dorchester's two public GIS hosts were separately checked for a rollback/
+    ag-deferral field (see parcel_cache.py's PARCEL_LAYERS["Dorchester"] entry); also
+    nothing. See project_dorchester_cluster_2026-11-16.md.
+
 PER-BILL NOTICE PDF (AUDITED 2026-10-03)
     Every bill also carries `PdfName` + `ContainerName` -- not previously captured
     anywhere, despite most real (non-placeholder) ones pointing at a genuine, per-bill
