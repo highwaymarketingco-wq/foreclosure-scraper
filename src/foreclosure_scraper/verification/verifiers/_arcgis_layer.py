@@ -103,6 +103,36 @@ async def _get(client: Any, url: str) -> Any:
     return data
 
 
+async def query_one(client: Any, layer: str, *, where: str, out_fields: str,
+                    max_records: int = 2000) -> Optional[list[dict]]:
+    """A single, non-paginated feature query against `layer` (2026-11-16, added for the
+    `condemned` family): for a county-wide roll too big to cache whole with `load_layer()`
+    (Spartanburg's CAMA_Parcels, 183,465 rows; Greenwood's CAMA, 39,554 -- both orders of
+    magnitude past what a per-sweep-run full load should pull just to answer a handful of
+    per-row queries), a verifier instead asks ONE targeted `where=` clause per row, same as
+    code_enforcement_city_open_data.py's own per-row `_query_one()` already does (duplicated
+    there because that module's query shape -- a LIKE over a street keyword, two candidate
+    fields -- is specific to it; this one is the plain single-clause case every other targeted
+    caller needs, so it lives here instead of a third near-duplicate).
+
+    Returns the matched attribute dicts (`[]` for a real, empty answer), or `None` when the
+    request itself failed or came back malformed -- the same "`None` = could not be asked, `[]`
+    = asked and empty" meaning `load_layer()`'s `error`/`complete` pair already carries, so a
+    caller never confuses "no such row" with "the service didn't answer"."""
+    try:
+        data = await _get(client, query_url(layer, {"where": where, "outFields": out_fields,
+                                                     "returnGeometry": "false",
+                                                     "resultRecordCount": str(max_records)}))
+    except Exception:  # noqa: BLE001 - unreachable/malformed; the caller answers unconfirmed
+        return None
+    if not isinstance(data, dict):
+        return None
+    feats = data.get("features")
+    if feats is None:
+        return None
+    return [(f.get("attributes") or {}) for f in feats]
+
+
 async def load_layer(client: Any, layer: str, *, out_fields: str, order_by: str,
                      page: int = 2000, max_pages: int = 50) -> LayerSnapshot:
     """The whole layer (explicit out_fields, no geometry) plus its count and edit stamps.
