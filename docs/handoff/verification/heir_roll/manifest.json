@@ -1,58 +1,51 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 507,
+  "confirmed": 661,
   "refuted": 11,
-  "rows": 533,
+  "rows": 703,
   "stale": 1,
-  "unconfirmed": 14,
+  "unconfirmed": 30,
   "wall": 0
  },
- "generated_at": "2026-10-17T14:28:27Z",
+ "generated_at": "2026-11-16T20:07:24Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-10-17T14:28:27Z",
-  "county": null,
+  "at": "2026-11-16T20:07:24Z",
+  "county": "Darlington",
   "host": "SMB-LTSEO05",
-  "max_rows": 300,
+  "max_rows": 12,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "berkeleycountysc.paystar.io": 10,
-    "cama.harnett.org": 3,
-    "services1.arcgis.com": 31,
-    "spartanburgcountytax.qpaybill.com": 4,
-    "tax.buncombenc.gov": 41,
-    "tax.transylvaniacounty.org": 56,
-    "taxbill.catawbacountync.gov": 555
+    "services5.arcgis.com": 38
    }
   },
   "result": {
-   "budget_stop": 1
+   "checked": 12,
+   "confirmed": 12
   },
-  "seconds": 1513,
+  "seconds": 74,
   "selection": {
-   "applies": 24639,
-   "due_new": 24162,
-   "due_retry": 10,
-   "not_due_ttl": 467
+   "applies": 30,
+   "due_new": 30
   },
   "source": null,
   "tier": null
  },
- "rows": 533,
+ "rows": 703,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 510092,
+   "bytes": 672531,
    "file": "000.json",
-   "rows": 533,
-   "sha256": "7cb69bd4abbcee0267e202c20c50d4cfb827c84ea7ad85032202c9c050e9e24e"
+   "rows": 703,
+   "sha256": "dd0d0922071d0d4f4e7755bb00d8dab9aab7edb3006904c8a7d0b02995543921"
   }
  ],
  "signal": "heir_roll",

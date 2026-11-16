@@ -111,3 +111,157 @@ def test_a_deed_based_probate_deed_is_not_governed():
     r = _run(row, {_first_url(row): _answer("EXAMPLE HOLDINGS LLC", saledatetx="2026-10-05")})
     assert r.verdict == "stale"
     assert H.governs_for(r.to_dict()) == ("estate_lead",)
+
+
+# ---------------------------------------------------------------------------------------------
+# 2026-11-16: counties_sc.sc_heir_estate_parcel_cache -- the SC producer this verifier's own
+# HEIR_SOURCE allowlist never recognized before today (see project_heir_roll_verifier_extension_
+# 2026-11-16.md). Real hit rows carry the SAME raw.heir_estate/relationship_signal shape as the
+# NC producer (it imports that module's own classifiers) but a different `source` slug and a
+# layer resolved from parcel_cache's OWN registry, not row.source_url.
+# ---------------------------------------------------------------------------------------------
+
+def _sc_row(**kw) -> dict:
+    """The exact shape counties_sc.sc_heir_estate_parcel_cache.py writes for a real hit
+    (confirmed against that module's own fetch(), not guessed)."""
+    row = {"state": "SC", "county": "Colleton", "source": H.SC_CACHE_SOURCE, "source_url":
+           "https://services1.arcgis.com/m0cnLGKdhwao8WvM/arcgis/rest/services/Public_Data/"
+           "FeatureServer/2/query",
+           "listing_type": "estate_lead", "parcel_id": "1234567890",
+           "defendant": "SIMMONS CAROL R (ESTATE)",
+           "first_seen": "2026-10-19T00:00:00",
+           "raw": {"heir_estate": {"owner_of_record": "SIMMONS CAROL R (ESTATE)",
+                                   "heir_names": [{"raw": "SIMMONS CAROL R (ESTATE)",
+                                                   "name": "SIMMONS CAROL R", "role": "estate"}],
+                                   "mailing": None, "match": "estate", "life_estate": False,
+                                   "source": "parcel_cache"},
+                   "relationship_signal": {"kind": "probate",
+                                           "keyword": "heir_estate_owner_of_record",
+                                           "source": H.SC_CACHE_SOURCE}}}
+    raw = kw.pop("raw", None)
+    row.update(kw)
+    if raw:
+        row["raw"].update(raw)
+    return row
+
+
+def _sc_first_url(row: dict) -> str:
+    from foreclosure_scraper.enrichment_owner_mailing import _pid_variants
+    spec = H.layer_spec(row)
+    cand = _pid_variants(row["parcel_id"])[0]
+    return H.query_url(spec, f"{spec['parcel']} LIKE '%{cand}%'", False)
+
+
+def _sc_answer(owner: str, parcel: str = "1234567890", **extra) -> str:
+    a = {"PIN": parcel, "OwnerName1": owner}
+    a.update(extra)
+    return json.dumps({"features": [{"attributes": a}]})
+
+
+def test_sc_cache_producer_recognized_chester_resolves_despite_empty_source_url():
+    """applies()/layer_spec() must resolve the layer from (state, county) against parcel_cache's
+    own registry, NOT row.source_url: that producer's real source_url for Chester (a
+    DUAL_STATE_COUNTIES name whose config lives in PARCEL_LAYERS, not SC_DUAL_LAYERS) is "" --
+    confirmed live against parcel_cache.resolve_layer_cfg("Chester", "SC") itself."""
+    from foreclosure_scraper import parcel_cache
+    assert parcel_cache.resolve_layer_cfg("Chester", "SC") is None
+    row = _sc_row(county="Chester", source_url="")
+    assert H.applies(row)
+    spec = H.layer_spec(row)
+    assert spec is not None and spec["url"] == parcel_cache.PARCEL_LAYERS["Chester"]["url"]
+
+
+def test_sc_cache_producer_recognized_and_scoped():
+    v = {x.name: x for x in registry.discover()}["heir_roll"]
+    assert H.applies(_sc_row())
+    assert not H.applies(_sc_row(source="counties.example"))
+    assert not H.applies(_sc_row(parcel_id=None))
+    # Williamsburg has no live ArcGIS /query endpoint (WTH-gis scrape) -- never a doomed retry.
+    assert not H.applies(_sc_row(county="Williamsburg"))
+    assert v.applies(_sc_row())
+
+
+def test_sc_cache_roll_still_names_the_estate_is_confirmed():
+    row = _sc_row()
+    r = _run(row, {_sc_first_url(row): _sc_answer("SIMMONS CAROL R (ESTATE)")})
+    assert r.verdict == "confirmed" and r.evidence["reason"] == "roll_still_says_heirs"
+    assert "SIMMONS" not in json.dumps(r.evidence)
+
+
+def test_sc_cache_conveyed_to_an_unrelated_owner_is_stale_and_governs_both():
+    row = _sc_row()
+    r = _run(row, {_sc_first_url(row): _sc_answer("EXAMPLE HOLDINGS LLC")})
+    assert r.verdict == "stale" and r.evidence["reason"] == "conveyed_out"
+    assert H.governs_for(r.to_dict()) == ("estate_lead", "probate_deed")
+
+
+def test_sc_cache_no_death_word_then_or_now_is_refuted():
+    row = _sc_row(defendant="SHEIRMAN CAROL",
+                  raw={"heir_estate": {"owner_of_record": "SHEIRMAN CAROL", "heir_names": []}})
+    r = _run(row, {_sc_first_url(row): _sc_answer("SHEIRMAN CAROL")})
+    assert r.verdict == "refuted" and r.evidence["reason"] == "no_death_word_on_roll"
+
+
+def test_sc_cache_parcel_not_found_is_unconfirmed():
+    row = _sc_row()
+    r = _run(row, {_sc_first_url(row): _sc_answer("SIMMONS CAROL R (ESTATE)", parcel="9999999999")})
+    assert r.verdict == "unconfirmed" and r.evidence["reason"] == "parcel_not_found"
+
+
+def _probe_url(spec: dict, field: str) -> str:
+    """The ONE-sample schema-probe URL _sample_groups() asks for `field` on this layer."""
+    from urllib.parse import urlencode
+    q = urlencode({"where": "1=1", "outFields": field, "resultRecordCount": "1", "f": "json"})
+    return f"{H._layer_url(spec['url'])}/query?{q}"
+
+
+def test_sc_cache_punctuated_live_pin_bridged_by_reseparation():
+    """The real Colleton shape (confirmed live 2026-11-16): parcel_cache strips the row's own
+    parcel_id down to bare digits ("3541200147"), but the live layer's PIN is punctuated TMS
+    text ("354-12-00-147.000") -- no substring of the plain digits ever appears verbatim in
+    that punctuated string, so the plain `_pid_variants` candidates alone can never match it.
+    _sample_groups()/_reseparated() read the layer's OWN separator pattern off one live sample
+    and reinsert it into the row's digits; H.verify() must reach a real, decisive verdict
+    through that path, not stop at parcel_not_found."""
+    H._SEP_GROUPS_CACHE.clear()  # this module-level, per-run cache must not leak across tests
+    row = _sc_row(parcel_id="3541200147", county="Colleton")
+    spec = H.layer_spec(row)
+    probe = _probe_url(spec, spec["parcel"])
+    # the reseparated candidate H._reseparated() derives from that sample
+    resep = H._reseparated("3541200147", H._parse_id_groups("353-00-00-002.000"))
+    assert resep == "354-12-00-147"
+    match_url = H.query_url(spec, f"{spec['parcel']} LIKE '%{resep}%'", False)
+    responses = {
+        probe: json.dumps({"features": [{"attributes": {"PIN": "353-00-00-002.000"}}]}),
+        match_url: _sc_answer("SIMMONS CAROL R (ESTATE)", parcel="354-12-00-147.000"),
+    }
+    r = _run(row, responses)
+    assert r.verdict == "confirmed" and r.evidence["reason"] == "roll_still_says_heirs"
+
+
+def test_sc_cache_probe_failure_falls_back_safely_not_a_layer_error():
+    """When the schema probe itself cannot be answered (no recorded response here, same as a
+    real network failure), verify() must still reach its ordinary parcel_not_found outcome --
+    never a crash, and never a false layer_error blamed on the row's own real query attempts
+    (which, for a punctuated-PIN county with no working probe, legitimately find nothing)."""
+    H._SEP_GROUPS_CACHE.clear()
+    row = _sc_row(parcel_id="3541200147", county="Colleton")
+    spec = H.layer_spec(row)
+    plain_url = H.query_url(spec, f"{spec['parcel']} LIKE '%3541200147%'", False)
+    r = _run(row, {plain_url: json.dumps({"features": []})})
+    assert r.verdict == "unconfirmed" and r.evidence["reason"] == "parcel_not_found"
+
+
+def test_williamsburg_never_queried_no_layer_at_all():
+    """A WTH-gis-only candidate county must get `applies() is False`, not a live query against
+    its non-ArcGIS homepage URL -- an unconfirmed/layer_error verdict there would be retried
+    forever (TRANSIENT_REASONS) against an endpoint that can never answer."""
+    row = _sc_row(county="Williamsburg", parcel_id="MAP123")
+    assert H.layer_spec(row) is None
+    assert not H.applies(row)
+
+
+def test_nc_producer_source_string_unchanged():
+    assert H.HEIR_SOURCE == "counties_nc.nc_heir_estate_parcels"
+    assert H.SC_CACHE_SOURCE == "counties_sc.sc_heir_estate_parcel_cache"
+    assert H.HEIR_SOURCES == (H.HEIR_SOURCE, H.SC_CACHE_SOURCE)
