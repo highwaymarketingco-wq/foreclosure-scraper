@@ -23,8 +23,8 @@ _GRID = """
 OF FILING OF COMPLAINT (NON-JURY MORTGAGE FORECLOSURE). ACME BANK, Plaintiff, vs JOHN Q DOE, Defendant.
 The property located at 123 OAK ST, Spartanburg SC is subject to foreclosure.</td>
 <td><input name="x$GridView1$ctl03$btnView2" onclick="javascript:location.href='Details.aspx?SID=abc&amp;ID=626766';"/></td></tr>
-<tr><td>The Sumter Item Sunday, June 21, 2026 City: Sumter County: Sumter</td>
-<td>NOTICE OF SALE foreclosure in Sumter</td>
+<tr><td>The Sun News Sunday, June 21, 2026 City: Myrtle Beach County: Horry</td>
+<td>NOTICE OF SALE foreclosure in Horry</td>
 <td><input name="x$GridView1$ctl04$btnView2" onclick="javascript:location.href='Details.aspx?SID=abc&amp;ID=626700';"/></td></tr>
 </table>
 """
@@ -90,7 +90,8 @@ def test_in_scope_foreclosure_becomes_listing():
 
 def test_out_of_scope_county_dropped():
     rows = M._parse_results(_GRID)
-    assert M._to_listing(rows[1], "4", "counties_sc.sc_public_notices") is None  # Sumter not in scope
+    # Horry/Myrtle Beach is deliberately excluded (module docstring, _IN_SCOPE comment)
+    assert M._to_listing(rows[1], "4", "counties_sc.sc_public_notices") is None
 
 
 def test_sale_notice_classified_as_sale():
@@ -347,3 +348,52 @@ def test_every_task_category_is_wired():
     Creditors, Probate Notices — the site's popular-search ids."""
     assert set(M._CATEGORIES) == {"4", "26", "22", "27", "30", "23"}
     assert set(M._COUNTIES) == {c.title() for c in M._IN_SCOPE}
+
+
+# -------------------------------------------- 2026-11-15 county-scope expansion
+def test_york_probate_gap_counties_in_scope():
+    """gap_matrix identified this module as the sole live producer of the
+    `probate` column's raw.probate field; these 9 counties were "sourced-not-built"
+    (York alone: 80,242 of ~90,489 estimated rows) though the site covers all 46."""
+    added = {"York", "Sumter", "Barnwell", "Richland", "Calhoun", "Lancaster",
+             "Newberry", "Greenwood", "Aiken"}
+    assert added <= set(M._COUNTIES)
+    assert {c.lower() for c in added} <= M._IN_SCOPE
+    for code, county in (("46", "York"), ("43", "Sumter"), ("06", "Barnwell"),
+                         ("40", "Richland"), ("09", "Calhoun"), ("29", "Lancaster"),
+                         ("36", "Newberry"), ("24", "Greenwood"), ("02", "Aiken")):
+        assert M._COUNTY_CODE[code] == county
+
+
+def test_york_estate_notice_becomes_a_probate_listing():
+    li = M._to_listing(
+        _row("York", "NOTICE TO CREDITORS Estate: Robert J Allen Date of Death: January 4, 2026 "
+                     "Case Number: 2026ES4600099 Personal Representative: Dana Allen "
+                     "200 Main St, York SC 29745"), "30", "counties_sc.sc_public_notices")
+    assert li is not None
+    assert li.listing_type is ListingType.PROBATE_NOTICE
+    assert li.county == "York" and li.state == "SC"
+    assert li.raw["probate"]["decedent"] == "Robert J Allen"
+    assert li.raw["probate"]["es_case_number"] == "2026-ES-46-00099"
+
+
+def test_sc_public_notices_counties_env_override(monkeypatch):
+    import asyncio
+
+    monkeypatch.setenv("SC_PUBLIC_NOTICES_COUNTIES", "York, Sumter")
+    captured = {}
+
+    async def _fake_harvest():
+        return {}
+
+    async def _fake_render(cat, counties=()):
+        captured[cat] = counties
+        return []
+
+    monkeypatch.setattr(M, "harvest_category_keywords", _fake_harvest)
+    monkeypatch.setattr(M, "_render_category", _fake_render)
+    scraper = M.SCPublicNotices()
+    asyncio.run(scraper.fetch())
+    assert captured
+    for counties in captured.values():
+        assert counties == ("York", "Sumter")

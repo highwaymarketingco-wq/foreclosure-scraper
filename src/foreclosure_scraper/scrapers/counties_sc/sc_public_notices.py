@@ -61,6 +61,7 @@ One county at a time is also what keeps each result set inside a page or two.
 """
 from __future__ import annotations
 
+import os
 import re
 from datetime import datetime
 from typing import Iterable
@@ -102,15 +103,34 @@ _CATEGORIES: dict[str, tuple[str, ListingType, str]] = {
 
 _IN_SCOPE = {"spartanburg", "anderson", "pickens", "oconee", "cherokee", "union", "laurens",
              # Coastal SC (brought into scope 2026-08-12; Horry/Myrtle Beach excluded):
-             "charleston", "georgetown", "colleton", "beaufort"}
+             "charleston", "georgetown", "colleton", "beaufort",
+             # 2026-11-15: gap_matrix's own code identifies this module as the SOLE live
+             # producer of the `probate` column's raw.probate field (enrichment_probate_search.py
+             # retired 2026-10-09; never wired into main.py). A fresh gap_matrix run found these 9
+             # counties "sourced-not-built" for that column (York alone: 80,242 of ~90,489
+             # estimated affected rows) even though the site itself serves all 46 SC counties
+             # (live-confirmed 2026-11-15: all 46 checkbox labels present, including these 9,
+             # title-case exact match) — the module's county tuples were simply never extended to
+             # them. Added here rather than built as a new scraper.
+             "york", "sumter", "barnwell", "richland", "calhoun", "lancaster", "newberry",
+             "greenwood", "aiken"}
 #: Title-cased county names exactly as the site's checkbox labels render them.
 _COUNTIES = ("Spartanburg", "Anderson", "Pickens", "Oconee", "Cherokee", "Union", "Laurens",
-             "Charleston", "Georgetown", "Colleton", "Beaufort")
-#: SC judicial county codes — the middle field of a CP/ES case number.
+             "Charleston", "Georgetown", "Colleton", "Beaufort",
+             # 2026-11-15 (see _IN_SCOPE comment above):
+             "York", "Sumter", "Barnwell", "Richland", "Calhoun", "Lancaster", "Newberry",
+             "Greenwood", "Aiken")
+#: SC judicial county codes — the middle field of a CP/ES case number. SC's Unified Judicial
+#: System numbers all 46 counties by alphabetical rank (Abbeville=01 ... York=46); every code
+#: below follows that fixed, public scheme, not a per-county lookup.
 _COUNTY_CODE = {"04": "Anderson", "11": "Cherokee", "30": "Laurens", "37": "Oconee",
                 "39": "Pickens", "42": "Spartanburg", "44": "Union",
                 # Coastal SC (2026-08-12):
-                "10": "Charleston", "22": "Georgetown", "15": "Colleton", "07": "Beaufort"}
+                "10": "Charleston", "22": "Georgetown", "15": "Colleton", "07": "Beaufort",
+                # 2026-11-15 (see _IN_SCOPE comment above):
+                "46": "York", "43": "Sumter", "06": "Barnwell", "40": "Richland",
+                "09": "Calhoun", "29": "Lancaster", "36": "Newberry", "24": "Greenwood",
+                "02": "Aiken"}
 
 _ROW_RE = re.compile(r"<tr[^>]*>(.*?)</tr>", re.S)
 _ID_RE = re.compile(r"Details\.aspx\?SID=[^&]+&(?:amp;)?ID=(\d+)")
@@ -802,8 +822,11 @@ class SCPublicNotices(BaseScraper):
     #: collapse (site redesign, filter stops applying), not police normal churn.
     expected_min_count = 100
     #: Measured 2026-07-31: 42s keyword harvest + ~75s per category (7 counties
-    #: x Go/perPage/paginate) = ~7 min for the 5 distinct keyword sets.
-    timeout_s = 1200.0
+    #: x Go/perPage/paginate) = ~7 min for the 5 distinct keyword sets. 1200 -> 1800
+    #: (2026-11-15) after _COUNTIES grew 11 -> 20 (same reasoning as sc_probate_net.py's
+    #: 600 -> 900: more counties per category means more time, and self.partial already
+    #: banks whatever's read so a timeout ships partial results, not nothing).
+    timeout_s = 1800.0
 
     async def fetch(self) -> Iterable[Listing]:
         out = self.partial
@@ -811,11 +834,21 @@ class SCPublicNotices(BaseScraper):
         # comes back under several of them. Keep the first sighting — _CATEGORIES
         # runs most-specific-first — so one notice yields exactly one lead.
         seen_ids: set[str] = set()
+        # 2026-11-15: _COUNTIES is a FIXED-order tuple and the new 9 counties (York et al,
+        # see _IN_SCOPE's comment) are appended at the end -- the same rotation-starvation
+        # shape already fixed for nc_its_public_tax.py (ITS_TAX_COUNTIES) and
+        # sc_probate_net.py (SC_PROBATE_NET_COUNTIES): a per-category sweep that runs long on
+        # the earlier counties could starve the later ones before timeout_s is reached.
+        # Mirrors both overrides exactly so a scoped catch-up run can target a starved
+        # county (or batch) without touching normal full-run behavior.
+        only = {c.strip().title() for c in
+                (os.getenv("SC_PUBLIC_NOTICES_COUNTIES") or "").split(",") if c.strip()}
+        counties = tuple(c for c in _COUNTIES if not only or c in only)
         cats = _distinct_categories(await harvest_category_keywords())
-        log.info("scpublicnotices.plan", categories=cats)
+        log.info("scpublicnotices.plan", categories=cats, counties=counties)
         for cat in cats:
             try:
-                notices = await _render_category(cat)
+                notices = await _render_category(cat, counties=counties)
             except Exception:
                 log.warning("scpublicnotices.category_failed", category=cat)
                 continue

@@ -746,12 +746,25 @@ def test_built_in_code_drops_retired_probate_search_false_credit():
     run) but was still listed as a 'probate' producer, and its own SC_PROBATE_COUNTY_CODES literal
     is real code text (not a comment), so a blanket grep over it credited 10 counties that never
     actually get probate-searched by any code that runs. 3 of them (SC Bamberg, SC Greenville, SC
-    York) have no other 'probate' producer at all."""
+    York) had no other 'probate' producer at all.
+
+    2026-11-15 UPDATE: SC York is now a TRUE positive, not a false one -- a fresh gap_matrix run
+    found York "sourced-not-built" for this column with 80,242 estimated affected rows (the single
+    biggest gap on the whole board), and the real live site (scpublicnotices.com) covers all 46 SC
+    counties, not just the 11 sc_public_notices.py's _COUNTIES/_IN_SCOPE had been scoped to --
+    live-confirmed (2026-11-15: all 46 county checkbox labels present, including York, exact
+    title-case match). Added York (plus Sumter/Barnwell/Richland/Calhoun/Lancaster/Newberry/
+    Greenwood/Aiken, the same gap's other 8 counties) to those tuples, so York now has a real,
+    running probate producer -- same evolution as Gaston/condemned's own 2026-11-10 UPDATE just
+    above test_built_in_code_known_false_positives_not_silently_fixed. Bamberg and Greenville are
+    untouched and remain genuine false positives."""
     built = gm.built_in_code()
-    for st, co in (("SC", "Bamberg"), ("SC", "Greenville"), ("SC", "York")):
+    for st, co in (("SC", "Bamberg"), ("SC", "Greenville")):
         assert (st, co) not in built["probate"], f"{st}/{co} has no live probate producer (retired module only)"
     # sc_public_notices.py's own real text-grep credit (this column's only live producer) stays
     assert ("SC", "Anderson") in built["probate"] and ("NC", "Beaufort") in built["probate"]
+    # York is now a TRUE positive (2026-11-15 UPDATE above) -- a real producer, not stale credit
+    assert ("SC", "York") in built["probate"]
 
 
 def test_nc_heir_estate_parcels_credit_reads_county_gis_keys_not_text():
