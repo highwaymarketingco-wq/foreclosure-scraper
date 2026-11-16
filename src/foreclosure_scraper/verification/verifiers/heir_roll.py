@@ -1,20 +1,33 @@
 """heir_roll, NC (outside Buncombe) + SC: does the county parcel roll STILL title this parcel to a
 dead owner's heirs or estate, or has the estate already conveyed it?
 
-THE CLAIM. counties_nc.nc_heir_estate_parcels reads a county parcel layer (enrichment_owner_mailing
-.COUNTY_GIS: 10 dedicated NC layers and 8 SC ones) or NC OneMap's statewide parcel layer (the 89
-other NC counties) for owner-of-record strings like "<NAME> HEIRS", "HEIRS OF <NAME>", "<NAME>
-ESTATE", "ESTATE OF <NAME>", "<NAME> (EST)", and emits an estate_lead with raw.relationship_signal
-{kind: probate, keyword: heir_estate_owner_of_record}: scorer signals estate_lead (LIFE_EVENT 20) and
-probate_deed (20). On the 2026-10-08 pre_publish checkpoint that is 5,720 NC rows (4,266 WARM, 30
-HOT) and 538 SC rows, the largest block of WARM court/estate leads. Nothing re-reads the roll once
-the row exists, and the row is carried for months.
+THE CLAIM. Two producers feed this verifier the SAME claim shape (raw.heir_estate.owner_of_record +
+raw.relationship_signal.keyword == heir_estate_owner_of_record / life_estate_owner_of_record):
+counties_nc.nc_heir_estate_parcels reads a county parcel layer (enrichment_owner_mailing.COUNTY_GIS:
+10 dedicated NC layers and 8 SC ones) or NC OneMap's statewide parcel layer (the 89 other NC
+counties) LIVE. counties_sc.sc_heir_estate_parcel_cache (added 2026-10-19; recognized here
+2026-11-16) reads the SAME owner-of-record text for ~19 more SC counties out of parcel_cache
+.PARCEL_LAYERS/SC_DUAL_LAYERS' already-downloaded local cache instead of a live query. Both look
+for "<NAME> HEIRS", "HEIRS OF <NAME>", "<NAME> ESTATE", "ESTATE OF <NAME>", "<NAME> (EST)" and emit
+an estate_lead; scorer signals estate_lead (LIFE_EVENT 20) and probate_deed (20). On the 2026-10-08
+pre_publish checkpoint that is 5,720 NC rows (4,266 WARM, 30 HOT) and 538 SC rows, the largest block
+of WARM court/estate leads. Nothing re-reads the roll once the row exists, and the row is carried
+for months.
 
-THE SOURCE. The SAME layer the row came from (row.source_url is the layer URL), asked for the row's
-own parcel id (spec["parcel"], plus NC OneMap's altparno, pinned to the county on a statewide
-layer; _pid_variants formats; a returned record counts only when its parcel id, letters and digits
-only, equals the row's: a LIKE match on part of an id is another parcel). Plain ArcGIS REST, no
-key; one or two requests per row.
+THE SOURCE. The SAME layer the row's county was read from, asked for the row's own parcel id
+(spec["parcel"]/spec["alt_parcel"], plus NC OneMap's altparno; _pid_variants formats; a returned
+record counts only when its parcel id, letters and digits only, equals the row's: a LIKE match on
+part of an id is another parcel). For the NC producer this is row.source_url's own layer
+(enrichment_owner_mailing.COUNTY_GIS, matched by url). For the SC cache producer it is resolved
+from the row's (state, county) against parcel_cache.PARCEL_LAYERS/SC_DUAL_LAYERS directly -- NEVER
+from row.source_url: that producer's own source_url (parcel_cache.resolve_layer_cfg()) reads EMPTY
+for a DUAL_STATE_COUNTIES name whose real config lives in PARCEL_LAYERS, not SC_DUAL_LAYERS
+(Chester; see _sc_cache_cfg()'s own docstring), so a url-based lookup would silently drop that
+county's otherwise-real layer. A candidate county whose parcel_cache entry is not a live ArcGIS
+/query endpoint at all (Williamsburg's WTH-gis scrape -- parcel_cache._WTH_SOURCED, or any future
+lookalike: checked here by the url's own shape, not just that one name) never gets a spec --
+"unconfirmed" against a dead endpoint, retried forever, would be worse than "no verifier applies"
+here. Plain ArcGIS REST, no key; one or two requests per row.
 
 WHAT "THE ESTATE STILL HOLDS IT" MEANS HERE. The county roll's title wording is the free, public
 evidence of an unsettled estate in every one of these counties (the estate FILE is the NC eCourts
@@ -68,6 +81,12 @@ ROW_SUMMARY_EXCLUDE = ("owner_name",)
 TRANSIENT_REASONS = ("fetch_failed", "layer_error")
 
 HEIR_SOURCE = "counties_nc.nc_heir_estate_parcels"
+#: 2026-11-16: the SC parcel_cache-backed sibling producer (module docstring's "THE CLAIM").
+#: Its rows carry the identical raw.heir_estate/raw.relationship_signal shape (it imports
+#: nc_heir_estate_parcels.py's own classifiers), just a different `source` slug and a layer
+#: resolved from parcel_cache's registry instead of enrichment_owner_mailing.COUNTY_GIS.
+SC_CACHE_SOURCE = "counties_sc.sc_heir_estate_parcel_cache"
+HEIR_SOURCES = (HEIR_SOURCE, SC_CACHE_SOURCE)
 ONEMAP_HOST_PART = "NC1Map_Parcels"
 #: NC OneMap's sale-date columns (read on the layer's schema; the county layers differ and are not
 #: asked for one: an unknown field makes ArcGIS answer 400)
@@ -93,8 +112,84 @@ def _layer_url(u: Any) -> str:
     return s
 
 
+def _is_query_url(url: Any) -> bool:
+    """Does this look like a live ArcGIS /query endpoint, not a bare homepage kept only for
+    provenance (parcel_cache._WTH_SOURCED's own shape -- Williamsburg's "url" is its WTH-gis
+    viewer's homepage, not a REST service; refresh_county() itself refuses to treat it as one,
+    see that function's own comment)? Checked by the url's own shape rather than importing
+    that private registry name, so a FUTURE non-ArcGIS parcel_cache entry is caught the same
+    way even before anyone adds it to that set."""
+    return str(url or "").strip().rstrip("/").lower().endswith("/query")
+
+
+def _sc_cache_cfg(county: str) -> Optional[dict]:
+    """counties_sc.sc_heir_estate_parcel_cache's OWN layer config for `county` -- resolved the
+    SAME way that producer's `_candidate_counties()` discovers it (by checking
+    parcel_cache.PARCEL_LAYERS and SC_DUAL_LAYERS directly), NEVER via
+    parcel_cache.resolve_layer_cfg() (what that producer calls to fill the row's own
+    `source_url`). That function's DUAL_STATE_COUNTIES branch reads ONLY SC_DUAL_LAYERS for a
+    dual name -- but SC_DUAL_LAYERS carries just "Beaufort" (itself excluded from this
+    producer's candidates as already NC-side-live-covered), while Chester, a REAL candidate
+    this producer does emit rows for, has its SC config in PARCEL_LAYERS instead. Confirmed
+    live 2026-11-16: parcel_cache.resolve_layer_cfg("Chester", "SC") returns None, so the
+    producer's own `source_url` for every Chester row is "" -- a url-based lookup here would
+    read that as "no layer", silently dropping a county this file's own HEIR_SOURCES allowlist
+    is specifically being extended to cover. Returns None for a county with no SC config, no
+    owner field mapped, or no live /query endpoint (_is_query_url)."""
+    from ... import parcel_cache
+    co = (county or "").strip()
+    if not co:
+        return None
+    cfg = parcel_cache.PARCEL_LAYERS.get(co)
+    if cfg is None or cfg.get("state") != "SC":
+        dual = {k.lower(): k for k in parcel_cache.DUAL_STATE_COUNTIES}.get(co.lower())
+        cfg = parcel_cache.SC_DUAL_LAYERS.get(dual) if dual else None
+    if not cfg or not (cfg.get("map") or {}).get("owner"):
+        return None
+    if not _is_query_url(cfg.get("url")):
+        return None
+    return cfg
+
+
+def _sc_cache_spec(row: Any) -> Optional[dict]:
+    """A heir_roll-shaped layer spec (url/parcel/alt_parcel/owner) built from this producer's
+    own parcel_cache registry entry, or None. `owner` is normalised to a list (parcel_cache's
+    `map["owner"]` is a bare string on some counties, e.g. Colleton's "OwnerName1", a list on
+    others, e.g. Georgetown's ["Owner1","Owner2"]; query_url()/_spec_out_fields() both splat
+    spec["owner"], which would iterate a bare string's CHARACTERS instead of field names).
+    Only the first two of `id_fields` become parcel/alt_parcel -- the same two-field shape
+    find_parcel() already searches for the NC producer; Dorchester is the only candidate with
+    a 3rd id_fields entry (PARCELNO), left unsearched (a documented, narrow limitation, not a
+    guess at a new field-matching scheme)."""
+    cfg = _sc_cache_cfg(str(_get(row, "county") or ""))
+    if cfg is None:
+        return None
+    owner = cfg["map"]["owner"]
+    owner = [owner] if isinstance(owner, str) else list(owner or [])
+    if not owner:
+        return None
+    ids = [i for i in (cfg.get("id_fields") or []) if i]
+    if not ids:
+        return None
+    spec = {"url": cfg["url"], "owner": owner, "parcel": ids[0]}
+    if len(ids) > 1:
+        spec["alt_parcel"] = ids[1]
+    where = cfg.get("where")
+    if where:
+        spec["where_suffix"] = where
+    return spec
+
+
 def layer_spec(row: Any) -> Optional[dict]:
-    """The COUNTY_GIS spec of the layer the row came from (its source_url), or None."""
+    """The layer spec the row's claim can be re-verified against, or None.
+
+    counties_sc.sc_heir_estate_parcel_cache rows resolve via `_sc_cache_spec` (by state+county,
+    against that producer's OWN parcel_cache registry -- see its docstring for why NOT
+    row.source_url). Every other HEIR_SOURCES row (counties_nc.nc_heir_estate_parcels) keeps
+    the original COUNTY_GIS-by-source_url resolution, unchanged.
+    """
+    if str(_get(row, "source") or "") == SC_CACHE_SOURCE:
+        return _sc_cache_spec(row)
     from ...enrichment_owner_mailing import COUNTY_GIS
     url = _layer_url(_get(row, "source_url"))
     if not url:
@@ -111,7 +206,7 @@ def layer_spec(row: Any) -> Optional[dict]:
 
 
 def applies(row: dict) -> bool:
-    if str(_get(row, "source") or "") != HEIR_SOURCE:
+    if str(_get(row, "source") or "") not in HEIR_SOURCES:
         return False
     st = str(_get(row, "state") or "").strip().upper()
     co = str(_get(row, "county") or "").strip().lower()
@@ -200,6 +295,87 @@ class _LayerError(Exception):
     pass
 
 
+# ----------------------------------------------------------------------------------------------
+# SC cache producer only: the row's own parcel_id is FULLY STRIPPED of punctuation at
+# parcel_cache ingest time (parcel_cache._norm_id), but several of these counties' LIVE layers
+# store their id field as punctuated TMS-shaped text ("354-12-00-147.000", "0006N-0B-034.00")
+# -- a plain `field LIKE '%<stripped id>%'` can never match that (the digits are not
+# contiguous in the stored text), which is why these rows would otherwise ALWAYS read
+# "parcel_not_found" despite the parcel genuinely being on the layer today (confirmed live
+# 2026-11-16: Colleton parcel_id "3541200147" vs. its live PIN "354-12-00-147.000" -- same
+# parcel, by owner name too, not just a coincidental digit match). Rather than guess any one
+# county's dash convention, this reads the SAME layer's own punctuation pattern off ONE live
+# sample of that field (cached per url+field for the run, the same one-schema-probe-per-layer
+# shape nc_heir_estate_parcels.py's own `_value_field` already uses) and reinserts it into the
+# row's digits. A county whose id field is already plain digits (Berkeley, Sumter, Horry, ...)
+# needs no help here -- `_pid_variants`'s existing raw/stripped candidates already match, and
+# the probe itself is cheap and cached regardless. A county whose digit COUNT never lands on
+# one of the sample's own group boundaries (Aiken's `PARCEL_ASR`, on a row whose id actually
+# came from the longer `PARC_NO`; Lancaster's letter-bearing PINs) safely yields no candidate
+# at all here -- never a wrong one; find_parcel() just has one fewer thing to try, same as a
+# layer this helper does not apply to.
+# ----------------------------------------------------------------------------------------------
+
+_SEP_GROUPS_CACHE: dict[tuple[str, str], Optional[list[tuple[int, str]]]] = {}
+
+
+def _parse_id_groups(sample: str) -> list[tuple[int, str]]:
+    """[(digit-run length, the separator text right after it), ...], e.g. "354-12-00-147.000"
+    -> [(3,"-"), (2,"-"), (2,"-"), (3,"."), (3,"")]. A letter inside a separator (Lancaster's
+    "0006N-0B-034.00") rides along as ordinary separator TEXT -- never reinterpreted as a
+    digit run to fill from the row's own (digit-only) parcel_id."""
+    return [(len(m.group(1)), m.group(2)) for m in re.finditer(r"(\d+)(\D*)", sample or "")]
+
+
+def _reseparated(pid: str, groups: list[tuple[int, str]]) -> Optional[str]:
+    """`groups`' own separator pattern, reinserted into pid's bare digits, consuming groups
+    left to right until pid is exhausted (a sample with a trailing group pid has no digits
+    left for -- Colleton's own ".000" card suffix -- is simply never reached, so the result,
+    e.g. "354-12-00-147", omits it; that is still a real substring of the live "354-12-00-
+    147.000" either way, all a LIKE search needs). None when pid's digit count does not land
+    exactly on one of the sample's own group boundaries -- a genuinely different id shape for
+    this field/row, never forced into a wrong-length guess."""
+    digits = re.sub(r"\D", "", pid or "")
+    if not digits:
+        return None
+    out: list[str] = []
+    i = 0
+    for n, sep in groups:
+        if i >= len(digits):
+            break
+        if i + n > len(digits):
+            return None
+        out.append(digits[i:i + n])
+        i += n
+        if i >= len(digits):
+            break
+        out.append(sep)
+    return "".join(out) if i == len(digits) else None
+
+
+async def _sample_groups(client, url: str, field: str) -> Optional[list[tuple[int, str]]]:
+    """ONE live sample of `field` on this layer, parsed into its own separator groups (cached
+    per url+field for the run) -- or None when the probe fails, the layer has no rows, or the
+    sampled value carries no punctuation at all (nothing to reinsert; the plain stripped id
+    already matches it directly). This probe's own request never touches find_parcel()'s
+    asked/errors accounting: a failed probe just means _reseparated() is never tried for this
+    field, not a layer error for the row being verified."""
+    key = (url, field)
+    if key not in _SEP_GROUPS_CACHE:
+        groups = None
+        try:
+            q = urlencode({"where": "1=1", "outFields": field, "resultRecordCount": "1", "f": "json"})
+            d = json.loads(await client.get_text(f"{_layer_url(url)}/query?{q}"))
+            feats = d.get("features") or [] if isinstance(d, dict) else []
+            v = str((feats[0].get("attributes") or {}).get(field) or "") if feats else ""
+            if re.search(r"\D", v):
+                groups = _parse_id_groups(v)
+        except Exception:  # noqa: BLE001 - a failed probe just means no extra candidate
+            groups = None
+        _SEP_GROUPS_CACHE[key] = groups
+    return _SEP_GROUPS_CACHE[key]
+
+
 async def find_parcel(row: Any, spec: dict, client) -> tuple[Optional[dict], list[str]]:
     """(attributes of the row's own parcel or None, the URLs asked)."""
     from ...enrichment_owner_mailing import _pid_variants
@@ -211,11 +387,28 @@ async def find_parcel(row: Any, spec: dict, client) -> tuple[Optional[dict], lis
     if spec.get("where_suffix"):
         cc += f" AND {spec['where_suffix']}"
     fields = [f for f in (spec.get("parcel"), spec.get("alt_parcel")) if f]
+    variants = _pid_variants(pid)
+    # SC cache rows only (see the block comment above): each field gets its OWN candidate
+    # list, variants first, plus a reseparated form LAST if that field's own live punctuation
+    # pattern yields one. The NC path (every other HEIR_SOURCES row) keeps `variants` shared
+    # identically across every field, byte-for-byte the same lists as before this addition.
+    cands_by_field: dict[str, list[str]] = {pf: list(variants) for pf in fields}
+    if str(_get(row, "source") or "") == SC_CACHE_SOURCE:
+        for pf in fields:
+            groups = await _sample_groups(client, spec["url"], pf)
+            if groups:
+                resep = _reseparated(pid, groups)
+                if resep and resep not in cands_by_field[pf]:
+                    cands_by_field[pf].append(resep)
+    max_len = max((len(v) for v in cands_by_field.values()), default=0)
     asked: list[str] = []
     errors = 0
-    for cand in _pid_variants(pid):
-        safe = cand.replace("'", "''")
+    for i in range(max_len):
         for pf in fields:
+            cands = cands_by_field[pf]
+            if i >= len(cands):
+                continue
+            safe = cands[i].replace("'", "''")
             url = query_url(spec, f"{pf} LIKE '%{safe}%'{cc}", onemap)
             asked.append(url)
             try:
