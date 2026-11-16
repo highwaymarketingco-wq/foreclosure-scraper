@@ -6,7 +6,7 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 
 ## 1. Hermes lane -- CAPTCHA or required login
 
-515 cells, 1,069,865 est_rows_affected combined.
+511 cells, 1,069,171 est_rows_affected combined.
 
 | state | county | column | est_rows | reason | source |
 |---|---|---|---|---|---|
@@ -211,11 +211,11 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | SC | Bamberg | usps_vacancy | 894 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Graham | heir_naming_publication | 887 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
 
-...and 315 more rows in this pile (full set in the source gap_list CSV, filtered to this reason pattern).
+...and 311 more rows in this pile (full set in the source gap_list CSV, filtered to this reason pattern).
 
 ## 2. Bot-wall, build in-house -- Cloudflare/WAF, not Hermes
 
-121 cells, 590,559 est_rows_affected combined.
+117 cells, 589,018 est_rows_affected combined.
 
 | state | county | column | est_rows | reason | source |
 |---|---|---|---|---|---|
@@ -294,9 +294,7 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | NC | Ashe | repeat_tax_loss | 794 | bot check (Cloudflare/WAF) | tax/property card: qpublic.schneidercorp.com |
 | NC | Ashe | tax_aging_surfaced | 794 | bot check (Cloudflare/WAF) | tax/property card: qpublic.schneidercorp.com |
 | NC | Ashe | two_year_delinquent | 794 | bot check (Cloudflare/WAF) | tax/property card: qpublic.schneidercorp.com |
-| SC | Berkeley | atty_heir_candidates | 723 | bot check (Cloudflare/WAF) | probate: berkeleycountysc.gov |
 | SC | Charleston | lt_tax_sale_overage | 718 | bot check (Cloudflare/WAF) | tax/property card: sc-charleston.publicaccessnow.com |
-| SC | Berkeley | lt_estate_lead | 716 | bot check (Cloudflare/WAF) | probate: berkeleycountysc.gov |
 | NC | Richmond | atty_rod_lien_checked | 705 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
 | NC | Richmond | liens | 705 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
 | NC | Chatham | atty_tax_verified_confirmed | 676 | bot check (Cloudflare/WAF) | tax/property card:  |
@@ -325,8 +323,6 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | SC | Kershaw | atty_heir_candidates | 56 | bot check (Cloudflare/WAF) | probate: www.kershaw.sc.gov |
 | SC | Kershaw | atty_probate_case | 56 | bot check (Cloudflare/WAF) | probate: www.kershaw.sc.gov |
 | SC | Chester | atty_probate_case | 54 | bot check (Cloudflare/WAF) | probate:  |
-| SC | Chester | atty_heir_candidates | 51 | bot check (Cloudflare/WAF) | probate:  |
-| SC | Chester | lt_estate_lead | 51 | bot check (Cloudflare/WAF) | probate:  |
 | SC | Kershaw | lt_estate_lead | 48 | bot check (Cloudflare/WAF) | probate: www.kershaw.sc.gov |
 | SC | Richland | atty_tax_verified_confirmed | 46 | bot check (Cloudflare/WAF) | tax/property card:  |
 | NC | Pender | divorce_no_subsequent_deed | 37 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |

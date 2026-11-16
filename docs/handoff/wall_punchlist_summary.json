@@ -1,8 +1,8 @@
 {
- "board_rows": 586228,
+ "board_rows": 586837,
  "by_category": {
-  "uncovered": 288375,
-  "wall": 77451
+  "uncovered": 277210,
+  "wall": 78029
  },
  "format_version": 1,
  "kind": "wall_punchlist_summary",
@@ -41,8 +41,8 @@
    "generated_at": "2026-10-17T14:28:27Z"
   },
   "heir_roll": {
-   "entries": 533,
-   "generated_at": "2026-10-17T14:28:27Z"
+   "entries": 703,
+   "generated_at": "2026-11-16T20:07:24Z"
   },
   "jail_booking": {
    "entries": 227,
@@ -73,36 +73,34 @@
    "generated_at": "2026-10-17T14:28:27Z"
   }
  },
- "listings": 365826,
+ "listings": 355239,
  "uncovered": {
   "by_scraper_source": {
-   "city_websites.charlotte_open_data": 5342,
-   "counties_generic.arcgis_distress.columbia_code_vacant_boarded": 972,
-   "counties_generic.arcgis_distress.durham_open_code_violations": 1034,
+   "city_websites.charlotte_open_data": 4585,
    "counties_generic.arcgis_distress.greensboro_code_housing": 603,
    "counties_generic.arcgis_distress.greenwood_cama_condemned": 718,
    "counties_generic.arcgis_distress.new_hanover_demolition_permits": 1326,
    "counties_generic.arcgis_distress.rocky_mount_blight_survey_2025": 596,
    "counties_generic.arcgis_distress.spartanburg_infill_eligible": 1062,
    "counties_generic.arcgis_distress.spartanburg_property_cleanup": 2050,
-   "counties_generic.epa_frs.acres": 1549,
-   "counties_generic.epa_frs.sems": 2007,
+   "counties_generic.epa_frs.acres": 1546,
+   "counties_generic.epa_frs.sems": 1996,
    "counties_generic.state_contamination.nc_dam_safety": 7546,
-   "counties_generic.state_contamination.nc_inactive_hazardous": 1484,
-   "counties_generic.state_contamination.nc_ust_incidents": 38169,
+   "counties_generic.state_contamination.nc_inactive_hazardous": 1470,
+   "counties_generic.state_contamination.nc_ust_incidents": 38077,
    "counties_nc.albemarle_observer_tax_lists": 5939,
    "counties_nc.asheville_helene": 698,
    "counties_nc.gaston_vacant": 20410,
    "counties_nc.gastonia_code_enforcement": 1087,
-   "counties_nc.lincoln_vacant": 13240,
+   "counties_nc.lincoln_vacant": 13232,
    "counties_nc.nc_county_pdf_delinquent_tax": 3200,
    "counties_nc.polk_tax": 2618,
    "counties_nc.transylvania_vacant": 10883,
    "counties_sc.charleston_delinquent_tax": 1757,
    "counties_sc.charleston_tax_sale_xlsx": 2393,
    "counties_sc.lexington_homestead": 28099,
-   "counties_sc.sc_heir_estate_parcel_cache": 8528,
    "counties_sc.sc_probate_net": 507,
+   "counties_sc.sc_probate_notices.yourpickenscounty": 442,
    "counties_sc.sc_public_index": 2517,
    "counties_sc.sc_public_notices": 1851,
    "counties_sc.sc_ust_registry": 15581,
@@ -110,34 +108,36 @@
    "counties_sc.spartanburg_vacant": 4220,
    "counties_sc.york_homestead": 78965,
    "courtlistener.recap": 730,
-   "national.distressed": 4773,
-   "national.hud_reac_inspection": 815,
+   "national.distressed": 4753,
+   "national.hud_reac_inspection": 810,
    "national.jail_bookings": 2236,
+   "national.landandfarm": 456,
    "national.landwatch": 576,
    "national.sc_public_index": 1587,
-   "national.usda_properties": 766
+   "national.usda_properties": 766,
+   "public_notices.echovita_obituaries": 419
   },
   "top_counties": {
-   "NC:durham": 2925,
+   "NC:cumberland": 2181,
    "NC:forsyth": 2406,
    "NC:gaston": 23419,
    "NC:guilford": 4621,
-   "NC:lincoln": 15170,
+   "NC:lincoln": 15105,
    "NC:mcdowell": 2948,
-   "NC:mecklenburg": 9567,
+   "NC:mecklenburg": 8680,
    "NC:polk": 3048,
    "NC:transylvania": 11368,
-   "NC:wake": 3882,
+   "NC:wake": 3869,
    "SC:charleston": 7698,
-   "SC:lexington": 29108,
+   "SC:lexington": 28912,
    "SC:pickens": 2293,
    "SC:spartanburg": 11121,
-   "SC:york": 80458
+   "SC:york": 80424
   }
  },
  "wall": {
   "by_scraper_source": {
-   "counties.column_legal_notices": 1795,
+   "counties.column_legal_notices": 2373,
    "counties.multi_year_delinquent_tax": 167,
    "counties_generic.arcgis_distress.greenville_unpaid_tax_parcels": 163,
    "counties_generic.arcgis_distress.pickens_flood_damage": 54,
@@ -196,33 +196,33 @@
    "reo.vrm_va_reo": 2
   },
   "by_signal": {
-   "court_wall": 6735,
+   "court_wall": 7313,
    "divorce": 4904,
    "lien_registry_wall": 65812
   },
   "by_wall_path": {
    "divorce_sc_wall": 4904,
    "liensnc_login": 57090,
-   "nc_est": 2487,
-   "nc_sp": 161,
+   "nc_est": 3058,
+   "nc_sp": 168,
    "sc_lien_registries": 8722,
    "sc_notice_body": 118,
    "sc_publicindex": 3969
   },
   "by_wall_state": {
-   "not_yet_labelled": 75795,
+   "not_yet_labelled": 76373,
    "recorded": 1656
   },
   "top_counties": {
    "NC:": 3836,
    "NC:brunswick": 3659,
-   "NC:buncombe": 1531,
-   "NC:durham": 2094,
-   "NC:forsyth": 1543,
-   "NC:guilford": 1729,
+   "NC:buncombe": 1532,
+   "NC:durham": 2095,
+   "NC:forsyth": 1601,
+   "NC:guilford": 1813,
    "NC:harnett": 1630,
-   "NC:johnston": 1858,
-   "NC:mecklenburg": 5864,
+   "NC:johnston": 1925,
+   "NC:mecklenburg": 5874,
    "NC:union": 1469,
    "NC:wake": 6723,
    "SC:charleston": 3282,
