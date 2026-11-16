@@ -2450,6 +2450,19 @@ RAW_KEEP = {
     # reached publish yet, but test_every_scraper_raw_key_survives_publish correctly flags
     # it now regardless of wiring status, same posture as every other entry in this file.
     "greenwood_corebtpay_delinquent_tax": "*",
+    # Florence County SC treasurer's own live tax-inquiry CGI (enrichment_florence_tax_inquiry.py,
+    # added 2026-11-10, same shape as billtrax_dorchester_delinquent_tax above): per-parcel
+    # balance/years/late_years, read by enrichment_tax_aging.py (via the canonical raw['tax_owed']
+    # this module also writes, already RAW_KEEP'd) and restated into raw['two_year_delinquent']
+    # (also already RAW_KEEP'd) by its sibling enrichment_florence_two_year_delinquent.py. Found
+    # missing here 2026-11-16 chasing gap_matrix's Florence tax_aging_surfaced/two_year_delinquent
+    # "sourced-not-built" entries (same root cause, ~3,883 est rows each): without this entry the
+    # module's own 14-day recheck stamp (raw['florence_tax_inquiry']['fetched_at'], read by
+    # needs()/_recently_checked()) would be silently stripped on every write_artifact() publish,
+    # so every regular run would re-fetch the entire eligible population from scratch forever
+    # instead of settling into "only the stale ones" -- same silent-drop bug class as every other
+    # entry in this file, caught before the first regular (non-patch) publish this flag reaches.
+    "florence_tax_inquiry": "*",
     "greenville_mie": "*",
     # 2026-09-23: caught by the greenville_tax_distress zero-net-new audit
     # (see that scraper's own docstring, "ZERO-NET-NEW AUDIT"). This module
