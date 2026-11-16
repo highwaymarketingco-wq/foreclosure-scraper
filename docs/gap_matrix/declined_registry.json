@@ -251,6 +251,81 @@
       "state": "NC", "county": "Granville", "column": "rollback_exposure",
       "reason": "Granville is the SAME bttaxpayerportal/ITSPublic vendor as the Anson entry above (nc_its_public_tax.py PORTALS['Granville'], just hosted on the county's own domain tax.granvillecounty.org rather than the shared bttaxpayerportal.com name, which is why it did not group with the other 6 by hostname). The 'no value/use-split field in TaxBillSearch's own column set' argument is a PLATFORM-level fact (re-confirmed this session by reading parse_row_cols()/parse_description_cols() directly, not per-tenant), so it applies here unchanged. The Description-text live check (2 years, 7,386 rows, zero 'ROLLBACK' hits) was run directly against Anson/Yadkin/Caswell/Jones/Graham/Alleghany, NOT against Granville's own tenant -- kept at 'medium' confidence rather than 'high' for that reason; a county-specific live recheck would raise it.",
       "confirmed_date": "2026-11-16", "confidence": "medium"
+    },
+    {
+      "state": "NC", "county": "Carteret", "column": "rollback_exposure",
+      "reason": "Carteret is the SAME bttaxpayerportal/ITSPublic vendor as Anson/Granville above (just newly wired into nc_its_public_tax.py's own PORTALS this same session, 2026-11-16 -- see that file and tax_lien_itspublic.py's own PORTALS/_NEWER_BUILD entries). Live-read directly today: Carteret's grid uses the ITSNET-style layout (TaxYear, BillNumber, AccountNumber, AccountName1, OriginalBillAmount, TotalDue, DiscoveryYear, Description, Address) where Description holds ONLY the bare parcel id token (e.g. '634603020856000') with no free text at all -- there is no asset/property description field of any kind on this layout for a value/use-split or a '<year> ROLLBACK TAX...' marker to ever appear in (the situs lives in the separate Address column, not Description). Structurally identical to the platform-level finding already confirmed for the Onslow/Graham-style layout (parse_row_cols()/parse_description_cols() read directly) and for Alleghany/Scotland's own ITSNET layout -- high confidence because this was read directly against Carteret's own live Description cells today, not inferred from a sibling county.",
+      "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "NC", "county": "Warren", "column": "multi_year_delinquent_tax",
+      "reason": "Warren's bttaxpayerportal/ITSPublicWN tax-bill portal is live (GET .../TaxBillSearch answers 200) but every bill search answers ZERO records -- already documented in nc_its_public_tax.py's own UNREADABLE_PORTALS dict ('portal answers 0 bills, paid or unpaid, for 2022-2025', read live 2026-10-09) and RE-confirmed live today (2026-11-16): a full-model UnpaidBillsOnly=false search with no TaxYear filter answers numRecords=0. With zero bills of any kind, there is no roll for nc_its_public_tax.py to read and no multi_year_delinquent_tax block can ever be produced -- this is the portal's own ceiling, not a parser or wiring gap (compare Carteret, re-checked the same way today, which answers thousands of real bills and was wired in instead of declined).",
+      "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "NC", "county": "Warren", "column": "atty_tax_verified_confirmed",
+      "reason": "Same Warren 0-record portal finding as the multi_year_delinquent_tax entry above (re-confirmed live 2026-11-16). atty_tax_verified_confirmed's own Spec requires a decisive tax_lien verdict (confirmed/refuted/stale) from tax_lien_itspublic.py, which itself depends on search() finding real bills on this same portal -- with zero records of any kind, every search can only ever answer parcel_not_found (unconfirmed), never a decisive verdict. Warren is correctly absent from both nc_its_public_tax.py's PORTALS and tax_lien_itspublic.py's PORTALS for this reason.",
+      "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "NC", "county": "Warren", "column": "tax_aging_surfaced",
+      "reason": "tax_aging_surfaced is produced off raw.tax_owed (enrichment_tax_aging.py), which on this vendor only ever comes from nc_its_public_tax.py's own roll block (raw['nc_its_public_tax'], aggregate()'s 'if total: raw[\"tax_owed\"]=...'). Warren's portal answers zero bills of any kind (re-confirmed live 2026-11-16, see the multi_year_delinquent_tax entry above for this county) so no roll block, and therefore no tax_owed block, can ever be produced for it on this source.",
+      "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "NC", "county": "Warren", "column": "rollback_exposure",
+      "reason": "Two independent reasons, both confirmed live 2026-11-16: (1) Warren's TaxBillSearch answers zero bills of any kind (see this county's multi_year_delinquent_tax entry) so there is no roll data to read a rollback signal from in the first place; (2) even where this vendor DOES have real bills (Anson/Yadkin/Caswell/Jones/Graham/Alleghany, round 2 this same session, commit 5469b46e), it structurally has no value/use-split field anywhere in TaxBillSearch's own Description/column set for a rollback marker to appear in -- a platform-level limitation, not specific to having records.",
+      "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "NC", "county": "Warren", "column": "lt_tax_sale",
+      "reason": "Same Warren 0-record portal finding as this county's other bttaxpayerportal entries above (re-confirmed live 2026-11-16: a full-model UnpaidBillsOnly=false, no-TaxYear-filter search answers numRecords=0). With no bills of any kind, this vendor can never surface a tax-sale/lien-registry feed row for Warren.",
+      "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "NC", "county": "Clay", "column": "multi_year_delinquent_tax",
+      "reason": "Clay's bttaxpayerportal/ITSPublicCL is the OLD ITS 1.0 build (a 6,241-byte TaxBillSearch page, the small-stub shape, not the full-model page's ~14KB) -- already documented in nc_its_public_tax.py's own UNREADABLE_PORTALS dict ('no JSON routes (404); its results form answers HTTP 500', read live 2026-10-09) and RE-confirmed live today (2026-11-16): both GetSearchTablePartial and GetSearchTableData answer HTTP 404 ('The resource cannot be found'). With no working AJAX route at all, nc_its_public_tax.py's roll scraper can never read any bills for Clay, so no multi_year_delinquent_tax block can ever be produced.",
+      "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "NC", "county": "Clay", "column": "atty_tax_verified_confirmed",
+      "reason": "Same Clay old-build 404 finding as the multi_year_delinquent_tax entry above (re-confirmed live 2026-11-16). tax_lien_itspublic.py's own search() would hit the identical 404 on every call, so no decisive tax_lien verdict (confirmed/refuted/stale) can ever be reached for a Clay row on this vendor -- Clay is correctly absent from both PORTALS dicts.",
+      "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "NC", "county": "Clay", "column": "tax_aging_surfaced",
+      "reason": "tax_aging_surfaced depends on raw.tax_owed, which on this vendor only comes from nc_its_public_tax.py's own roll block. Clay's AJAX routes 404 (re-confirmed live 2026-11-16, see this county's multi_year_delinquent_tax entry), so no roll block and no tax_owed block can ever be produced for it on this source.",
+      "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "NC", "county": "Clay", "column": "rollback_exposure",
+      "reason": "Clay's old-build AJAX routes 404 (re-confirmed live 2026-11-16, see this county's multi_year_delinquent_tax entry) so there is no roll data of any kind to read a rollback signal from, independent of the separate platform-level finding (round 2, this same session) that this vendor's TaxBillSearch has no value/use-split field anywhere even where bills ARE readable.",
+      "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "NC", "county": "Swain", "column": "multi_year_delinquent_tax",
+      "reason": "Swain's bttaxpayerportal/ITSPublicSW is the SAME old ITS 1.0 build as Clay (a 6,307-byte TaxBillSearch page) -- documented in nc_its_public_tax.py's own UNREADABLE_PORTALS dict as 'same page as Clay, its form was not posted' (read live 2026-10-09, assumed rather than directly tested at the time) and NOW directly RE-confirmed live 2026-11-16: both GetSearchTablePartial and GetSearchTableData answer HTTP 404, the identical failure as Clay's own AJAX routes. With no working AJAX route, no multi_year_delinquent_tax block can ever be produced for Swain.",
+      "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "NC", "county": "Swain", "column": "atty_tax_verified_confirmed",
+      "reason": "Same Swain old-build 404 finding as the multi_year_delinquent_tax entry above (directly re-confirmed live 2026-11-16, not merely assumed-same-as-Clay this time). No decisive tax_lien verdict can ever be reached for a Swain row on this vendor.",
+      "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "NC", "county": "Swain", "column": "tax_aging_surfaced",
+      "reason": "tax_aging_surfaced depends on raw.tax_owed, which on this vendor only comes from nc_its_public_tax.py's own roll block. Swain's AJAX routes 404 (directly re-confirmed live 2026-11-16, see this county's multi_year_delinquent_tax entry), so no roll block and no tax_owed block can ever be produced for it on this source.",
+      "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "NC", "county": "Swain", "column": "rollback_exposure",
+      "reason": "Swain's old-build AJAX routes 404 (directly re-confirmed live 2026-11-16, see this county's multi_year_delinquent_tax entry) so there is no roll data of any kind to read a rollback signal from, independent of the separate platform-level finding (round 2, this same session) that this vendor's TaxBillSearch has no value/use-split field anywhere even where bills ARE readable.",
+      "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "NC", "county": "Swain", "column": "lt_tax_sale",
+      "reason": "Same Swain old-build 404 finding as this county's other bttaxpayerportal entries above (directly re-confirmed live 2026-11-16). With no working AJAX route, this vendor can never surface a tax-sale/lien-registry feed row for Swain.",
+      "confirmed_date": "2026-11-16", "confidence": "high"
     }
   ]
 }
