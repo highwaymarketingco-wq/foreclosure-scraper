@@ -441,6 +441,12 @@ def test_built_in_code_known_false_positives_not_silently_fixed():
         a real SC Cherokee producer exists, but the regex is state-blind (it only checks whether
         the literal word "Cherokee" appears, not which state tuple it's paired with), so it also
         credits NC's unrelated Cherokee County with the same real entry.
+      - jail_booking also credits ('SC', 'Lee') -- the mirror of the Cherokee case above, same
+        state-blind mechanism, opposite direction: a real NC Lee producer (see 2026-11-16 UPDATE
+        below) makes the bare word "Lee" true in the stripped text, and counties_named_in()'s own
+        docstring says plainly a name shared by both states "counts for both: a grep cannot tell
+        them apart." No SC Lee producer exists in any of these 3 files; this is permanent, not
+        fixable by comment-stripping once real NC/Lee code exists, same as Cherokee.
 
     2026-11-10 UPDATE: the "previously-known Gaston/condemned rejection-comment false positive"
     this docstring used to also pin down is GONE, not regressed -- gastonia_code_enforcement.py
@@ -451,6 +457,19 @@ def test_built_in_code_known_false_positives_not_silently_fixed():
     opposite of the Moore/Davidson/Cherokee cases above, and belongs in
     test_built_in_code_drops_arcgis_distress_layers_false_credit_for_condemned_and_code_enforcement
     -style end-to-end assertions, not here.
+
+    2026-11-16 UPDATE: the "jail_booking Lee NC/SC false positive" this docstring's opening line
+    claims comment-stripping fixes is GONE for NC, same evolution as Gaston above, not a
+    regression -- but it brought SC/Lee back as a DIFFERENT, Cherokee-shaped false positive (see
+    the new bullet above), not a clean fix. scrapers/national/jail_bookings.py gained a real
+    `("NC", "Lee", "dcn_export", "https://dcn.leecountync.gov/DCN/Inmates")` adapter-registry
+    entry on 2026-11-10 (commit afae3501, an unrelated sos_agent hand-off batch) plus a real
+    `elif state == "NC" and county == "Lee":` branch; enrichment_jail_bookings.py's own ROSTERS
+    prose docstring independently names "Lee NC" too (2026-11-05 ROSTER SYNC). Both are literal
+    code/real-data text, not a comment or docstring example, so counties_named_in()'s grep now
+    correctly credits ('NC', 'Lee') -- a true positive -- but the same bare "Lee" text, being a
+    county name shared with SC, mechanically also satisfies SC's pattern (the function's own
+    docstring: "a grep cannot tell them apart"), reviving ('SC', 'Lee') as a live false positive.
     """
     condemned_files = [gm.PKG / f for f in gm.SPECS["condemned"].producers if (gm.PKG / f).exists()]
     jail_files = [gm.PKG / f for f in gm.SPECS["jail_booking"].producers if (gm.PKG / f).exists()]
@@ -466,8 +485,13 @@ def test_built_in_code_known_false_positives_not_silently_fixed():
     assert ("NC", "Cherokee") in jail_counties, (
         "known-unfixed: cross-state leak from jail_bookings.py's real SC Cherokee registry entry"
     )
-    # the two FPs comment-stripping DOES fix must stay fixed
-    assert ("NC", "Lee") not in jail_counties and ("SC", "Lee") not in jail_counties
+    assert ("SC", "Lee") in jail_counties, (
+        "known-unfixed: cross-state leak from jail_bookings.py's real NC Lee dcn_export entry "
+        "(mirror of the Cherokee case -- see 2026-11-16 UPDATE above)"
+    )
+    # NC/Lee is now a TRUE positive here (see 2026-11-16 UPDATE above) -- a real dcn_export
+    # adapter entry, not a stale docstring example.
+    assert ("NC", "Lee") in jail_counties
     # Gaston is now a TRUE positive here (see 2026-11-10 UPDATE above) -- a real producer, not a
     # stale rejection comment.
     assert ("NC", "Gaston") in condemned_counties
