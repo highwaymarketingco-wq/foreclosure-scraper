@@ -536,6 +536,18 @@ ROSTERS: list[tuple[str, str, str, str]] = [
     # Sample: Michael Vladimir Anderson, DOB 01/05/92, TRESPASS INTO ENCLOSED PLACE, booking
     # 26-09607, arrested 11/03/2026 09:52.
     ("SC", "Spartanburg", "spartanburg_mugshots", "https://mugshots.spartanburgsheriff.org/bookings/"),
+
+    # Stokes NC -- Southern Software Citizen Connect, same tenant family as Henderson/Duplin/
+    # Harnett/Anson above (found 2026-11-16, gap_matrix jail_booking/jail_booking_new "no
+    # source known" sweep: a bounded live probe of the AgencyID="{County}Co{State}" pattern
+    # already confirmed for every other Citizen Connect county in this file). Verified live:
+    # AgencyID=StokesCoNC loads the real bookingsearch page (does not redirect to the
+    # vendor's generic invalid-agency homepage) and the current-confinements AJAX call
+    # returns a real, populated roster -- 114 in custody, full DOB on every row, e.g.
+    # AMERSON, SIERRA, DOB 03/16/1996, arrested 08/01/2026, "AID & ABET LARCENY (F); AID AND
+    # ABET IMPAIRED DRIVING; FAILURE TO APPEAR ON MISD". No JMSAgencyID needed (same as
+    # Rutherford above -- this tenant accepts a blank value).
+    ("NC", "Stokes", "citizen_connect", "StokesCoNC|"),
 ]
 
 # Southern Software hosts every Citizen Connect tenant off one origin; the
@@ -4198,6 +4210,8 @@ def _to_listing(rec: dict, state: str, county: str) -> Listing:
                       "4dbd3f63e56c492f9b408ebff12155f3/")
     elif state == "SC" and county == "Spartanburg":
         source_url = "https://mugshots.spartanburgsheriff.org/bookings/"
+    elif state == "NC" and county == "Stokes":
+        source_url = f"{CITIZEN_CONNECT_BASE}/bookingsearch/index.php?AgencyID=StokesCoNC"
     else:
         source_url = ""
 
