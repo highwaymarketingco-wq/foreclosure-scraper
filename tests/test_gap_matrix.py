@@ -772,8 +772,19 @@ def test_nc_heir_estate_parcels_credit_reads_county_gis_keys_not_text():
     literal 'ST:County' strings ('NC:Cleveland', 'SC:York', ...), but counties_named_in()'s own
     regex needs a quote/slash/underscore immediately before the name (or a trailing 'County'
     suffix) -- a colon satisfies neither, so its blanket text match is empty despite 20 real
-    entries. _nc_heir_estate_parcels_credit() reads COUNTY_GIS's own keys directly instead."""
-    assert gm.counties_named_in([gm.PKG / gm._NC_HEIR_ESTATE_PARCELS_REL]) == set()
+    entries. _nc_heir_estate_parcels_credit() reads COUNTY_GIS's own keys directly instead.
+
+    2026-11-15: the Greene-County parno-collision fix added a real code comparison,
+    `county.strip().lower() == "greene"`, whose quoted literal DOES satisfy the blanket
+    regex's quote-before-name rule -- so counties_named_in() now also finds ('NC', 'Greene')
+    via this one incidental string, unlike every other county here (which only the COUNTY_GIS
+    keys name). This is harmless in practice: built_in_code()'s real 'heir_estate' column
+    (see the heir_spec block a few hundred lines up) explicitly drops this file from the
+    files it runs counties_named_in() over and replaces that contribution with
+    _nc_heir_estate_parcels_credit() alone, so this isolated call's result never reaches the
+    real crediting path. Asserting the new, narrower truth instead of rewriting a working,
+    clear comparison just to dodge a diagnostic regex."""
+    assert gm.counties_named_in([gm.PKG / gm._NC_HEIR_ESTATE_PARCELS_REL]) == {("NC", "Greene")}
     credit = gm._nc_heir_estate_parcels_credit()
     assert ("NC", "Cleveland") in credit and ("SC", "York") in credit
     assert len(credit) == 20
