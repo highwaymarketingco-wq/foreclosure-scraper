@@ -359,6 +359,117 @@ def test_harnett_bare_digit_row_confirms_end_to_end():
     assert r.evidence["searched"][0] == {"by": "ParcelNumber", "from": "board_parcel", "bills": 2}
 
 
+def test_scotland_is_registered_with_native_map6_space_only():
+    """Scotland was already wired onto this same ITS.net newer build (2026-10-17, ITSNET_CELLS
+    layout) -- native_map6_space is the only thing this follow-up fix (2026-11-16, gap_matrix
+    multi_year_delinquent_tax/atty_tax_verified_confirmed sweep) adds to it."""
+    scotland = p.PORTALS["Scotland"]
+    assert scotland.base == "https://www.bttaxpayerportal.com/ITSPublicSC"
+    assert scotland.parcel_field == "ParcelNumber" and scotland.full_model is True
+    assert scotland.cells == p.ITSNET_CELLS
+    assert scotland.native_map6_space is True
+    assert scotland.native_map_lot_dash is False and scotland.native_map_lot_space is False
+    assert p.Portal("Other", "https://x", "ParcelNumber").native_map6_space is False
+    assert p.PORTALS["Harnett"].native_map6_space is False       # the flags never overlap
+
+
+def test_scotland_bare_digit_parcel_is_reformatted_to_its_native_map_lot_id():
+    """Root-caused 2026-11-16 (this session's gap_matrix follow-up to round 2's rollback_exposure
+    decline, same day): a tax_lien ledger entry for Scotland board parcel '01004402007' (bare, no
+    space) recorded "parcel_not_found" (checked 2026-11-03/11-05). Searching that exact bare
+    string live answers 0 records (reproduced twice); the reformatted '010044 02007' answers the
+    row's own real bills (reproduced twice: 2 unpaid bills, owner CROMARTIE JAMES, account
+    1010114) -- only this exact single-space form resolves. Unlike Harnett's native_map_lot_space,
+    Scotland's MAP segment is always exactly 6 digits (5 different live accounts sampled
+    2026-11-16), so there is only ONE plausible reading, not two."""
+    GROUND_TRUTH = (
+        ("01004402007", "010044 02007"),    # CROMARTIE JAMES, live-confirmed 2026-11-16
+        ("01004101020", "010041 01020"),    # GRAHAM MAMIE, already-correct form seen live too
+        ("03040203004", "030402 03004"),
+    )
+    for raw, native in GROUND_TRUTH:
+        assert p._native_map6_space(raw) == native, (raw, native)
+    row = {"state": "NC", "county": "Scotland", "listing_type": "tax_sale",
+          "source": "counties_nc.nc_its_public_tax", "parcel_id": "01004402007",
+          "street_address": None, "owner_name": None, "raw": {}}
+    assert p.searches(row, p.PORTALS["Scotland"])[:1] == [
+        ("ParcelNumber", "010044 02007", "board_parcel")]
+    # a value outside the evidenced 7-20-digit bare-run shape passes through untouched
+    for untouched in ("010044 02007", "11-1401--", "AB1234", "123456", "1" * 25):
+        assert p._native_map6_space(untouched) == untouched
+
+
+def test_scotland_tolerates_its_own_native_space_padded_id_in_description():
+    """Scotland's TaxBillSearch prints its own native space-separated id in the Description cell
+    (live-captured 2026-11-16, CROMARTIE JAMES's real bill: '010044 02007<br/>0014331') -- the
+    generic " " not in p id check would otherwise drop that first token (no letters, so it also
+    fails the situs check). Gated to native_map6_space portals only: the identical-looking text
+    on a portal without the flag must still drop that first token exactly as before."""
+    desc = "010044 02007<br/>0014331"
+    d = p.parse_description(desc, p.PORTALS["Scotland"])
+    assert d["ids"] == ["01004402007", "0014331"]
+    assert d["real"] is True          # real_without_units: a parcel id present, not Personal Property
+    assert p.parse_description(desc, p.PORTALS["Onslow"])["ids"] == ["0014331"]
+    assert p.parse_description(desc)["ids"] == ["0014331"]                 # portal=None too
+
+
+def test_scotland_bare_digit_row_confirms_end_to_end():
+    """Same shape as test_harnett_bare_digit_row_confirms_end_to_end, for Scotland's own
+    bare-digit case (owner/address synthetic; only the parcel-id shape itself,
+    '01004402007'/'010044 02007', is the real bug, live-confirmed 2026-11-16). Scotland is an
+    ITSNET_CELLS portal (Address in its own cell, like Brunswick/Alleghany), hence ItsNetPortal."""
+    scotland_base = p.PORTALS["Scotland"].base
+    situs = "TEST ADDR 604 TESTFORD ST"
+    bills = [bill(2026, 7788, ["010044 02007", "0014331"], situs, balance=72.00,
+                  original=72.00, owner="TESTOWNER CROMARTIE"),
+            bill(2025, 4689, ["010044 02007", "0014331"], situs, balance=71.23,
+                 original=61.18, owner="TESTOWNER CROMARTIE")]
+    portal = ItsNetPortal(scotland_base, bills)
+    row = {"state": "NC", "county": "Scotland", "listing_type": "tax_sale",
+          "source": "counties_nc.nc_its_public_tax", "parcel_id": "01004402007",
+          "street_address": "TEST ADDR 604 TESTFORD ST", "owner_name": "TESTOWNER CROMARTIE", "raw": {}}
+    r = run(row, portal)
+    assert r.verdict == "confirmed", r.evidence
+    assert r.evidence["tax_parcel"] == "01004402007"
+    assert r.evidence["searched"][0] == {"by": "ParcelNumber", "from": "board_parcel", "bills": 2}
+
+
+# ---------------------------------------------------------------------------------------------
+# Carteret (2026-11-16): wrongly declared "not in PORTALS at all" by round 2's own commit the
+# same day -- it never actually checked UNREADABLE_PORTALS, which never names Carteret.
+# ---------------------------------------------------------------------------------------------
+
+def test_carteret_is_registered_on_the_same_vendor_as_its_itsnet_siblings():
+    """Live-checked 2026-11-16: GET .../ITSPublicCE/TaxBillSearch answers 200 (the full-model page
+    shape), and a real UnpaidBillsOnly/TaxYear=2025 search answers 4,605 records with real
+    non-personal-property bills (parcel 634603020856000, 2 KINGS LLC, $52.39 due;
+    638617114393000, 2101 EVANS STREET LLC, $52.77 due). The grid's own column order
+    (TaxYear, BillNumber, AccountNumber, AccountName1, OriginalBillAmount, TotalDue,
+    DiscoveryYear, Description, Address) is identical to Alleghany/Scotland/Brunswick's
+    ITSNET_CELLS, with Description holding only the bare parcel id (no acreage suffix needed:
+    the situs is the separate Address cell)."""
+    carteret = p.PORTALS["Carteret"]
+    assert carteret.base == "https://www.bttaxpayerportal.com/ITSPublicCE"
+    assert carteret.parcel_field == "ParcelNumber" and carteret.full_model is True
+    assert carteret.real_without_units is True
+    assert carteret.cells == p.ITSNET_CELLS
+    assert carteret.native_map6_space is False and carteret.native_map_lot_space is False
+
+
+def test_carteret_layout_bare_parcel_in_description_address_in_its_own_cell():
+    """Live-captured 2026-11-16 (real bills, owner names redacted to EXAMPLE per convention)."""
+    payload = {"rows": [
+        {"id": "2025/140209", "cell": ["2025", "140209", "1000000028692", "EXAMPLE LLC",
+                                       "2,204.03", "52.39", "", "634603020856000",
+                                       "116 EXAMPLE LN NEWPORT NC 28570"]},
+        {"id": "2025/8300001", "cell": ["2025", "8300001", "8300001", "EXAMPLE GROCERY",
+                                        "30.00", "30.00", "2025", "Personal Property", ""]}]}
+    bills = p.parse_rows(payload, p.PORTALS["Carteret"])
+    assert len(bills) == 1
+    assert bills[0]["ids"] == ["634603020856000"]
+    assert bills[0]["situs"] == "116 EXAMPLE LN NEWPORT NC 28570" and bills[0]["balance"] == 52.39
+
+
 def test_applies_to_the_configured_counties_only():
     assert p.applies(onslow_roll_row())
     assert p.applies(onslow_roll_row(county="Graham", raw={"two_year_delinquent": {"is_two_year_plus": True}}))
@@ -803,10 +914,11 @@ def test_brunswick_reads_the_itsnet_cell_order():
 # ---------------------------------------------------------------------------------------------
 
 def test_the_newer_build_counties_are_configured_with_the_full_model():
-    for c in ("anson", "granville", "harnett", "yadkin", "alleghany", "scotland"):
+    for c in ("anson", "granville", "harnett", "yadkin", "alleghany", "scotland", "carteret"):
         port = p._BY_COUNTY[c]
         assert port.full_model and port.parcel_field == "ParcelNumber" and port.real_without_units
     assert p._BY_COUNTY["alleghany"].cells == p.ITSNET_CELLS and p._BY_COUNTY["anson"].cells == p.CELLS
+    assert p._BY_COUNTY["carteret"].cells == p.ITSNET_CELLS       # same layout as Alleghany/Scotland
     assert not p._BY_COUNTY["granville"].account_search
     assert "AlternateParcelIdentifier" in p._BY_COUNTY["granville"].model_fields
     # 2026-10-18: re-verified live rather than trusting the "no parcel id" assumption this test

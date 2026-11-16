@@ -126,6 +126,17 @@ years and the history from levy 2019 (at most MAX_HISTORY_VIEWS bill views) are 
 records late_levy_years and chronic_claim, and governs_for keeps tax_lien_chronic when the history
 confirms it or could not be read in full.
 
+ADDED 2026-11-16 (gap_matrix follow-up to round 2's rollback_exposure decline, same session, same
+day): Scotland and Carteret.
+    Scotland's own native bare-digit parcel_id shape (a 6-digit map plus a space plus a variable-
+    length lot, "010044 02007") needed the SAME fix class as Duplin/Harnett -- see
+    Portal.native_map6_space's own docstring for the live evidence.
+    Carteret was wrongly declared "not in PORTALS at all" earlier the SAME day (commit 5469b46e,
+    going by nc_its_public_tax.py's own UNREADABLE_PORTALS dict, which never actually names
+    Carteret) -- its TaxBillSearch is live, full_model, ITSNET_CELLS, 4,605 real unpaid 2025
+    bills; wired in alongside Alleghany/Scotland/Brunswick. Its rollback_exposure is still
+    declined (same vendor-wide no-value-split finding as the other 7 counties on this build).
+
 Evidence is a whitelist (public ledger): no owner names, no account numbers, no mailing addresses.
 
 FETCHING. One cookie session per portal per run (reopened after SESSION_MAX_AGE_S), one request at
@@ -272,6 +283,29 @@ class Portal:
     #: needed together, same reason native_map_lot_dash needs both of its own). Not generalized
     #: beyond the evidenced 10/12/14/16-digit shape.
     native_map_lot_space: bool = False
+    #: Scotland's own native MAP-LOT id shape: a fixed 6-digit MAP number, one space, then a
+    #: VARIABLE-length LOT/block number (5 digits in nearly every live example; one read 7 --
+    #: "030426 0110601" -- so the lot side is not padded to one fixed width, unlike Harnett's
+    #: BLOCK). Unlike native_map_lot_space (ambiguous between two readings because Harnett's own
+    #: MAP segment length itself varies), Scotland's MAP segment was exactly 6 digits in every
+    #: one of 5 different live accounts/parcels sampled 2026-11-16 off TaxBillSearch's own
+    #: current Description cells, so a bare digit run has exactly ONE plausible reading. Root-
+    #: caused and confirmed live 2026-11-16 (this session's gap_matrix follow-up on
+    #: multi_year_delinquent_tax/atty_tax_verified_confirmed, docs/gap_matrix/gap_list_2026-11-
+    #: 16.csv): a ledger entry for board parcel '01004402007' (bare, no space) recorded
+    #: "parcel_not_found" (checked 2026-11-03/11-05) -- searching that exact bare string live
+    #: answers 0 records (reproduced twice), while the reformatted '010044 02007' answers the
+    #: row's own real bills (reproduced twice: 2 unpaid bills, owner CROMARTIE JAMES, account
+    #: 1010114). Three OTHER Scotland ledger entries whose board parcel ALREADY carried the
+    #: native space ('010041 01020', '030402 03004', '010205 01003') all answer their own real
+    #: bills live today despite having recorded "parcel_not_found" too on their first (and only)
+    #: check -- a transient portal/session hiccup at check time, not a format bug; TTL_DAYS/
+    #: RETRY_DAYS already re-checks those on the normal cadence, so only the bare-digit SHAPE
+    #: itself (this flag) needed a code fix. See _native_map6_space() (searches()) and
+    #: parse_description()'s id loop, which -- like native_map_lot_dash's and
+    #: native_map_lot_space's own tolerance -- recognizes this portal's own single-space id
+    #: token in a found bill's description so the match still binds (both ends needed together).
+    native_map6_space: bool = False
 
 
 PORTALS: dict[str, Portal] = {
@@ -461,6 +495,24 @@ def _native_map_lot_space(pid: str) -> list[str]:
     return [f"{map6:<10}{block6} {lot}", f"{map4:<10}{block4}"]
 
 
+#: Scotland's own evidenced bare board parcel_id shape (Portal.native_map6_space): a 6-digit MAP
+#: plus at least one LOT digit, 7-20 total (room past the longest live example read, 13 digits) --
+#: a run outside this range is left alone (returned unchanged).
+_BARE_DIGIT_PARCEL_SCOTLAND = re.compile(r"^\d{7,20}$")
+
+
+def _native_map6_space(pid: str) -> str:
+    """pid reformatted into Scotland's own ITSPublicSC ParcelNumber search shape
+    (Portal.native_map6_space) when it is a bare 7-20-digit run: the first 6 digits are the map
+    number, the rest is the lot, joined by the single space the portal's own numbering always
+    carries -- '01004402007' -> '010044 02007'. Confirmed live 2026-11-16: the bare digits alone
+    answer zero records on the real portal (reproduced twice), only this exact single-space form
+    resolves (also reproduced twice) -- see Portal.native_map6_space's own docstring for the
+    live-verified example. Anything else (already spaced, non-digit, too short/long) is returned
+    unchanged -- a narrow, evidenced transform, not a guess at the general case."""
+    return f"{pid[:6]} {pid[6:]}" if _BARE_DIGIT_PARCEL_SCOTLAND.match(pid) else pid
+
+
 def _roll_parcels(roll: Roll, blk: dict, keys: Optional[tuple[str, ...]] = None) -> list[str]:
     out = []
     for f in (roll.parcel_keys if keys is None else keys):
@@ -563,6 +615,10 @@ def searches(row: Any, portal: Portal) -> list[tuple[str, str, str]]:
                 # say which reading is right -- verify()'s own owner/address bind decides.
                 for cand in _native_map_lot_space(pid):
                     out.append((portal.parcel_field, cand, "board_parcel"))
+            elif portal.native_map6_space:
+                # one reading only: see _native_map6_space()'s own docstring for why
+                # Scotland's fixed 6-digit map segment makes the split unambiguous.
+                out.append((portal.parcel_field, _native_map6_space(pid), "board_parcel"))
             else:
                 out.append((portal.parcel_field, tc.alnum(pid) if portal.parcel_alnum else pid,
                             "board_parcel"))
@@ -666,6 +722,13 @@ def parse_description(desc_html: Any, portal: Optional[Portal] = None) -> dict:
             # this from ever eating a real situs line the way blindly space-stripping every
             # token would (a street address stripped of spaces is still a plain alnum run too).
             ids.append(re.sub(r"\s+", "", p))
+        elif (portal is not None and portal.native_map6_space and " " in p and len(p) <= 24
+              and re.match(r"^\d{6} \d+$", p)):
+            # Scotland's own native MAP-LOT id is printed WITH its real separating space intact
+            # (Portal.native_map6_space, "010044 02007") -- still the parcel id, not a situs,
+            # once that space is ignored. The exact "6 digits, space, more digits" shape (no
+            # letters, nothing before or after) keeps this from ever eating a real situs line.
+            ids.append(re.sub(r"\s+", "", p))
         elif map_ref is not None and map_ref.search(p):
             continue
         elif situs is None and re.search(r"[A-Za-z]", p):
@@ -729,6 +792,21 @@ _NEWER_BUILD = {
     "Yadkin": ("https://www.bttaxpayerportal.com/ITSPublicYK", CELLS),
     "Alleghany": ("https://www.bttaxpayerportal.com/ITSPublicAL", ITSNET_CELLS),
     "Scotland": ("https://www.bttaxpayerportal.com/ITSPublicSC", ITSNET_CELLS),
+    #: added 2026-11-16 (gap_matrix follow-up on the fresh 2026-11-16 sourced-not-built cluster):
+    #: round 2 the SAME day declared Carteret "not in PORTALS at all... no JSON grid route, or a
+    #: 0-record portal" (commit 5469b46e) on the strength of nc_its_public_tax.py's own
+    #: UNREADABLE_PORTALS dict -- but that dict never actually names Carteret, only Clay/Swain/
+    #: Surry/Warren/Gates. Live-checked directly: GET .../ITSPublicCE/TaxBillSearch answers 200
+    #: (a 14,640-byte full-model page, the SAME size class as Warren's genuinely-live-but-empty
+    #: page, not Clay/Swain's 6-is-two-KB old-build stub), and a real UnpaidBillsOnly/TaxYear=2025
+    #: search answers 4,605 records with real non-personal-property bills (e.g. parcel
+    #: 634603020856000, 2 KINGS LLC, $2,204.03 original / $52.39 due; 638617114393000, 2101 EVANS
+    #: STREET LLC, $6,011.48 original / $52.77 due) -- round 2's claim was wrong for this one
+    #: county. The grid prints the SAME ITSNET_CELLS order as Alleghany/Scotland/Brunswick
+    #: (TaxYear, BillNumber, AccountNumber, AccountName1, OriginalBillAmount, TotalDue,
+    #: DiscoveryYear, Description, Address -- read live), Description holding only the bare
+    #: parcel id (no acreage suffix needed, the separate Address column carries the situs).
+    "Carteret": ("https://www.bttaxpayerportal.com/ITSPublicCE", ITSNET_CELLS),
 }
 #: form fields beyond the common ones, read from each page's own .search-value inputs
 _NEWER_EXTRA = {"Granville": dict(model_fields=("AlternateParcelIdentifier",), account_search=False),
@@ -736,7 +814,9 @@ _NEWER_EXTRA = {"Granville": dict(model_fields=("AlternateParcelIdentifier",), a
                 # root-caused 2026-11-15, see Portal.native_map_lot_dash's docstring
                 "Duplin": dict(native_map_lot_dash=True),
                 # root-caused 2026-11-15, see Portal.native_map_lot_space's docstring
-                "Harnett": dict(native_map_lot_space=True)}
+                "Harnett": dict(native_map_lot_space=True),
+                # root-caused 2026-11-16, see Portal.native_map6_space's docstring
+                "Scotland": dict(native_map6_space=True)}
 for _county, (_base, _cells) in _NEWER_BUILD.items():
     PORTALS.setdefault(_county, Portal(_county, _base, "ParcelNumber", full_model=True,
                                        real_without_units=True, cells=_cells,

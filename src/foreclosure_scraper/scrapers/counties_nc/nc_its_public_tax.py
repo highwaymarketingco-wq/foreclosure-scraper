@@ -157,6 +157,19 @@ PORTALS: dict[str, ITSPortal] = {
     # Description, Address), so rollback_exposure cannot be read from this source (same verdict
     # as Spartanburg's qPayBill: a bill-payment portal, not a property/value card).
     "Brunswick": ITSPortal("Brunswick", "https://tax.brunsco.net/ITSNet", full_model=True),
+    # added 2026-11-16 (gap_matrix follow-up, multi_year_delinquent_tax/tax_aging_surfaced sweep):
+    # round 2 the SAME day declared Carteret "not in PORTALS at all... no JSON grid route, or a
+    # 0-record portal" (commit 5469b46e), but that was going by UNREADABLE_PORTALS below, which
+    # never actually names Carteret -- only Clay/Swain/Surry/Warren/Gates do. Live-checked
+    # directly 2026-11-16: GET .../ITSPublicCE/TaxBillSearch answers 200 (14,640 bytes, the
+    # full-model page shape, not Clay/Swain's ~6KB old-build stub), and a real
+    # UnpaidBillsOnly/TaxYear=2025 search answers 4,605 records with real non-personal-property
+    # bills (e.g. parcel 634603020856000, 2 KINGS LLC, $52.39 due; 638617114393000, 2101 EVANS
+    # STREET LLC, $52.77 due). The grid carries a separate Address column (the ITSNET-style
+    # layout, same as Alleghany/Scotland below), parsed by this file's own column-id-driven
+    # parse_row_cols()/parse_description_cols() with no extra wiring beyond this one PORTALS
+    # entry -- see verification/verifiers/tax_lien_itspublic.py's own matching Carteret entry.
+    "Carteret": ITSPortal("Carteret", "https://www.bttaxpayerportal.com/ITSPublicCE", full_model=True),
 }
 
 #: Counties on this vendor that cannot be read (verdicts, not gaps; read live 2026-10-09):
