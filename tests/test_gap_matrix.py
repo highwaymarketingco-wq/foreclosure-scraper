@@ -783,11 +783,17 @@ def test_nc_heir_estate_parcels_credit_reads_county_gis_keys_not_text():
     files it runs counties_named_in() over and replaces that contribution with
     _nc_heir_estate_parcels_credit() alone, so this isolated call's result never reaches the
     real crediting path. Asserting the new, narrower truth instead of rewriting a working,
-    clear comparison just to dodge a diagnostic regex."""
+    clear comparison just to dodge a diagnostic regex.
+
+    2026-11-16: the NC Hoke fix (commit 41da6190, this same session) added a real, dedicated
+    `COUNTY_GIS["NC:Hoke"]` entry (its own live-GIS layer, not a stale statewide-mirror timeout) --
+    20 real entries is now 21, a legitimate growth of the same registry this test already reads
+    directly, not a regression."""
     assert gm.counties_named_in([gm.PKG / gm._NC_HEIR_ESTATE_PARCELS_REL]) == {("NC", "Greene")}
     credit = gm._nc_heir_estate_parcels_credit()
     assert ("NC", "Cleveland") in credit and ("SC", "York") in credit
-    assert len(credit) == 20
+    assert ("NC", "Hoke") in credit
+    assert len(credit) == 21
 
 
 def test_built_in_code_adds_nc_heir_estate_parcels_credit():
@@ -1014,6 +1020,91 @@ def test_screen_ledger_ignored_for_unknown_county():
     led = _ledger({"jail_booking": {"NC|UNKNOWN": {"sources": ["x"]}}})
     roll = gm.roll_up(cube, {}, {}, led)
     assert not roll["cells"][("NC", "UNKNOWN", "jail_booking")]["screened"]
+
+
+# ---------------------------------------------------------------- 2026-11-16 heir_estate sweep: roll_up()'s
+# 'verify' layer must not reuse 'check' layer's "sourced-not-built" text for a different situation
+
+def test_verify_layer_distinguishes_built_not_verified_from_sourced_not_built():
+    """Root-cause fix for the round-3 2026-11-16 heir_estate sweep (see memory:
+    project_heir_estate_systematic_sweep_2026-11-16.md). 20 SC counties (Colleton 1,817 real
+    published rows, Sumter 1,339, Berkeley 716, ...) were already fully built and ran (ran=True,
+    built="ran", the layer 'check' cell for the SAME (state, county, column) is None -- not a gap
+    at all) yet gap_matrix still printed a gap_class=="sourced-not-built" row for every one of
+    them, with est_rows_affected matching the real published row count almost exactly. That row
+    was never the build-layer gap (there isn't one: ran=True makes target==app, so classify_cell
+    returns None and layer 'check' never emits a row) -- it is roll_up()'s SEPARATE 'verify' layer
+    (hit rows of a ledger-backed column without a decisive verdict), which used to fall back to
+    the exact same "sourced-not-built" string whenever no verifier applied and the source read
+    free. The real reason no verifier applies: heir_roll.py's own HEIR_SOURCE allowlist names only
+    counties_nc.nc_heir_estate_parcels, never the later (2026-10-19) counties_sc.
+    sc_heir_estate_parcel_cache -- the SAME "stale producer/source list" bug class already fixed
+    3 times this session in the BUILD layer's own credit functions, just in the VERIFY layer
+    instead. The fix renames that fallback (and its unknown-source sibling) to `built-not-verified`,
+    so the class string itself can never again be read as "nothing built here" when a real hit row
+    is the only way this loop reaches the cell at all (its own guard: c["pos"] == 0: continue)."""
+    cube = gm.Cube(today=TODAY)
+    # the exact raw shape counties_sc.sc_heir_estate_parcel_cache.py writes (confirmed live against
+    # the real published board, 2026-11-16: a real Colleton SC row carries this shape verbatim)
+    hit = row(state="SC", county="Colleton", listing_type="estate_lead", property_kind="unknown",
+              source="counties_sc.sc_heir_estate_parcel_cache", defendant="SIMMONS CAROL R (ESTATE)",
+              raw={"heir_estate": {"owner_of_record": "SIMMONS CAROL R (ESTATE)",
+                                   "heir_names": [{"raw": "SIMMONS CAROL R (ESTATE)", "role": "estate"}],
+                                   "mailing": None, "match": "estate", "life_estate": False,
+                                   "source": "parcel_cache"},
+                   "relationship_signal": {"kind": "probate", "keyword": "heir_estate_owner_of_record",
+                                            "source": "counties_sc.sc_heir_estate_parcel_cache"}})
+    cube.add(hit)
+    matrix = {("SC", "Colleton"): dict(MATRIX_REC, state="SC", county="colleton")}
+    roll = gm.roll_up(cube, matrix, gm.built_in_code())
+    check_cell = roll["cells"][("SC", "Colleton", "heir_estate")]
+    assert check_cell["ran"] is True and check_cell["built"] == "ran"
+    assert check_cell["class"] is None                      # layer 'check': 100% built, not a gap at all
+    verify_gaps = [g for g in roll["gaps"] if g["column"] == "heir_estate" and g["county"] == "Colleton"
+                   and g["layer"] == "verify"]
+    assert len(verify_gaps) == 1, verify_gaps
+    vg = verify_gaps[0]
+    assert vg["gap_class"] == "built-not-verified"
+    assert vg["gap_class"] != "sourced-not-built"
+    assert vg["built"] == "ran" and vg["ran"] is True       # carries the real build state, not "no"/False
+    assert vg["est_rows_affected"] == 1
+    assert vg["next_action"] == "write a probate_heir|heir_roll verifier for this county (county GIS: gis.example.test)"
+
+
+def test_verify_layer_unknown_source_also_not_labelled_sourced_not_built_or_no_source_known():
+    """Sibling fallback branch of the same fix: no county_records_matrix entry at all (vsrc[0] is
+    "unknown", not "free"). Was 'no source known'; a real hit row still makes "nothing sourced"
+    false, so this reads 'built-not-verified (source status unknown)' -- the by-column summary's
+    re.sub(r" \\(.*", "", ...) still buckets it with the plain 'built-not-verified' class."""
+    cube = gm.Cube(today=TODAY)
+    hit = row(state="SC", county="Colleton", listing_type="estate_lead", property_kind="unknown",
+              source="counties_sc.sc_heir_estate_parcel_cache", defendant="DOE JOHN (HEIRS)",
+              raw={"heir_estate": {"owner_of_record": "DOE JOHN (HEIRS)", "heir_names": ["DOE JOHN"],
+                                   "mailing": None, "match": "heirs", "life_estate": False,
+                                   "source": "parcel_cache"}})
+    cube.add(hit)
+    roll = gm.roll_up(cube, {}, {})                         # no county_records_matrix entry at all
+    verify_gaps = [g for g in roll["gaps"] if g["column"] == "heir_estate" and g["layer"] == "verify"]
+    assert len(verify_gaps) == 1, verify_gaps
+    assert verify_gaps[0]["gap_class"] == "built-not-verified (source status unknown)"
+    assert "sourced-not-built" not in verify_gaps[0]["gap_class"]
+    assert "no source known" not in verify_gaps[0]["gap_class"]
+
+
+def test_check_layer_genuinely_unbuilt_county_still_reads_sourced_not_built():
+    """Regression guard for the fix above: a county with no real hit at all (and no code credit
+    either) must still read the ordinary layer 'check' sourced-not-built, and must never spawn a
+    layer 'verify' row (its own guard: c["pos"] == 0 skips it) -- the rename only touches layer
+    'verify' output, never layer 'check', and never fires without a real hit to justify it."""
+    cube = gm.Cube(today=TODAY)
+    cube.add(row(state="SC", county="Cherokee", listing_type="tax_lien", owner_name="SMITH ANN",
+                 raw={"entity_type": "individual"}))
+    matrix = {("SC", "Cherokee"): dict(MATRIX_REC, state="SC", county="cherokee")}
+    roll = gm.roll_up(cube, matrix, {})
+    cell = roll["cells"][("SC", "Cherokee", "heir_estate")]
+    assert cell["ran"] is False and cell["built"] == "no"
+    assert cell["class"] == "sourced-not-built"
+    assert not any(g["column"] == "heir_estate" and g["layer"] == "verify" for g in roll["gaps"])
 
 
 # ---------------------------------------------------------------- 2026-10-17 gap-sweep wave 5

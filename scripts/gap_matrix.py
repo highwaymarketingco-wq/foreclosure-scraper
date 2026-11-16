@@ -20,12 +20,27 @@ which is iter_board_rows plus the index-aligned lazy-detail sidecar for the one 
   (docs/handoff/verification/*.json and raw.verification, read only).
 
 THE GAP LIST. Every (county, column) cell under 100% of its target gets a class:
-  sourced-not-built | built-but-low-yield | walled (<the wall>) | no source known |
-  not applicable
+  sourced-not-built | built-but-low-yield | built-not-verified | walled (<the wall>) |
+  no source known | not applicable
 with a one-line next action and the rows it affects. The target is the FILL share for a field
 column (every applicable row should carry the value) and the CHECKED share for a signal column
 (every applicable row should be screened; a low hit rate after a full screen is a county with
 little of that distress, not a gap).
+
+`built-not-verified` is layer `verify`'s own counterpart to `sourced-not-built`: it means the
+signal IS built and DID run (real hit rows exist, built=ran/code), but no registered verifier
+covers them yet (Spec.ledger names a signal, but the verifier registered under that signal's own
+`applies()` does not recognize this cell's rows -- commonly because the producer that wrote them
+was added after the verifier's own producer/source allowlist, or is a differently-shaped producer
+of the same raw key the verifier never learned about; see e.g. heir_roll.py's HEIR_SOURCE, which
+names only nc_heir_estate_parcels.py and not the later counties_sc.sc_heir_estate_parcel_cache.py).
+Before this class existed, that exact situation (verifier scope narrower than the real producer
+set) read as a plain `sourced-not-built` row (layer `verify`) -- textually IDENTICAL to layer
+`check`'s "no code reads this signal here" -- even though code is built, ran, and produced every
+one of the real hits the est_rows_affected count names (2026-11-16: SC heir_estate, 20 counties,
+e.g. Colleton 1,817/1,817, confirmed built=ran/ran=True while still reading "sourced-not-built").
+Always read `layer` alongside `gap_class`, but `built-not-verified`'s own text no longer depends
+on a reader remembering to.
 
 PRIVACY. The repo is public. Everything written is a count, a percentage, a county name, a
 column name, a source slug or a format shape ("9999-99-9999"). No owner names, phones,
@@ -2666,7 +2681,21 @@ def roll_up(cube: Cube, matrix: dict, code_counties: dict[str, set], screens: Op
                          next_action=action, source=c["src"][2], built=c["built"], ran=c["ran"],
                          matrix_ref=f"county_records_matrix.json#{st}/{co}" if crec else ""))
         c["est"] = est
-    # the verification layer: hit rows of a ledger-backed column without a decisive verdict
+    # the verification layer: hit rows of a ledger-backed column without a decisive verdict.
+    # 2026-11-16 fix: this loop only ever reaches a cell when c["pos"] > 0 (the `continue` just
+    # above requires it) -- i.e. a REAL hit row already exists on the board for this (state,
+    # county, column). Its last two branches used to read "sourced-not-built"/"no source known",
+    # the SAME strings layer `check` uses to mean "no code reads this signal here" -- textually
+    # indistinguishable from that, even though a real hit row is the very thing that put this
+    # cell in this loop at all. Live-confirmed (SC heir_estate, 20 counties: Colleton 1,817 real
+    # published rows, Sumter 1,339, Berkeley 716, ... matching c["est"]/est_rows_affected almost
+    # exactly) that this is not a rare edge case: it is what EVERY cell in this branch looks like,
+    # because the branch cannot be reached any other way. The real cause there is heir_roll.py's
+    # own HEIR_SOURCE allowlist naming only nc_heir_estate_parcels.py, never the later (2026-10-19)
+    # counties_sc.sc_heir_estate_parcel_cache.py, so c["v_applies"] stays 0 for every one of those
+    # rows and this loop falls through past the one branch that would read "built-but-low-yield".
+    # `built-not-verified` says plainly what is actually true here: the signal is built and ran
+    # (real hits exist), nothing here is unsourced -- only verification coverage is missing.
     for (st, co, col), c in cells.items():
         spec = SPECS[col]
         if not spec.ledger or col == "atty_tax_verified_confirmed" or c["pos"] == 0:
@@ -2686,9 +2715,9 @@ def roll_up(cube: Cube, matrix: dict, code_counties: dict[str, set], screens: Op
         elif vsrc[0] == "walled":
             cls, act = f"walled ({vsrc[1]})", f"human lane for {spec.ledger}: {vsrc[2]}"[:160]
         elif vsrc[0] == "free":
-            cls, act = "sourced-not-built", f"write a {spec.ledger} verifier for this county ({vsrc[2]})"[:160]
+            cls, act = "built-not-verified", f"write a {spec.ledger} verifier for this county ({vsrc[2]})"[:160]
         else:
-            cls, act = "no source known", f"find an authoritative page to verify {spec.ledger} here"
+            cls, act = "built-not-verified (source status unknown)", f"find an authoritative page to verify {spec.ledger} here"
         cls = declined_override(st, co, col, cls)
         gaps.append(dict(state=st, county=co, column=col, layer="verify", kind=spec.kind, scope=spec.scope,
                          applicable=c["pos"], target=c["v_dec"], pct=pct(c["v_dec"], c["pos"]),
@@ -3076,10 +3105,13 @@ def render_readme(doc: dict, roll: dict, cube: Cube) -> str:
     L.append(f"\n## (c) Gap list ({len(gaps):,} cells under 100%; full list `gap_list_{doc['date']}.csv`)\n")
     L.append("Classes: `sourced-not-built` (a free source is known, nothing built here), `built-but-low-yield` "
              "(it runs or the code covers the county, but not every applicable row is filled/checked), "
-             "`walled (...)` (the only source needs a CAPTCHA, login, payment or breaks terms: a human lane), "
-             "`no source known`, `not applicable` (no applicable rows). Layer `verify` = hit rows without a "
-             "decisive verdict. Estimated rows for a feed that never ran = the state's median hit rate where it "
-             "ran x the county's rows.\n")
+             "`built-not-verified` (layer `verify` only: real hit rows exist -- the signal IS built and ran -- "
+             "but no registered verifier covers them yet, so none has a decisive confirmed/refuted/stale "
+             "verdict), `walled (...)` (the only source needs a CAPTCHA, login, payment or breaks terms: a "
+             "human lane), `no source known`, `not applicable` (no applicable rows). Layer `verify` = hit rows "
+             "without a decisive verdict -- never read `built-not-verified` as `sourced-not-built`'s "
+             "\"nothing built\": this layer only runs on cells that already have real hits. Estimated rows for "
+             "a feed that never ran = the state's median hit rate where it ran x the county's rows.\n")
     L.append("### By column (gap cells, rows affected)\n")
     by_col: dict[str, Counter] = defaultdict(Counter)
     for g in gaps:
