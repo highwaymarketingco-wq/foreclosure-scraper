@@ -1,52 +1,52 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 25,
+  "confirmed": 48,
   "refuted": 1,
-  "rows": 93,
-  "stale": 31,
+  "rows": 131,
+  "stale": 46,
   "unconfirmed": 36,
   "wall": 0
  },
- "generated_at": "2026-11-16T20:49:58Z",
+ "generated_at": "2026-11-16T21:50:13Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-16T20:49:58Z",
-  "county": "Dorchester",
+  "at": "2026-11-16T21:50:13Z",
+  "county": "Greenville",
   "host": "SMB-LTSEO05",
-  "max_rows": 12,
+  "max_rows": 2000,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "www.southcarolinaprobate.net": 36
+    "www.greenvillecounty.org": 38
    }
   },
   "result": {
-   "checked": 12,
-   "confirmed": 4,
-   "stale": 8
+   "checked": 38,
+   "confirmed": 23,
+   "stale": 15
   },
-  "seconds": 70,
+  "seconds": 153,
   "selection": {
-   "applies": 101,
-   "due_new": 101
+   "applies": 38,
+   "due_new": 38
   },
   "source": null,
   "tier": null
  },
- "rows": 93,
+ "rows": 131,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 144592,
+   "bytes": 183183,
    "file": "000.json",
-   "rows": 93,
-   "sha256": "641d2e4a2a30fd837990354810ecc77d9dc39a9d08eca6ee880580621bbb1396"
+   "rows": 131,
+   "sha256": "baf4e99144065addf631e051843a2edd7d1a08f818e0ad02ee1a67b04d478293"
   }
  ],
  "signal": "probate_heir",
