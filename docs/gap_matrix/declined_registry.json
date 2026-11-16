@@ -3,514 +3,916 @@
   "doc": "Cells confirmed, via live verification, to have NO real path forward -- the gap tool's own heuristics would otherwise keep re-flagging these as 'sourced-not-built'/'walled'/'no source known' on every regeneration, costing real investigation time to re-derive the same answer. Each entry needs: state, county (or null for every county in that state), column, reason (specific, falsifiable), confirmed_date, confidence ('high' = directly verified for this exact cell; 'medium' = inferred from a verified sibling/structural rule, not independently re-checked for every county it covers). gap_matrix.py's roll_up() checks this registry before finalizing each cell's gap_class and overrides to 'declined (<reason>)' when found -- never silently; the override is itself visible in the gap list so a human can challenge it. A declined entry is a claim, not a law: if new evidence contradicts one (the underlying platform adds a field, a law changes, a county switches vendors), remove or correct the entry and re-verify live before trusting the correction.",
   "entries": [
     {
-      "state": "SC", "county": "Spartanburg", "column": "rollback_exposure",
+      "state": "SC",
+      "county": "Spartanburg",
+      "column": "rollback_exposure",
       "reason": "qPayBill (Springbrook/PUBLIQ) vendor's shared parse_detail() extracts a fixed 24-field label set with no present-use/deferred field anywhere, confirmed across all 29 qPayBill tenants this project reads (3rd independent confirmation: 2026-10-18, 2026-10-20, 2026-10-21).",
-      "confirmed_date": "2026-10-21", "confidence": "high"
+      "confirmed_date": "2026-10-21",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Horry", "column": "rollback_exposure",
+      "state": "SC",
+      "county": "Horry",
+      "column": "rollback_exposure",
       "reason": "Same qPayBill vendor limitation as Spartanburg -- no present-use/deferred field exists in the shared parser.",
-      "confirmed_date": "2026-10-21", "confidence": "high"
+      "confirmed_date": "2026-10-21",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Sumter", "column": "rollback_exposure",
+      "state": "SC",
+      "county": "Sumter",
+      "column": "rollback_exposure",
       "reason": "Same qPayBill vendor limitation as Spartanburg -- no present-use/deferred field exists in the shared parser.",
-      "confirmed_date": "2026-10-21", "confidence": "high"
+      "confirmed_date": "2026-10-21",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Orangeburg", "column": "rollback_exposure",
+      "state": "SC",
+      "county": "Orangeburg",
+      "column": "rollback_exposure",
       "reason": "Same qPayBill vendor limitation as Spartanburg -- no present-use/deferred field exists in the shared parser.",
-      "confirmed_date": "2026-10-21", "confidence": "high"
+      "confirmed_date": "2026-10-21",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Oconee", "column": "rollback_exposure",
+      "state": "SC",
+      "county": "Oconee",
+      "column": "rollback_exposure",
       "reason": "Same qPayBill vendor limitation as Spartanburg -- no present-use/deferred field exists in the shared parser.",
-      "confirmed_date": "2026-10-21", "confidence": "high"
+      "confirmed_date": "2026-10-21",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Colleton", "column": "rollback_exposure",
+      "state": "SC",
+      "county": "Colleton",
+      "column": "rollback_exposure",
       "reason": "Same qPayBill vendor limitation as Spartanburg -- no present-use/deferred field exists in the shared parser.",
-      "confirmed_date": "2026-10-21", "confidence": "high"
+      "confirmed_date": "2026-10-21",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Laurens", "column": "rollback_exposure",
+      "state": "SC",
+      "county": "Laurens",
+      "column": "rollback_exposure",
       "reason": "Same qPayBill vendor limitation as Spartanburg -- live-reconfirmed by matching Laurens' own ASP.NET control IDs to the already-tested tenants.",
-      "confirmed_date": "2026-10-21", "confidence": "high"
+      "confirmed_date": "2026-10-21",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Pickens", "column": "rollback_exposure",
+      "state": "SC",
+      "county": "Pickens",
+      "column": "rollback_exposure",
       "reason": "Its only bulk GIS layer (Pickens_Open_data FeatureServer/6) has no value field of any kind; its alternate platform (Catalis/Sturgis) only extracts Appraised/Assessed and its CDN API returns a live HTTP 403 (confirmed CatalisBlocked wall).",
-      "confirmed_date": "2026-10-21", "confidence": "high"
+      "confirmed_date": "2026-10-21",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Florence", "column": "rollback_exposure",
+      "state": "SC",
+      "county": "Florence",
+      "column": "rollback_exposure",
       "reason": "Its tax card's 'Land Market Value' vs 'Land Use Value' split looks like an ag-deferral field but live-checking 5 real parcel cards showed the split appears on ordinary RESIDENTIAL IMPROVED parcels too (not just FARM VACANT) -- it's a structural artifact of the acreage-valuation schedule (any parcel with a Gross Acres land record gets both numbers), not an ag-rollback flag. No 'Deferred'/'Rollback' label exists on the card. Would need an ACTUAL deferred/rollback label to change this, not a re-derivation from the Market/Use split.",
-      "confirmed_date": "2026-10-21", "confidence": "high"
+      "confirmed_date": "2026-10-21",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Orangeburg", "column": "vacant_lot",
+      "state": "SC",
+      "county": "Orangeburg",
+      "column": "vacant_lot",
       "reason": "Both GIS hosts (gis2.orangeburgcounty.org, arcserver2.orangeburgcounty.org) have been down/connection-refused for 13+ days (re-confirmed 2026-10-21, not a blip); qPublic is CAPTCHA-walled; the only live AGOL replica has owner/mailing/acreage only, no value or land-use field.",
-      "confirmed_date": "2026-10-21", "confidence": "high"
+      "confirmed_date": "2026-10-21",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Florence", "column": "vacant_lot",
+      "state": "SC",
+      "county": "Florence",
+      "column": "vacant_lot",
       "reason": "Its cached TOTBDGVAL (building-value-only) field looked like a clean $0=vacant signal (35% of parcels), but a live satellite spot-check against real addresses found actual rooftops on 2 of 7 checked $0 parcels -- almost certainly manufactured/mobile homes taxed as separate personal property, excluded from the real-property improvement-value card. Wiring TOTBDGVAL as vacant_lot here would mis-flag real improved homes. Would need Florence's personal-property/mobile-home tax roll (a different, unbuilt source) to fix, not a reuse of this field.",
-      "confirmed_date": "2026-10-21", "confidence": "high"
+      "confirmed_date": "2026-10-21",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Laurens", "column": "vacant_lot",
+      "state": "SC",
+      "county": "Laurens",
+      "column": "vacant_lot",
       "reason": "Already cached (owner/mailing/sale/deed only); its full 23-field schema (live-fetched via ?f=json) has no value, land-use, or building-count field of any kind.",
-      "confirmed_date": "2026-10-21", "confidence": "high"
+      "confirmed_date": "2026-10-21",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Anderson", "column": "vacant_lot",
+      "state": "SC",
+      "county": "Anderson",
+      "column": "vacant_lot",
       "reason": "Checked both known hosts (gis.cityofandersonsc.com, already cached with land_use=None, and the gap list's alternate propertyviewer.andersoncountysc.org -- same underlying data). The only text field (DESCRIPTIO) tested 0/120,547 matches against a VACANT/VAC wordlist -- it's a short legal description, never a land-use class. The RATIO field is a bare SC assessment-ratio code with no companion improvement-value field to anchor a vacant-lot inference against.",
-      "confirmed_date": "2026-10-21", "confidence": "high"
+      "confirmed_date": "2026-10-21",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Cherokee", "column": "vacant_lot",
+      "state": "SC",
+      "county": "Cherokee",
+      "column": "vacant_lot",
       "reason": "Correctly excluded as the SC half of a DUAL_STATE_COUNTIES name pairing. Its only parcel source (qpublic.schneidercorp.com) returns a live HTTP 403 (Cloudflare); the county's own Assessor page links directly to that same walled URL, confirming it's the sole official system, not a wrong/dead link. No alternate open ArcGIS service exists (the only AGOL hit for this name is Cherokee County, GEORGIA, a different state).",
-      "confirmed_date": "2026-10-21", "confidence": "high"
+      "confirmed_date": "2026-10-21",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": null, "column": "marriage_license",
+      "state": "SC",
+      "county": null,
+      "column": "marriage_license",
       "reason": "South Carolina marriage licenses are issued and recorded by the county PROBATE COURT, never the Register of Deeds, statewide (state law, not county discretion) -- confirmed directly for Sumter (live-pulled its full 182-code CountyFusion/GovOS instrument-type tree: zero marriage-related codes) and corroborated by SCDHEC + Sumter's own Probate Court page. This is structurally different from NC, where RODs DO record marriage licenses (why the Johnston NC EagleWeb sweep worked). This project's ROD-platform infrastructure (sc_countyfusion.py, kofile.py, publicsearch.py, etc.) cannot reach Probate Court records at all -- a different county office entirely, not a missing filter. DIRECTLY verified only for Sumter; HIGH confidence it generalizes (state law), but not independently re-checked county-by-county.",
-      "confirmed_date": "2026-10-21", "confidence": "medium"
+      "confirmed_date": "2026-10-21",
+      "confidence": "medium"
     },
     {
-      "state": "NC", "county": "Mecklenburg", "column": "atty_obituary_match",
+      "state": "NC",
+      "county": "Mecklenburg",
+      "column": "atty_obituary_match",
       "reason": "Already live-swept (2026-09-28, \"round 3\" of ~55 candidate domains across the state's 15 biggest-population NC/SC counties with zero coverage, see scrapers/public_notices/funeral_home_rss.py's own module docstring) -- zero usable hits. Charlotte-area funeral homes cluster on three patterns this project's RSS adapters cannot read: large corporate rollups (Dignity Memorial/SCI) whose obituaries live on the parent's own CMS; funeral-vertical SaaS (Tukios, custom allobituaries.php) that return plain HTML, never RSS, for both probe shapes; or a Cloudflare challenge page on every path including /feed (houseofrosadalecharlotte.com, confirmed again live 2026-10-24). gannett_obituaries.py (this column's other declared producer) does not cover Mecklenburg either (its 8 hardcoded papers are Buncombe/Henderson/Gaston/Cleveland/Rutherford NC + Spartanburg/Greenville/Anderson SC). Re-confirmed live 2026-10-24 (6 fresh domain probes, same zero-hit result) before realizing this exact research was already documented -- a check-before-reinvestigating miss on my own part, recorded here so it is not repeated a third time.",
-      "confirmed_date": "2026-10-24", "confidence": "high"
+      "confirmed_date": "2026-10-24",
+      "confidence": "high"
     },
     {
-      "state": "NC", "county": "Guilford", "column": "atty_obituary_match",
+      "state": "NC",
+      "county": "Guilford",
+      "column": "atty_obituary_match",
       "reason": "Same round-3 sweep (see the Mecklenburg entry above and funeral_home_rss.py's module docstring) -- one of the 15 populous NC/SC counties checked with zero usable hits.",
-      "confirmed_date": "2026-09-28", "confidence": "high"
+      "confirmed_date": "2026-09-28",
+      "confidence": "high"
     },
     {
-      "state": "NC", "county": "Forsyth", "column": "atty_obituary_match",
+      "state": "NC",
+      "county": "Forsyth",
+      "column": "atty_obituary_match",
       "reason": "Same round-3 sweep (see the Mecklenburg entry above and funeral_home_rss.py's module docstring) -- one of the 15 populous NC/SC counties checked with zero usable hits.",
-      "confirmed_date": "2026-09-28", "confidence": "high"
+      "confirmed_date": "2026-09-28",
+      "confidence": "high"
     },
     {
-      "state": "NC", "county": "Cumberland", "column": "atty_obituary_match",
+      "state": "NC",
+      "county": "Cumberland",
+      "column": "atty_obituary_match",
       "reason": "Same round-3 sweep (see the Mecklenburg entry above and funeral_home_rss.py's module docstring) -- one of the 15 populous NC/SC counties checked with zero usable hits.",
-      "confirmed_date": "2026-09-28", "confidence": "high"
+      "confirmed_date": "2026-09-28",
+      "confidence": "high"
     },
     {
-      "state": "NC", "county": "New Hanover", "column": "atty_obituary_match",
+      "state": "NC",
+      "county": "New Hanover",
+      "column": "atty_obituary_match",
       "reason": "Same round-3 sweep (see the Mecklenburg entry above and funeral_home_rss.py's module docstring) -- one of the 15 populous NC/SC counties checked with zero usable hits.",
-      "confirmed_date": "2026-09-28", "confidence": "high"
+      "confirmed_date": "2026-09-28",
+      "confidence": "high"
     },
     {
-      "state": "NC", "county": "Durham", "column": "atty_obituary_match",
+      "state": "NC",
+      "county": "Durham",
+      "column": "atty_obituary_match",
       "reason": "Same round-3 sweep (see the Mecklenburg entry above and funeral_home_rss.py's module docstring) -- one of the 15 populous NC/SC counties checked with zero usable hits.",
-      "confirmed_date": "2026-09-28", "confidence": "high"
+      "confirmed_date": "2026-09-28",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Horry", "column": "atty_obituary_match",
+      "state": "SC",
+      "county": "Horry",
+      "column": "atty_obituary_match",
       "reason": "Same round-3 sweep (see the Mecklenburg entry above and funeral_home_rss.py's module docstring) -- one of the 15 populous NC/SC counties checked with zero usable hits.",
-      "confirmed_date": "2026-09-28", "confidence": "high"
+      "confirmed_date": "2026-09-28",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Richland", "column": "atty_obituary_match",
+      "state": "SC",
+      "county": "Richland",
+      "column": "atty_obituary_match",
       "reason": "Same round-3 sweep (see the Mecklenburg entry above and funeral_home_rss.py's module docstring) -- one of the 15 populous NC/SC counties checked with zero usable hits.",
-      "confirmed_date": "2026-09-28", "confidence": "high"
+      "confirmed_date": "2026-09-28",
+      "confidence": "high"
     },
     {
-      "state": "NC", "county": null, "column": "lt_tax_sale_overage",
+      "state": "NC",
+      "county": null,
+      "column": "lt_tax_sale_overage",
       "reason": "NC tax-foreclosure sales are JUDICIAL (G.S. 105-374 in rem, or power-of-sale under G.S. 45-21.31 for mortgage-style tax foreclosures); any excess-over-debt proceeds are deposited with the CLERK OF SUPERIOR COURT inside that specific foreclosure special-proceeding's own case file, not published by the county tax office as a roster. Claiming requires a motion/petition referencing that case number (G.S. 45-21.31/105-374(q)); there is no county-wide or statewide published list of who has surplus -- confirmed independently two ways: (1) this repo's own gap_matrix.py Spec for this column already carries the ambiguity note 'SC counties publish excess-funds lists; NC clerks hold surplus without a published list', and (2) fresh 2026-11-10 web research (NC probate/estate-law firm Q&A content, a dozen+ independent articles) converges on the same claim-by-petition-to-the-case-file process with no published roster. After ~1 year unclaimed, money can migrate to the NC State Treasurer's generic Unclaimed Property Division (116B-62) -- a DIFFERENT, non-tax-sale-specific statewide database (bank accounts, uncashed checks, etc.), not a fix for this column; scraping it would need heavy filtering and is a separate future signal, not this one. This makes the 101 NC rows the gap matrix flags 'sourced-not-built' for lt_tax_sale_overage a heuristic false-positive (the matrix treats 'county has SOME tax source in county_records_matrix.json' as 'sourced' for every tax-family column, including this one, without checking that source actually publishes an overage list). Verified directly against the structural rule (judicial-foreclosure routing), not independently re-checked clerk-by-clerk for all 100 NC counties -- a county-specific override still wins if one clerk turns out to publish a list anyway.",
-      "confirmed_date": "2026-11-10", "confidence": "medium"
+      "confirmed_date": "2026-11-10",
+      "confidence": "medium"
     },
     {
-      "state": "SC", "county": "Oconee", "column": "lt_tax_sale_overage",
+      "state": "SC",
+      "county": "Oconee",
+      "column": "lt_tax_sale_overage",
       "reason": "Live-fetched https://oconeesc.com/delinquent-tax/tax-sale-information/overage-information 2026-11-10 (HTTP 200, no login/CAPTCHA): the page is PROCESS INFO ONLY, no itemized list. It states the delinquent tax office MAILS certified notification letters to anyone with available overage, and anyone else must CALL (864-638-4147) to inquire -- there is no roster of names/parcels/amounts on the page or linked from it.",
-      "confirmed_date": "2026-11-10", "confidence": "high"
+      "confirmed_date": "2026-11-10",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Greenville", "column": "lt_tax_sale_overage",
+      "state": "SC",
+      "county": "Greenville",
+      "column": "lt_tax_sale_overage",
       "reason": "The gap matrix's own 'source' pointer for this cell, https://greenvillecountysc.gov/TaxCollector/pdf/taxsaleoverbid.pdf, was live-fetched and text-extracted 2026-11-10 (HTTP 200, application/pdf): it is a static 'INSTRUCTIONS FOR FILING CLAIM FOR TAX SALE OVERAGE' form (dated 5/11/2017), not an itemized list -- no names, parcels or dollar amounts anywhere in the document. No other overage-list link found on the Tax Collector's TaxSaleProcedures/TaxSaleFAQ pages.",
-      "confirmed_date": "2026-11-10", "confidence": "high"
+      "confirmed_date": "2026-11-10",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Bamberg", "column": "lt_tax_sale_overage",
+      "state": "SC",
+      "county": "Bamberg",
+      "column": "lt_tax_sale_overage",
       "reason": "Live-fetched https://www.bambergcounty.sc.gov/overage-claims 2026-11-10 (HTTP 200 after a 301 from the www-less host, no login/CAPTCHA): page is claim-filing instructions only (links to an Agreement-and-Release claim FORM PDF), no itemized list of names/parcels/amounts.",
-      "confirmed_date": "2026-11-10", "confidence": "high"
+      "confirmed_date": "2026-11-10",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Jasper", "column": "lt_tax_sale_overage",
+      "state": "SC",
+      "county": "Jasper",
+      "column": "lt_tax_sale_overage",
       "reason": "Live-fetched https://jaspercountysc.gov/services/taxes/delinquent-tax-collection 2026-11-10 (HTTP 200): no document/PDF links at all on the page, no overage list. Page says the tax-sale property list itself is sold on paper ($0.50/page) at the Tax Collector's office; an overage list would require a phone call (843-717-3610) or a FOIA request, not a public scrape target.",
-      "confirmed_date": "2026-11-10", "confidence": "high"
+      "confirmed_date": "2026-11-10",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Berkeley", "column": "lt_tax_sale_overage",
+      "state": "SC",
+      "county": "Berkeley",
+      "column": "lt_tax_sale_overage",
       "reason": "A third-party aggregator claims Berkeley publishes 'an unclaimed tax sale overage list by owner name including bid amount and overage', but every Berkeley County path tried live 2026-11-10 with a full Chrome UA (both WebFetch and curl) -- berkeleycountysc.gov/departments/delinquent-tax/, taxsale.berkeleycountysc.gov/, and berkeleycountysc.gov/?s=overage -- returned HTTP 403 (Cloudflare/WAF, not a wrong URL: all three independent paths on the same host blocked identically). This cell should read 'walled (bot check (Cloudflare/WAF))', not 'sourced-not-built'; the gap matrix has not re-detected the wall. No free/no-CAPTCHA path confirmed as of this date.",
-      "confirmed_date": "2026-11-10", "confidence": "high"
+      "confirmed_date": "2026-11-10",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Dorchester", "column": "lt_tax_sale_overage",
+      "state": "SC",
+      "county": "Dorchester",
+      "column": "lt_tax_sale_overage",
       "reason": "https://www.dorchestercountysc.gov/departments/delinquent-tax-collector returned HTTP 403 live 2026-11-10 (WebFetch, full browser UA) -- Cloudflare/WAF wall, same class as Berkeley above. Not re-tried via curl this session; re-verify before building.",
-      "confirmed_date": "2026-11-10", "confidence": "medium"
+      "confirmed_date": "2026-11-10",
+      "confidence": "medium"
     },
     {
-      "state": "SC", "county": "Kershaw", "column": "lt_tax_sale_overage",
+      "state": "SC",
+      "county": "Kershaw",
+      "column": "lt_tax_sale_overage",
       "reason": "Every kershaw.sc.gov path tried live 2026-11-10 with a full Chrome UA -- the Treasurer 'delinquent-matters' page and both 'showpublisheddocument' doc IDs (17179, 9876) surfaced by search as the county's Tax Sale List/Guide -- returned HTTP 403 (Cloudflare/WAF, consistent across 3 independent paths on the same host). Walled, not sourced-not-built.",
-      "confirmed_date": "2026-11-10", "confidence": "high"
+      "confirmed_date": "2026-11-10",
+      "confidence": "high"
     },
     {
-      "state": "NC", "county": "Mecklenburg", "column": "storm_damage",
+      "state": "NC",
+      "county": "Mecklenburg",
+      "column": "storm_damage",
       "reason": "No post-Helene parcel-level damage-assessment GIS layer exists or will exist here, even though Mecklenburg sits inside the broad ~71-county FEMA IA footprint (storm_scope). 2026-10-29 session found Mecklenburg's only logged tornado was EF-0 (negligible) via NOAA Storm Events + the state's own Helene damage briefing, but never implemented the override -- this session (2026-11-16) independently re-confirmed via FEMA OpenFEMA HousingAssistanceOwners/Renters per-household inspected-damage data for DR-4827: Mecklenburg averages $810 FEMA-inspected damage per inspected home (5,309 inspections), only 39 homes assessed above $30k, 8 max-grant recipients -- an order of magnitude below the counties this column's own producer (enrichment_helene_damage.py) already covers (Henderson: avg $4,184/home, 170 >$30k, 299 max grants; Buncombe: avg $2,840/home, 367 >$30k, 617 max grants). NOAA Storm Events' only Helene-week (2024-09-24..10-03) entries for Mecklenburg are a Flash Flood and a county-wide Tropical Storm wind estimate, no tornado, no structural-damage narrative. Real catastrophic structural damage -- the kind that drives a county to run and publish a parcel-level ATC-45 damage survey -- never happened here.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "NC", "county": "Gaston", "column": "storm_damage",
+      "state": "NC",
+      "county": "Gaston",
+      "column": "storm_damage",
       "reason": "Same confirmed dead end as Mecklenburg (see that entry, same FEMA DR-4827/NOAA cross-check method). Gaston's only logged tornado (EF-1) explicitly missed the federal damage-assistance threshold per the 2026-10-29 session; this session's FEMA per-household data shows Gaston at the lowest severity of any county checked (avg $674 FEMA-inspected damage/inspected home across 3,609 inspections, zero homes above $30k, 3 max-grant recipients). NOAA Storm Events' only Helene-week entries for Gaston are a Tropical Storm wind estimate and a Flash Flood -- no tornado logged in that window (Gaston's EF-1 was a separate, non-Helene 2024 event). No parcel-level damage-assessment layer exists or will exist here.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "NC", "county": "Lincoln", "column": "storm_damage",
+      "state": "NC",
+      "county": "Lincoln",
+      "column": "storm_damage",
       "reason": "Same confirmed dead end as Mecklenburg/Gaston (see those entries). Lincoln was rated 'low-impact' in the state's own Helene damage briefing per the 2026-10-29 session; this session's FEMA per-household data for DR-4827 corroborates it (avg $725 FEMA-inspected damage/inspected home across 775 inspections, only 1 home above $30k, 2 max-grant recipients -- same low tier as Mecklenburg/Gaston, far below the confirmed-built counties). NOAA Storm Events' only Helene-week entry for Lincoln is a single county-wide Tropical Storm wind estimate -- no tornado, no flood. No parcel-level damage-assessment layer exists or will exist here.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "NC", "county": "Forsyth", "column": "storm_damage",
+      "state": "NC",
+      "county": "Forsyth",
+      "column": "storm_damage",
       "reason": "Forsyth sits inside the broad FEMA DR-4827 IA footprint (storm_scope) but NOAA's Storm Events Database has ZERO logged weather events of any kind for Forsyth County during the entire Helene window (2024-09-24..10-03) -- its only other 2024 entries are four unrelated ordinary thunderstorm-wind reports (Jan/Feb/Apr/Aug), each under $5K. FEMA's per-household inspected-damage data for DR-4827 is the lowest of all 64 'no source known' storm_damage counties checked this session (avg $268 FEMA-inspected damage per inspected home across 383 inspections, zero homes above $30k, zero max-grant recipients). The federal IA registration here reflects generic storm-adjacent hardship, not structural damage. No county/city post-Helene parcel-level damage-assessment GIS layer exists or will exist here.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "NC", "county": "Cabarrus", "column": "storm_damage",
+      "state": "NC",
+      "county": "Cabarrus",
+      "column": "storm_damage",
       "reason": "Same Charlotte-metro-ring profile as the confirmed Mecklenburg/Gaston/Lincoln/Forsyth dead ends (see those entries). NOAA Storm Events' only Helene-week entries for Cabarrus are a Flood ($1K) and a Flash Flood ($10K), no tornado; FEMA's per-household data for DR-4827 shows Cabarrus at avg $352 FEMA-inspected damage per inspected home across 784 inspections, zero homes above $30k, zero max-grant recipients -- below even the confirmed tier. Inferred from the same structural rule as the directly-verified siblings above (sibling Charlotte-Piedmont county); not independently checked against an official Helene damage briefing document the way Mecklenburg/Gaston/Lincoln were.",
-      "confirmed_date": "2026-11-16", "confidence": "medium"
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
     },
     {
-      "state": "NC", "county": "Union", "column": "storm_damage",
+      "state": "NC",
+      "county": "Union",
+      "column": "storm_damage",
       "reason": "Same Charlotte-metro-ring profile as the confirmed Mecklenburg/Gaston/Lincoln/Forsyth dead ends (see those entries). NOAA Storm Events' only Helene-week entries for Union are a Thunderstorm Wind ($5K), a Flash Flood ($5K) and a county-wide Tropical Storm wind estimate, no tornado; FEMA's per-household data for DR-4827 shows Union at avg $761 FEMA-inspected damage per inspected home across 253 inspections, zero homes above $30k, zero max-grant recipients -- same low tier as the confirmed dead ends. Inferred from the same structural rule as the directly-verified siblings above (sibling Charlotte-Piedmont county); not independently checked against an official Helene damage briefing document the way Mecklenburg/Gaston/Lincoln were.",
-      "confirmed_date": "2026-11-16", "confidence": "medium"
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
     },
     {
-      "state": "NC", "county": "Anson", "column": "rollback_exposure",
+      "state": "NC",
+      "county": "Anson",
+      "column": "rollback_exposure",
       "reason": "NC ITSPublic/bttaxpayerportal TaxBillSearch (nc_its_public_tax.py's PORTALS entry, full_model=True) exposes only TaxYear/BillNumber/AccountNumber/AccountName1/Description/OriginalBillAmount/TotalDue -- no market-vs-use valuation field anywhere, the same structural gap enrichment_its_public_multiyear_tax.py's own docstring already noted for this vendor (the pre-2026-11-05 finding that originally justified qPayBill's own now-superseded Spartanburg/Oconee/Laurens entries above). Additionally, re-tested LIVE 2026-11-16 for the specific Description-text trick that DID work on the sibling qPayBill vendor (a literal '<year> ROLLBACK TAX...' string in place of the usual situs line, which parse_description_cols()/parse_row_cols() currently drop as 'personal property / junk'): fetched 2 real tax years (2024/2025) end-to-end via the production call sequence (GetSearchTablePartial -> GetSearchTableData), inspected every row's raw Description cell before filtering -- 1,400 rows read, 524 dropped as non-real, ZERO contained 'ROLLBACK' in any form. The Description-text signal genuinely does not exist on this vendor; this is not the same silent-gap bug class as qPayBill.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "NC", "county": "Yadkin", "column": "rollback_exposure",
+      "state": "NC",
+      "county": "Yadkin",
+      "column": "rollback_exposure",
       "reason": "Same bttaxpayerportal/ITSPublic vendor limitation as Anson (see that entry for the full reasoning and method) -- live-rechecked 2026-11-16 as part of the same 6-county probe: 2 tax years (2024/2025), 1,500 rows read, 679 dropped as non-real, zero 'ROLLBACK' hits in any raw Description cell.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "NC", "county": "Caswell", "column": "rollback_exposure",
+      "state": "NC",
+      "county": "Caswell",
+      "column": "rollback_exposure",
       "reason": "Same bttaxpayerportal/ITSPublic vendor limitation as Anson (see that entry for the full reasoning and method) -- live-rechecked 2026-11-16 as part of the same 6-county probe: 2 tax years (2024/2025), 1,292 rows read, 745 dropped as non-real, zero 'ROLLBACK' hits in any raw Description cell.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "NC", "county": "Jones", "column": "rollback_exposure",
+      "state": "NC",
+      "county": "Jones",
+      "column": "rollback_exposure",
       "reason": "Same bttaxpayerportal/ITSPublic vendor limitation as Anson (see that entry for the full reasoning and method) -- live-rechecked 2026-11-16 as part of the same 6-county probe: 2 tax years (2024/2025), 1,455 rows read, 772 dropped as non-real, zero 'ROLLBACK' hits in any raw Description cell.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "NC", "county": "Graham", "column": "rollback_exposure",
+      "state": "NC",
+      "county": "Graham",
+      "column": "rollback_exposure",
       "reason": "Same bttaxpayerportal/ITSPublic vendor limitation as Anson (see that entry for the full reasoning and method) -- live-rechecked 2026-11-16 as part of the same 6-county probe: 2 tax years (2024/2025), 1,102 rows read, 254 dropped as non-real, zero 'ROLLBACK' hits in any raw Description cell.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "NC", "county": "Alleghany", "column": "rollback_exposure",
+      "state": "NC",
+      "county": "Alleghany",
+      "column": "rollback_exposure",
       "reason": "Same bttaxpayerportal/ITSPublic vendor limitation as Anson (see that entry for the full reasoning and method) -- live-rechecked 2026-11-16 as part of the same 6-county probe: 2 tax years (2024/2025), 637 rows read, 257 dropped as non-real, zero 'ROLLBACK' hits in any raw Description cell. (Caswell/Jones/Graham/Alleghany are not independently known to carry ag-use-deferral parcels the way Anson's farmland does, so 'medium' confidence would also be defensible for those four on that basis alone -- kept 'high' here because the claim being verified is about the PLATFORM's field set, not about any one county's parcel mix, and the platform check was run directly against each of the 6, not inferred from a sibling.)",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Chester", "column": "rollback_exposure",
+      "state": "SC",
+      "county": "Chester",
+      "column": "rollback_exposure",
       "reason": "Chester's tax-roll source in county_records_matrix.json (chestercountysctax.com) is a THIRD shared vendor this sweep found: Catalis/Sturgis, the same host sc_catalis_delinquent_roll.py already reads for Pickens/Hampton/Fairfield/Aiken (CATALIS_COUNTIES, shared CloudFront CDN d1ebsyxxbc7tep.cloudfront.net). Live-reconfirmed 2026-11-16 with ONE POST /Records against this exact host (Chester's own GUID, the module's own _headers()/payload shape, prefix 'A'): HTTP 403 immediately, no retry attempted -- this module's own documented rule for this exact host (CatalisBlocked: 'that is the host declining... stop, do not retry, do not route around it', weekend_runner.sh 2026-09-11) and the same wall Pickens' declined_registry entry already cites (confirmed there 2026-10-21, now reconfirmed still live 36 days later on the shared host, not just for Pickens). Walled, not sourced-not-built -- a real reader already exists and already runs for this county when the host is reachable. NOT independently checked: whether this vendor's unread 'Classes' field (named in the module's own docstring, never parsed by any existing code) would have carried a present-use/ag classification useful for an ESTIMATED rollback figure -- the 403 blocked seeing any live record at all, so that question stays open for whenever the wall lifts, and is not what this entry declines.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Hampton", "column": "rollback_exposure",
+      "state": "SC",
+      "county": "Hampton",
+      "column": "rollback_exposure",
       "reason": "Same Catalis/Sturgis shared-host wall as Chester (see that entry for the full reasoning) -- Hampton is CATALIS_COUNTIES['Hampton'] on the identical CloudFront CDN host, confirmed blocked by the same live 403 2026-11-16 (one request, against Chester's GUID; the block is host-level per weekend_runner.sh's 2026-09-11 finding and Pickens' own 2026-10-21 entry, not per-county, so it is not independently re-tested against Hampton's own GUID to avoid a second request against an already-confirmed-blocking host).",
-      "confirmed_date": "2026-11-16", "confidence": "medium"
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
     },
     {
-      "state": "SC", "county": "Fairfield", "column": "rollback_exposure",
+      "state": "SC",
+      "county": "Fairfield",
+      "column": "rollback_exposure",
       "reason": "Same Catalis/Sturgis shared-host wall as Chester (see that entry for the full reasoning) -- Fairfield is CATALIS_COUNTIES['Fairfield'] on the identical CloudFront CDN host (also the reason scrapers/counties_sc/fairfield_delinquent_tax.py was disabled 2026-10-01: Fairfield's own treasurer page links straight to this same fairfieldsctax.com Catalis tenant). Confirmed blocked by the same live 403 2026-11-16 (one request, against Chester's GUID; the block is host-level, not re-tested against Fairfield's own GUID to avoid a second request against an already-confirmed-blocking host).",
-      "confirmed_date": "2026-11-16", "confidence": "medium"
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
     },
     {
-      "state": "SC", "county": "Aiken", "column": "rollback_exposure",
+      "state": "SC",
+      "county": "Aiken",
+      "column": "rollback_exposure",
       "reason": "Same Catalis/Sturgis shared-host wall as Chester (see that entry for the full reasoning) -- Aiken is CATALIS_COUNTIES['Aiken'] on the identical CloudFront CDN host. Confirmed blocked by the same live 403 2026-11-16 (one request, against Chester's GUID; the block is host-level, not re-tested against Aiken's own GUID to avoid a second request against an already-confirmed-blocking host, and Aiken's own responses already run ~3MB/prefix per the module's docstring, the worst case to probe twice for the same answer).",
-      "confirmed_date": "2026-11-16", "confidence": "medium"
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
     },
     {
-      "state": "NC", "county": "Robeson", "column": "rollback_exposure",
+      "state": "NC",
+      "county": "Robeson",
+      "column": "rollback_exposure",
       "reason": "This vendor (ustaxdata.com, enrichment_ustaxdata_tax_search.py) has no present-use/land-use-deferral field of any kind -- already directly checked and documented in that module's own docstring, independent of this session: every row's 'Asset Description' cell reads the literal static placeholder '> CONTACT COUNTY FOR' on EVERY year and EVERY county tried (confirmed live 2026-10-16, not a fetch error), so there is no per-bill descriptive text at all for a '<year> ROLLBACK TAX...'-style marker (the qPayBill-vendor signal this sweep found 2026-11-05) to ever appear in. The summary table has no dollar amount either (that lives one click deeper, on a separate per-bill page this module already reads for tax_owed, which also carries no use-value split). Structurally weaker than a vendor that has real but merely-unexploited Description text -- here the field itself is dead on arrival.",
-      "confirmed_date": "2026-10-16", "confidence": "high"
+      "confirmed_date": "2026-10-16",
+      "confidence": "high"
     },
     {
-      "state": "NC", "county": "Alexander", "column": "rollback_exposure",
+      "state": "NC",
+      "county": "Alexander",
+      "column": "rollback_exposure",
       "reason": "Same ustaxdata.com vendor limitation as Robeson (see that entry -- the 'Asset Description' placeholder is vendor-wide, not county-specific). Alexander's own tenant (alexander.ustaxdata.com) is additionally a confirmed live dead end independent of this question: its taxbill.cfm answered 'Connection Timeout Alexander County Tax Record Application... We are experiencing technical difficulties' (HTTP 200, not a bill) per enrichment_ustaxdata_tax_search.py's own docstring -- a pre-existing condition on the county's own server, not something this project caused, and not independently re-checked here as still current.",
-      "confirmed_date": "2026-10-20", "confidence": "medium"
+      "confirmed_date": "2026-10-20",
+      "confidence": "medium"
     },
     {
-      "state": "NC", "county": "Granville", "column": "rollback_exposure",
+      "state": "NC",
+      "county": "Granville",
+      "column": "rollback_exposure",
       "reason": "Granville is the SAME bttaxpayerportal/ITSPublic vendor as the Anson entry above (nc_its_public_tax.py PORTALS['Granville'], just hosted on the county's own domain tax.granvillecounty.org rather than the shared bttaxpayerportal.com name, which is why it did not group with the other 6 by hostname). The 'no value/use-split field in TaxBillSearch's own column set' argument is a PLATFORM-level fact (re-confirmed this session by reading parse_row_cols()/parse_description_cols() directly, not per-tenant), so it applies here unchanged. The Description-text live check (2 years, 7,386 rows, zero 'ROLLBACK' hits) was run directly against Anson/Yadkin/Caswell/Jones/Graham/Alleghany, NOT against Granville's own tenant -- kept at 'medium' confidence rather than 'high' for that reason; a county-specific live recheck would raise it.",
-      "confirmed_date": "2026-11-16", "confidence": "medium"
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
     },
     {
-      "state": "NC", "county": "Carteret", "column": "rollback_exposure",
+      "state": "NC",
+      "county": "Carteret",
+      "column": "rollback_exposure",
       "reason": "Carteret is the SAME bttaxpayerportal/ITSPublic vendor as Anson/Granville above (just newly wired into nc_its_public_tax.py's own PORTALS this same session, 2026-11-16 -- see that file and tax_lien_itspublic.py's own PORTALS/_NEWER_BUILD entries). Live-read directly today: Carteret's grid uses the ITSNET-style layout (TaxYear, BillNumber, AccountNumber, AccountName1, OriginalBillAmount, TotalDue, DiscoveryYear, Description, Address) where Description holds ONLY the bare parcel id token (e.g. '634603020856000') with no free text at all -- there is no asset/property description field of any kind on this layout for a value/use-split or a '<year> ROLLBACK TAX...' marker to ever appear in (the situs lives in the separate Address column, not Description). Structurally identical to the platform-level finding already confirmed for the Onslow/Graham-style layout (parse_row_cols()/parse_description_cols() read directly) and for Alleghany/Scotland's own ITSNET layout -- high confidence because this was read directly against Carteret's own live Description cells today, not inferred from a sibling county.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "NC", "county": "Warren", "column": "multi_year_delinquent_tax",
+      "state": "NC",
+      "county": "Warren",
+      "column": "multi_year_delinquent_tax",
       "reason": "Warren's bttaxpayerportal/ITSPublicWN tax-bill portal is live (GET .../TaxBillSearch answers 200) but every bill search answers ZERO records -- already documented in nc_its_public_tax.py's own UNREADABLE_PORTALS dict ('portal answers 0 bills, paid or unpaid, for 2022-2025', read live 2026-10-09) and RE-confirmed live today (2026-11-16): a full-model UnpaidBillsOnly=false search with no TaxYear filter answers numRecords=0. With zero bills of any kind, there is no roll for nc_its_public_tax.py to read and no multi_year_delinquent_tax block can ever be produced -- this is the portal's own ceiling, not a parser or wiring gap (compare Carteret, re-checked the same way today, which answers thousands of real bills and was wired in instead of declined).",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "NC", "county": "Warren", "column": "atty_tax_verified_confirmed",
+      "state": "NC",
+      "county": "Warren",
+      "column": "atty_tax_verified_confirmed",
       "reason": "Same Warren 0-record portal finding as the multi_year_delinquent_tax entry above (re-confirmed live 2026-11-16). atty_tax_verified_confirmed's own Spec requires a decisive tax_lien verdict (confirmed/refuted/stale) from tax_lien_itspublic.py, which itself depends on search() finding real bills on this same portal -- with zero records of any kind, every search can only ever answer parcel_not_found (unconfirmed), never a decisive verdict. Warren is correctly absent from both nc_its_public_tax.py's PORTALS and tax_lien_itspublic.py's PORTALS for this reason.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "NC", "county": "Warren", "column": "tax_aging_surfaced",
+      "state": "NC",
+      "county": "Warren",
+      "column": "tax_aging_surfaced",
       "reason": "tax_aging_surfaced is produced off raw.tax_owed (enrichment_tax_aging.py), which on this vendor only ever comes from nc_its_public_tax.py's own roll block (raw['nc_its_public_tax'], aggregate()'s 'if total: raw[\"tax_owed\"]=...'). Warren's portal answers zero bills of any kind (re-confirmed live 2026-11-16, see the multi_year_delinquent_tax entry above for this county) so no roll block, and therefore no tax_owed block, can ever be produced for it on this source.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "NC", "county": "Warren", "column": "rollback_exposure",
+      "state": "NC",
+      "county": "Warren",
+      "column": "rollback_exposure",
       "reason": "Two independent reasons, both confirmed live 2026-11-16: (1) Warren's TaxBillSearch answers zero bills of any kind (see this county's multi_year_delinquent_tax entry) so there is no roll data to read a rollback signal from in the first place; (2) even where this vendor DOES have real bills (Anson/Yadkin/Caswell/Jones/Graham/Alleghany, round 2 this same session, commit 5469b46e), it structurally has no value/use-split field anywhere in TaxBillSearch's own Description/column set for a rollback marker to appear in -- a platform-level limitation, not specific to having records.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "NC", "county": "Warren", "column": "lt_tax_sale",
+      "state": "NC",
+      "county": "Warren",
+      "column": "lt_tax_sale",
       "reason": "Same Warren 0-record portal finding as this county's other bttaxpayerportal entries above (re-confirmed live 2026-11-16: a full-model UnpaidBillsOnly=false, no-TaxYear-filter search answers numRecords=0). With no bills of any kind, this vendor can never surface a tax-sale/lien-registry feed row for Warren.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "NC", "county": "Clay", "column": "multi_year_delinquent_tax",
+      "state": "NC",
+      "county": "Clay",
+      "column": "multi_year_delinquent_tax",
       "reason": "Clay's bttaxpayerportal/ITSPublicCL is the OLD ITS 1.0 build (a 6,241-byte TaxBillSearch page, the small-stub shape, not the full-model page's ~14KB) -- already documented in nc_its_public_tax.py's own UNREADABLE_PORTALS dict ('no JSON routes (404); its results form answers HTTP 500', read live 2026-10-09) and RE-confirmed live today (2026-11-16): both GetSearchTablePartial and GetSearchTableData answer HTTP 404 ('The resource cannot be found'). With no working AJAX route at all, nc_its_public_tax.py's roll scraper can never read any bills for Clay, so no multi_year_delinquent_tax block can ever be produced.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "NC", "county": "Clay", "column": "atty_tax_verified_confirmed",
+      "state": "NC",
+      "county": "Clay",
+      "column": "atty_tax_verified_confirmed",
       "reason": "Same Clay old-build 404 finding as the multi_year_delinquent_tax entry above (re-confirmed live 2026-11-16). tax_lien_itspublic.py's own search() would hit the identical 404 on every call, so no decisive tax_lien verdict (confirmed/refuted/stale) can ever be reached for a Clay row on this vendor -- Clay is correctly absent from both PORTALS dicts.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "NC", "county": "Clay", "column": "tax_aging_surfaced",
+      "state": "NC",
+      "county": "Clay",
+      "column": "tax_aging_surfaced",
       "reason": "tax_aging_surfaced depends on raw.tax_owed, which on this vendor only comes from nc_its_public_tax.py's own roll block. Clay's AJAX routes 404 (re-confirmed live 2026-11-16, see this county's multi_year_delinquent_tax entry), so no roll block and no tax_owed block can ever be produced for it on this source.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "NC", "county": "Clay", "column": "rollback_exposure",
+      "state": "NC",
+      "county": "Clay",
+      "column": "rollback_exposure",
       "reason": "Clay's old-build AJAX routes 404 (re-confirmed live 2026-11-16, see this county's multi_year_delinquent_tax entry) so there is no roll data of any kind to read a rollback signal from, independent of the separate platform-level finding (round 2, this same session) that this vendor's TaxBillSearch has no value/use-split field anywhere even where bills ARE readable.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "NC", "county": "Swain", "column": "multi_year_delinquent_tax",
+      "state": "NC",
+      "county": "Swain",
+      "column": "multi_year_delinquent_tax",
       "reason": "Swain's bttaxpayerportal/ITSPublicSW is the SAME old ITS 1.0 build as Clay (a 6,307-byte TaxBillSearch page) -- documented in nc_its_public_tax.py's own UNREADABLE_PORTALS dict as 'same page as Clay, its form was not posted' (read live 2026-10-09, assumed rather than directly tested at the time) and NOW directly RE-confirmed live 2026-11-16: both GetSearchTablePartial and GetSearchTableData answer HTTP 404, the identical failure as Clay's own AJAX routes. With no working AJAX route, no multi_year_delinquent_tax block can ever be produced for Swain.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "NC", "county": "Swain", "column": "atty_tax_verified_confirmed",
+      "state": "NC",
+      "county": "Swain",
+      "column": "atty_tax_verified_confirmed",
       "reason": "Same Swain old-build 404 finding as the multi_year_delinquent_tax entry above (directly re-confirmed live 2026-11-16, not merely assumed-same-as-Clay this time). No decisive tax_lien verdict can ever be reached for a Swain row on this vendor.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "NC", "county": "Swain", "column": "tax_aging_surfaced",
+      "state": "NC",
+      "county": "Swain",
+      "column": "tax_aging_surfaced",
       "reason": "tax_aging_surfaced depends on raw.tax_owed, which on this vendor only comes from nc_its_public_tax.py's own roll block. Swain's AJAX routes 404 (directly re-confirmed live 2026-11-16, see this county's multi_year_delinquent_tax entry), so no roll block and no tax_owed block can ever be produced for it on this source.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "NC", "county": "Swain", "column": "rollback_exposure",
+      "state": "NC",
+      "county": "Swain",
+      "column": "rollback_exposure",
       "reason": "Swain's old-build AJAX routes 404 (directly re-confirmed live 2026-11-16, see this county's multi_year_delinquent_tax entry) so there is no roll data of any kind to read a rollback signal from, independent of the separate platform-level finding (round 2, this same session) that this vendor's TaxBillSearch has no value/use-split field anywhere even where bills ARE readable.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "NC", "county": "Swain", "column": "lt_tax_sale",
+      "state": "NC",
+      "county": "Swain",
+      "column": "lt_tax_sale",
       "reason": "Same Swain old-build 404 finding as this county's other bttaxpayerportal entries above (directly re-confirmed live 2026-11-16). With no working AJAX route, this vendor can never surface a tax-sale/lien-registry feed row for Swain.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Sumter", "column": "beds_baths",
+      "state": "SC",
+      "county": "Sumter",
+      "column": "beds_baths",
       "reason": "Two checked sources, neither usable. (1) sumtercounty.qpaybill.com's own TaxesDetailsType4.aspx: fetched a REAL live detail page today (notice 058761263) and grepped its flattened visible text for every bed/bath-shaped label -- zero matches; the page's full label set is exactly Acres/Appraisal/Balance Due/Buildings/City Tax/County Tax/Date/Description/Fees/Exemptions/Map Number/Owner Name/Ratio/Record Type/Status/Tax Year/Total*, matching parse_detail()'s own documented field list. 3rd independent county confirming this is a qPayBill VENDOR-WIDE limitation, not Sumter-specific (after Lexington, commit 535e71d0, and Orangeburg, this same session). (2) The one ArcGIS layer configured for Sumter (parcel_cache.py PARCEL_LAYERS['Sumter'], gis.sumter-sc.com BaseMaps/Sumter_City_County/FeatureServer/7): data/parcel_cache/sumter.sqlite has 0/122,941 non-null bedrooms, bathrooms, living_sqft, year_built or stories; live-refetched the layer's own field metadata today (25 fields total) and confirmed none is bed/bath/sqft-shaped -- same structural shape as Orangeburg's layer (see project_orangeburg_cluster_2026-11-16.md). UNLIKE Orangeburg, this layer's own WebURL field ('Property Card Link') resolves to a REAL, different, more promising candidate: a Schneider qPublic property card (https://qpublic.schneidercorp.com/Application.aspx?AppID=1154&LayerID=30904&PageTypeID=4&PageID=12534&KeyValue=144-00-03-001, i.e. AppID=1154/LayerID=30904/card-PageID=12534/KeyValue=dashed-parcel-number) -- the exact same Schneider qPublic platform this project's own assessor_cards/qpublic_render.py already extracts real bedrooms/bathrooms/living_sqft from for 7 sibling SC counties (Spartanburg/Oconee/Pickens/Union/Clarendon/Lee/Fairfield). Live-fetched that exact URL today: HTTP 403 with a genuine Cloudflare Turnstile challenge (cf-mitigated: challenge header) -- the same wall this project's own code already names as 'can ONLY be reached by SOLVING it' (enrichment_assessor_card.py's _SOLVE_REQUIRED_COUNTIES) and that this project does not provide CAPTCHA-bypass help for. This is NOT the same flat dead end as Orangeburg: a concrete, ready-to-wire config exists (app=1154, layer=30904, card=12534, key='dashed') for whoever next extends qpublic_render.py's existing 7-county roster with its own browser-based Cloudflare-solving infrastructure outside this session. Separately (not Sumter-specific): a live board_stream check today found that mechanism currently yields ZERO non-null beds_baths/sqft on the board for ALL 7 of ITS OWN already-wired counties too (it is wired into main.py but OFF by default, ASSESSOR_CARD_ON=1) -- a pre-existing, bigger gap, not something this entry declines.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Sumter", "column": "sqft",
+      "state": "SC",
+      "county": "Sumter",
+      "column": "sqft",
       "reason": "Same two-source check and same result as this county's beds_baths entry above (qpaybill detail page has no sqft-shaped label either -- 'square feet'/'sq ft'/'heated'/'living area' all zero matches on today's live fetch; the ArcGIS layer's 25 live fields include no sqft/living-area field of any kind, matching its sqlite cache's 0/122,941 non-null living_sqft). See that entry for the full method and for the one real-but-walled candidate (the same qPublic card link, Cloudflare-walled, not attempted here).",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Williamsburg", "column": "beds_baths",
+      "state": "SC",
+      "county": "Williamsburg",
+      "column": "beds_baths",
       "reason": "qpaybill vendor-wide limitation applies (see the Sumter beds_baths entry for the live re-confirmation method -- same parse_detail() field set, no bed/bath label on any qPayBill tenant's detail page). Williamsburg's OWN source is not an ArcGIS layer at all but a custom WTH tgis viewer ingest (scripts/ingest_williamsburg_wthgis_parcels.py, parcel_cache.py's own 'Williamsburg' entry); its parcel_cache.py module comment already predicted this county's CAMA shape matches Sumter/Orangeburg's ('the exact _VALUE_ONLY_NO_LANDUSE shape already shipped for Sumter'). Directly re-confirmed live today by reading data/parcel_cache/williamsburg.sqlite: 0/3,347 non-null bedrooms, bathrooms or living_sqft, and the cache schema carries no WebURL/property-card-link field of any kind for this ingestion (unlike Sumter's ArcGIS layer) -- no qPublic-style escape hatch found. Not independently re-probed against Williamsburg's own county website for a separate, un-cached qPublic/Beacon link the way Sumter's was found (kept at 'high' confidence for the two checks actually performed today, not for an exhaustive search of every possible third-party source).",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Williamsburg", "column": "sqft",
+      "state": "SC",
+      "county": "Williamsburg",
+      "column": "sqft",
       "reason": "Same check and result as this county's beds_baths entry above -- data/parcel_cache/williamsburg.sqlite also shows 0/3,347 non-null living_sqft, and qpaybill's vendor-wide field absence applies equally to sqft.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Saluda", "column": "beds_baths",
+      "state": "SC",
+      "county": "Saluda",
+      "column": "beds_baths",
       "reason": "qpaybill vendor-wide limitation applies (see the Sumter beds_baths entry). Saluda's own ArcGIS layer (parcel_cache.py PARCEL_LAYERS['Saluda'], saludacountysc.net ParcelViewers/PublicWebsite_Pro/MapServer/4) DOES have FACT_MAPS entries mapping bedrooms/bathrooms to real field names (SDE.DBO.AssessorData.F__Bedrms/F__Baths, added 2026-10-07) -- unlike Orangeburg/Williamsburg/Sumter, this is NOT a case of no field existing. But live-verified today those fields are themselves always empty in the county's own source data: data/parcel_cache/saluda.sqlite shows bedrooms non-null on 30,950/30,977 rows, but EVERY one of those 30,950 values is exactly 0 (zero bedrooms > 0 across the entire cache); re-queried the live ArcGIS layer directly (not just the cache) with a bedrooms>0 WHERE clause style check to rule out a cache-refresh artifact -- the layer's own F__Bedrms/F__Baths are 0 for effectively all of its ~15,566 real parcels. This is a 4th distinct shape, different from both Orangeburg-style 'no field exists' and Lexington-style 'field has real data but a downstream bug drops it' (commit 535e71d0): here the field exists, is mapped, and is read correctly, but the county's own assessor source never actually populated it. parcel_cache_join.py's apply_hit() already guards against this correctly ('if beds and 0 < beds < 100' -- a literal 0 is falsy and is never written to a board row), so this is NOT a backfill bug needing a fix; there is no real number behind the field to backfill. No WebURL/property-card-link-style field exists on this layer either (checked all 99 live field names for url/card/web/link-shaped names -- none found), so no qPublic-style escape hatch like Sumter's was found here.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Saluda", "column": "sqft",
+      "state": "SC",
+      "county": "Saluda",
+      "column": "sqft",
       "reason": "Same qpaybill vendor-wide limitation as this county's beds_baths entry. Saluda's ArcGIS layer additionally carries a SqFt_Total field (plus SqFt_1st/2nd/Garage/Storage/Basement/Carport) that was NEVER mapped in parcel_cache.py's FACT_MAPS -- looked promising enough to check live before concluding anything. Live-queried the layer directly with a SqFt_Total>0 filter: only 1 of 15,601 parcels has any nonzero value. Same dead-field shape as this county's bedrooms/bathrooms (the source data itself is unpopulated, not a missing mapping) -- mapping this field would add real code with zero real yield, so it was not added.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Beaufort", "column": "multi_year_delinquent_tax",
+      "state": "SC",
+      "county": "Beaufort",
+      "column": "multi_year_delinquent_tax",
       "reason": "Not a CAPTCHA/403/robots wall and not 'no data exists' -- a materially different shape: every candidate on/around beaufortcountytreasurer.com was reachable, but none of them is a bulk roll this project's httpx/curl_cffi tooling can read. (1) The Treasurer's own Squarespace site publishes no delinquent list itself: its 'Delinquent Taxes' news category (sept-2022/sept-2023 'property-advertising', aug-2022 'delinquent-timeline') is procedural only -- the posts' own text states the actual advertisement runs 'in the local newspaper and online... every Sunday for three consecutive weeks', i.e. a third-party newspaper's site, not this county domain, and no PDF/Dropbox link to any list was found on any of these pages (checked all three plus the category page and research-and-data page directly). (2) sc-beaufort-county.governmax.com is dead: the root 404/connect path now fails outright (SSL TLSV1_UNRECOGNIZED_NAME, hostname no longer recognized) and /svc/ times out -- both re-confirmed live 2026-11-16, matching and now exceeding the matrix's own 2026-10-07 'timed out' note. (3) The one real per-parcel tool linked from the Treasurer's own page ('Real Property Info' -> sc-beaufort.publicaccessnow.com/Searches/Real.aspx, Aumentum/PublicAccessNow on ASP.NET WebForms + DNN) answers 200 with NO CAPTCHA/Turnstile/reCAPTCHA signature of any kind (no cf-ray header, no challenge markup, no cloudflare/turnstile/grecaptcha text anywhere) and no robots block -- but the server-rendered HTML carries only bare WebForms/DNN scaffolding (__VIEWSTATE/__EVENTVALIDATION/etc.), zero search-form fields, confirmed twice (a fresh client, and a session with cookies established via a prior Home.aspx GET in the same client). The real search widget is client-JS-rendered; a plain GET/POST never sees it. This is the same vendor family sc_tax_walled.py already flags Turnstile-gated for Charleston (sc-charleston.publicaccessnow.com) -- though Beaufort's own instance shows none of that signature itself, so the two may not share the identical gate -- but the practical result is the same either way: unreadable with this project's httpx/curl_cffi-only convention (no browser automation for agents). Needs either real browser automation (Playwright) to drive Real.aspx, or identifying and scraping the specific Beaufort-area newspaper that actually carries the statutory ad across years -- both materially bigger than a backfill/reader-add, not attempted here. Sibling columns on this same host (rollback_exposure, tax_aging_surfaced, two_year_delinquent, lt_tax_sale, lt_tax_sale_overage, atty_tax_verified_confirmed) were not independently re-checked and likely share this exact blocker, but are outside this entry's scope.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Sumter", "column": "lt_tax_sale_overage",
+      "state": "SC",
+      "county": "Sumter",
+      "column": "lt_tax_sale_overage",
       "reason": "Live-fetched https://sumtercountysc.gov/departments/s_-_z/treasurer/delinquent_tax.php 2026-11-16 (HTTP 200): the page covers the upcoming delinquent TAX SALE (who owes taxes, registration, dates) only -- zero mention of 'overage' or 'excess funds' anywhere, no linked roster of claimable surplus. Same shape as the 7 SC counties already declined for this column 2026-11-10 (Oconee/Greenville/Bamberg/Jasper/Berkeley/Dorchester/Kershaw): a published delinquent-tax-SALE list exists; a published OVERAGE list does not.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Florence", "column": "lt_tax_sale_overage",
+      "state": "SC",
+      "county": "Florence",
+      "column": "lt_tax_sale_overage",
       "reason": "Live-fetched https://www.florencecountysc.gov/offices/delinquent-tax 2026-11-16 (HTTP 200, after a 301 from florenceco.org -- the gap list's own 'source' host): describes the 2026 tax sale, registration and redemption only; zero mention of 'overage' or 'excess funds' anywhere on the page. No linked roster found.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Lexington", "column": "lt_tax_sale_overage",
+      "state": "SC",
+      "county": "Lexington",
+      "column": "lt_tax_sale_overage",
       "reason": "Web-searched 2026-11-16: lex-co.sc.gov publishes many delinquent-tax-SALE listing PDFs (owner/parcel/amount OWED, by year) but no overage/surplus roster turned up in any result or page title; the one Lexington overage document found (a court order, ActualFiledOrder.pdf) describes a single claimant's case, not a published list. Not independently re-fetched page-by-page this session (30+ PDFs feed the site's own tax-sale list) -- re-verify directly before building if this is picked up again.",
-      "confirmed_date": "2026-11-16", "confidence": "medium"
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
     },
     {
-      "state": "SC", "county": "Pickens", "column": "lt_tax_sale_overage",
+      "state": "SC",
+      "county": "Pickens",
+      "column": "lt_tax_sale_overage",
       "reason": "Web-searched 2026-11-16: no Pickens County overage/excess-funds list found. The county's own tax-sale-auction pages and third-party tax-sale-resource sites publish the delinquent SALE roster, not overage; the SC State Treasurer's separate general unclaimed-property program (a different, non-tax-sale-specific database) has a Pickens page but that is not this column's source. Not independently page-fetched this session.",
-      "confirmed_date": "2026-11-16", "confidence": "medium"
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
     },
     {
-      "state": "SC", "county": "Aiken", "column": "lt_tax_sale_overage",
+      "state": "SC",
+      "county": "Aiken",
+      "column": "lt_tax_sale_overage",
       "reason": "Web-searched 2026-11-16: no Aiken County overage list found; aikencountysctax.com (this column's own source) and the City of Aiken's separate delinquent-tax-sale page both describe the sale/redemption process only. A direct WebFetch of the City of Aiken's own delinquent-tax-sale page (a related but distinct city-level sale, not the county source) confirmed zero mention of 'overage'/'excess funds'; the county-level aikencountysctax.com page itself was not independently re-fetched this session.",
-      "confirmed_date": "2026-11-16", "confidence": "medium"
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
     },
     {
-      "state": "SC", "county": "Marion", "column": "lt_tax_sale_overage",
+      "state": "SC",
+      "county": "Marion",
+      "column": "lt_tax_sale_overage",
       "reason": "Web-searched 2026-11-16: no Marion County overage/excess-funds list found anywhere; only third-party tax-sale-auction directory pages (sale listings, not overage) turned up. Not independently page-fetched this session.",
-      "confirmed_date": "2026-11-16", "confidence": "medium"
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
     },
     {
-      "state": "SC", "county": "Hampton", "column": "lt_tax_sale_overage",
+      "state": "SC",
+      "county": "Hampton",
+      "column": "lt_tax_sale_overage",
       "reason": "Web-searched 2026-11-16: no Hampton County overage/excess-funds list found anywhere; only third-party tax-sale-auction directory pages (sale listings, not overage) turned up. Not independently page-fetched this session.",
-      "confirmed_date": "2026-11-16", "confidence": "medium"
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
     },
     {
-      "state": "SC", "county": "Spartanburg", "column": "lt_tax_sale_overage",
+      "state": "SC",
+      "county": "Spartanburg",
+      "column": "lt_tax_sale_overage",
       "reason": "project_tax_sale_overage_gap_likely_mostly_false_2026-11-12 (web-searched that date): Spartanburg publishes 'INSTRUCTIONS FOR FILING CLAIM' and a blank 'Overage Form (to be filed after Tax Deed has been recorded)' -- a claim-filing process, not a roster of who is owed money. Registry entry added retroactively 2026-11-16 (the original check never wrote one); not independently re-verified this session.",
-      "confirmed_date": "2026-11-12", "confidence": "medium"
+      "confirmed_date": "2026-11-12",
+      "confidence": "medium"
     },
     {
-      "state": "SC", "county": "Horry", "column": "lt_tax_sale_overage",
+      "state": "SC",
+      "county": "Horry",
+      "column": "lt_tax_sale_overage",
       "reason": "project_tax_sale_overage_gap_likely_mostly_false_2026-11-12 (web-searched that date): no Horry-specific overage roster or claim page turned up at all, beyond generic/unrelated results. Registry entry added retroactively 2026-11-16 (the original check never wrote one); not independently re-verified this session.",
-      "confirmed_date": "2026-11-12", "confidence": "medium"
+      "confirmed_date": "2026-11-12",
+      "confidence": "medium"
     },
     {
-      "state": "SC", "county": "Colleton", "column": "lt_tax_sale_overage",
+      "state": "SC",
+      "county": "Colleton",
+      "column": "lt_tax_sale_overage",
       "reason": "Round 7 (follow-on to project_sourced_not_built_round6_survey_2026-11-16, which named this as one of the remaining ~21 ungrepped SC counties). Live-fetched https://colletoncounty.org/node/700 2026-11-16 (HTTP 200): page describes tax-sale bidder terms and redemption, including a VOIDED-sale bidder refund ('the successful bidder will be refunded the bid amount and the actual interest earned by the county') -- a bidder refund, not an owner overage. Zero mention of 'overage' or 'excess funds' anywhere on the page; no linked roster. Same shape as the 16 SC counties already declined for this column.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Cherokee", "column": "lt_tax_sale_overage",
+      "state": "SC",
+      "county": "Cherokee",
+      "column": "lt_tax_sale_overage",
       "reason": "Round 7. Live-fetched https://cherokeecountysc.gov/delinquent-tax/tax-collection-and-tax-sale-procedures/ 2026-11-16 (HTTP 200): describes the sale process and notes the statutory advertisement 'includes the delinquent taxpayer's name' -- a pre-sale notice, not a post-sale overage roster. Zero mention of 'overage' or 'excess funds'. The county's own PDFs found alongside this page (Tax-Sale-List-2024-1.pdf, 2024-TAX-SALE-FOR-WEBSITE.pdf, Bidders2025.pdf) are delinquent-tax-SALE rosters only, confirmed by filename/title, not an overage list.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Williamsburg", "column": "lt_tax_sale_overage",
+      "state": "SC",
+      "county": "Williamsburg",
+      "column": "lt_tax_sale_overage",
       "reason": "Round 7. Web-searched 2026-11-16: no official Williamsburg County overage page or PDF surfaced in any result. Only a third-party tax-sale-resources directory page (contact only: TaxCollector@williamsburgcounty.sc.gov) and a public-records recorded-document search link turned up -- neither is an overage roster. Not independently page-fetched this session.",
-      "confirmed_date": "2026-11-16", "confidence": "medium"
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
     },
     {
-      "state": "SC", "county": "Darlington", "column": "lt_tax_sale_overage",
+      "state": "SC",
+      "county": "Darlington",
+      "column": "lt_tax_sale_overage",
       "reason": "Round 7. Live-fetched https://darcosc.com/departments/tax_collector.php 2026-11-16 (HTTP 200): describes the December 2026 sale's logistics only (location Darlington Middle School Gym, bidder-number assignment, 10am start). Zero mention of 'overage' or 'excess funds'; no linked roster.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Barnwell", "column": "lt_tax_sale_overage",
+      "state": "SC",
+      "county": "Barnwell",
+      "column": "lt_tax_sale_overage",
       "reason": "Round 7. Web-searched 2026-11-16: no official Barnwell County overage page surfaced; only a directory listing giving the Tax Collector's office address/phone (57 Wall Street, Room 121). No roster found anywhere. Not independently page-fetched this session.",
-      "confirmed_date": "2026-11-16", "confidence": "medium"
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
     },
     {
-      "state": "SC", "county": "Beaufort", "column": "lt_tax_sale_overage",
+      "state": "SC",
+      "county": "Beaufort",
+      "column": "lt_tax_sale_overage",
       "reason": "Round 7. beaufortcountysc.gov returned HTTP 403 to this session's fetch, so live-fetched the Treasurer's own operating site instead, https://bt843.squarespace.com 2026-11-16 (HTTP 200): zero mention of 'overage' or 'excess funds' anywhere on its news/announcements (only general redemption-deadline procedural posts, e.g. 'Redemption Deadline Coming Up', 'Upcoming Delinquent Tax Sale'). A supplementary web search of the Treasurer's own 2017-2022 PDF announcements confirms Beaufort defines and explains 'overage' (bid exceeding the minimum bid, payable to the owner of record when the redemption period ends) but never links to a published roster of who is currently owed one -- consistent with the existing declined_registry entry for this same host under multi_year_delinquent_tax, which found the Treasurer site and its PublicAccessNow search widget unreadable for bulk per-parcel data; here the narrower finding is that no overage-specific roster exists on the Treasurer's own site at all, apart from that separate access problem.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Clarendon", "column": "lt_tax_sale_overage",
+      "state": "SC",
+      "county": "Clarendon",
+      "column": "lt_tax_sale_overage",
       "reason": "Round 7. Web-searched 2026-11-16: no official Clarendon County overage page surfaced; only a directory listing for the County Treasurer (411 Sunset Drive, Manning). No roster found anywhere. Not independently page-fetched this session.",
-      "confirmed_date": "2026-11-16", "confidence": "medium"
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
     },
     {
-      "state": "SC", "county": "Dillon", "column": "lt_tax_sale_overage",
+      "state": "SC",
+      "county": "Dillon",
+      "column": "lt_tax_sale_overage",
       "reason": "Round 7. Web-searched 2026-11-16: no official Dillon County overage page surfaced; only directory contact listings for the Treasurer/Tax Collector and the Clerk of Court. No roster found anywhere. Not independently page-fetched this session.",
-      "confirmed_date": "2026-11-16", "confidence": "medium"
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
     },
     {
-      "state": "SC", "county": "Union", "column": "lt_tax_sale_overage",
+      "state": "SC",
+      "county": "Union",
+      "column": "lt_tax_sale_overage",
       "reason": "Round 7. Live-fetched https://gearupunionsc.com/departments/delinquent-tax-office/ 2026-11-16 (HTTP 200): describes the November 2025 sale and a separate post-sale list of properties that did NOT sell (available from the Auditor's Office starting January 2026) -- an unsold-property list, not an overage roster. Zero mention of 'overage' or 'excess funds'.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Marlboro", "column": "lt_tax_sale_overage",
+      "state": "SC",
+      "county": "Marlboro",
+      "column": "lt_tax_sale_overage",
       "reason": "Round 7. Web-searched 2026-11-16: no official Marlboro County overage page, PDF, or even a distinct county-contact directory entry surfaced -- only generic/statewide statute references. No roster found anywhere. Not independently page-fetched this session.",
-      "confirmed_date": "2026-11-16", "confidence": "medium"
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
     },
     {
-      "state": "SC", "county": "Greenwood", "column": "lt_tax_sale_overage",
+      "state": "SC",
+      "county": "Greenwood",
+      "column": "lt_tax_sale_overage",
       "reason": "Round 7. Live-fetched https://www.greenwoodcounty-sc.gov/tax-collector 2026-11-16 (HTTP 200): page is a short redirect notice ('All redemptions and tax sale matters are now handled by the Tax Office, located in Room 101 of the Courthouse') plus accepted-payment-method rules. Zero mention of 'overage' or 'excess funds'; no linked roster.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Lancaster", "column": "lt_tax_sale_overage",
+      "state": "SC",
+      "county": "Lancaster",
+      "column": "lt_tax_sale_overage",
       "reason": "Round 7. Web-searched 2026-11-16: no official Lancaster County overage page or PDF surfaced; only a third-party tax-sale-resources directory page (no roster). A direct fetch attempt at a guessed county-treasurer URL this session returned HTTP 404, so the county's own site was not independently confirmed beyond search snippets.",
-      "confirmed_date": "2026-11-16", "confidence": "medium"
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
     },
     {
-      "state": "SC", "county": "Newberry", "column": "lt_tax_sale_overage",
+      "state": "SC",
+      "county": "Newberry",
+      "column": "lt_tax_sale_overage",
       "reason": "Round 7. Live-fetched https://newberrycounty.gov/delinquent-tax/tax-sales 2026-11-16 (HTTP 200): page is only a link to a general 'Tax Sale information' PDF plus the Delinquent Tax Collector's phone number. Zero mention of 'overage' or 'excess funds'; no linked roster.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Edgefield", "column": "lt_tax_sale_overage",
+      "state": "SC",
+      "county": "Edgefield",
+      "column": "lt_tax_sale_overage",
       "reason": "Round 7. Web-searched 2026-11-16: no official Edgefield County overage page surfaced; only a directory contact listing for the Tax Collector (129 Courthouse Square). A third-party aggregator's summary mentioned 'Berkeley County publishes an unclaimed overage list' as a format example -- Berkeley is a DIFFERENT, already-declined county (2026-11-10 entry), cited there only as an illustration, not evidence of an Edgefield roster. Not independently page-fetched this session.",
-      "confirmed_date": "2026-11-16", "confidence": "medium"
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
     },
     {
-      "state": "SC", "county": "Chesterfield", "column": "lt_tax_sale_overage",
+      "state": "SC",
+      "county": "Chesterfield",
+      "column": "lt_tax_sale_overage",
       "reason": "Round 7. Live-fetched https://www.chesterfieldcountysc.com/tax-collector 2026-11-16 (HTTP 200): describes newspaper advertisement of delinquent properties and the one-year redemption window only. Zero mention of 'overage' or 'excess funds'; no linked roster.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Abbeville", "column": "lt_tax_sale_overage",
+      "state": "SC",
+      "county": "Abbeville",
+      "column": "lt_tax_sale_overage",
       "reason": "Round 7. Live-fetched https://abbevillecountysc.com/delinquent-tax-collector/ 2026-11-16 (HTTP 200): describes the first-Monday-in-November sale, advertisement in The Press & Banner, and interest-tiered redemption only. Zero mention of 'overage' or 'excess funds'. The county's separate Forfeited Land Commission page (sealed bids on forfeited/unsold land) is also not an overage roster -- a different disposition mechanism entirely.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Allendale", "column": "lt_tax_sale_overage",
+      "state": "SC",
+      "county": "Allendale",
+      "column": "lt_tax_sale_overage",
       "reason": "Round 7. Web-searched 2026-11-16: no official Allendale County overage page surfaced; only a paid third-party tax-sale-resources page (no visible roster) and a directory contact listing for the Tax Collector. Not independently page-fetched this session.",
-      "confirmed_date": "2026-11-16", "confidence": "medium"
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
     },
     {
-      "state": "SC", "county": "Lee", "column": "lt_tax_sale_overage",
+      "state": "SC",
+      "county": "Lee",
+      "column": "lt_tax_sale_overage",
       "reason": "Round 7. Web-searched 2026-11-16: no official Lee County overage page surfaced; only a paid third-party tax-sale-resources page (subscription-gated, no visible roster) and generic statewide statute references. Not independently page-fetched this session.",
-      "confirmed_date": "2026-11-16", "confidence": "medium"
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
     },
     {
-      "state": "SC", "county": "Saluda", "column": "lt_tax_sale_overage",
+      "state": "SC",
+      "county": "Saluda",
+      "column": "lt_tax_sale_overage",
       "reason": "Round 7. Live-fetched https://saludacounty.sc.gov/departments/tax-collector/delinquent-tax-sale 2026-11-16 (HTTP 200): lists the 2025 sale's property-list PDFs (delinquent-tax-SALE rosters, e.g. 'TS Final List', 'TS Week 2 properties') and bidder-registration dates only. Zero mention of 'overage' or 'excess funds'; no linked overage roster.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "McCormick", "column": "lt_tax_sale_overage",
+      "state": "SC",
+      "county": "McCormick",
+      "column": "lt_tax_sale_overage",
       "reason": "Round 7. Live-fetched https://mccormickcountysc.org/departments/treasurer.php 2026-11-16 (HTTP 200): describes the first-Monday-in-October sale and advertisement in The McCormick Messenger only. Zero mention of 'overage' or 'excess funds'; no linked roster.",
-      "confirmed_date": "2026-11-16", "confidence": "high"
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     },
     {
-      "state": "SC", "county": "Chester", "column": "lt_tax_sale_overage",
+      "state": "SC",
+      "county": "Chester",
+      "column": "lt_tax_sale_overage",
       "reason": "Round 7. Web-searched 2026-11-16: no official Chester County overage page surfaced; a direct fetch attempt at a guessed county-site URL this session failed outright (DNS: www.chestercountysc.org does not resolve). Search results surfaced only a directory contact listing for the Tax Collector (1476 J.A. Cochran Bypass) and generic/other-county references (Berkeley's list cited elsewhere only as a format example). Not independently page-fetched this session.",
-      "confirmed_date": "2026-11-16", "confidence": "medium"
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": null,
+      "column": "email",
+      "reason": "email has exactly one live producer that is structurally OWNER-sourced: liensnc_handoff.py reads a filed LiensNC lien-agent-designation record (raw.liensnc_related.owner_contact.email / raw.liensnc.owner_text), which exists only because NC Gen. Stat. 44A-11.1/44A-11.2 uniquely requires owners of qualifying NC construction projects to designate a lien agent and record that designation (LiensNC.com is the de facto public registry; confirmed via statute text and vendor commentary, 2026-11-16 web research) -- the OWNER (or their agent) supplies the contact block at filing time, so it genuinely carries the owner, not a third party. South Carolina mechanics-lien law (SC Code Title 29, Chapter 5) has no equivalent lien-agent-designation-with-public-registry mechanism: its closest instruments (29-5-23 Notice of Project Commencement, 29-5-40 Notice to Owner, 29-5-15 contractor licensing proof) are different filings that do not capture an owner email address, and no SC vendor equivalent to LiensNC surfaced in a 2026-11-16 search of SC Title 29 Ch.5 sources. Every OTHER raw e-mail source in this codebase (raw.distressed.agent_email / raw.homeharvest.agent_email -- a listing agent, raw.notice_contact.email -- the filing attorney/trustee from Column legal notices, which IS live and does cover SC) is attorney/agent/broker contact, not the owner, and is correctly excluded from owner_email_of() by design (enrichment_email_extract.py's own stated rule, the 2026-10-09 fix for an escape-artifact/misclassification defect) -- re-wiring notice_contact into this column would reintroduce that defect and would not even serve the outreach use case (a distressed owner cannot be reached by emailing their own foreclosing trustee). SC SOS entity records (sc_sos_entity.py) carry only a registered_agent NAME, never an address or email, so that is not a substitute either. The only remaining path is skip-trace (raw.skip_trace.email_addresses, owner_email_of's final fallback) -- real but gated by per-lookup cost, not a free source. Verified directly for the LiensNC mechanism and the codebase's own email-source inventory (high confidence); the SC-has-no-equivalent-statute claim rests on secondary legal-commentary sources converging on the same reading of SC Title 29 Ch.5, not a certified reading of the current statute text (medium confidence, same bar as the existing SC marriage_license entry).",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Mecklenburg",
+      "column": "lt_elderly_disabled",
+      "reason": "County's own CAMA ownership layer (meckgis.mecklenburgcountync.gov TaxParcel_Camaownershipvalues/FeatureServer/0, 30 fields) carries no exemption/homestead field; txt_propertyuse_desc is a land-use/zoning category (e.g. '100 YEAR FLOOD PLAIN - AC'), not an exemption flag. NC's elderly/disabled exclusion (G.S. 105-277.1) is published as a parcel attribute only on Buncombe's layer among every NC county checked across this project.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Charleston",
+      "column": "lt_elderly_disabled",
+      "reason": "County's registered parcel layer (gisccapps.charlestoncounty.org ENERGOV/energov_css MapServer/4, 'PARCELS WITH ATTRIBUTES', 38 fields) has LEGAL_RESIDENCE/OTHER/AGR classification fields (the 4%/6% assessment-ratio class plus ag-use, the same shape already declined for Anderson SC in enrichment_tax_relief.py), not a personal age/disability homestead-exemption flag.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Gaston",
+      "column": "lt_elderly_disabled",
+      "reason": "Live-reconfirmed 2026-11-16 (gis.gastoncountync.gov PublicGIS/Parcels/FeatureServer/11, EXEMPT_COD field): every sampled value is institutional (GOV, CLMI) -- the same institutional-only finding enrichment_tax_relief.py already documented for this county's Exempt-coded parcels (2026-08-06).",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Lincoln",
+      "column": "lt_elderly_disabled",
+      "reason": "County parcel layer (arcgisserver.lincolncountync.gov Server_TaxParcelViewerSP/MapServer/0, 55 fields) carries no exemption/homestead field at all; its only relief-shaped field, LANDEFERRED, is the present-use-value ag/forestry deferral flag already used for the rollback_exposure signal (enrichment_tax_relief.py), not a personal elderly/disabled exclusion.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Horry",
+      "column": "lt_elderly_disabled",
+      "reason": "County parcel layer (horrycountysc.gov parcelapp HorryCountyGISApp/MapServer/24, 37 fields) has no homestead/exemption field; PARCELTYPE is a 1-9 numeric class code and LandUseCode a standard 3-digit land-use code (100=residential, 300=commercial, ...), neither exemption-related.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Pickens",
+      "column": "lt_elderly_disabled",
+      "reason": "County parcel layer (services1.arcgis.com Pickens_Open_data/FeatureServer/6, 31 fields) has no homestead/exemption field; IMPVAC is an improved/vacant flag, not an exemption.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Sumter",
+      "column": "lt_elderly_disabled",
+      "reason": "County parcel layer (gis.sumter-sc.com BaseMaps/Sumter_City_County/FeatureServer/7, 25 fields -- a bare owner/value/deed schema) has no homestead/exemption field at all.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Greenville",
+      "column": "lt_elderly_disabled",
+      "reason": "County parcel layer (gcgis.org GreenvilleNJ/QueryLayers/MapServer/0, 89 fields) DOES carry an HMSTCD ('homestead code') field by name, but a live groupBy count shows all 244,748 parcels read blank -- an unused/legacy schema column, not a populated exemption flag.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Wake",
+      "column": "lt_elderly_disabled",
+      "reason": "County parcel layer (maps.wake.gov Property/Parcels/FeatureServer/0, 59 fields) carries EXEMPTSTAT/EXEMPTDESC fields, but live groupBy values are exclusively institutional/government/nonprofit categories (BUILDERS INVENTORY, housing authority, churches, HOA, towns, schools, PHA, ...) -- the same institutional-only trap already documented for Henderson/Gaston/Rutherford/Burke; no elderly/disabled/homestead category exists among them.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Orangeburg",
+      "column": "lt_elderly_disabled",
+      "reason": "The parcel_cache-registered layer (services2.arcgis.com Main_Public_Tax_Parcel_Map_WFL1, 29 fields) is a plat-index layer only (MAPBLOLOT/PLATBK/PLATPG/owner/address), with no assessed-value or exemption fields at all -- not the assessor CAMA source. Orangeburg's real valuation path in this project is qPayBill (tax-bill detail pages), which does parse a 'Homestead Exemption' dollar line when present, but only for delinquent-roll accounts -- too narrow and non-bulk to source a county-wide feed. No comprehensive GIS CAMA layer carrying the flag was found in the time available; re-check if a better Orangeburg assessor endpoint surfaces later.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "low"
+    },
+    {
+      "state": "NC",
+      "county": "Transylvania",
+      "column": "lt_elderly_disabled",
+      "reason": "County parcel layer (gis.transylvaniacounty.org Parcels/MapServer/2, 66 fields, a rich CAMA schema with building characteristics) has no exemption/homestead field; consistent with the general NC finding (enrichment_tax_relief.py) that Buncombe is the only NC county checked across this project that publishes the elderly/disabled exclusion as a parcel attribute.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
     }
   ]
 }
