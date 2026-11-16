@@ -913,6 +913,246 @@
       "reason": "County parcel layer (gis.transylvaniacounty.org Parcels/MapServer/2, 66 fields, a rich CAMA schema with building characteristics) has no exemption/homestead field; consistent with the general NC finding (enrichment_tax_relief.py) that Buncombe is the only NC county checked across this project that publishes the elderly/disabled exclusion as a parcel attribute.",
       "confirmed_date": "2026-11-16",
       "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Buncombe",
+      "column": "condemned",
+      "reason": "Live-checked 2026-11-16, three angles: (1) Asheville's own Accela code-enforcement feed (gis.ashevillenc.gov/server/rest/services/Permits/AccelaServicesView/MapServer/0), the only case-level candidate, is frozen -- a live outStatistics MAX(date_opened) query returns 2018-12-14 (1544745600000ms), confirming the WHOLE feed (not just a filtered subset) stopped syncing years ago, same dead-feed class already rejected for Greensboro's code_housing layer 2026-10-28. (2) The county's own 'Accela' MapServer (gis.buncombecounty.org/arcgis/rest/services/Accela/MapServer/0, layer Bun.DBO.PROPERTY) is the 135,459-row parcel/tax master only (pinnum/owner/TaxValue/LandUse fields), no case, status or condition column at all. (3) The only condition-named AGOL item, 'Real Estate Appraisal Building Conditions 2018' (services6.arcgis.com/VLA0ImJ33zhtGEaP/.../Real_Estate_Appraisal_Physical_Condition_2018), is a 6-row CODE-LOOKUP table (N/U/F/G/P/R -> NORMAL/UNSOUND/FAIR/GOOD/POOR/RENOVATED) with no parcel/address join key at all, not per-parcel data -- confirmed by fetching all 6 rows. A prior round (2026-09-28/2026-11-10 discovery passes, see arcgis_distress_layers.py's own comments) already swept Buncombe's full ~600-service AGOL org for a code/violation-named layer and found none; this pass independently confirmed the condition-table and county-Accela dead ends too.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Buncombe",
+      "column": "vacancy",
+      "reason": "Live-checked 2026-11-16, three angles: (1) Asheville's own Accela code-enforcement feed (gis.ashevillenc.gov/server/rest/services/Permits/AccelaServicesView/MapServer/0), the only case-level candidate, is frozen -- a live outStatistics MAX(date_opened) query returns 2018-12-14 (1544745600000ms), confirming the WHOLE feed (not just a filtered subset) stopped syncing years ago, same dead-feed class already rejected for Greensboro's code_housing layer 2026-10-28. (2) The county's own 'Accela' MapServer (gis.buncombecounty.org/arcgis/rest/services/Accela/MapServer/0, layer Bun.DBO.PROPERTY) is the 135,459-row parcel/tax master only (pinnum/owner/TaxValue/LandUse fields), no case, status or condition column at all. (3) The only condition-named AGOL item, 'Real Estate Appraisal Building Conditions 2018' (services6.arcgis.com/VLA0ImJ33zhtGEaP/.../Real_Estate_Appraisal_Physical_Condition_2018), is a 6-row CODE-LOOKUP table (N/U/F/G/P/R -> NORMAL/UNSOUND/FAIR/GOOD/POOR/RENOVATED) with no parcel/address join key at all, not per-parcel data -- confirmed by fetching all 6 rows. A prior round (2026-09-28/2026-11-10 discovery passes, see arcgis_distress_layers.py's own comments) already swept Buncombe's full ~600-service AGOL org for a code/violation-named layer and found none; this pass independently confirmed the condition-table and county-Accela dead ends too.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Buncombe",
+      "column": "vacant",
+      "reason": "Live-checked 2026-11-16, three angles: (1) Asheville's own Accela code-enforcement feed (gis.ashevillenc.gov/server/rest/services/Permits/AccelaServicesView/MapServer/0), the only case-level candidate, is frozen -- a live outStatistics MAX(date_opened) query returns 2018-12-14 (1544745600000ms), confirming the WHOLE feed (not just a filtered subset) stopped syncing years ago, same dead-feed class already rejected for Greensboro's code_housing layer 2026-10-28. (2) The county's own 'Accela' MapServer (gis.buncombecounty.org/arcgis/rest/services/Accela/MapServer/0, layer Bun.DBO.PROPERTY) is the 135,459-row parcel/tax master only (pinnum/owner/TaxValue/LandUse fields), no case, status or condition column at all. (3) The only condition-named AGOL item, 'Real Estate Appraisal Building Conditions 2018' (services6.arcgis.com/VLA0ImJ33zhtGEaP/.../Real_Estate_Appraisal_Physical_Condition_2018), is a 6-row CODE-LOOKUP table (N/U/F/G/P/R -> NORMAL/UNSOUND/FAIR/GOOD/POOR/RENOVATED) with no parcel/address join key at all, not per-parcel data -- confirmed by fetching all 6 rows. A prior round (2026-09-28/2026-11-10 discovery passes, see arcgis_distress_layers.py's own comments) already swept Buncombe's full ~600-service AGOL org for a code/violation-named layer and found none; this pass independently confirmed the condition-table and county-Accela dead ends too.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Sumter",
+      "column": "condemned",
+      "reason": "Live-checked 2026-11-16: the City of Sumter's 'Vacant Property Survey 2018' web map (gis_SumterSC AGOL org) has two real backing layers -- the per-parcel field-collection layer (services.arcgis.com/4B9WU9185SohZnyi/.../Vacant_Property_Survey_Field_Collection_2017/FeatureServer/0) returns HTTP 200 with {'error':{'code':499,'message':'Token Required'}} on every query, and the only publicly queryable sibling ('2018_Vacant_Property_Survey_(Poor_and_Hazard)_Density', same org) is a 29-feature DENSITY/heatmap aggregate (editingInfo.lastEditDate 1547053167895 = 2019-01-09) with no address or parcel field at all -- confirmed by its own field schema. The city's separate 'Code Enforcement Zone Map' item is an enforcement-ZONE boundary layer (same rejected shape as this file's existing Anderson/zone-boundary precedent), not case data.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Sumter",
+      "column": "vacancy",
+      "reason": "Live-checked 2026-11-16: the City of Sumter's 'Vacant Property Survey 2018' web map (gis_SumterSC AGOL org) has two real backing layers -- the per-parcel field-collection layer (services.arcgis.com/4B9WU9185SohZnyi/.../Vacant_Property_Survey_Field_Collection_2017/FeatureServer/0) returns HTTP 200 with {'error':{'code':499,'message':'Token Required'}} on every query, and the only publicly queryable sibling ('2018_Vacant_Property_Survey_(Poor_and_Hazard)_Density', same org) is a 29-feature DENSITY/heatmap aggregate (editingInfo.lastEditDate 1547053167895 = 2019-01-09) with no address or parcel field at all -- confirmed by its own field schema. The city's separate 'Code Enforcement Zone Map' item is an enforcement-ZONE boundary layer (same rejected shape as this file's existing Anderson/zone-boundary precedent), not case data.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Sumter",
+      "column": "vacant",
+      "reason": "Live-checked 2026-11-16: the City of Sumter's 'Vacant Property Survey 2018' web map (gis_SumterSC AGOL org) has two real backing layers -- the per-parcel field-collection layer (services.arcgis.com/4B9WU9185SohZnyi/.../Vacant_Property_Survey_Field_Collection_2017/FeatureServer/0) returns HTTP 200 with {'error':{'code':499,'message':'Token Required'}} on every query, and the only publicly queryable sibling ('2018_Vacant_Property_Survey_(Poor_and_Hazard)_Density', same org) is a 29-feature DENSITY/heatmap aggregate (editingInfo.lastEditDate 1547053167895 = 2019-01-09) with no address or parcel field at all -- confirmed by its own field schema. The city's separate 'Code Enforcement Zone Map' item is an enforcement-ZONE boundary layer (same rejected shape as this file's existing Anderson/zone-boundary precedent), not case data.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Guilford",
+      "column": "condemned",
+      "reason": "Live-checked 2026-11-16: the only vacant/condemned-named ArcGIS Online item found for Greensboro ('CondemnedAndBoardedHousingTest', owner 19398_greensboro, id 78ef7e6cd99e466d8ce7b00a4fda7d58) is an UNLISTED internal web map (listed:false, snippet literally 'TEST - LOE Condemned and Boarded Housing', url:'' -- no backing FeatureServer, size 1,113 bytes) -- confirmed by fetching the item's own metadata, not inferred from its title. This extends, for vacant/condemned specifically, the identical dead/never-shipped finding scripts/gap_matrix.py's own 2026-10-28 audit already made for Greensboro's separate code_housing layer (frozen sync, newest case 2024-06-18). High Point was not independently checked this pass.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Guilford",
+      "column": "vacancy",
+      "reason": "Live-checked 2026-11-16: the only vacant/condemned-named ArcGIS Online item found for Greensboro ('CondemnedAndBoardedHousingTest', owner 19398_greensboro, id 78ef7e6cd99e466d8ce7b00a4fda7d58) is an UNLISTED internal web map (listed:false, snippet literally 'TEST - LOE Condemned and Boarded Housing', url:'' -- no backing FeatureServer, size 1,113 bytes) -- confirmed by fetching the item's own metadata, not inferred from its title. This extends, for vacant/condemned specifically, the identical dead/never-shipped finding scripts/gap_matrix.py's own 2026-10-28 audit already made for Greensboro's separate code_housing layer (frozen sync, newest case 2024-06-18). High Point was not independently checked this pass.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Guilford",
+      "column": "vacant",
+      "reason": "Live-checked 2026-11-16: the only vacant/condemned-named ArcGIS Online item found for Greensboro ('CondemnedAndBoardedHousingTest', owner 19398_greensboro, id 78ef7e6cd99e466d8ce7b00a4fda7d58) is an UNLISTED internal web map (listed:false, snippet literally 'TEST - LOE Condemned and Boarded Housing', url:'' -- no backing FeatureServer, size 1,113 bytes) -- confirmed by fetching the item's own metadata, not inferred from its title. This extends, for vacant/condemned specifically, the identical dead/never-shipped finding scripts/gap_matrix.py's own 2026-10-28 audit already made for Greensboro's separate code_housing layer (frozen sync, newest case 2024-06-18). High Point was not independently checked this pass.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Charleston",
+      "column": "condemned",
+      "reason": "Live-checked 2026-11-16: gis.charleston-sc.gov's full REST catalog (Basemaps/External/Imagery/Internal/Internal_City/MEOC/Mobile/Utilities folders, enumerated via ?f=json) has exactly one public folder (External, 14 services) and none of them are code-enforcement/condemned/vacant-related: PDI_Data is a police dataset, Service_Energov_Composite/Service_AddressView3_Gazetter_Energov are EnerGov address GEOCODERS, not case data. Consistent with this file's existing finding that Charleston COUNTY's own ENERGOV FeatureServer (gisccapps.charlestoncounty.org) is a cross-module GIS-sync audit trail with no case fields. North Charleston has no public ArcGIS REST host found this pass (gis.northcharleston.org does not resolve/connect; a targeted web search surfaced only a phone number for its Code Enforcement office, no online list or portal).",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Charleston",
+      "column": "vacancy",
+      "reason": "Live-checked 2026-11-16: gis.charleston-sc.gov's full REST catalog (Basemaps/External/Imagery/Internal/Internal_City/MEOC/Mobile/Utilities folders, enumerated via ?f=json) has exactly one public folder (External, 14 services) and none of them are code-enforcement/condemned/vacant-related: PDI_Data is a police dataset, Service_Energov_Composite/Service_AddressView3_Gazetter_Energov are EnerGov address GEOCODERS, not case data. Consistent with this file's existing finding that Charleston COUNTY's own ENERGOV FeatureServer (gisccapps.charlestoncounty.org) is a cross-module GIS-sync audit trail with no case fields. North Charleston has no public ArcGIS REST host found this pass (gis.northcharleston.org does not resolve/connect; a targeted web search surfaced only a phone number for its Code Enforcement office, no online list or portal).",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Charleston",
+      "column": "vacant",
+      "reason": "Live-checked 2026-11-16: gis.charleston-sc.gov's full REST catalog (Basemaps/External/Imagery/Internal/Internal_City/MEOC/Mobile/Utilities folders, enumerated via ?f=json) has exactly one public folder (External, 14 services) and none of them are code-enforcement/condemned/vacant-related: PDI_Data is a police dataset, Service_Energov_Composite/Service_AddressView3_Gazetter_Energov are EnerGov address GEOCODERS, not case data. Consistent with this file's existing finding that Charleston COUNTY's own ENERGOV FeatureServer (gisccapps.charlestoncounty.org) is a cross-module GIS-sync audit trail with no case fields. North Charleston has no public ArcGIS REST host found this pass (gis.northcharleston.org does not resolve/connect; a targeted web search surfaced only a phone number for its Code Enforcement office, no online list or portal).",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Catawba",
+      "column": "condemned",
+      "reason": "Live-fetched 2026-11-16 the county's full public 'datasets' page (catawbacountync.gov/online-services/datasets/, 32 listed datasets, fetched directly not just search snippets): parcels, monthly assessment data, zoning, infrastructure layers and a building-FOOTPRINT shapefile ('Structures in Catawba County') only -- no condition, status or violation dataset of any kind. The one code-related link on that same page ('Report a Violation', arcgis2.catawbacountync.gov/codecompliance/) is a complaint-INTAKE form, not a data feed, and that same EnerGov host independently returns HTTP 200 with {'error':{'code':499,'message':'Token Required'}} (a login/token wall, same rejection class as this file's existing Berkeley/Goose Creek entries).",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Catawba",
+      "column": "vacancy",
+      "reason": "Live-fetched 2026-11-16 the county's full public 'datasets' page (catawbacountync.gov/online-services/datasets/, 32 listed datasets, fetched directly not just search snippets): parcels, monthly assessment data, zoning, infrastructure layers and a building-FOOTPRINT shapefile ('Structures in Catawba County') only -- no condition, status or violation dataset of any kind. The one code-related link on that same page ('Report a Violation', arcgis2.catawbacountync.gov/codecompliance/) is a complaint-INTAKE form, not a data feed, and that same EnerGov host independently returns HTTP 200 with {'error':{'code':499,'message':'Token Required'}} (a login/token wall, same rejection class as this file's existing Berkeley/Goose Creek entries).",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Catawba",
+      "column": "vacant",
+      "reason": "Live-fetched 2026-11-16 the county's full public 'datasets' page (catawbacountync.gov/online-services/datasets/, 32 listed datasets, fetched directly not just search snippets): parcels, monthly assessment data, zoning, infrastructure layers and a building-FOOTPRINT shapefile ('Structures in Catawba County') only -- no condition, status or violation dataset of any kind. The one code-related link on that same page ('Report a Violation', arcgis2.catawbacountync.gov/codecompliance/) is a complaint-INTAKE form, not a data feed, and that same EnerGov host independently returns HTTP 200 with {'error':{'code':499,'message':'Token Required'}} (a login/token wall, same rejection class as this file's existing Berkeley/Goose Creek entries).",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Rutherford",
+      "column": "condemned",
+      "reason": "Live-checked 2026-11-16: gis.rutherfordcountync.gov/arcgis/rest/services (the county's only discoverable ArcGIS REST host) returns the ArcGIS Web Adaptor's own error page -- 'Could not access any server machines. Please contact your system administrator' -- for every request including ?f=json, confirming the GIS SERVER BACKEND itself is down, not merely one layer misconfigured. No alternate host turned up via a targeted ArcGIS Online title search (county GIS org, zoning, building codes, embeds).",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Rutherford",
+      "column": "vacancy",
+      "reason": "Live-checked 2026-11-16: gis.rutherfordcountync.gov/arcgis/rest/services (the county's only discoverable ArcGIS REST host) returns the ArcGIS Web Adaptor's own error page -- 'Could not access any server machines. Please contact your system administrator' -- for every request including ?f=json, confirming the GIS SERVER BACKEND itself is down, not merely one layer misconfigured. No alternate host turned up via a targeted ArcGIS Online title search (county GIS org, zoning, building codes, embeds).",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Rutherford",
+      "column": "vacant",
+      "reason": "Live-checked 2026-11-16: gis.rutherfordcountync.gov/arcgis/rest/services (the county's only discoverable ArcGIS REST host) returns the ArcGIS Web Adaptor's own error page -- 'Could not access any server machines. Please contact your system administrator' -- for every request including ?f=json, confirming the GIS SERVER BACKEND itself is down, not merely one layer misconfigured. No alternate host turned up via a targeted ArcGIS Online title search (county GIS org, zoning, building codes, embeds).",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Brunswick",
+      "column": "condemned",
+      "reason": "Live-enumerated 2026-11-16 the county's real ArcGIS REST catalog (bcgis.brunswickcountync.gov/arcgis/rest/services, corrected from an initial wrong-subdomain guess that 404'd): the Layers/ folder (56 services) is parcels/zoning/addresses/roads/signs only; the one candidate by folder name, Inspections/CurrentInspections (527 live rows, confirmed by a real count query), is a building-PERMIT inspection schedule (fields PermitNumber/InspectionType/Inspector/contractor/Applicant -- routine construction inspections, not code violations) -- confirmed by its own field schema, not by the folder name alone. No condemned/vacant-named service exists anywhere across the catalog's 13 folders.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Brunswick",
+      "column": "vacancy",
+      "reason": "Live-enumerated 2026-11-16 the county's real ArcGIS REST catalog (bcgis.brunswickcountync.gov/arcgis/rest/services, corrected from an initial wrong-subdomain guess that 404'd): the Layers/ folder (56 services) is parcels/zoning/addresses/roads/signs only; the one candidate by folder name, Inspections/CurrentInspections (527 live rows, confirmed by a real count query), is a building-PERMIT inspection schedule (fields PermitNumber/InspectionType/Inspector/contractor/Applicant -- routine construction inspections, not code violations) -- confirmed by its own field schema, not by the folder name alone. No condemned/vacant-named service exists anywhere across the catalog's 13 folders.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Brunswick",
+      "column": "vacant",
+      "reason": "Live-enumerated 2026-11-16 the county's real ArcGIS REST catalog (bcgis.brunswickcountync.gov/arcgis/rest/services, corrected from an initial wrong-subdomain guess that 404'd): the Layers/ folder (56 services) is parcels/zoning/addresses/roads/signs only; the one candidate by folder name, Inspections/CurrentInspections (527 live rows, confirmed by a real count query), is a building-PERMIT inspection schedule (fields PermitNumber/InspectionType/Inspector/contractor/Applicant -- routine construction inspections, not code violations) -- confirmed by its own field schema, not by the folder name alone. No condemned/vacant-named service exists anywhere across the catalog's 13 folders.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Forsyth",
+      "column": "condemned",
+      "reason": "Freshly live-enumerated 2026-11-16 the full maps.co.forsyth.nc.us catalog (65 folders, independently re-checked with direct schema queries rather than relying on this project's own older in-repo note about this same host): Housing/* (Home_Buyer_Program, HomeOwnershipProgram, Institutional_Home_Buyers) is buyer-assistance program layers, not violations; Foreclosures/Foreclosures_WebMap is, despite its name, a 30-feature ZIP-code boundary layer (fields ZIP/ZIP_TEXT/MCITY/MCD only); WS_CommDev/DQ_Parcels_and_City_Owned_Parcels is a stale (named 'Delinquent Real Estate - Feb 2019') tax-delinquency table (PIN/TotalAmoun/Bankruptcy/SentToFore fields), not condemned/vacant; Planning_Inspection/Planning_Inspection is a municipality/jurisdiction boundary layer (MUNICIPALITY/COUNTY/JURISDICTION/ACRES fields only). No condemned/vacant/code-violation case-level service found in any of the 65 folders checked.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Forsyth",
+      "column": "vacancy",
+      "reason": "Freshly live-enumerated 2026-11-16 the full maps.co.forsyth.nc.us catalog (65 folders, independently re-checked with direct schema queries rather than relying on this project's own older in-repo note about this same host): Housing/* (Home_Buyer_Program, HomeOwnershipProgram, Institutional_Home_Buyers) is buyer-assistance program layers, not violations; Foreclosures/Foreclosures_WebMap is, despite its name, a 30-feature ZIP-code boundary layer (fields ZIP/ZIP_TEXT/MCITY/MCD only); WS_CommDev/DQ_Parcels_and_City_Owned_Parcels is a stale (named 'Delinquent Real Estate - Feb 2019') tax-delinquency table (PIN/TotalAmoun/Bankruptcy/SentToFore fields), not condemned/vacant; Planning_Inspection/Planning_Inspection is a municipality/jurisdiction boundary layer (MUNICIPALITY/COUNTY/JURISDICTION/ACRES fields only). No condemned/vacant/code-violation case-level service found in any of the 65 folders checked.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Forsyth",
+      "column": "vacant",
+      "reason": "Freshly live-enumerated 2026-11-16 the full maps.co.forsyth.nc.us catalog (65 folders, independently re-checked with direct schema queries rather than relying on this project's own older in-repo note about this same host): Housing/* (Home_Buyer_Program, HomeOwnershipProgram, Institutional_Home_Buyers) is buyer-assistance program layers, not violations; Foreclosures/Foreclosures_WebMap is, despite its name, a 30-feature ZIP-code boundary layer (fields ZIP/ZIP_TEXT/MCITY/MCD only); WS_CommDev/DQ_Parcels_and_City_Owned_Parcels is a stale (named 'Delinquent Real Estate - Feb 2019') tax-delinquency table (PIN/TotalAmoun/Bankruptcy/SentToFore fields), not condemned/vacant; Planning_Inspection/Planning_Inspection is a municipality/jurisdiction boundary layer (MUNICIPALITY/COUNTY/JURISDICTION/ACRES fields only). No condemned/vacant/code-violation case-level service found in any of the 65 folders checked.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Lexington",
+      "column": "condemned",
+      "reason": "Web-searched 2026-11-16 (several queries: vacant building registry, condemned structures list, ArcGIS/Socrata open data): no county or municipal vacant/condemned registry surfaced for Lexington County SC, and the county's own code-enforcement page (lex-co.sc.gov/departments/community-development/zoning/code-enforcement) says enforcement in the unincorporated county is run by the Sheriff's Department's Code Enforcement Officers, not a GIS- or case-management-backed system. No ArcGIS REST host for the county's own GIS (lex-co.sc.gov/departments/planning-gis) was independently live-probed this pass beyond the search results -- weaker evidence than the live-fetched dead ends elsewhere in this batch.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Lexington",
+      "column": "vacancy",
+      "reason": "Web-searched 2026-11-16 (several queries: vacant building registry, condemned structures list, ArcGIS/Socrata open data): no county or municipal vacant/condemned registry surfaced for Lexington County SC, and the county's own code-enforcement page (lex-co.sc.gov/departments/community-development/zoning/code-enforcement) says enforcement in the unincorporated county is run by the Sheriff's Department's Code Enforcement Officers, not a GIS- or case-management-backed system. No ArcGIS REST host for the county's own GIS (lex-co.sc.gov/departments/planning-gis) was independently live-probed this pass beyond the search results -- weaker evidence than the live-fetched dead ends elsewhere in this batch.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Lexington",
+      "column": "vacant",
+      "reason": "Web-searched 2026-11-16 (several queries: vacant building registry, condemned structures list, ArcGIS/Socrata open data): no county or municipal vacant/condemned registry surfaced for Lexington County SC, and the county's own code-enforcement page (lex-co.sc.gov/departments/community-development/zoning/code-enforcement) says enforcement in the unincorporated county is run by the Sheriff's Department's Code Enforcement Officers, not a GIS- or case-management-backed system. No ArcGIS REST host for the county's own GIS (lex-co.sc.gov/departments/planning-gis) was independently live-probed this pass beyond the search results -- weaker evidence than the live-fetched dead ends elsewhere in this batch.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Transylvania",
+      "column": "condemned",
+      "reason": "Web-searched 2026-11-16 and attempted 4 common self-hosted ArcGIS REST catalog URL guesses (gis./tcgis./maps.transylvaniacounty.org, gis.cityofbrevard.com) for the county and the City of Brevard: none resolved/connected, and no official open-data hub or live GIS REST catalog surfaced in search results for either (only a 2011-2014 NCSU Libraries archive and paid parcel-data resellers). Weaker evidence than a confirmed dead/walled endpoint -- absence of a found host, not a live-verified negative -- so a future pass that finds the county's real GIS subdomain should re-check before trusting this entry.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Transylvania",
+      "column": "vacancy",
+      "reason": "Web-searched 2026-11-16 and attempted 4 common self-hosted ArcGIS REST catalog URL guesses (gis./tcgis./maps.transylvaniacounty.org, gis.cityofbrevard.com) for the county and the City of Brevard: none resolved/connected, and no official open-data hub or live GIS REST catalog surfaced in search results for either (only a 2011-2014 NCSU Libraries archive and paid parcel-data resellers). Weaker evidence than a confirmed dead/walled endpoint -- absence of a found host, not a live-verified negative -- so a future pass that finds the county's real GIS subdomain should re-check before trusting this entry.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Transylvania",
+      "column": "vacant",
+      "reason": "Web-searched 2026-11-16 and attempted 4 common self-hosted ArcGIS REST catalog URL guesses (gis./tcgis./maps.transylvaniacounty.org, gis.cityofbrevard.com) for the county and the City of Brevard: none resolved/connected, and no official open-data hub or live GIS REST catalog surfaced in search results for either (only a 2011-2014 NCSU Libraries archive and paid parcel-data resellers). Weaker evidence than a confirmed dead/walled endpoint -- absence of a found host, not a live-verified negative -- so a future pass that finds the county's real GIS subdomain should re-check before trusting this entry.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
     }
   ]
 }
