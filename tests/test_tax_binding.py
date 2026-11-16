@@ -48,6 +48,52 @@ def test_own_parcel_block_binds():
     assert tb.bind_block(li, "nc_county_csv_delinquent_tax", li.raw["nc_county_csv_delinquent_tax"]) == "own_parcel"
 
 
+# ---- Florence SC tax-inquiry block (found 2026-11-16: unregistered, every row verdicted
+# "no_evidence" and scrub_unbound_tax() -- wired into main.py's regular orchestration --
+# would have removed raw['florence_tax_inquiry']/raw['tax_owed'] on the very next run, undoing
+# the gap_matrix fix and making the fetcher re-check its whole eligible population forever) --
+
+def _florence_block(tms="34000-47-051", balance=439.09):
+    return {"tms": tms, "balance": balance, "years": [2026], "late_years": [], "is_two_year_plus": False,
+            "years_delinquent": 0, "oldest_year": 2026, "sold_at_tax_sale": False,
+            "fetched_at": "2026-11-16T00:00:00+00:00", "source": "web.florenceco.org"}
+
+
+def test_florence_tax_inquiry_binds_a_dash_separated_row():
+    li = _li(source="counties_sc.florence_delinquent_tax", parcel="34000-47-051",
+             county="Florence", state="SC", raw={"florence_tax_inquiry": _florence_block()})
+    assert tb.bind_block(li, "florence_tax_inquiry", li.raw["florence_tax_inquiry"]) == "own_parcel"
+
+
+def test_florence_tax_inquiry_binds_the_flat_parcel_cache_row_shape():
+    # sc_heir_estate_parcel_cache's own parcel_id convention: the same Map-Block-Parcel, no
+    # dashes -- norm_id()/canon_id() strip separators, so this must bind too, not just the dash
+    # form the sale-list scraper uses.
+    li = _li(source="counties_sc.sc_heir_estate_parcel_cache", parcel="3400047051",
+             county="Florence", state="SC", raw={"florence_tax_inquiry": _florence_block()})
+    assert tb.bind_block(li, "florence_tax_inquiry", li.raw["florence_tax_inquiry"]) == "own_parcel"
+
+
+def test_florence_tax_inquiry_does_not_rubber_stamp_a_mismatched_parcel():
+    li = _li(source="counties_sc.florence_delinquent_tax", parcel="99999-99-999",
+             county="Florence", state="SC", raw={"florence_tax_inquiry": _florence_block()})
+    assert tb.bind_block(li, "florence_tax_inquiry", li.raw["florence_tax_inquiry"]) != "own_parcel"
+
+
+def test_florence_tax_inquiry_survives_scrub_unbound_tax():
+    """End-to-end pin: the exact raw shape apply_block() writes, run through the real
+    scrub_unbound_tax() main.py calls -- must come out untouched."""
+    li = _li(source="counties_sc.florence_delinquent_tax", parcel="34000-47-051",
+             county="Florence", state="SC",
+             raw={"florence_tax_inquiry": _florence_block(),
+                  "tax_owed": {"balance": 439.09, "kind": "delinquent_tax",
+                              "source": "web.florenceco.org", "basis": "own_record",
+                              "year": 2026, "years": [2026], "status": "unpaid"}})
+    stats = tb.scrub_unbound_tax([li])
+    assert stats["blocks_removed"] == 0 and stats["tax_owed_removed"] == 0
+    assert "florence_tax_inquiry" in li.raw and "tax_owed" in li.raw
+
+
 def test_another_parcels_block_is_removed_with_everything_derived_from_it():
     # the finding: one roll entry copied onto a row of a DIFFERENT parcel of the same county
     li = _li(parcel="R22222-002-002-002",

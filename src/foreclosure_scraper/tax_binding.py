@@ -86,6 +86,21 @@ BLOCK_PARCEL_FIELDS: dict[str, tuple[str, ...]] = {
     "spartanburg_delinquent_tax": ("tms",),
     "spartanburg_flc": ("tms",),
     "florence_delinquent_tax": ("tms",),
+    # enrichment_florence_tax_inquiry.py's own per-parcel block (its "tms" field is the SAME
+    # dash-separated Map-Block-Parcel string florence_delinquent_tax above already uses).
+    # Found 2026-11-16: without this entry, bind_block() has no parcel field to compare, finds
+    # no address on the block either (it carries none), and block_from_source() never matches
+    # "florence_tax_inquiry" to the row's own scraper slug -- every row's verdict is
+    # "no_evidence", which scrub_unbound_tax() (wired into main.py's regular orchestration)
+    # treats as unbound and REMOVES on the very next run, taking raw['tax_owed'] with it via
+    # its own balance-matches-a-removed-block cascade. That would have silently undone this
+    # fix within one production cycle and, worse, made raw['florence_tax_inquiry']['fetched_at']
+    # (the 14-day recheck stamp) disappear with it -- re-fetching the whole eligible
+    # population from web.florenceco.org every run forever instead of settling down.
+    # norm_id()/canon_id() strip separators before comparing, so this one tuple binds both
+    # row shapes correctly: a dash TMS from florence_delinquent_tax and the flat 10-digit form
+    # sc_heir_estate_parcel_cache's own parcel_id carries (both verified live).
+    "florence_tax_inquiry": ("tms",),
     "transylvania_tax": ("parcel",),
     "qpaybill_roll": ("parcel_from_map_number", "identification_no"),
     "pickens_tax_sale": ("parcel",),
