@@ -186,6 +186,36 @@
       "state": "NC", "county": "Union", "column": "storm_damage",
       "reason": "Same Charlotte-metro-ring profile as the confirmed Mecklenburg/Gaston/Lincoln/Forsyth dead ends (see those entries). NOAA Storm Events' only Helene-week entries for Union are a Thunderstorm Wind ($5K), a Flash Flood ($5K) and a county-wide Tropical Storm wind estimate, no tornado; FEMA's per-household data for DR-4827 shows Union at avg $761 FEMA-inspected damage per inspected home across 253 inspections, zero homes above $30k, zero max-grant recipients -- same low tier as the confirmed dead ends. Inferred from the same structural rule as the directly-verified siblings above (sibling Charlotte-Piedmont county); not independently checked against an official Helene damage briefing document the way Mecklenburg/Gaston/Lincoln were.",
       "confirmed_date": "2026-11-16", "confidence": "medium"
+    },
+    {
+      "state": "NC", "county": "Anson", "column": "rollback_exposure",
+      "reason": "NC ITSPublic/bttaxpayerportal TaxBillSearch (nc_its_public_tax.py's PORTALS entry, full_model=True) exposes only TaxYear/BillNumber/AccountNumber/AccountName1/Description/OriginalBillAmount/TotalDue -- no market-vs-use valuation field anywhere, the same structural gap enrichment_its_public_multiyear_tax.py's own docstring already noted for this vendor (the pre-2026-11-05 finding that originally justified qPayBill's own now-superseded Spartanburg/Oconee/Laurens entries above). Additionally, re-tested LIVE 2026-11-16 for the specific Description-text trick that DID work on the sibling qPayBill vendor (a literal '<year> ROLLBACK TAX...' string in place of the usual situs line, which parse_description_cols()/parse_row_cols() currently drop as 'personal property / junk'): fetched 2 real tax years (2024/2025) end-to-end via the production call sequence (GetSearchTablePartial -> GetSearchTableData), inspected every row's raw Description cell before filtering -- 1,400 rows read, 524 dropped as non-real, ZERO contained 'ROLLBACK' in any form. The Description-text signal genuinely does not exist on this vendor; this is not the same silent-gap bug class as qPayBill.",
+      "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "NC", "county": "Yadkin", "column": "rollback_exposure",
+      "reason": "Same bttaxpayerportal/ITSPublic vendor limitation as Anson (see that entry for the full reasoning and method) -- live-rechecked 2026-11-16 as part of the same 6-county probe: 2 tax years (2024/2025), 1,500 rows read, 679 dropped as non-real, zero 'ROLLBACK' hits in any raw Description cell.",
+      "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "NC", "county": "Caswell", "column": "rollback_exposure",
+      "reason": "Same bttaxpayerportal/ITSPublic vendor limitation as Anson (see that entry for the full reasoning and method) -- live-rechecked 2026-11-16 as part of the same 6-county probe: 2 tax years (2024/2025), 1,292 rows read, 745 dropped as non-real, zero 'ROLLBACK' hits in any raw Description cell.",
+      "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "NC", "county": "Jones", "column": "rollback_exposure",
+      "reason": "Same bttaxpayerportal/ITSPublic vendor limitation as Anson (see that entry for the full reasoning and method) -- live-rechecked 2026-11-16 as part of the same 6-county probe: 2 tax years (2024/2025), 1,455 rows read, 772 dropped as non-real, zero 'ROLLBACK' hits in any raw Description cell.",
+      "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "NC", "county": "Graham", "column": "rollback_exposure",
+      "reason": "Same bttaxpayerportal/ITSPublic vendor limitation as Anson (see that entry for the full reasoning and method) -- live-rechecked 2026-11-16 as part of the same 6-county probe: 2 tax years (2024/2025), 1,102 rows read, 254 dropped as non-real, zero 'ROLLBACK' hits in any raw Description cell.",
+      "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "NC", "county": "Alleghany", "column": "rollback_exposure",
+      "reason": "Same bttaxpayerportal/ITSPublic vendor limitation as Anson (see that entry for the full reasoning and method) -- live-rechecked 2026-11-16 as part of the same 6-county probe: 2 tax years (2024/2025), 637 rows read, 257 dropped as non-real, zero 'ROLLBACK' hits in any raw Description cell. (Caswell/Jones/Graham/Alleghany are not independently known to carry ag-use-deferral parcels the way Anson's farmland does, so 'medium' confidence would also be defensible for those four on that basis alone -- kept 'high' here because the claim being verified is about the PLATFORM's field set, not about any one county's parcel mix, and the platform check was run directly against each of the 6, not inferred from a sibling.)",
+      "confirmed_date": "2026-11-16", "confidence": "high"
     }
   ]
 }
