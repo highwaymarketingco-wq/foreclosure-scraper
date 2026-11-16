@@ -205,7 +205,7 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | NC | Jackson | quiet_title | 969 | no Column paper in this county; ncnotices.com bodies are CAPTCHA-walled | statewide: no Column paper in this county; ncnotices.com bod |
 | NC | Jackson | usps_vacancy | 969 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | NC | Halifax | usps_vacancy | 957 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
-| NC | Chowan | probate | 943 | CAPTCHA | probate: portal-nc.tylertech.cloud |
+| NC | Chowan | probate | 942 | CAPTCHA | probate: portal-nc.tylertech.cloud |
 | NC | Wilkes | usps_vacancy | 930 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
 | SC | Beaufort | sos_dissolution | 913 | SC Secretary of State search is CAPTCHA-walled | statewide: SC Secretary of State search is CAPTCHA-walled |
 | SC | Bamberg | usps_vacancy | 894 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
@@ -215,7 +215,7 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 
 ## 2. Bot-wall, build in-house -- Cloudflare/WAF, not Hermes
 
-117 cells, 589,018 est_rows_affected combined.
+107 cells, 573,322 est_rows_affected combined.
 
 | state | county | column | est_rows | reason | source |
 |---|---|---|---|---|---|
@@ -251,12 +251,8 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | SC | Richland | rollback_exposure | 2,316 | bot check (Cloudflare/WAF) | tax/property card:  |
 | SC | Richland | tax_aging_surfaced | 2,316 | bot check (Cloudflare/WAF) | tax/property card:  |
 | SC | Richland | two_year_delinquent | 2,316 | bot check (Cloudflare/WAF) | tax/property card:  |
-| NC | Rockingham | atty_rod_lien_checked | 2,289 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) 'e-Vault' us5.co |
-| NC | Rockingham | liens | 2,289 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) 'e-Vault' us5.co |
 | NC | Washington | atty_rod_lien_checked | 2,168 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
 | NC | Washington | liens | 2,168 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
-| NC | Perquimans | atty_rod_lien_checked | 1,882 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
-| NC | Perquimans | liens | 1,882 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
 | SC | Kershaw | probate | 1,802 | bot check (Cloudflare/WAF) | probate: www.kershaw.sc.gov |
 | NC | Moore | atty_rod_lien_checked | 1,557 | bot check (Cloudflare/WAF) | register: Aumentum Recorder web access (Harris Recording Sol |
 | NC | Moore | liens | 1,557 | bot check (Cloudflare/WAF) | register: Aumentum Recorder web access (Harris Recording Sol |
@@ -264,11 +260,7 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | NC | Chatham | repeat_tax_loss | 1,554 | bot check (Cloudflare/WAF) | tax/property card:  |
 | NC | Chatham | tax_aging_surfaced | 1,554 | bot check (Cloudflare/WAF) | tax/property card:  |
 | NC | Chatham | two_year_delinquent | 1,554 | bot check (Cloudflare/WAF) | tax/property card:  |
-| NC | Pender | atty_rod_lien_checked | 1,543 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
-| NC | Pender | liens | 1,543 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
 | NC | Union | atty_tax_verified_confirmed | 1,509 | bot check (Cloudflare/WAF) | tax/property card:  |
-| NC | Person | atty_rod_lien_checked | 1,429 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
-| NC | Person | liens | 1,429 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
 | NC | Wilson | multi_year_delinquent_tax | 1,392 | bot check (Cloudflare/WAF) | tax/property card: www.wilsoncountync.gov |
 | NC | Wilson | repeat_tax_loss | 1,392 | bot check (Cloudflare/WAF) | tax/property card: www.wilsoncountync.gov |
 | NC | Wilson | rollback_exposure | 1,392 | bot check (Cloudflare/WAF) | tax/property card: www.wilsoncountync.gov |
@@ -295,8 +287,6 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | NC | Ashe | tax_aging_surfaced | 794 | bot check (Cloudflare/WAF) | tax/property card: qpublic.schneidercorp.com |
 | NC | Ashe | two_year_delinquent | 794 | bot check (Cloudflare/WAF) | tax/property card: qpublic.schneidercorp.com |
 | SC | Charleston | lt_tax_sale_overage | 718 | bot check (Cloudflare/WAF) | tax/property card: sc-charleston.publicaccessnow.com |
-| NC | Richmond | atty_rod_lien_checked | 705 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
-| NC | Richmond | liens | 705 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
 | NC | Chatham | atty_tax_verified_confirmed | 676 | bot check (Cloudflare/WAF) | tax/property card:  |
 | NC | Alleghany | atty_rod_lien_checked | 609 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCHS), new-style host |
 | NC | Alleghany | liens | 609 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCHS), new-style host |
@@ -339,7 +329,7 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 
 ## 3. Human judgment call -- NOT a scrape target
 
-270 cells, 410,583 est_rows_affected combined.
+270 cells, 410,587 est_rows_affected combined.
 
 | state | county | column | est_rows | reason | source |
 |---|---|---|---|---|---|
@@ -473,7 +463,7 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | NC | Catawba | lt_probate_notice | 73 | verifier is a declared wall | probate: portal-nc.tylertech.cloud |
 | SC | Aiken | lt_lis_pendens | 70 | SC Public Index terms forbid automated querying | statewide: SC Public Index terms forbid automated querying |
 | SC | Richland | lt_lis_pendens | 70 | SC Public Index terms forbid automated querying | statewide: SC Public Index terms forbid automated querying |
-| NC | Cleveland | tax_aging_surfaced | 62 | verifier is a declared wall | tax/property card: www.clevelandcountytaxes.com |
+| NC | Cleveland | tax_aging_surfaced | 66 | verifier is a declared wall | tax/property card: www.clevelandcountytaxes.com |
 | NC | Columbus | lt_probate_notice | 62 | verifier is a declared wall | probate: portal-nc.tylertech.cloud |
 | NC | Polk | lt_probate_notice | 58 | verifier is a declared wall | probate: portal-nc.tylertech.cloud |
 | SC | Pickens | divorce | 57 | verifier is a declared wall | statewide: SC family-court index terms forbid automation |
