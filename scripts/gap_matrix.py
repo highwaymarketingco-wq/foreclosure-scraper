@@ -859,11 +859,15 @@ SPECS: dict[str, Spec] = {
                    # SC, where= pre-filtered to Boarded Building/Demolition/Vacant Building
                    # cases, 1,020 live rows re-verified 2026-11-11 -- and rockhill_code_demolition
                    # -- York SC, 17 live rows re-verified same day).
+                   # lincoln_code_violations.py added 2026-11-16 alongside the identical fix to
+                   # the 'vacancy' Spec above -- same raw["gis"]["vacant"] mirror, same 2-row
+                   # "Abandoned structure" subset (see that Spec's own comment for detail).
                    producers=("enrichment_arcgis.py", "scrapers/counties_sc/spartanburg_vacant.py",
                               "nc_lincoln_bulk.py", "scrapers/counties_nc/gastonia_code_enforcement.py",
                               "scrapers/counties_nc/kinston_proposed_demolition.py",
                               "scrapers/counties_nc/rocky_mount_blight_survey.py",
-                              "scrapers/counties_generic/arcgis_distress_layers.py"),
+                              "scrapers/counties_generic/arcgis_distress_layers.py",
+                              "scrapers/counties_nc/lincoln_code_violations.py"),
                    doc="raw.vacant present (a city/county vacant-structure registry); the real "
                        "check elsewhere in this file is raw['gis']['vacant'] specifically"),
     "storm_damage": Spec(_S, "county", "disaster", applies="storm_scope",
@@ -1031,10 +1035,32 @@ SPECS: dict[str, Spec] = {
                     # block on a subset of its case types (confirmed by reading the file, not its
                     # docstring's older "code_vacancy" terminology) -- a fourth tiny source, not
                     # the 3 the 2026-10-17 sweep's ambiguity note below counted.
+                    #
+                    # 2026-11-16 (vacant_structure "no source known" research pass): arcgis_distress_
+                    # layers.py was MISSING from this tuple entirely -- the exact omission already
+                    # fixed for 'condemned'/'vacant'/'code_enforcement' above and below, just never
+                    # swept for this fourth sibling column. Its own Layer.vacancy flag feeds raw.vacancy
+                    # AND raw["gis"]["vacant"] on the SAME two live entries (see Layer.vacancy's own
+                    # docstring) -- columbia_code_vacant_boarded (Richland SC, 1,020 rows) and
+                    # rockhill_code_demolition (York SC, 17 rows) -- so both counties were reading "no
+                    # source known" here despite that already-running, already-wired code. Added to
+                    # producers below; _arcgis_distress_layers_credit() grows a matching 'vacancy' key
+                    # (identical set to 'vacant', since it is the same underlying flag) and
+                    # built_in_code()'s existing precise-credit loop picks it up with no further change.
+                    #
+                    # lincoln_code_violations.py (NOT the generic arcgis_distress_layers.py entry of
+                    # the same name -- a separate, dedicated scraper with its own TLS workaround for
+                    # this host) also added 2026-11-16: live-sampled its 66 open cases, only
+                    # "Abandoned structure" (2 rows) is vacant-structure evidence; now stamps
+                    # raw.vacancy/raw["gis"]["vacant"] on that subset (was computing `severe`/
+                    # `distressed` from the same VIOLATEDESC match already, just never wrote either
+                    # of this column's two keys). Real but small: 2 live rows, Lincoln NC.
                     producers=("scrapers/counties_nc/hendersonville_vacant_structures.py",
                                "scrapers/counties_nc/rocky_mount_blight_survey.py",
                                "scrapers/counties_nc/kinston_proposed_demolition.py",
-                               "scrapers/counties_nc/gastonia_code_enforcement.py"),
+                               "scrapers/counties_nc/gastonia_code_enforcement.py",
+                               "scrapers/counties_generic/arcgis_distress_layers.py",
+                               "scrapers/counties_nc/lincoln_code_violations.py"),
                     doc="raw.vacancy.vacant/boarded_up/utility_status truthy; checked = vacancy wrapper",
                     ambiguity="a code-officer vacant-structure registry is a rare open-data product; only "
                              "4 tiny city/county sources exist in all of NC+SC as of 2026-11-10 (was 3 at "
@@ -1744,22 +1770,26 @@ _ARCGIS_DISTRESS_LAYERS_REL = "scrapers/counties_generic/arcgis_distress_layers.
 
 
 def _arcgis_distress_layers_credit() -> dict[str, set[tuple[str, str]]]:
-    """{'condemned': {...}, 'code_enforcement': {...}, 'vacant': {...}} read from
-    arcgis_distress_layers.py's own LAYERS registry: only an entry's own condemned=True /
+    """{'condemned': {...}, 'code_enforcement': {...}, 'vacant': {...}, 'vacancy': {...}} read
+    from arcgis_distress_layers.py's own LAYERS registry: only an entry's own condemned=True /
     process=='code_enforcement' / vacancy=True counts, never mere co-location in the file.
     'vacant' added 2026-11-11 (same bug, same fix, for the same file's new Layer.vacancy
     opt-in -- see Layer.vacancy's own docstring in that module): columbia_code_vacant_boarded
     (Richland SC) and rockhill_code_demolition (York SC) are the only two entries that set it,
     out of ~26 layers spanning a dozen+ counties for unrelated processes in this one file.
-    Empty dict if the module can't be imported."""
+    'vacancy' added 2026-11-16, same Layer.vacancy flag as 'vacant' (one raw["gis"]["vacant"]
+    AND raw["vacancy"] write per entry, per that field's own docstring) -- the SAME two entries,
+    just never read for this sibling column before. Empty dict if the module can't be imported."""
     try:
         from foreclosure_scraper.scrapers.counties_generic import arcgis_distress_layers as _adl
     except Exception:  # noqa: BLE001 - a missing/broken module leaves the blanket grep in place
         return {}
+    _vacancy_flagged = {(lay.state, lay.county) for lay in _adl.LAYERS if lay.vacancy}
     return {
         "condemned": {(lay.state, lay.county) for lay in _adl.LAYERS if lay.condemned},
         "code_enforcement": {(lay.state, lay.county) for lay in _adl.LAYERS if lay.process == "code_enforcement"},
-        "vacant": {(lay.state, lay.county) for lay in _adl.LAYERS if lay.vacancy},
+        "vacant": _vacancy_flagged,
+        "vacancy": _vacancy_flagged,
     }
 
 

@@ -99,3 +99,26 @@ def test_no_open_violations_with_a_description_leaves_code_enforcement_not_sever
     ce = li.raw["code_enforcement"]
     assert ce["violation_types"] == []
     assert ce["severe"] is False
+
+
+def test_abandoned_structure_sets_vacancy_and_gis_vacant():
+    """2026-11-16 (vacant_structure 'no source known' research pass): this file
+    had never written raw['vacancy'] or raw['gis']['vacant'] -- the keys
+    gap_matrix.py's own 'vacancy'/'vacant' columns check -- despite already
+    classifying 'Abandoned structure' as severe. Pins the new bridge."""
+    li = build_listing([_feat("V-8", "Abandoned structure")], now=NOW)
+    assert li.raw["vacancy"] == {
+        "vacant": True, "basis": "abandoned_structure",
+        "source": "lincoln_county_code_violations_archive",
+    }
+    assert li.raw["gis"]["vacant"] is True
+
+
+def test_junkyard_alone_does_not_set_vacancy():
+    """Severe (junk/solid-waste) but not vacancy: the structure is not known to
+    be vacant just because the yard has a violation -- only 'Abandoned
+    structure' is itself vacant-structure evidence."""
+    li = build_listing([_feat("V-9", "Junkyard")], now=NOW)
+    assert li.raw["code_enforcement"]["severe"] is True
+    assert "vacancy" not in li.raw
+    assert "gis" not in li.raw

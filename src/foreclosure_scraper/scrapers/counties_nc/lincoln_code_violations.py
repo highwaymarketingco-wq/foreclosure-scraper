@@ -124,6 +124,18 @@ _SEVERE = re.compile(
     r"(solid\s*waste|junk\s*yard|junkyard|junk\s*vehicle|abandoned\s*structure)",
     re.I)
 
+#: 2026-11-16 (vacant_structure "no source known" research pass): of the 66 open-case
+#: live sample, only "Abandoned structure" (2 of 66) is itself vacant-STRUCTURE evidence
+#: -- solid waste/junk vehicles/junkyard are nuisance-complaint categories on an otherwise-
+#: occupied property and were never meant to feed the separate vacancy/vacant columns
+#: (they stay in _SEVERE above for the code_enforcement/distressed signals only). This
+#: scraper has never written raw["vacancy"]/raw["gis"]["vacant"] at all -- the same
+#: raw-key-naming gap already fixed for gastonia_code_enforcement.py/kinston_proposed_
+#: demolition.py/rocky_mount_blight_survey.py (see each file's own history), just never
+#: swept for this one. Small (2 live rows), but real, free, and genuinely net-new for a
+#: column gap_matrix.py's own Spec calls "a rare open-data product".
+_VACANT = re.compile(r"abandoned\s*structure", re.I)
+
 _PAGE = 1000
 
 
@@ -258,6 +270,7 @@ def build_listing(feats: list[dict], now: datetime | None = None) -> Listing | N
     # cosmetic one (Sign, Use violation, Setback encroachment, ...).
     types = sorted({v["description"] for v in violations if v["description"]})
     severe = any(_SEVERE.search(t) for t in types)
+    vacant = any(_VACANT.search(t) for t in types)
 
     raw: dict[str, Any] = {
         "lincoln_code": {
@@ -297,6 +310,14 @@ def build_listing(feats: list[dict], now: datetime | None = None) -> Listing | N
         raw["lincoln_code"]["contacts"] = contacts
     if severe:
         raw["distressed"] = True
+    if vacant:
+        raw["vacancy"] = {"vacant": True, "basis": "abandoned_structure",
+                          "source": "lincoln_county_code_violations_archive"}
+        # Mirror into raw["gis"]["vacant"], the key gap_matrix.py's "vacant" column
+        # actually checks (separate from "vacancy" above) -- same dual-write shape
+        # kinston_proposed_demolition.py's utility_cutoff branch and charlotte_open_
+        # data.py's fof_ordered branch already use for the identical pair of keys.
+        raw.setdefault("gis", {})["vacant"] = True
 
     return Listing(
         source=LincolnCodeViolations.slug,
