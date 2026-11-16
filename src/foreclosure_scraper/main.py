@@ -3891,7 +3891,14 @@ async def run_enrich_tail(st: TailState) -> dict:
     try:
         from .enrichment_transylvania_multiyear_tax import enrich_transylvania_multiyear_tax
         s = enrich_transylvania_multiyear_tax(enriched)
-        if s and s.get("matched"):
+        # NOTE (2026-11-16, multi_year_delinquent_tax gap fix): this module's own stats dict
+        # never has a "matched" key (it reports "eligible"/"qualified"/"insufficient_history" --
+        # see its own enrich_transylvania_multiyear_tax() docstring), unlike the rollback sibling
+        # just above. The old `s.get("matched")` check was always falsy, so a real run's stats
+        # never surfaced into enrichment_stats (cosmetic only -- the restatement itself still
+        # wrote raw['multi_year_delinquent_tax'] directly onto `enriched`'s Listing objects
+        # regardless of this check; nothing about the actual data was affected).
+        if s and s.get("qualified"):
             enrichment_stats["transylvania_multiyear_tax"] = s
     except Exception:
         log.error("transylvania_multiyear_tax.failed", traceback=traceback.format_exc())
