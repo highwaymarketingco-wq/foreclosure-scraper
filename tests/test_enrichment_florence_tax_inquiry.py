@@ -32,6 +32,16 @@ def test_mbp_zero_pads_and_rejects_blank():
     assert mbp("not a tms") is None
 
 
+def test_mbp_accepts_the_bare_ten_digit_parcel_cache_form():
+    """sc_heir_estate_parcel_cache's own parcel_id shape (1,297 Florence rows, 100% this
+    format, found 2026-11-16): the same identity as the dash form, no separator."""
+    assert mbp("0000404007") == ("00004", "04", "007")
+    assert mbp("3000044787") == ("30000", "44", "787")
+    assert mbp("0000000000") is None  # all-zero
+    assert mbp("123456789") is None  # 9 digits -- not a valid flat TMS, not ambiguously accepted
+    assert mbp("12345678901") is None  # 11 digits
+
+
 def test_build_block_shapes_is_two_year_plus_from_late_years():
     agg = {"balance": 487.49, "years": [2024, 2026], "sold": False}
     today = date(2026, 11, 15)
