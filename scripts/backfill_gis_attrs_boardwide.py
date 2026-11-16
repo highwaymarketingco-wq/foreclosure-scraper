@@ -60,7 +60,33 @@ _LIGHT_FIELDS = _APPEND_SIG_FIELDS + ("raw", "latitude", "longitude", "owner_nam
                                       "year_built", "acreage", "assessed_value",
                                       "land_use")
 _TOP_FIELDS = ("assessed_value", "market_value", "tax_value", "living_sqft",
-               "year_built", "acreage", "land_use", "owner_name", "street_address")
+               "year_built", "acreage", "land_use", "owner_name", "street_address",
+               # 2026-11-15: bedrooms/bathrooms were missing here even though
+               # parcel_cache_join.apply_hit() sets li.bedrooms/li.bathrooms (real top-level
+               # Listing scalars, models.py) whenever a cache hit carries them -- every prior
+               # batch of this backfill computed real bedroom/bathroom fills in memory
+               # (visible in enrich_gis_attrs's own "filled bedrooms"/"filled bathrooms"
+               # cache_join stats) and then silently DROPPED them from the patch sent to
+               # patch_existing_rows, because this tuple -- which both the before/after
+               # snapshot AND the per-field patch loop key off -- never carried those two
+               # names. (`stories` is NOT a bug of this kind: apply_hit() writes it into
+               # raw['gis']['stories'], not a Listing attribute, and raw['gis'] is already
+               # covered by _RAW_WATCH_KEYS below -- it was never dropped.) Live-confirmed on
+               # Lexington SC (gap_matrix's biggest 'sourced-not-built' beds_baths gap): a dry
+               # run of the Lexington-scoped sibling (backfill_lexington_gis_attrs.py) showed
+               # cache_join="filled bedrooms": 25,609 while the resulting patch carried zero
+               # bedroom changes, matching the published board's independent 0-of-31,402 fill
+               # rate despite 10+ batches of this exact script having already "landed"
+               # board-wide (see project_gis_attrs_boardwide_dormant_2026-10-23). Every county
+               # this script has NOT yet reached (raw['gis']['queried'] still unset) gets
+               # correct bedroom/bathroom fills from this fix with no other change needed.
+               # NOT fixed by this alone: the ~10,691 rows the 10+ prior batches already
+               # stamped raw['gis']['queried']=True while this bug was live -- the candidate-
+               # selection loop above treats that stamp as "already done" and keeps skipping
+               # them, so they need a dedicated one-time re-pass (ignore the queried stamp,
+               # re-run enrich_gis_attrs, patch again) to pick up what this fix now lets
+               # through; not attempted here.
+               "bedrooms", "bathrooms")
 _RAW_WATCH_KEYS = ("gis", "gis_attrs", "gis_attrs_full", "owner_name_as_of")
 _NEEDED_RAW_KEYS = ("gis", "gis_attrs", "gis_attrs_full", "owner_name_as_of",
                     "geo_imprecise", "geocoded_by_name", "parcel_id_nulled",
