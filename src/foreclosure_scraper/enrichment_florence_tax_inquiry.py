@@ -317,7 +317,26 @@ def build_block(m: tuple[str, str, str], agg: dict, now_iso: str, today: date) -
 
 def apply_block(li: Any, block: dict) -> bool:
     """Write florence_tax_inquiry unconditionally, tax_owed only when balance > 0 and the row has
-    none yet. Returns True when tax_owed was (newly) written."""
+    none yet. Returns True when tax_owed was (newly) written.
+
+    FOUND 2026-11-16 (live-testing the gap_matrix fix this module exists for): the canonical
+    raw['tax_owed'] contract enrichment_tax_owed.py's own enrich_tax_owed() writes everywhere
+    else always carries a SINGULAR "year" (the newest levy year -- its own line 479 comment:
+    "the newest year ... beats its TAX_YEAR label") alongside any per-year list, and
+    enrichment_tax_aging.py's own first gate reads exactly that singular key
+    (`to_year = _year(to.get("year"))`) before it ever calls tax_year_status() -- it does NOT
+    fall back to a plural "years" list the way tax_year_status()'s OWN internal
+    unpaid_levy_years() scan does for other tax-ish blocks. This block had "years" (plural)
+    only, so that first gate's to_year/years_delinquent check always failed and
+    enrich_tax_aging() skipped every Florence row via its `else: continue` -- tax_owed and
+    two_year_delinquent would land, but raw['tax_aging_surfaced'] never would have, flag or no
+    flag. Confirmed fixed live: adding "year" here makes enrich_tax_aging() reach
+    tax_year_status(), which already reads this module's own florence_tax_inquiry block
+    correctly via unpaid_levy_years()'s generic _is_tax_source_block("florence_tax_inquiry")
+    match (the name contains "tax") -- both a not-yet-late single-year balance (status
+    "not_yet_late", years_delinquent 0) and a genuinely 2024+2026 case (years_delinquent 1)
+    verified to produce a real raw['tax_aging_surfaced'] dict, not just raw['tax_owed'].
+    """
     raw = dict(_raw(li))
     raw["florence_tax_inquiry"] = block
     filled = False
@@ -326,6 +345,7 @@ def apply_block(li: Any, block: dict) -> bool:
     if block["balance"] > 0 and not has_balance:
         raw["tax_owed"] = {"balance": block["balance"], "kind": "delinquent_tax",
                            "source": "web.florenceco.org", "basis": "own_record",
+                           "year": max(block["years"]) if block["years"] else None,
                            "years": block["years"],
                            "status": "sold_at_tax_sale" if block["sold_at_tax_sale"] else "unpaid"}
         filled = True
