@@ -1099,3 +1099,54 @@ def test_board_rows_reads_a_checkpoint(tmp_path):
     assert gm.is_checkpoint(d) and gm.is_checkpoint(d / "board.json.gz")
     rows = list(gm.board_rows(d))
     assert len(rows) == 1 and rows[0]["county"] == "Buncombe"
+
+
+
+# ---------------------------------------------------------------- 2026-11-16 storm_damage dead-end sweep
+
+def test_storm_damage_declined_for_confirmed_no_qualifying_event_counties():
+    """storm_damage's own applicability rule (in_storm_scope) is the real ~71-county FEMA
+    Helene IA footprint -- deliberately broader than the 3 counties the producer
+    (enrichment_helene_damage.py) covers today, so an in-footprint-but-unbuilt county still
+    reads as a real gap (see test_storm_damage_applies_only_in_the_real_fema_helene_footprint
+    above). That is correct for most of the footprint, but Mecklenburg/Gaston/Lincoln were
+    live-confirmed (2026-10-29 session: NOAA tornado EF-ratings + the state's Helene damage
+    briefing; re-confirmed 2026-11-16: FEMA OpenFEMA per-household inspected-damage data) to
+    have had NO qualifying structural-damage event at all -- a county the storm's real
+    footprint touched only glancingly can never grow a parcel-level damage-assessment dataset
+    for this column's producer to read, no matter how long the gap sweep waits. The 2026-10-29
+    session recommended reclassifying these in gap_matrix but never implemented it, so they
+    kept re-surfacing as 'no source known' on every regeneration (confirmed still broken in the
+    2026-11-16 gap list before this fix). Fixed by POPULATING the existing declined_registry.json
+    override (not by changing classify_cell/in_storm_scope, which stay correct for the rest of
+    the footprint) -- Forsyth/Cabarrus/Union added the same pass from the same FEMA cross-check."""
+    for county in ("Mecklenburg", "Gaston", "Lincoln", "Forsyth", "Cabarrus", "Union"):
+        assert gm.in_storm_scope("NC", county)      # still "applicable" -- the override is the fix, not app==0
+        got = gm.declined_override("NC", county, "storm_damage", "no source known")
+        assert got is not None and got.startswith("declined ("), (county, got)
+    # a DIFFERENT column for the same county is untouched (the override is column-scoped, not blanket)
+    assert gm.declined_override("NC", "Mecklenburg", "condemned", "no source known") == "no source known"
+
+
+def test_storm_damage_not_declined_for_york_and_lexington_sc():
+    """York SC and Lexington SC also show storm_damage as 'no source known' on the board (the
+    2026-10-29 session never checked them -- it covered only 3 NC counties) but 2026-11-16
+    live FEMA per-household data shows their damage severity (avg FEMA-inspected damage per
+    inspected home: York $1,112, Lexington $1,384) at or above Spartanburg SC's (avg $1,224 --
+    a county with a CONFIRMED real, built damage-assessment layer per
+    enrichment_helene_damage.py's own module docstring), unlike Mecklenburg/Gaston/Lincoln's
+    $674-810 tier. These stay genuinely open gaps -- deliberately NOT added to
+    declined_registry.json this pass."""
+    for state, county in (("SC", "York"), ("SC", "Lexington")):
+        got = gm.declined_override(state, county, "storm_damage", "no source known")
+        assert got == "no source known", (state, county, got)
+
+
+def test_declined_override_never_fires_on_not_applicable_or_at_target():
+    """Guard for the new storm_damage registry rows specifically: declined_override must still
+    refuse to touch a cell that is already correctly 'not applicable' (app == 0) or already at
+    target (None), even for a (state, county, column) tuple the registry now has a real entry
+    for -- a future narrowing of in_storm_scope must never be silently overridden back to
+    'declined' by this registry."""
+    assert gm.declined_override("NC", "Mecklenburg", "storm_damage", "not applicable") == "not applicable"
+    assert gm.declined_override("NC", "Mecklenburg", "storm_damage", None) is None

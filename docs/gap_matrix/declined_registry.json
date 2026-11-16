@@ -156,6 +156,36 @@
       "state": "SC", "county": "Kershaw", "column": "lt_tax_sale_overage",
       "reason": "Every kershaw.sc.gov path tried live 2026-11-10 with a full Chrome UA -- the Treasurer 'delinquent-matters' page and both 'showpublisheddocument' doc IDs (17179, 9876) surfaced by search as the county's Tax Sale List/Guide -- returned HTTP 403 (Cloudflare/WAF, consistent across 3 independent paths on the same host). Walled, not sourced-not-built.",
       "confirmed_date": "2026-11-10", "confidence": "high"
+    },
+    {
+      "state": "NC", "county": "Mecklenburg", "column": "storm_damage",
+      "reason": "No post-Helene parcel-level damage-assessment GIS layer exists or will exist here, even though Mecklenburg sits inside the broad ~71-county FEMA IA footprint (storm_scope). 2026-10-29 session found Mecklenburg's only logged tornado was EF-0 (negligible) via NOAA Storm Events + the state's own Helene damage briefing, but never implemented the override -- this session (2026-11-16) independently re-confirmed via FEMA OpenFEMA HousingAssistanceOwners/Renters per-household inspected-damage data for DR-4827: Mecklenburg averages $810 FEMA-inspected damage per inspected home (5,309 inspections), only 39 homes assessed above $30k, 8 max-grant recipients -- an order of magnitude below the counties this column's own producer (enrichment_helene_damage.py) already covers (Henderson: avg $4,184/home, 170 >$30k, 299 max grants; Buncombe: avg $2,840/home, 367 >$30k, 617 max grants). NOAA Storm Events' only Helene-week (2024-09-24..10-03) entries for Mecklenburg are a Flash Flood and a county-wide Tropical Storm wind estimate, no tornado, no structural-damage narrative. Real catastrophic structural damage -- the kind that drives a county to run and publish a parcel-level ATC-45 damage survey -- never happened here.",
+      "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "NC", "county": "Gaston", "column": "storm_damage",
+      "reason": "Same confirmed dead end as Mecklenburg (see that entry, same FEMA DR-4827/NOAA cross-check method). Gaston's only logged tornado (EF-1) explicitly missed the federal damage-assistance threshold per the 2026-10-29 session; this session's FEMA per-household data shows Gaston at the lowest severity of any county checked (avg $674 FEMA-inspected damage/inspected home across 3,609 inspections, zero homes above $30k, 3 max-grant recipients). NOAA Storm Events' only Helene-week entries for Gaston are a Tropical Storm wind estimate and a Flash Flood -- no tornado logged in that window (Gaston's EF-1 was a separate, non-Helene 2024 event). No parcel-level damage-assessment layer exists or will exist here.",
+      "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "NC", "county": "Lincoln", "column": "storm_damage",
+      "reason": "Same confirmed dead end as Mecklenburg/Gaston (see those entries). Lincoln was rated 'low-impact' in the state's own Helene damage briefing per the 2026-10-29 session; this session's FEMA per-household data for DR-4827 corroborates it (avg $725 FEMA-inspected damage/inspected home across 775 inspections, only 1 home above $30k, 2 max-grant recipients -- same low tier as Mecklenburg/Gaston, far below the confirmed-built counties). NOAA Storm Events' only Helene-week entry for Lincoln is a single county-wide Tropical Storm wind estimate -- no tornado, no flood. No parcel-level damage-assessment layer exists or will exist here.",
+      "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "NC", "county": "Forsyth", "column": "storm_damage",
+      "reason": "Forsyth sits inside the broad FEMA DR-4827 IA footprint (storm_scope) but NOAA's Storm Events Database has ZERO logged weather events of any kind for Forsyth County during the entire Helene window (2024-09-24..10-03) -- its only other 2024 entries are four unrelated ordinary thunderstorm-wind reports (Jan/Feb/Apr/Aug), each under $5K. FEMA's per-household inspected-damage data for DR-4827 is the lowest of all 64 'no source known' storm_damage counties checked this session (avg $268 FEMA-inspected damage per inspected home across 383 inspections, zero homes above $30k, zero max-grant recipients). The federal IA registration here reflects generic storm-adjacent hardship, not structural damage. No county/city post-Helene parcel-level damage-assessment GIS layer exists or will exist here.",
+      "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "NC", "county": "Cabarrus", "column": "storm_damage",
+      "reason": "Same Charlotte-metro-ring profile as the confirmed Mecklenburg/Gaston/Lincoln/Forsyth dead ends (see those entries). NOAA Storm Events' only Helene-week entries for Cabarrus are a Flood ($1K) and a Flash Flood ($10K), no tornado; FEMA's per-household data for DR-4827 shows Cabarrus at avg $352 FEMA-inspected damage per inspected home across 784 inspections, zero homes above $30k, zero max-grant recipients -- below even the confirmed tier. Inferred from the same structural rule as the directly-verified siblings above (sibling Charlotte-Piedmont county); not independently checked against an official Helene damage briefing document the way Mecklenburg/Gaston/Lincoln were.",
+      "confirmed_date": "2026-11-16", "confidence": "medium"
+    },
+    {
+      "state": "NC", "county": "Union", "column": "storm_damage",
+      "reason": "Same Charlotte-metro-ring profile as the confirmed Mecklenburg/Gaston/Lincoln/Forsyth dead ends (see those entries). NOAA Storm Events' only Helene-week entries for Union are a Thunderstorm Wind ($5K), a Flash Flood ($5K) and a county-wide Tropical Storm wind estimate, no tornado; FEMA's per-household data for DR-4827 shows Union at avg $761 FEMA-inspected damage per inspected home across 253 inspections, zero homes above $30k, zero max-grant recipients -- same low tier as the confirmed dead ends. Inferred from the same structural rule as the directly-verified siblings above (sibling Charlotte-Piedmont county); not independently checked against an official Helene damage briefing document the way Mecklenburg/Gaston/Lincoln were.",
+      "confirmed_date": "2026-11-16", "confidence": "medium"
     }
   ]
 }
