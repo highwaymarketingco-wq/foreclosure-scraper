@@ -681,14 +681,15 @@ def test_enrichment_flags(monkeypatch):
 
 def test_registry_names_every_county_and_its_readers():
     # Watauga added 2026-10-19 (gap-matrix wave3 follow-up): same LRSearch MVC app as Beaufort,
-    # live-confirmed one GET of VRMarriageSearch/MarriageIndex -- marriage job only, the lien side
-    # was not probed so it stays out of this registry.
+    # live-confirmed one GET of VRMarriageSearch/MarriageIndex. 2026-11-16: the lien side was
+    # live-probed too (open()/doc_types() found 4 real adverse codes, a clean CS.sweep() read) --
+    # both jobs now registered, same shape as Beaufort.
     # Johnston added 2026-10-21: Tyler EagleWeb's own BookTypeID='M' document-type sweep --
     # marriage job only, the lien side was not probed so it stays out of this registry too.
     nc = {"Orange", "Stanly", "Surry", "Beaufort", "Watauga", "Johnston", *CS.HOSTED_CCHS}
     assert set(ES.SWEEP_COUNTIES) == {("NC", c) for c in nc} | {("SC", "Sumter"), ("SC", "Oconee")}
     assert [j.kind for j in ES.SWEEP_COUNTIES[("NC", "Beaufort")]] == ["lien", "marriage"]
-    assert [j.kind for j in ES.SWEEP_COUNTIES[("NC", "Watauga")]] == ["marriage"]
+    assert [j.kind for j in ES.SWEEP_COUNTIES[("NC", "Watauga")]] == ["lien", "marriage"]
     assert [j.kind for j in ES.SWEEP_COUNTIES[("NC", "Johnston")]] == ["marriage"]
     assert {"Gates", "Hertford", "Franklin", "Caldwell", "Currituck", "Chowan", "Hyde", "Montgomery", "Caswell",
             "Camden"} <= set(CS.HOSTED_CCHS)

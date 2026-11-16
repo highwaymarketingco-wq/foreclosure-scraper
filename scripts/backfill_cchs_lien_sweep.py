@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""One-time backfill: run rod/county_sweeps.py's CchsClassicReader + sweep()/stamp_for() (already
-wired into enrichment_county_lien_sweep.SWEEP_COUNTIES via `*CS.HOSTED_CCHS`, default-ON) against
-the real board for the 12 HOSTED_CCHS us3/us5 tenants that have NEVER actually landed a single
-raw['rod_lien_sweep'] stamp.
+"""One-time backfill: run rod/county_sweeps.py's CchsClassicReader (+ LrSearchReader for one
+county) and sweep()/stamp_for() (already wired into enrichment_county_lien_sweep.SWEEP_COUNTIES,
+default-ON) against the real board for 14 counties that have NEVER actually landed a single
+raw['rod_lien_sweep'] stamp: the original 12 HOSTED_CCHS us3/us5 tenants (round 6) plus Pasquotank
+and Watauga (round 7, see below).
 
 Confirmed via a board_stream scan 2026-11-16 (read-only, iter_board_rows(), never load_board()):
 0 of 2030/1054/315/1275/1167/1607/669/869/1369/822/720/3148/740/720(dup)/1429/705/2289(these and
@@ -21,9 +22,33 @@ unblocked -- 3/25 -> 13/25 HOSTED_CCHS tenants working -- MINUS the 12 separate 
 (Lincoln, Madison, Henderson, Hertford, Hyde, Montgomery, Chowan, Franklin, Camden, Duplin,
 Tyrrell, Washington), which that SAME memory says now fail with a plain HTTP 400 on the search
 call itself -- a DIFFERENT, still-unsolved bug, NOT attempted here, NOT this script's target.
-Watauga is also excluded: SWEEP_COUNTIES wires it for the marriage job only (a different reader,
-LrSearchReader-style MVC app); its lien side was explicitly left unprobed by a prior session and
-is not addressed here either.
+2026-11-16, round 7: added 2 more counties this script skipped the first time, both live-probed
+and confirmed working the same day. Pasquotank (us4-hosted CCHS, CchsClassicReader) was wrongly
+swept into "the 12 broken us4 tenants" by round 6's own framing -- it is NOT one of the 12; its
+own code comment in county_sweeps.py already said "fully worked, not walled at all" and a fresh
+live POST (cookie+Referer, exactly what read() sends) confirms it: 200, real <SearchResponse>,
+392 real 2024 docs. Watauga (LrSearchReader, the SAME LRSearch MVC app as Beaufort) had its lien
+side explicitly left unprobed by a prior session (SWEEP_COUNTIES wired its marriage job only) --
+live-probed now: open()/doc_types() found 4 real adverse codes, CS.sweep() read 2024-01-01..today
+cleanly (walled=None, error=None, 20 real instruments). Both now wired into SWEEP_COUNTIES too
+(Pasquotank automatically via `*CS.HOSTED_CCHS`; Watauga via a new lien Job alongside its existing
+marriage one) -- this script's own board scan confirmed both still had ZERO rod_lien_sweep rows
+beforehand (2,413 Pasquotank-eligible, 793 Watauga-eligible, unstamped).
+
+The other 12 us4 tenants (Lincoln, Madison, Hertford, Hyde, Montgomery, Franklin, Camden, Duplin,
+Tyrrell, Washington -- 10 of them -- plus Henderson and Chowan) remain OUT OF SCOPE, live-recheck
+2026-11-16: a cookie+Referer POST (what read() actually sends) gets a flat HTTP 400 "Bad Request"
+for 10 of them (Lincoln/Madison/Hertford/Hyde/Montgomery/Franklin/Camden/Duplin/Tyrrell/Washington
+-- stable across 3 retries each, across 4 request-body shapes, and across curl-cffi Chrome
+impersonation -- genuinely NOT the Cloudflare Turnstile/search_token wall documented in
+project_us4_cchs_session_expired_unsolved_2026-11-12 (no challenge page, no search_token
+involvement, no cf-mitigated header; a bare 11-byte IIS-level body), but ALSO not fixed by any
+header/body/fingerprint variation tried -- a genuinely separate, still-unexplained server-side
+rejection, not attempted here. Henderson and Chowan are the opposite: their SAME cookie+Referer
+POST gets HTTP 400 with the literal body "session_expired" (stable across 3 retries each) -- THE
+SAME search_token/Turnstile-gated check as the already-confirmed-dead owner-search path, just
+surfacing on this endpoint with a 400 instead of a 200. Confirmed dead end for those 2, not a new
+bug, not attempted here either.
 
 ROOT CAUSE, investigated but deliberately NOT fixed here: enrich_county_lien_sweep() in
 enrichment_county_lien_sweep.py gives EVERY swept county (currently 31, SWEEP_COUNTIES) the SAME
@@ -53,6 +78,7 @@ import sys
 import time
 from datetime import date, timezone, datetime
 from pathlib import Path
+from typing import Callable
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "src"))
@@ -64,11 +90,18 @@ from foreclosure_scraper.web_artifact import (  # noqa: E402
     _APPEND_SIG_FIELDS, board_lock, board_patch_size_state, patch_existing_rows,
 )
 
-#: The 12 HOSTED_CCHS us3/us5 tenants confirmed live + confirmed zero rod_lien_sweep coverage
-#: 2026-11-16 (see module docstring). NOT the 12 us4 tenants (separate HTTP-400 bug) and NOT
-#: Watauga (marriage-only job).
-COUNTIES = ("Caldwell", "Currituck", "Gates", "Dare", "Caswell", "Burke", "Cleveland",
-            "Pender", "Perquimans", "Person", "Richmond", "Rockingham")
+#: county -> reader factory. The original 12 HOSTED_CCHS us3/us5 tenants (round 6) plus, as of
+#: round 7 (2026-11-16, see module docstring): Pasquotank (HOSTED_CCHS us4, but NOT one of the
+#: 12 broken ones -- live-confirmed working) and Watauga (LrSearchReader, the Beaufort-style
+#: LRSearch MVC app, lien side newly confirmed working). NOT the 12 genuinely-broken/walled us4
+#: tenants.
+READERS: dict[str, "Callable[[], CS.Reader]"] = {
+    **{c: (lambda c=c: CS.CchsClassicReader(c))
+       for c in ("Caldwell", "Currituck", "Gates", "Dare", "Caswell", "Burke", "Cleveland",
+                 "Pender", "Perquimans", "Person", "Richmond", "Rockingham", "Pasquotank")},
+    "Watauga": (lambda: CS.LrSearchReader("Watauga")),
+}
+COUNTIES = tuple(READERS)
 
 SINCE = date(2016, 1, 1)           # CS.DEFAULT_SINCE's own value; matches the scheduled job's default
 BUDGET_S = 300.0                   # generous per county; no shared deadline here, unlike main.py's pass
@@ -108,7 +141,7 @@ def main() -> int:
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--allow-large", action="store_true")
     ap.add_argument("--counties", nargs="*", default=None,
-                    help="subset of COUNTIES to run (default: all 12)")
+                    help="subset of COUNTIES to run (default: all 14)")
     args = ap.parse_args()
 
     docs_dir = REPO / "docs"
@@ -132,7 +165,7 @@ def main() -> int:
 
     for county in targets:
         t0 = time.time()
-        reader = CS.CchsClassicReader(county)
+        reader = READERS[county]()
         try:
             index, res = CS.sweep(reader, since=SINCE, budget_s=BUDGET_S)
         except Exception as exc:  # noqa: BLE001 - one county never stops the backfill

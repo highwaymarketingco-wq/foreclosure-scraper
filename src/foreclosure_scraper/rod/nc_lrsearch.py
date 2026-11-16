@@ -55,8 +55,12 @@ COUNTIES: dict[str, LrCounty] = {
     # 2026-10-19: same LRSearch MVC app, different us-host/tenant slug. Live-confirmed (one GET,
     # PoliteClient, gap-matrix wave3 follow-up): VRMarriageSearch/MarriageIndex opens a real
     # Marriages-tab search form here (its own 'last'/'vitaltype' defaults, same shape as
-    # Beaufort's), so the marriage sweep works unmodified; the lien side was not probed and is
-    # left unregistered in enrichment_county_lien_sweep.py's SWEEP_COUNTIES (marriage job only).
+    # Beaufort's), so the marriage sweep works unmodified.
+    # 2026-11-16: the lien side (LRSearch/GetDocTypes + LRSearch/ExecuteSearch) was live-probed
+    # and ALSO works unmodified -- 4 real adverse codes (F, FCL, JGMT, N/F), a clean CS.sweep()
+    # read of 2024-01-01..today (walled=None, error=None). Now registered in
+    # enrichment_county_lien_sweep.py's SWEEP_COUNTIES alongside the marriage job, same shape as
+    # Beaufort's two-job entry.
     "Watauga": LrCounty("https://us3.courthousecomputersystems.com/WataugaNC2/"),
 }
 

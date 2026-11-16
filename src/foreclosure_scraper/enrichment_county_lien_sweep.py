@@ -59,10 +59,13 @@ SWEEP_COUNTIES: dict[tuple[str, str], tuple[Job, ...]] = {
     ("NC", "Beaufort"): (Job("lien", lambda: CS.LrSearchReader("Beaufort")),
                          Job("marriage", lambda: CS.MarriageReader("Beaufort"))),
     # 2026-10-19: Watauga runs the identical LRSearch MVC app (see rod/nc_lrsearch.py's own
-    # COUNTIES comment) with an open Marriages tab, live-confirmed one GET. Marriage job only --
-    # the lien side (its own adverse-doc-type codes) was not probed, so it stays unregistered here
-    # rather than assumed to work the same way.
-    ("NC", "Watauga"): (Job("marriage", lambda: CS.MarriageReader("Watauga")),),
+    # COUNTIES comment) with an open Marriages tab, live-confirmed one GET.
+    # 2026-11-16: the lien side (its own adverse-doc-type codes) was live-probed and confirmed
+    # working the same way as Beaufort -- open()/doc_types() found 4 real adverse codes
+    # (F, FCL, JGMT, N/F) and CS.sweep() read 2024-01-01..today cleanly (walled=None, error=None,
+    # 20 real instruments indexed in a 60s test). Lien job added, same shape as Beaufort's.
+    ("NC", "Watauga"): (Job("lien", lambda: CS.LrSearchReader("Watauga")),
+                        Job("marriage", lambda: CS.MarriageReader("Watauga"))),
     # 2026-10-21: Johnston's Tyler EagleWeb register (rod/nc_tyler.py's own COUNTIES, already
     # wired for the deed side via FORECLOSURE_NC_TYLER_ROD) carries a document-TYPE filter
     # ('M - Marriage') its guest docSearch form exposes directly -- a blank-name, date-windowed
