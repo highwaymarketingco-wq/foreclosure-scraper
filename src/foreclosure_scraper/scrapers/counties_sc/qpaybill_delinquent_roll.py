@@ -161,7 +161,7 @@ from html import unescape as html_unescape
 from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
 from ...tax_calendar import levy_year_is_delinquent
-from ...enrichment_qpaybill_tax import _UA, _hidden, _url
+from ...enrichment_qpaybill_tax import _UA, _hidden, _url, _ROLLBACK_YEARS_SC
 
 log = structlog.get_logger()
 
@@ -1369,6 +1369,43 @@ def _to_listings(county: str, rows: list[dict]) -> list[Listing]:
         owner = next((g["owner"] for g in group if g.get("owner")), None)
         address = next((g["address"] for g in group if g.get("address")), None)
         prior = next((g["description"] for g in group if g.get("description")), None)
+        # ROLLBACK DETECTION (2026-11-16, rollback_exposure systematic sweep). A real
+        # agricultural-use change-of-use rollback bill's Description reads "<year>
+        # ROLLBACK TAX..." instead of the usual situs-address/lot text -- the IDENTICAL
+        # substring test enrichment_qpaybill_tax.py's _parse_rows() added 2026-11-05
+        # (confirmed live that day against Calhoun map 053-00-01-112) and the same field
+        # this grid's own rows already carry (group entries come from parse_grid() above,
+        # whose "description" is this exact cell, kept verbatim). That module's own
+        # surname-search only ever queries 9 of the 29 counties this sweep covers
+        # (QPAYBILL_COUNTIES); this sweep already fetches every row's Description for
+        # all 29 as part of its normal weekly lead pull, at zero extra request cost, so
+        # the same cheap signal is read here too rather than only on a 9-county subset
+        # that may never actually run (enrich_qpaybill_tax is opt-in, QPAYBILL_TAX=1,
+        # not part of the scheduled crawl -- see main.py's own comment at its call site).
+        # Read from EVERY row in the group regardless of year-delinquency status, same as
+        # the sibling producer: this records the FACT a rollback was billed, not whether
+        # it is currently owed (a separately-tracked, already-unpaid row in the same
+        # group would already be reflected in `total`/`years` above).
+        _rollback_rows = [g for g in group if g.get("description")
+                         and "ROLLBACK" in g["description"].upper()]
+        rollback_exposure = None
+        if _rollback_rows:
+            rollback_exposure = {
+                "rollback_already_billed": round(sum(g["amount"] for g in _rollback_rows), 2),
+                "rollback_billed_years": sorted({g["year"] for g in _rollback_rows if g.get("year")}),
+                "deferred_value": None,
+                "annual_deferred_tax": None,
+                "estimated_rollback": None,
+                "estimate_is_floor": None,
+                "tax_rate_source": "unavailable_grid_has_no_value_split",
+                "rollback_years": _ROLLBACK_YEARS_SC,
+                "basis": "agricultural_use_deferral",
+                "county": county,
+                "state": "SC",
+                "source": f"qpaybill:{QPAYBILL_SUBS[county]} (grid Description: '<year> ROLLBACK TAX...')",
+                "source_key": "qpaybill_grid_rollback",
+                "match_method": "parcel",
+            }
         det = {}
         for g in group:
             if isinstance(g.get("detail"), dict) and g["detail"]:
@@ -1479,6 +1516,11 @@ def _to_listings(county: str, rows: list[dict]) -> list[Listing]:
             # raw['tax_relief'] at the top level (see the comment above tax_relief's
             # computation).
             **({"tax_relief": tax_relief} if tax_relief else {}),
+            # Top-level raw key, NOT nested under qpaybill_roll -- matches the shared
+            # contract enrichment_rollback_deferral.py / enrichment_qpaybill_tax.py /
+            # enrichment_greenville_rollback_exposure.py all write raw['rollback_exposure']
+            # into (see the ROLLBACK DETECTION comment above where this is computed).
+            **({"rollback_exposure": rollback_exposure} if rollback_exposure else {}),
             },
             tax_value=det.get("appraised_value"),
             assessed_value=det.get("assessed_value"),

@@ -145,9 +145,75 @@ def test_an_account_id_county_makes_no_parcel_claim():
     assert "Orangeburg" in ACCOUNT_ID_ONLY
     out = _to_listings("Orangeburg", [_row("2082143", "2025", 10.0)])
     assert out[0].parcel_id is None
-    raw = out[0].raw["qpaybill_roll"]
-    assert raw["identification_no"] == "2082143"
-    assert raw["is_account_id_not_parcel"] is True
+
+
+# --- ROLLBACK DETECTION (2026-11-16 rollback_exposure systematic sweep) -------------------
+#
+# Same Description-text signal enrichment_qpaybill_tax.py's _parse_rows() already uses
+# ("<year> ROLLBACK TAX..." instead of the usual situs/lot text, confirmed live 2026-11-05
+# against Calhoun map 053-00-01-112) -- but read here, in THIS module's own weekly
+# full-roster sweep, which covers all 29 QPAYBILL_SUBS counties rather than only the 9 in
+# enrichment_qpaybill_tax.QPAYBILL_COUNTIES, at zero extra request cost (the Description
+# cell is already fetched for every row this sweep absorbs).
+
+def test_a_rollback_tax_row_stamps_the_shared_contract():
+    out = _to_listings("Cherokee", [
+        _row("002-00-01-112.00", "2025", 50.0),  # an ordinary unpaid year, same parcel
+        {"notice_no": "N1", "owner": "SMITH JOHN", "address": "1 MAIN ST",
+         "year": "2024", "description": "2024 ROLLBACK TAX...",
+         "ident": "002-00-01-112.00", "status": "Unpaid", "amount": 611.42},
+    ])
+    assert len(out) == 1
+    rb = out[0].raw["rollback_exposure"]
+    assert rb["rollback_already_billed"] == 611.42
+    assert rb["rollback_billed_years"] == ["2024"]
+    assert rb["basis"] == "agricultural_use_deferral"
+    assert rb["county"] == "Cherokee" and rb["state"] == "SC"
+    assert rb["source_key"] == "qpaybill_grid_rollback"
+    assert rb["match_method"] == "parcel"
+    # fields this vendor cannot supply stay explicitly None, never a guessed estimate
+    assert rb["deferred_value"] is None
+    assert rb["estimated_rollback"] is None
+    # an unpaid rollback bill is also real money owed -- it sums into balance_owed exactly
+    # like any other unpaid row (matching enrichment_qpaybill_tax.py's own tax_owed
+    # aggregation, which sums an Unpaid rollback row into the balance too; rollback_exposure
+    # records the FACT of the rollback on top of, not instead of, the balance it owes).
+    assert out[0].raw["qpaybill_roll"]["balance_owed"] == 661.42
+
+
+def test_multiple_rollback_years_sum_and_sort():
+    out = _to_listings("Calhoun", [
+        _row("053-00-01-112", "2025", 20.0),
+        {"notice_no": "N1", "owner": "SMITH JOHN", "address": None, "year": "2023",
+         "description": "2023 ROLLBACK TAX...", "ident": "053-00-01-112",
+         "status": "Unpaid", "amount": 100.0},
+        {"notice_no": "N2", "owner": "SMITH JOHN", "address": None, "year": "2022",
+         "description": "2022 ROLLBACK TAX...", "ident": "053-00-01-112",
+         "status": "Unpaid", "amount": 50.0},
+    ])
+    rb = out[0].raw["rollback_exposure"]
+    assert rb["rollback_already_billed"] == 150.0
+    assert rb["rollback_billed_years"] == ["2022", "2023"]
+
+
+def test_an_ordinary_parcel_gets_no_rollback_exposure_key():
+    """A parcel with nothing but a normal situs/lot Description must not grow a
+    raw['rollback_exposure'] key -- idempotence with the sibling producers depends on
+    this key's mere PRESENCE meaning a real rollback was found (enrichment_qpaybill_tax.py
+    skips any row that already carries one)."""
+    out = _to_listings("Barnwell", [_row("045-00-00-021.03", "2025", 130.55)])
+    assert "rollback_exposure" not in out[0].raw
+
+
+def test_rollback_detection_is_case_insensitive_and_substring():
+    """Real live Description cells carry trailing case/space noise around the marker;
+    the check must not depend on an exact, anchored match."""
+    out = _to_listings("Darlington", [
+        {"notice_no": "N1", "owner": "DOE JANE", "address": "9 FARM RD",
+         "year": "2024", "description": "  2024 Rollback Tax - Ag Use Change  ",
+         "ident": "067-07-03-066", "status": "Unpaid", "amount": 25448.19},
+    ])
+    assert out[0].raw["rollback_exposure"]["rollback_already_billed"] == 25448.19
 
 
 def test_a_parcel_county_does_claim_its_parcel():

@@ -889,7 +889,21 @@ SPECS: dict[str, Spec] = {
                                                               "enrichment_rowan_rollback_exposure.py",
                                                               "enrichment_brunswick_rollback_exposure.py",
                                                               "enrichment_duplin_rollback_exposure.py",
-                                                              "enrichment_johnston_rollback_exposure.py"),
+                                                              "enrichment_johnston_rollback_exposure.py",
+                                                              # 2026-11-16 rollback_exposure sweep: these two were
+                                                              # missing entirely, which is WHY 6 of the 9 qPayBill
+                                                              # counties the ROLLBACK-TAX Description-text detector
+                                                              # (enrichment_qpaybill_tax.py, added 2026-11-05) and the
+                                                              # weekly full-roster sweep (qpaybill_delinquent_roll.py,
+                                                              # detector added same day) actually cover still showed
+                                                              # "sourced-not-built" instead of built-but-low-yield --
+                                                              # same bug class as the nc_harris/marriage_license and
+                                                              # ustaxdata/tax_aging_surfaced omissions above: a real
+                                                              # producer simply wasn't in this tuple, so the blanket
+                                                              # counties_named_in() grep never looked inside it. See
+                                                              # project_rollback_exposure_systematic_sweep_2026-11-16.md.
+                                                              "enrichment_qpaybill_tax.py",
+                                                              "scrapers/counties_sc/qpaybill_delinquent_roll.py"),
                               doc="raw.rollback_exposure present (present-use/ag deferral rollback)"),
     "jail_booking": Spec(_S, "county", "jail", applies="person", ledger="jail_booking",
                          producers=("enrichment_jail_bookings.py", "scrapers/national/jail_bookings.py",
