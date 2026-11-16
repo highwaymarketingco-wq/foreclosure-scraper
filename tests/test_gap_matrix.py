@@ -945,28 +945,37 @@ def test_nc_quiet_title_is_read_by_nc_heir_notices():
         assert johnston[0] == "free" and "Column" in johnston[2]
         alleghany = gm.source_status(spec, "NC", m[("NC", "Alleghany")])
         assert alleghany[0] == "walled" and "Column" in alleghany[1]
-        # 25 NC counties with no Column paper, plus 27 SC counties outside column_legal_notices's
-        # active 19-county SC estate-lane loop (grew from 18 after the 2026-10-23 re-probe added
-        # one more county back in; gap-sweep wave 2, 2026-10-16)
-        assert len(spec.statewide_except) == 25 + 27
+        # 25 NC counties with no Column paper, plus 25 SC counties outside column_legal_notices's
+        # active 21-county SC estate-lane coverage (19 by exact county match + Orangeburg/Calhoun
+        # recovered from the "Orangeburg, Bamberg and Calhoun" newspaper-region tag, 2026-11-16 --
+        # grew from 18 after the 2026-10-23 re-probe added Aiken, then from 19-exact-match/27-gap
+        # after the 2026-11-16 region-tag fix moved Orangeburg/Calhoun to covered; gap-sweep wave 2,
+        # 2026-10-16)
+        assert len(spec.statewide_except) == 25 + 25
     assert gm.source_status(gm.SPECS["heir_naming_publication"], "SC", None)[2].startswith("statewide: SC estate")
 
 
 def test_sc_quiet_title_only_reaches_column_legal_notices_18_county_footprint():
-    # column_legal_notices's SC estate lane only queries SC_FOOTPRINT + SC_DISTRESSED_ONLY +
-    # SC_PROBATE_EXTRA_COUNTIES -- 18 of 46 counties originally, now 19 of 46 after the
-    # 2026-10-23 re-probe added one back in; the rest were dropped after a one-time 2026-10-02
-    # probe found zero notices there, then re-confirmed empty on re-probe. Before the original
-    # fix, gap_matrix.py claimed blanket SC statewide coverage with no exception, so those
-    # excluded counties showed an unsatisfiable "run it for this county" built-but-low-yield gap
-    # forever (gap-sweep wave 2, 2026-10-16).
+    # column_legal_notices's SC estate lane queries SC_FOOTPRINT + SC_DISTRESSED_ONLY +
+    # SC_PROBATE_EXTRA_COUNTIES by exact county match (18 of 46 originally, 19 after the
+    # 2026-10-23 re-probe added Aiken), PLUS -- since 2026-11-16 -- Orangeburg and Calhoun,
+    # recovered from the "Orangeburg, Bamberg and Calhoun" combined newspaper-coverage-region
+    # tag (the same "county is a region, not a county" quirk already handled for the SC
+    # foreclosure lane, extended here to the estate/probate lane): 21 of 46 total. A 3rd
+    # re-probe of the rest (2026-11-16) reconfirmed them empty, York/Lexington included
+    # (checked via the server's own total_results over a 10-year window). Before the
+    # original fix, gap_matrix.py claimed blanket SC statewide coverage with no exception, so
+    # those excluded counties showed an unsatisfiable "run it for this county" built-but-low-
+    # yield gap forever (gap-sweep wave 2, 2026-10-16).
     m = gm.load_matrix(gm.REPO / "docs" / "county_records" / "county_records_matrix.json")
     for col in ("quiet_title", "heir_naming_publication"):
         spec = gm.SPECS[col]
         greenville = gm.source_status(spec, "SC", m[("SC", "Greenville")])  # SC_PROBATE_EXTRA_COUNTIES
         assert greenville[0] == "free" and "SC estate" in greenville[2]
-        abbeville = gm.source_status(spec, "SC", m[("SC", "Abbeville")])  # not in the active 19
-        assert abbeville[0] == "walled" and "19 of 46" in abbeville[1]
+        orangeburg = gm.source_status(spec, "SC", m[("SC", "Orangeburg")])  # region-tag recovered
+        assert orangeburg[0] == "free" and "SC estate" in orangeburg[2]
+        abbeville = gm.source_status(spec, "SC", m[("SC", "Abbeville")])  # not in the active 21
+        assert abbeville[0] == "walled" and "21 of 46" in abbeville[1]
 
 
 def test_ledger_signals_accepts_several_verifier_signals():
