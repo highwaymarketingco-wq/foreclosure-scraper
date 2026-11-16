@@ -13,9 +13,12 @@ which only enrichment_florence_tax_inquiry.py writes, and that module's own
 FORECLOSURE_FLORENCE_TAX_INQUIRY flag defaults OFF ("opt in explicitly" --
 built+wired into main.py 2026-11-10, never turned on since). One flag flip
 closes both columns for every Florence row with a usable Map-Block-Parcel
-parcel_id (measured 2026-11-16: 1,836 of 3,883 Florence SC rows -- the rest
-carry a heir-estate/UST-registry id this fetcher's parcel key can't use, a
-real scope boundary, not a bug).
+parcel_id -- 1,836 of 3,883 Florence SC rows from the dash-separated TMS form
+(counties_sc.florence_delinquent_tax) plus another 1,297 from
+counties_sc.sc_heir_estate_parcel_cache's own flat 10-digit form once mbp()
+was taught to read it too (measured 2026-11-16: up to ~3,133 of 3,883). The
+remaining rows carry no parcel_id at all on the row -- a real scope
+boundary (nothing to query), not a bug this fetcher can close.
 
 Live-verified 2026-11-16 against the real web.florenceco.org CGI (18/18 real
 parcels, 0 portal failures) before this script was written.
