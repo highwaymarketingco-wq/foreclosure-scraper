@@ -1888,6 +1888,57 @@ def _deed_chain_credit() -> set[tuple[str, str]]:
     return {(st, co) for st, counties in STATE_COUNTIES.items() for co in counties}
 
 
+#: 'divorce_no_subsequent_deed' column, 2026-11-16 gap-sweep (ask: a likely repeat of the
+#: storm_damage classification bug just fixed in 2612ed64). Its only producer,
+#: enrichment_divorce_no_subsequent_deed.py, carries ZERO per-county logic of any kind: the
+#: module gates only on listing_type == DIVORCE_NOTICE and li.state == 'NC' (see its own
+#: module docstring/enrich_divorce_no_subsequent_deed -- no county registry, allowlist or
+#: skip-list anywhere in the file), and is a pure OFFLINE re-read of raw['resolved_from_name']
+#: (written by the SHARED enrichment_resolve_name_to_property.py name-resolver) -- it never
+#: calls a register, a court site or any county-specific network endpoint at all. It is wired
+#: unconditionally in main.py (~line 4690, every run) and in
+#: scripts/run_pending_signal_enrichers.py (PENDING_SIGNAL_JOBS/dispatch). Confirmed by
+#: project_divorce_no_subsequent_deed_false_gap_2026-11-12.md (this exact column, found
+#: 2026-11-12) and RE-confirmed live today (2026-11-16, board_stream.iter_board_rows, no
+#: load_board): 7,244 NC divorce_notice rows, 0.68% (49) have a raw['resolved_from_name']
+#: block -- essentially unchanged from the 2026-09-28 reading (48/6,678, 0.7%) the module's own
+#: docstring cites, so the shared resolver-backlog ceiling this column's yield depends on is
+#: still real today, not stale. bug-class shape (b): a blanket counties_named_in() text match
+#: over the file does NOT read as empty here the way it does for repeat_tax_loss/deed_chain_*
+#: above -- it finds exactly ONE false-positive, ('NC', 'Person'), from the English word
+#: "PERSON" inside a sentence in the module's docstring ("the SAME PERSON is captioned as both
+#: plaintiff and defendant"), not any real per-county code (live-confirmed: Person's own board
+#: rows show zero rows resolved/tagged, identical to every other flagged county). That one
+#: accidental match is why Person alone currently reads built-but-low-yield while its 99 NC
+#: siblings read sourced-not-built/no source known for identical code and identical (zero)
+#: local yield. Live-measured impact on the 2026-11-16 gap list: 63 (state, county) cells read
+#: "sourced-not-built" (4,043 est_rows combined -- the single highest cell-count column in that
+#: bucket) and 3 more (New Hanover, Lee, Hoke) read "no source known" purely because
+#: code_counties has nothing real for this column, even though the module genuinely already
+#: runs in every one of them; the correct read for both groups is built-but-low-yield (code
+#: exists and runs here; the missing input is the shared resolver's backlog, not missing
+#: code) -- next_action's own spec.scope == "derived" branch already says exactly that
+#: ("N rows lack the inputs ... fill the inputs, then recompute"), no next_action change
+#: needed. The other 12 counties already read ran=True (at least one row resolved there by the
+#: backlog's own order) and so already correctly read built-but-low-yield; the 16 "walled"
+#: rows read that from the unrelated 'rod' family's OWN register-portal wall for that county
+#: (source_status(), family == "rod") -- the SAME imprecision repeat_tax_loss's docstring
+#: above already flags and explicitly leaves alone (a county_records_matrix family-assignment
+#: question, outside this fix's scope) -- classify_cell() checks a declared wall before it
+#: ever looks at code_counties, so those 16 stay walled regardless of this fix. NOT a
+#: declined_registry.json case (unlike storm_damage): there is no per-county dead end here --
+#: every one of the 66 reclassified cells is the SAME board-wide, self-clearing backlog, not a
+#: confirmed "nothing's there."
+def _divorce_no_subsequent_deed_credit() -> set[tuple[str, str]]:
+    """Every NC county: enrichment_divorce_no_subsequent_deed.py's own
+    enrich_divorce_no_subsequent_deed() loop (see this function's own docstring above) applies
+    uniformly to any NC divorce_notice row handed to it, with no per-county registry, allowlist
+    or skip-list of any kind -- the real 'built' set already is every NC county, not whatever a
+    blanket counties_named_in() text match over the file happens to find (one false positive,
+    'Person', from an unrelated English sentence, not real per-county code)."""
+    return {("NC", c) for c in NC_COUNTIES}
+
+
 def built_in_code() -> dict[str, set[tuple[str, str]]]:
     pats = _county_patterns()
     out: dict[str, set[tuple[str, str]]] = {}
@@ -2042,6 +2093,13 @@ def built_in_code() -> dict[str, set[tuple[str, str]]]:
         _spec = SPECS.get(_col)
         if _spec and _spec.producers == ("enrichment_deed_chain.py",):
             out[_col] = _deed_chain_credit()
+    # divorce_no_subsequent_deed: enrichment_divorce_no_subsequent_deed.py refinement (see
+    # _divorce_no_subsequent_deed_credit's own docstring) -- its only producer has no real
+    # per-county text (just one accidental 'Person' match); replace the blanket grep with the
+    # full NC county universe it genuinely runs against.
+    dnsd_spec = SPECS.get("divorce_no_subsequent_deed")
+    if dnsd_spec and dnsd_spec.producers == ("enrichment_divorce_no_subsequent_deed.py",):
+        out["divorce_no_subsequent_deed"] = _divorce_no_subsequent_deed_credit()
     return out
 
 
