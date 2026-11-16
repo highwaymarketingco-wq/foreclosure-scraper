@@ -13,7 +13,7 @@ already resolved to a parcel (no downstream GIS round-trip needed). It reuses th
 COUNTY_GIS field map + _query helper from enrichment_owner_mailing, so adding a
 county here is free once its parcel layer is in COUNTY_GIS.
 
-Scope: 11 NC counties (each with its OWN dedicated COUNTY_GIS layer) + 8 Upstate/
+Scope: 12 NC counties (each with its OWN dedicated COUNTY_GIS layer) + 8 Upstate/
 broader-footprint SC counties (Spartanburg, Pickens, Laurens, Union, Oconee, York,
 Charleston, Beaufort) whose COUNTY_GIS owner layer retitles decedent parcels.
 SC:Anderson is still omitted: its COUNTY_GIS entry carries owner=[] on purpose (the
@@ -128,6 +128,42 @@ its OWN signal, not noise -- see the 2026-11-10 note above _EXCLUDE below.
   its own sign-off; promoting parcel_id to the unique altparno here already
   closes the practical hole for every row this scraper publishes going
   forward, including against that lookup.
+
+  2026-11-16 HOKE COUNTY FIX — gap_matrix flagged NC:Hoke heir_estate as
+  "sourced-not-built" (3,465 est_rows), with next_action text suggesting a
+  `parcel_cache.py` entry. A PRIOR session already built that parcel_cache
+  entry (`data/parcel_cache/hoke.sqlite`, 29,577 parcels) and found real
+  decedent/life-estate hits through it (329 decedent + 262 life_estate via
+  this module's own `_is_decedent()`/`_is_life_estate()`) -- but then
+  correctly self-caught that parcel_cache.py is NOT what this heir_estate
+  COLUMN reads: this module (COUNTY_GIS + `_HEIR_COUNTIES`/
+  NC_STATEWIDE_FALLBACK_COUNTIES) is the real mechanism, and Hoke was
+  already automatically included in the statewide OneMap fallback (every
+  NC county not in `_HEIR_COUNTIES` falls through there) -- so adding a
+  parcel_cache entry would never have closed this gap either way.
+
+  Audited the REAL mechanism live: the statewide NC OneMap fallback's own
+  mirror of Hoke returns a real 30,524-parcel count for `cntyname='HOKE'`
+  (so Hoke IS being queried there, not silently skipped), but `ownname`/
+  `ownname2` are BLANK on every sampled row -- the identical heir/estate
+  WHERE clause against OneMap scoped to Hoke returns `count: 0`. This is a
+  genuine data gap in the STATEWIDE MIRROR for this one county, not a
+  code bug: NC OneMap simply never received real owner data for Hoke's
+  parcels, the same situation every OTHER dedicated county above (Buncombe,
+  Henderson, Lincoln, ...) already exists to work around.
+
+  Hoke's OWN ArcGIS Server (maps.hokecounty.org, plain JSON, no token, no
+  CAPTCHA/WAF -- field names re-confirmed live against its `?f=json` schema,
+  matching parcel_cache.py's own 2026-11-06 "Hoke" comment exactly) answers
+  the SAME heir/estate WHERE clause with 650 real hits -- e.g. "LOCKLEAR,
+  INEZ S." / "LIFE ESTATE", mailing address in Mooresville NC diverging from
+  the Hoke situs (a real absentee/life-estate lead, not noise). So this was,
+  after all, a genuine missing-county-list-entry gap -- just one layer
+  removed from where the matrix's own suggestion and the first look both
+  pointed: NC:Hoke now has its own dedicated `COUNTY_GIS` entry (below in
+  `_HEIR_COUNTIES`), which also removes it from NC_STATEWIDE_FALLBACK_COUNTIES
+  (a query that was real but zero-yield) automatically, the same way
+  Cleveland already works.
 """
 from __future__ import annotations
 
@@ -156,16 +192,19 @@ from ...validation import NC_COUNTIES as _ALL_NC_COUNTIES
 log = structlog.get_logger()
 
 # Counties whose COUNTY_GIS layer exposes a queryable owner-name field that
-# retitles decedent parcels to "<name> HEIRS" / "ESTATE OF". NC is the 11 core
+# retitles decedent parcels to "<name> HEIRS" / "ESTATE OF". NC is the 12 core
 # counties, each with its own dedicated layer (every OTHER NC county is covered
 # by the statewide NC OneMap fallback below instead). SC adds the Upstate +
 # broader-footprint layers that return real hits — see the module docstring's
 # 2026-10-02 notes for Oconee's correction and York/Charleston/Beaufort's
-# addition. SC:Anderson (no usable owner column) and SC:Cherokee (no ArcGIS
-# layer at all) are still genuinely unfixable via this technique.
+# addition, and the 2026-11-16 note for Hoke's (the fallback's OneMap mirror
+# has no real owner data for Hoke specifically, confirmed live). SC:Anderson
+# (no usable owner column) and SC:Cherokee (no ArcGIS layer at all) are still
+# genuinely unfixable via this technique.
 _HEIR_COUNTIES = [
     "NC:Buncombe", "NC:Henderson", "NC:Rutherford", "NC:Gaston", "NC:Transylvania",
     "NC:Polk", "NC:Lincoln", "NC:Mitchell", "NC:Burke", "NC:McDowell", "NC:Cleveland",
+    "NC:Hoke",
     "SC:Spartanburg", "SC:Pickens", "SC:Laurens", "SC:Union",
     "SC:Oconee", "SC:York", "SC:Charleston", "SC:Beaufort",
 ]
@@ -239,6 +278,7 @@ _VALUE_FIELD_PREFERENCE = (
     "totalappraisedvalue", "appraisedvalue", "appraised_value", "cost_total_value",
     "marketvalue", "market_value", "assessedvalue", "assessed_value", "assessed_v",
     "taxvalue", "tax_value",
+    "cost_total",  # 2026-11-16: Hoke's own numeric total-value column (COST_TOTAL)
 )
 _NUMERIC_TYPES = {"esriFieldTypeDouble", "esriFieldTypeInteger", "esriFieldTypeSmallInteger",
                   "esriFieldTypeSingle", "esriFieldTypeBigInteger"}

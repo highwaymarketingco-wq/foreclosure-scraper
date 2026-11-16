@@ -205,6 +205,25 @@ GASTON_ENTITY_NOT_A_DECEDENT = {
     "CURR_NAME2": "",
 }
 
+# maps.hokecounty.org/server/rest/services/Parcels/MapServer/0 — OWNER_NAME/
+# OWNER_NA_1. Live-sampled 2026-11-16 (returnCountOnly: 650 real heir/estate
+# hits on this layer; the exact attribute shapes below, including the mailing
+# address diverging from the situs, were read from a real feature in that set).
+HOKE_LIFE_ESTATE = {
+    "TWN_PIN": "193190001032", "OWNER_NAME": "LOCKLEAR, INEZ S.",
+    "OWNER_NA_1": "LIFE ESTATE", "PHY_ADDRES": "5804 S OLD WIRE RD",
+    "MAILING_AD": "208 ROLLING HILL RD", "MAILING__1": "", "CITY": "MOORESVILLE",
+    "STATE_OR_C": "NC", "ZIP_CODE": "28117", "COST_TOTAL": 1340190.0,
+}
+
+# Same layer/fields, a plain decedent (HEIRS) row -- made-up name/PIN.
+HOKE_HEIR = {
+    "TWN_PIN": "999999999999", "OWNER_NAME": "SAMPLE PAT HEIRS",
+    "OWNER_NA_1": "", "PHY_ADDRES": "1 TEST RD",
+    "MAILING_AD": "1 TEST RD", "MAILING__1": "", "CITY": "RAEFORD",
+    "STATE_OR_C": "NC", "ZIP_CODE": "28376", "COST_TOTAL": 50000.0,
+}
+
 
 @pytest.fixture
 def canned(monkeypatch):
@@ -268,6 +287,50 @@ def test_entity_owner_is_still_excluded(canned):
     assert [li for li in out if li.county == "Gaston"] == []
 
 
+# --------------------------------------------------------------------------- 2026-11-16 Hoke
+
+def test_hoke_life_estate_row_is_tagged_life_estate_not_probate(canned):
+    """Hoke's OWNER_NA_1 carries the "LIFE ESTATE" role flag live (unlike Gaston/
+    Polk/McDowell, where the second subfield is a second heir's name) -- this
+    must be detected and tagged distinctly, not run through the decedent path."""
+    table, _ = canned
+    table[_url("NC:Hoke")] = [HOKE_LIFE_ESTATE]
+    out = asyncio.run(m.NCHeirEstateParcels().fetch())
+    rows = [li for li in out if li.county == "Hoke"]
+    assert len(rows) == 1
+    li = rows[0]
+    assert li.listing_type == ListingType.ESTATE_LEAD
+    assert li.parcel_id == "193190001032"
+    assert li.street_address == "5804 S OLD WIRE RD"
+    assert "MOORESVILLE" in li.raw["heir_estate"]["mailing"]
+    assert li.raw["heir_estate"]["match"] == "life_estate"
+    assert li.raw["heir_estate"]["life_estate"] is True
+    assert li.raw["relationship_signal"]["kind"] == "life_estate"
+    assert li.raw["life_events"] == ["life_estate"]
+
+
+def test_hoke_heir_row_is_a_probate_signal(canned):
+    table, _ = canned
+    table[_url("NC:Hoke")] = [HOKE_HEIR]
+    out = asyncio.run(m.NCHeirEstateParcels().fetch())
+    rows = [li for li in out if li.county == "Hoke"]
+    assert len(rows) == 1
+    li = rows[0]
+    assert li.parcel_id == "999999999999"
+    assert li.raw["heir_estate"]["match"] == "heirs"
+    assert li.raw["heir_estate"]["life_estate"] is False
+    assert li.raw["relationship_signal"]["kind"] == "probate"
+
+
+def test_hoke_cost_total_is_picked_as_the_value_ranking_field():
+    """2026-11-16: added to _VALUE_FIELD_PREFERENCE so Hoke's 650 real hits get
+    ranked highest-value-first within the per-county cap, like every other
+    dedicated county that has a matching numeric column."""
+    assert m._pick_value_field(
+        {"fields": [{"name": "COST_TOTAL", "type": "esriFieldTypeDouble"}]}
+    ) == "COST_TOTAL"
+
+
 # --------------------------------------------------------------------------- 2026-10-02 extension
 # (1) word-boundary fix, (2) new SC counties, (3) NC statewide OneMap fallback.
 
@@ -304,7 +367,7 @@ def test_nc_statewide_fallback_excludes_dedicated_counties_and_covers_the_rest()
     dedicated = set(m._NC_DEDICATED_COUNTIES)
     assert dedicated == {
         "Buncombe", "Henderson", "Rutherford", "Gaston", "Transylvania",
-        "Polk", "Lincoln", "Mitchell", "Burke", "McDowell", "Cleveland",
+        "Polk", "Lincoln", "Mitchell", "Burke", "McDowell", "Cleveland", "Hoke",
     }
     assert not (fallback & dedicated)
     # Live-verified sample counties (module docstring) must be in the fallback set.
@@ -371,6 +434,19 @@ def test_statewide_fallback_never_double_queries_a_dedicated_county(canned_state
     """Cleveland has its OWN COUNTY_GIS entry (also the onemap url) -- it must not
     also appear in NC_STATEWIDE_FALLBACK_COUNTIES."""
     assert "Cleveland" not in m.NC_STATEWIDE_FALLBACK_COUNTIES
+
+
+def test_hoke_is_a_dedicated_county_not_the_statewide_fallback():
+    """2026-11-16: Hoke used to fall through to NC_STATEWIDE_FALLBACK_COUNTIES like
+    most NC counties, but that fallback's own OneMap mirror of Hoke carries BLANK
+    ownname/ownname2 on every row (live-verified: the heir/estate WHERE clause
+    against OneMap scoped to cntyname='HOKE' returns count=0). Hoke's OWN ArcGIS
+    layer (maps.hokecounty.org) answers the identical pattern with 650 real hits,
+    so it is now a dedicated COUNTY_GIS entry like every other NC county above,
+    not a fallback county."""
+    assert "NC:Hoke" in m._HEIR_COUNTIES
+    assert "Hoke" in m._NC_DEDICATED_COUNTIES
+    assert "Hoke" not in m.NC_STATEWIDE_FALLBACK_COUNTIES
 
 
 def test_partial_is_populated_for_soft_timeout_salvage(canned_statewide):

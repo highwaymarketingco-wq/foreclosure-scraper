@@ -122,6 +122,28 @@ COUNTY_GIS: dict[str, dict] = {
     "NC:Cleveland": {"url": "https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1",
         "owner": ["ownname", "ownname2"], "mail": ["mailadd", "munit", "mcity", "mstate", "mzip"],
         "mail_state": "mstate", "situs": ["siteadd"], "parcel": "parno", "county_field": "cntyname"},
+    # 2026-11-16: Hoke was previously relying on the NC OneMap statewide fallback
+    # (NC_STATEWIDE_FALLBACK_COUNTIES in nc_heir_estate_parcels.py) like most NC
+    # counties -- but live-verified that fallback's OneMap mirror of Hoke carries
+    # BLANK ownname/ownname2 on every sampled row (confirmed via returnCountOnly:
+    # the heir/estate WHERE clause against OneMap scoped to cntyname='HOKE' returns
+    # 0, vs the county's OWN layer below returning 650 real hits for the identical
+    # pattern). This is a data gap in the statewide mirror for this one county, not
+    # a code bug -- same situation every OTHER dedicated NC entry above already
+    # exists to work around. The county's own ArcGIS Server (maps.hokecounty.org,
+    # plain HTTP/JSON, no token, no CAPTCHA/WAF) was already identified and its
+    # field names already confirmed live in a prior session (see parcel_cache.py's
+    # own 2026-11-06 "Hoke" PARCEL_LAYERS comment) -- re-confirmed live again here
+    # against the layer's own ?f=json schema before adding this entry. OWNER_NAME/
+    # OWNER_NA_1 retitle real decedent parcels ("LOCKLEAR, INEZ S." / "LIFE ESTATE"
+    # live-sampled, mailing address diverging from situs -- a real absentee-heir
+    # row); TWN_PIN is the board's real Hoke parcel id (matches parcel_cache's
+    # id_fields). No county_field needed -- this is a dedicated single-county
+    # layer, not a shared statewide one.
+    "NC:Hoke": {"url": "https://maps.hokecounty.org/server/rest/services/Parcels/MapServer/0",
+        "owner": ["OWNER_NAME", "OWNER_NA_1"],
+        "mail": ["MAILING_AD", "MAILING__1", "CITY", "STATE_OR_C", "ZIP_CODE"],
+        "mail_state": "STATE_OR_C", "situs": ["PHY_ADDRES"], "parcel": "TWN_PIN"},
     # --- SC ---
     # 2026-08-03 REPOINT: the old AGOL layer (services9…/Parcel_and_CAMA_Feb_1_2021)
     # is a 29,402-row MUNICIPAL extract — it can only answer ~16% of the 8,919
