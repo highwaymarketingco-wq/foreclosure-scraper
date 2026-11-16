@@ -216,6 +216,26 @@
       "state": "NC", "county": "Alleghany", "column": "rollback_exposure",
       "reason": "Same bttaxpayerportal/ITSPublic vendor limitation as Anson (see that entry for the full reasoning and method) -- live-rechecked 2026-11-16 as part of the same 6-county probe: 2 tax years (2024/2025), 637 rows read, 257 dropped as non-real, zero 'ROLLBACK' hits in any raw Description cell. (Caswell/Jones/Graham/Alleghany are not independently known to carry ag-use-deferral parcels the way Anson's farmland does, so 'medium' confidence would also be defensible for those four on that basis alone -- kept 'high' here because the claim being verified is about the PLATFORM's field set, not about any one county's parcel mix, and the platform check was run directly against each of the 6, not inferred from a sibling.)",
       "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "SC", "county": "Chester", "column": "rollback_exposure",
+      "reason": "Chester's tax-roll source in county_records_matrix.json (chestercountysctax.com) is a THIRD shared vendor this sweep found: Catalis/Sturgis, the same host sc_catalis_delinquent_roll.py already reads for Pickens/Hampton/Fairfield/Aiken (CATALIS_COUNTIES, shared CloudFront CDN d1ebsyxxbc7tep.cloudfront.net). Live-reconfirmed 2026-11-16 with ONE POST /Records against this exact host (Chester's own GUID, the module's own _headers()/payload shape, prefix 'A'): HTTP 403 immediately, no retry attempted -- this module's own documented rule for this exact host (CatalisBlocked: 'that is the host declining... stop, do not retry, do not route around it', weekend_runner.sh 2026-09-11) and the same wall Pickens' declined_registry entry already cites (confirmed there 2026-10-21, now reconfirmed still live 36 days later on the shared host, not just for Pickens). Walled, not sourced-not-built -- a real reader already exists and already runs for this county when the host is reachable. NOT independently checked: whether this vendor's unread 'Classes' field (named in the module's own docstring, never parsed by any existing code) would have carried a present-use/ag classification useful for an ESTIMATED rollback figure -- the 403 blocked seeing any live record at all, so that question stays open for whenever the wall lifts, and is not what this entry declines.",
+      "confirmed_date": "2026-11-16", "confidence": "high"
+    },
+    {
+      "state": "SC", "county": "Hampton", "column": "rollback_exposure",
+      "reason": "Same Catalis/Sturgis shared-host wall as Chester (see that entry for the full reasoning) -- Hampton is CATALIS_COUNTIES['Hampton'] on the identical CloudFront CDN host, confirmed blocked by the same live 403 2026-11-16 (one request, against Chester's GUID; the block is host-level per weekend_runner.sh's 2026-09-11 finding and Pickens' own 2026-10-21 entry, not per-county, so it is not independently re-tested against Hampton's own GUID to avoid a second request against an already-confirmed-blocking host).",
+      "confirmed_date": "2026-11-16", "confidence": "medium"
+    },
+    {
+      "state": "SC", "county": "Fairfield", "column": "rollback_exposure",
+      "reason": "Same Catalis/Sturgis shared-host wall as Chester (see that entry for the full reasoning) -- Fairfield is CATALIS_COUNTIES['Fairfield'] on the identical CloudFront CDN host (also the reason scrapers/counties_sc/fairfield_delinquent_tax.py was disabled 2026-10-01: Fairfield's own treasurer page links straight to this same fairfieldsctax.com Catalis tenant). Confirmed blocked by the same live 403 2026-11-16 (one request, against Chester's GUID; the block is host-level, not re-tested against Fairfield's own GUID to avoid a second request against an already-confirmed-blocking host).",
+      "confirmed_date": "2026-11-16", "confidence": "medium"
+    },
+    {
+      "state": "SC", "county": "Aiken", "column": "rollback_exposure",
+      "reason": "Same Catalis/Sturgis shared-host wall as Chester (see that entry for the full reasoning) -- Aiken is CATALIS_COUNTIES['Aiken'] on the identical CloudFront CDN host. Confirmed blocked by the same live 403 2026-11-16 (one request, against Chester's GUID; the block is host-level, not re-tested against Aiken's own GUID to avoid a second request against an already-confirmed-blocking host, and Aiken's own responses already run ~3MB/prefix per the module's docstring, the worst case to probe twice for the same answer).",
+      "confirmed_date": "2026-11-16", "confidence": "medium"
     }
   ]
 }
