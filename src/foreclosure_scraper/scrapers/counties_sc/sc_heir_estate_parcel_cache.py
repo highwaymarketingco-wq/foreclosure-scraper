@@ -62,6 +62,50 @@ disambiguating) and so never surface as a candidate here. Harmless today only be
 4 of those 5 are already covered live by nc_heir_estate_parcels.py's _HEIR_COUNTIES
 and the 5th (Anderson) is the confirmed dead end above -- but widening this filter
 without ALSO widening _ALREADY_LIVE_COVERED would silently double-source those 4.
+
+2026-11-16 GAP_MATRIX SWEEP -- 34 of the 39 "sourced-not-built" heir_estate cells
+gap_matrix flagged this day were SC. Split them against this module's own real,
+live `_candidate_counties()` (not the stale hand-copied list from an old note) rather
+than assume every flagged county needs a brand-new source:
+
+  20 of the 34 (Aiken, Barnwell, Berkeley, Calhoun, Chester, Colleton, Darlington,
+  Dorchester, Florence, Georgetown, Greenville, Hampton, Horry, Jasper, Lancaster,
+  Lexington, Orangeburg, Saluda, Sumter, Williamsburg) are ALREADY in
+  `_candidate_counties()` today -- this module already runs for every one of them,
+  no code change needed. A direct board_stream audit (read-only, this same day)
+  found this producer has ALREADY published real rows for every single one of
+  them -- and the row counts match gap_matrix's own `est_rows_affected` for that
+  cell almost exactly (e.g. Colleton 1,817 published vs. 1,817 flagged, Sumter
+  1,339 vs. 1,339, Berkeley 716 vs. 716). The mechanism is not missing or broken
+  for these 20 -- the real leads are already on the board. Re-deriving gap_matrix
+  fresh the same way (scripts/gap_matrix.py --no-verifiers) reproduced the same
+  flag against the same live board, so this is not simply an hour-old snapshot
+  either; it did not resolve on a fresh pass, and the exact cause of the
+  mismatch between gap_matrix's own credit-function count and the real board
+  count for this column was not run down further this session -- flagged here so
+  a future editor does not re-discover "sc_heir_estate_parcel_cache doesn't cover
+  county X" from the matrix alone without first checking the real board, the way
+  this note now does.
+
+  The other 14 (the 13 listed in the 2026-11-10 note above + Cherokee) genuinely
+  have no parcel_cache entry. Live-reprobed each one's OWN county GIS host (not
+  the dead GDITAdmin catalog re-checked above -- the vendor site next_action
+  itself names): 7 (Cherokee, Clarendon, Bamberg, Abbeville, Allendale, Lee on
+  qpublic.schneidercorp.com; Fairfield on beacon.schneidercorp.com -- both
+  Schneider Corp products) answer with a Cloudflare "Just a moment..." bot-check
+  (HTTP 403) on a plain unauthenticated GET -- a real wall, not an unbuilt
+  source; consistent with Cherokee's existing "qPublic-only, no ArcGIS layer"
+  note elsewhere in this project. 5 (Dillon, Marlboro, Chesterfield, McCormick,
+  Marion -- all on the shared "<county>sc.wthgis.com" platform) answered the
+  standard ArcGIS REST discovery paths (/arcgis/rest/services, /server/rest/
+  services) with a plain generic 404, not a wall -- inconclusive without
+  deeper, county-specific discovery of whatever path or product that GIS
+  platform actually uses, not attempted this pass. Newberry's custom domain
+  (map.newberrycounty.net) did not respond to either path. Edgefield's
+  qpublic.net (note: a DIFFERENT host than the Schneider Corp qpublic.
+  schneidercorp.com above) answered 200 or an ordinary HTML search page, not a
+  wall -- reachable but not explored further this pass; still genuinely
+  unbuilt, not confirmed addable.
 """
 from __future__ import annotations
 

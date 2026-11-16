@@ -25,6 +25,12 @@ from typing import Optional
 
 import httpx
 import structlog
+from tenacity import (
+    AsyncRetrying,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
 
 from . import condo_units
 from .models import Listing, ListingType
@@ -369,7 +375,32 @@ def _join(attrs: dict, fields: list[str], *, dedupe: bool = False) -> str:
 async def _query_page(http: httpx.AsyncClient, base: str, where: str, out_fields: str = "*",
                       count: int = 25, offset: int = 0,
                       order_by: str = "") -> tuple[list[dict], bool]:
-    """One /query call -> (attribute rows, server's exceededTransferLimit)."""
+    """One /query call -> (attribute rows, server's exceededTransferLimit).
+
+    2026-11-16: wrapped the GET in AsyncRetrying (same shape as
+    nc_heir_estate_parcels.py's own `_value_field` retry, added 2026-10-17 for
+    exactly this reason). Before this, a bare transient httpx.ReadTimeout/
+    TransportError on THIS call -- the actual feature fetch, not just a schema
+    probe -- fell straight into the blanket `except Exception: return [], False`
+    below, which is already documented (see that except's own comment) as
+    "the same shape as a genuine zero-match query": indistinguishable from a
+    county that really has zero matching parcels. Live-confirmed while auditing
+    the gap_matrix-flagged NC statewide-fallback counties Columbus/Alexander:
+    the IDENTICAL unmodified call against NC OneMap for Columbus returned 0
+    rows on one run and 400 real rows (incl. a genuine "PERSELL S F (HEIRS)"
+    decedent parcel) on an immediate re-run minutes later with no code change
+    at all -- a transient blip, not a real zero. `johnston_delinquent_tax_
+    crosswalk.py`'s own `_crosswalk_one` already found and worked around this
+    SAME shape locally (its own 2026-10-20 note: a `httpx.ReadTimeout` on one
+    call, 2 real hits on an immediate retry) by retrying at ITS call site --
+    but every OTHER caller of `_query`/`_query_page` (nc_heir_estate_parcels.py's
+    88-county NC OneMap statewide fallback chief among them, all sharing this
+    one throttled host) stayed exposed. Fixing it HERE instead covers every
+    caller at once rather than requiring each one to rediscover and re-patch
+    the same bug locally. Retried ONLY transport/timeout errors (never a real
+    bad status or parse failure, and never just because a query came back
+    empty) so a genuine zero-match county still costs nothing extra.
+    """
     url = base.rstrip("/") + "/query"
     params = {"where": where, "outFields": out_fields, "returnGeometry": "false",
               "resultRecordCount": str(count), "f": "json"}
@@ -381,7 +412,15 @@ async def _query_page(http: httpx.AsyncClient, base: str, where: str, out_fields
     if order_by:
         params["orderByFields"] = order_by
     try:
-        r = await http.get(url, params=params, timeout=20.0)
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type(
+                (httpx.TransportError, httpx.TimeoutException, TimeoutError)),
+            reraise=True,
+        ):
+            with attempt:
+                r = await http.get(url, params=params, timeout=20.0)
         if r.status_code != 200:
             return [], False
         data = r.json()
