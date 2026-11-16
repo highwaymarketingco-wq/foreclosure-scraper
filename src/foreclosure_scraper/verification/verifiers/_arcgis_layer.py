@@ -115,11 +115,26 @@ async def load_layer(client: Any, layer: str, *, out_fields: str, order_by: str,
         meta = await _get(client, meta_url(layer))
         last_edit = epoch_iso(((meta or {}).get("editingInfo") or {}).get("dataLastEditDate"))
         count = int((await _get(client, count_url(layer)) or {}).get("count"))
-        for i in range(max_pages):
+        offset = 0
+        for _ in range(max_pages):
             data = await _get(client, page_url(layer, out_fields=out_fields, order_by=order_by,
-                                               offset=i * page, page=page))
+                                               offset=offset, page=page))
             feats = (data or {}).get("features") or []
             rows.extend((f.get("attributes") or {}) for f in feats)
+            # 2026-11-16 fix: advance by the rows THIS page actually returned, not the
+            # requested `page` size. A server whose own maxRecordCount caps below `page`
+            # (confirmed live: Lincoln County NC's ComDev MapServer/15 returns exactly 1000
+            # features per page however large resultRecordCount asks for, exceededTransferLimit
+            # true both times) used to advance the offset by the full requested `page` (2000)
+            # every iteration regardless, silently SKIPPING the rows between the actual and the
+            # requested page size every page (rows 1000-1999 of 3,465 vanished entirely, offset
+            # jumping 0 -> 2000 -> 4000) -- `len(rows) != count` caught the result as incomplete
+            # (never a false confirmed/refuted on the missing slice), but the layer could never
+            # become complete this way, however many times a sweep retried it. A server that
+            # already returns exactly `page` rows per page (Henderson's OVT layer, the only one
+            # this module's own tests fix a response for) is unaffected: `offset` and `i * page`
+            # are identical there.
+            offset += len(feats)
             if not feats or (len(feats) < page and not data.get("exceededTransferLimit")):
                 break
             if len(rows) >= count:
