@@ -127,15 +127,31 @@ def _raw(li: Any) -> dict:
 # ---------------------------------------------------------------------------------------------
 
 _TMS = re.compile(r"^\s*(\d{1,5})[-\s.]+(\d{1,2})[-\s.]+(\d{1,3})\s*$")
+#: scopes/counties_sc/sc_heir_estate_parcel_cache.py sources its parcel_id from this project's
+#: own bulk parcel_cache (the county GIS layer's raw PIN column), which for Florence stores the
+#: SAME 5-2-3 Map-Block-Parcel already zero-padded but run together with no separator --
+#: confirmed 2026-11-16: ALL 1,297 Florence rows from that one source are exactly 10 digits, no
+#: exceptions (e.g. "0000404007" -> map 00004, block 04, parcel 007), a second, otherwise-
+#: unreachable population roughly as large as the dash-separated one the sale-list scraper
+#: provides. gaps the dash form matches.
+_TMS_FLAT = re.compile(r"^\s*(\d{10})\s*$")
 
 
 def mbp(v: Any) -> Optional[tuple[str, str, str]]:
-    """('30000', '44', '787') from a board TMS ('30000-44-787'), zero-padded to 5-2-3; None for a
-    blank/all-zero/unshaped value."""
-    m = _TMS.match(str(v or ""))
-    if not m:
-        return None
-    a, b, c = m.group(1).zfill(5), m.group(2).zfill(2), m.group(3).zfill(3)
+    """('30000', '44', '787') from a board TMS, zero-padded to 5-2-3; accepts the dash/space/dot-
+    separated form ('30000-44-787') or a bare 10-digit run with no separator at all
+    ('0000404007', the shape parcel_cache-sourced parcel_ids carry) -- same identity, two
+    serializations. None for a blank/all-zero/unshaped value."""
+    s = str(v or "")
+    m = _TMS.match(s)
+    if m:
+        a, b, c = m.group(1).zfill(5), m.group(2).zfill(2), m.group(3).zfill(3)
+    else:
+        mf = _TMS_FLAT.match(s)
+        if not mf:
+            return None
+        digits = mf.group(1)
+        a, b, c = digits[0:5], digits[5:7], digits[7:10]
     return None if set(a + b + c) <= {"0"} else (a, b, c)
 
 
