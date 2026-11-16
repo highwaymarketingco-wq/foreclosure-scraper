@@ -275,6 +275,23 @@ def test_lee_applies_and_passes_a_flat_parcel_through_unchanged():
     assert p.search_id("964572517500") == "964572517500"
 
 
+def test_nash_applies_with_no_munis_roll_block_and_css_base():
+    """2026-11-16 (tax_aging_surfaced built-not-verified sweep): Nash is on the same Munis
+    platform, the Pender-style `/css` base (a bare /citizens/... 404s on this tenant; confirmed
+    live). Its heir_estate-sourced rows carry no nc_county_csv_delinquent_tax roll block either
+    -- applies() needs the same generic tax_owed/aging-claim path as Hoke/Lee. Live-verified
+    against 3 real Nash parcels (011877/006828/005936): real 2008/2009-2026 bill-year grids,
+    owner names matching the board exactly, each with a real, current unpaid 2026 balance."""
+    row = {"state": "NC", "county": "Nash", "listing_type": "estate_lead",
+          "source": "counties_nc.nc_heir_estate_parcels", "parcel_id": "011877",
+          "raw": {"tax_aging_surfaced": {"tax_year": 2019, "years_delinquent": 3,
+                                         "status": "delinquent"}}}
+    assert p.portal_of(row) is p.PORTALS["Nash"]
+    assert p.PORTALS["Nash"].base.endswith("/css")
+    assert p.applies(row)
+    assert p.search_id("011877", "Nash") == "011877"
+
+
 def test_a_block_of_another_parcel_names_no_claimed_year():
     """The 2026-10-07 board copied one parcel's roll block onto 1,198 New Hanover rows: its years
     are not a claim about the row's parcel."""

@@ -149,6 +149,27 @@ PORTALS: dict[str, Portal] = {
     # backend outage on their side), not anything this module sends. Re-test later by hand; don't
     # spend more live requests on it without a reason to think the tenant's own state changed.
     "Sampson": Portal("Sampson", "https://sampsonnc.munisselfservice.com"),
+    # ADDED 2026-11-16 (tax_aging_surfaced's own 2026-11-16 built-not-verified gap-matrix sweep,
+    # the Nash cell: 61 rows, source counties_nc.nc_heir_estate_parcels + arcgis_distress's
+    # Rocky Mount blight survey -- see project_verify_layer_survey_2026-11-16.md Finding 2 and
+    # project_tax_aging_surfaced_verifier_build_2026-11-16.md). The board's own raw rows already
+    # carried two_year_delinquent.source == "verification.verifiers.tax_lien_munis" (a stale
+    # provenance stamp from some earlier ad-hoc run of this module's own functions against Nash --
+    # not from the live registry, which never had a "Nash" entry to match against). county_records_
+    # matrix.json's own tax.notes already named the real site ("collections on Munis self service
+    # (nashcountync.munisselfservice.com, not opened)") but marked it "not opened" -- this closes
+    # that. The Pender-style `/css` path segment is REQUIRED here too (a bare /citizens/... 404s;
+    # confirmed live). search()/view() work completely UNCHANGED, no code change needed, the same
+    # "Live-verified before adding, not guessed from the shared hostname pattern" discipline the
+    # Pender/Sampson/Greene entries above used: 3 real board parcels (011877/MURRAY O BRUCE HEIRS,
+    # 006828/MURRAY ANNA T HEIRS, 005936/RICHARDSON ORA HEIRS), 18-19 real bill-year rows each
+    # (2008/2009-2026), owner names matching the board exactly. Each one's 2026 bill is a real,
+    # current unpaid balance (011877 $4,383.45; 006828 $998.69 plus 2025's $1,084.80 with
+    # interest; 005936 $774.40 plus 2025's $154.82 partial) -- a genuine, live, ongoing multi-year
+    # delinquency, not a stale snapshot. applies() recognizes these rows the same way it already
+    # recognizes Hoke's: no nc_county_csv_delinquent_tax roll block at all (own_block=False),
+    # claims_property_tax()'s generic tax_owed/aging-claim OR already covers them.
+    "Nash": Portal("Nash", "https://nashcountync.munisselfservice.com/css"),
 }
 _BY_COUNTY = {k.lower(): v for k, v in PORTALS.items()}
 
