@@ -164,6 +164,46 @@ its OWN signal, not noise -- see the 2026-11-10 note above _EXCLUDE below.
   `_HEIR_COUNTIES`), which also removes it from NC_STATEWIDE_FALLBACK_COUNTIES
   (a query that was real but zero-yield) automatically, the same way
   Cleveland already works.
+
+  2026-11-16 FOLLOW-UP SWEEP -- gap_matrix's next-biggest "sourced-not-built"
+  heir_estate cells after Hoke were 5 more statewide-fallback NC counties
+  (Columbus 654 est_rows, Alexander 290, Swain 187, Lenoir 1, Vance 1), with
+  next_action text shaped exactly like Hoke's own original flag ("add the
+  county parcel layer ... to parcel_cache" / "write a ... verifier"). Checked
+  EACH one live against the exact same Hoke diagnostic (returnCountOnly on
+  NC OneMap scoped to that county, same WHERE) rather than assuming Hoke's
+  cause generalizes -- and in every case it does NOT: unlike Hoke, the
+  statewide mirror has REAL, substantial owner-name data for all 5 (Columbus
+  1,168 heir/estate-pattern hits, Lenoir 1,090, Vance 887, Swain 133,
+  Alexander 50 -- live counts against the real endpoint). None of them have
+  Hoke's "county's own data never made it into the statewide mirror" root
+  cause, so none get a new dedicated `COUNTY_GIS` entry here -- there is no
+  missing layer to add; NC_STATEWIDE_FALLBACK_COUNTIES already covers all 5
+  correctly today.
+
+  What WAS real: calling the production `_process_county()` path for Columbus
+  twice in a row, unmodified, returned 0 rows on the first call and 400 real
+  rows (incl. a genuine "PERSELL S F (HEIRS)" decedent parcel, Kalamazoo MI
+  mailing vs. the Columbus situs) on the second, minutes later, no code
+  change in between -- a transient httpx timeout on the underlying ArcGIS
+  /query call, silently indistinguishable from a real zero-match through
+  enrichment_owner_mailing._query_page()'s blanket exception swallow (see
+  that function's own 2026-11-16 note). That bug is shared by EVERY county
+  this module queries (dedicated and statewide-fallback alike) and by every
+  OTHER producer that calls `_query`/`_query_page` against a throttled
+  ArcGIS host -- the actual fix landed there, not here, so it also helps the
+  other ~87 fallback counties' reliability, not just these 5. Confirmed via
+  the full existing test_nc_heir_estate_parcels*.py suite (no behavior change
+  for a genuine zero-match county) plus a clean, unmodified-code re-run of
+  Columbus/Alexander/Swain/Lenoir/Vance through `_process_county()` after the
+  fix landed (see this fix's own commit for the sampled output).
+
+  Separately, a live board_stream audit this same day found 0 rows ever
+  published by this producer for any of these 5 counties despite the real
+  data above -- that gap (code correct, data real, but nothing on the board
+  yet) is a run-cadence/orchestration question, not something a change to
+  THIS module's county lists can fix, and is left open rather than papered
+  over with a county-list change that would not actually be the cause.
 """
 from __future__ import annotations
 
