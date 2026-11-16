@@ -998,6 +998,10 @@ DATELESS_OK_SOURCES = {
     # parcel from another source). Dateless (a homestead flag has no sale date).
     "counties_sc.york_homestead",                 # York SC homestead exemption (GIS, dateless)
     "counties_sc.lexington_homestead",            # Lexington SC homestead exemption (GIS, dateless)
+    # 2026-11-16 — same lt_elderly_disabled gap-sweep, 3rd SC county found with a clean
+    # HomesteadNumber flag (31,265 live parcels); corrects enrichment_tax_relief.py's stale
+    # 2026-08-06 "book codes only" read of this same field (see this module's own docstring).
+    "counties_sc.spartanburg_homestead",          # Spartanburg SC homestead exemption (GIS, dateless)
     "counties_nc.asheville_helene",               # Helene Unsafe/Restricted placards (dateless)
     "public_notices.gannett_obituaries",          # obituaries -> pre-probate heir leads (dateless)
     "counties_nc.buncombe_delinquent_tax",        # Buncombe delinquent-tax list (dateless)

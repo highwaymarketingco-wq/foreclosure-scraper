@@ -100,6 +100,17 @@ THE ELDERLY EXEMPTION DOES NOT EXTEND BEYOND BUNCOMBE (NC) — checked 2026-08-0
     is unusual in publishing the elderly-or-disabled exclusion per parcel.
     York SC is the SC equivalent for homestead exemption flags.
 
+    CORRECTION, 2026-11-16 (lt_elderly_disabled gap-sweep): the "32 book codes" read of
+    Spartanburg's HomesteadNumber above was INCOMPLETE, not wrong about what it saw -- those
+    ~14 tiny codes (A2/A3/A4/B1A/B1D/B2B/B11A/B11E/B16A/B16B/B16C/B31, each <90 rows) are real
+    and still unexplained, but HomesteadNumber='H' is a SEPARATE, massive, clean population
+    sitting alongside them: 31,265 parcels (live groupBy count), every sampled row an
+    individual owner, the identical shape as York/Lexington below. Wired as a full bulk-sweep
+    scraper (counties_sc.spartanburg_homestead, its own docstring has the live detail) rather
+    than added to _RELIEF_LAYERS here, matching how York/Lexington's own per-lead entries below
+    coexist with their bulk-sweep scrapers. Do not re-decline this field from this old note
+    alone -- re-check live first.
+
 BREADTH RE-PASS, 2026-10-30 — the other 32 PARCEL_LAYERS counties re-checked
     against the now much larger (124-county) data/parcel_cache/, now that
     there are far more live GIS layers to search than the 17 probed above.
