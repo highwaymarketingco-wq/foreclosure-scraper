@@ -358,6 +358,71 @@ def build_multi_year_block(bills: list[dict], map_no: str, state: Optional[str],
     }
 
 
+def patch_cached_tax_owed_year(li: Listing, *, today: Optional[date] = None) -> bool:
+    """Offline, no-network: when this row already has BOTH a cached raw[SOURCE_KEY]['bills']
+    history (from an earlier enrich_greenville_tax() fetch) and an existing raw['tax_owed']
+    with a balance but NO usable 'year' (the exact shape this module's own header docstring
+    already documents -- an older/different producer, e.g. the Taxsale roster's generic
+    promotion via enrichment_tax_owed.py, set balance with year=None), add ONLY the missing
+    year/years/years_delinquent/status fields recomputed from the SAME bills this module
+    already fetched -- never touch balance/source/kind/basis, so whichever balance figure was
+    already authoritative on the row is left exactly as-is.
+
+    WHY THIS IS SEPARATE FROM enrich_greenville_tax()'s OWN write path (the to_block guard
+    above): _already_done() skips any row that already has raw[SOURCE_KEY] set, by design
+    (never re-fetch a parcel this module has already queried) -- so a row whose FIRST fetch
+    hit the "balance already exists" guard and discarded its own correctly-shaped to_block
+    (dropping the year it had just computed) can never reach that logic again through the
+    normal fetch path. This offline function re-derives that same to_block from the bills
+    already sitting in raw[SOURCE_KEY] -- no new network call -- and patches in just what's
+    missing, so enrichment_tax_aging.py's first gate (a singular raw['tax_owed']['year'],
+    same contract fixed for Florence the same session, see
+    enrichment_florence_tax_inquiry.apply_block()) can finally reach tax_year_status() for
+    these rows too.
+
+    Returns True when a patch was made."""
+    raw = li.raw if isinstance(li.raw, dict) else None
+    if raw is None:
+        return False
+    hist = raw.get(SOURCE_KEY)
+    if not isinstance(hist, dict):
+        return False
+    bills = hist.get("bills")
+    map_no = hist.get("map_number")
+    if not bills or not map_no:
+        return False
+    to = raw.get("tax_owed")
+    if not isinstance(to, dict) or not to.get("balance"):
+        return False  # no existing balance to preserve alongside -- not this function's case
+    if to.get("year") or isinstance(to.get("years_delinquent"), (int, float)):
+        return False  # already has what enrich_tax_aging's gate needs -- nothing to do
+    to_block = build_tax_owed_block(bills, map_no, li.state, li.county, today=today or date.today())
+    if not to_block:
+        return False
+    patched = False
+    for k in ("year", "years", "years_delinquent", "status"):
+        if to.get(k) is None and to_block.get(k) is not None:
+            to[k] = to_block[k]
+            patched = True
+    return patched
+
+
+def patch_cached_tax_owed_years(listings: Iterable[Listing]) -> dict[str, int]:
+    """Pure, no-network driver for patch_cached_tax_owed_year() over many listings."""
+    stats = {"scanned": 0, "eligible_hist": 0, "patched": 0}
+    today = date.today()
+    for li in listings:
+        if not _is_greenville_sc(li):
+            continue
+        stats["scanned"] += 1
+        raw = li.raw if isinstance(li.raw, dict) else {}
+        if isinstance(raw.get(SOURCE_KEY), dict):
+            stats["eligible_hist"] += 1
+        if patch_cached_tax_owed_year(li, today=today):
+            stats["patched"] += 1
+    return stats
+
+
 def search_url(map_no: str) -> str:
     return f"{BASE_URL}?SearchType=MapNumber&Criteria={map_no}"
 
