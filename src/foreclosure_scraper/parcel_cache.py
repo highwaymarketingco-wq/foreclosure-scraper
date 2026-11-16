@@ -1040,6 +1040,39 @@ SC_DUAL_LAYERS: dict[str, dict] = {
 #: 20s, 3/3 attempts) so a fresh field list could not be pulled; this layer's own comment
 #: above already establishes no value field exists here regardless, so a land_use/
 #: improvement-value fallback was never going to be available on this layer either way.
+#:
+#: rollback_exposure + vacant_lot re-verification, same day, later pass: re-confirmed the
+#: above INDEPENDENTLY and live (not from the log or the note above) -- gisportal still
+#: timed out (curl exit 28, 25s) at the moment of this second check. Also checked the
+#: county's OTHER public GIS host, maps.dorchestercounty.net (scripts/check_dorchester_
+#: gis.py's "maps_parcel_public" target, up every day per logs/dorchester_health_check.log
+#: including today): its Parcel_PUBLIC FeatureServer/0 answered live with its full 40-field
+#: schema -- OBJECTID, TMS13, TMS_DEC, TMS, TMSSUB, E_DATE, E_CODE, GIS_ACREAGE, PLAT_DATE,
+#: X_cord, Y_cord, FULL_TMS, created_date, last_edited_date, ACCOUNTNO, FULL_PARCELNO,
+#: PARCELNO, JURISDICTION, TAX_DISTRICT, OWNER, CARE_OF, MAILING_ADDRESS, CITY_STATE_ZIP,
+#: PARENT_PARCELNO, PROPERTY_LOCATION, TAXED_ACRES, PLAT, LOT, OTHER, SUBDIVISION,
+#: SUB_INFO, GRANTOR, GRANTEE, DEED, RECORDING_DATE, SALE_DATE, SALE_PRICE, ZONINGCODE,
+#: Shape__Area, Shape__Length -- no land_use/class/property-type field and no value field
+#: of any kind (ZONINGCODE is what's allowed on the parcel, not its current use, and this
+#: file's own established bar -- see the Greenwood/Aiken/Chester notes elsewhere in this
+#: file -- is a field actually confirmed to carry a vacant/improved signal, not a
+#: plausible-looking one used blind; not mapped). This is a DIFFERENT ArcGIS item from
+#: gisportal's Parcels_Public (no PLAT/SUBDIVISION/GRANTOR on this one, no ZONINGCODE/
+#: TAX_DISTRICT on that one), not a mirror of it, so checking it was a genuinely new lead,
+#: not a re-check of the same dead host under another name -- it just turns out to carry
+#: the same deed/ownership category of field as gisportal's, never a land-use or appraisal
+#: one. The same pass also checked rollback_exposure on this county (the OTHER
+#: "sourced-not-built" cell in this cluster, 2,080 rows, source tax/property card:
+#: dorchestercountyscdelinquenttax.billtrax.com -- a DIFFERENT vendor from qPayBill; see
+#: gap_matrix.py's rollback_exposure Spec comment and dorchester_billtrax_delinquent_tax.py
+#: for the live BillTrax field-schema check backing that): neither live-reachable GIS host
+#: above carries a rollback/ag-deferral field either. NOT added to declined_registry.json
+#: for either column, same reasoning as the note above and
+#: project_vacant_lot_23county_sc_scoped_2026-10-29.md: gisportal answered fine as recently
+#: as 8 days before this check (dorchester_health_check.log), so an outage is not the same
+#: claim as "no such field exists and never will" -- a real GIS-side rollback/land-use
+#: field could still turn up there once it answers again. Both cells correctly stay
+#: sourced-not-built. See memory: project_dorchester_cluster_2026-11-16.md.
 PARCEL_LAYERS["Dorchester"] = {
     "state": "SC",
     "url": ("https://gisportal.dorchestercounty.net/hosting/rest/services/General_Data/"

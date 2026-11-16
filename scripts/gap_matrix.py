@@ -881,6 +881,26 @@ SPECS: dict[str, Spec] = {
                               doc="raw.sc_state_tax_lien present (SC only)"),
     "lien_priority": Spec(_S, "derived", "rod", applies="has_rod", producers=("rod/enrich.py",),
                           doc="raw.lien_priority present; applies to rows with a register pull"),
+    #: 2026-11-16 rollback_exposure Dorchester check (same gap_matrix "sourced-not-built"
+    #: sweep as the qpaybill fix below, a SEPARATE county/vendor question): is Dorchester on
+    #: the qPayBill family the fix below just extended to 29 counties? No -- Dorchester's
+    #: delinquent-tax vendor is BillTrax (dorchestercountyscdelinquenttaxapi.billtrax.com,
+    #: see dorchester_billtrax_delinquent_tax.py), a wholly different host/vendor/data model,
+    #: not a qPayBill tenant under another name. Live-pulled BillTrax's own full per-bill
+    #: field schema that day (2,025 real bills sampled: 25 inspected in full, 2,000 more
+    #: scanned for the literal text "ROLLBACK" in any field): exactly 13 fields total --
+    #: AccountNumber, AllowPartialPayment, BillDate, BillNumber, BlockPayment, ContainerName,
+    #: IsDeliquent, PdfName, PropertyLocation, PropertyOwner, ReasonToBlockPayment,
+    #: StickerNo, TotalDueNow -- no free-text Description/BillType/LevyType field of any
+    #: kind (unlike qPayBill's grid Description cell, which is what the fix below detects),
+    #: and zero of the 2,025 sampled bills' field values contained "ROLLBACK" anywhere. This
+    #: vendor genuinely carries no rollback-tax signal for Dorchester. The county's two
+    #: live-reachable public GIS hosts were also checked and carry no rollback/ag-deferral
+    #: field either -- see parcel_cache.py's PARCEL_LAYERS["Dorchester"] entry (its own
+    #: 2026-11-16 comments) for that check. Not added to declined_registry.json: the
+    #: configured GIS source (gisportal.dorchestercounty.net) is down, not confirmed to
+    #: lack such a field forever, so this stays a real, open sourced-not-built gap -- see
+    #: project_dorchester_cluster_2026-11-16.md.
     "rollback_exposure": Spec(_S, "county", "tax", producers=("enrichment_rollback_deferral.py",
                                                               "enrichment_tax_relief.py",
                                                               "enrichment_transylvania_rollback_exposure.py",
