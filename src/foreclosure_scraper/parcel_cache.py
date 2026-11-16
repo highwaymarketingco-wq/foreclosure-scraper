@@ -478,6 +478,15 @@ PARCEL_LAYERS: dict[str, dict] = {
         # already documented for Darlington (e.g. 290723914 = 29072-3914);
         # left OUT of owner_mailing on purpose -- Address_1 + Address_2
         # ("City ST") is still a usable mailing address without it.
+        #
+        # vacant_lot re-check 2026-11-16 (gap_matrix "sourced-not-built" sweep, closing
+        # the question the 2026-10-29 session left open for this county): the Parcels
+        # table (not AssessorData) carries a genuine "LandUse" text field -- not a bare
+        # numeric DOR code, which is what made this worth checking live. But it is
+        # essentially empty: only 181/15,601 parcels (1.2%) carry any value at all, and a
+        # 15-row live sample of the populated ones was 15/15 "Church" -- this is a sparse
+        # institutional/exempt-use tag, not a general vacant-vs-improved classifier. Not
+        # usable; do not map "land_use" to it.
         "map": {"owner": ["SDE.DBO.AssessorData.Name", "SDE.DBO.AssessorData.Name_2"],
                 "address": ["SDE.DBO.AssessorData.Street_Number_E911", "SDE.DBO.AssessorData.Street_Name_E911"],
                 "owner_mailing": ["SDE.DBO.AssessorData.Address_1", "SDE.DBO.AssessorData.Address_2"],
@@ -509,6 +518,14 @@ PARCEL_LAYERS: dict[str, dict] = {
         # detect this second date shape is out of scope for one county's
         # sale_date field when owner_mailing is what this cache exists for;
         # left unmapped rather than silently wrong.
+        #
+        # vacant_lot re-check 2026-11-16 (gap_matrix "sourced-not-built" sweep): this
+        # AECOM-hosted host is DOWN -- both the layer's own ?f=json and the bare
+        # /arcgis/rest/services root timed out (curl exit 28, 15-20s, 3 consecutive
+        # attempts) rather than answering or even 403ing. Could not live-check whether
+        # a land_use/class field exists here at all. Not the same problem the
+        # 2026-10-29 session scoped (it never got far enough to check); re-try once
+        # the host answers again.
         "state": "SC",
         "url": "https://gis.aecomonline.net/arcgis/rest/services/CalhounCO/Parcel/MapServer/2/query",
         "id_fields": ["TMS"],
@@ -829,6 +846,14 @@ PARCEL_LAYERS: dict[str, dict] = {
         # mapped (see Calhoun). Board parcel_ids: Hampton has ZERO rows today, so the
         # board's format is unknown; the layer's TMS carries a trailing dot
         # ("009-00-00-001.") which normalisation strips to the 10-digit form.
+        #
+        # vacant_lot re-check 2026-11-16 (gap_matrix "sourced-not-built" sweep, closing
+        # the question the 2026-10-29 session left open for this county): live-pulled
+        # the full 36-field schema (?f=json). No land_use/class/property-type field, no
+        # building COUNT field, and no building-only $ value distinct from
+        # Tot_Market_Appr exists anywhere on this layer -- genuinely nothing to anchor a
+        # fallback on (unlike Chester's Appraised1/Buildings, see that entry). Real dead
+        # end for this county's field inventory, not an unmapped-but-usable field.
         "state": "SC",
         "url": "https://services8.arcgis.com/6eabNhFouHU5vuYk/arcgis/rest/services/Parcels_Published_view/FeatureServer/1/query",
         "id_fields": ["Map_Number", "Parcel_polygons_TMS"],
@@ -849,6 +874,28 @@ PARCEL_LAYERS: dict[str, dict] = {
         # fields (Appraised_ = land, Appraised1 = building; verified on a row with
         # buildings: 84,200 + 58,400), so market_value is their {"sum": ...}. There is NO
         # situs on this layer, and the county's address points carry no parcel key.
+        #
+        # vacant_lot re-check 2026-11-16 (gap_matrix "sourced-not-built" sweep, closing
+        # the question the 2026-10-29 session left open for this county): this layer
+        # also carries Buildings (an esriFieldTypeInteger building COUNT, not currently
+        # mapped) alongside Appraised1 (building $ value, already fetched but only as
+        # part of market_value's sum, never exposed standalone). Both are 100% populated
+        # (22,300/22,300) and agree with each other on 99.93% of parcels (9,136 vs 9,143
+        # read zero; only 15 disagree) -- looks like a strong _VALUE_ONLY_NO_LANDUSE-style
+        # candidate (the Richland/Kershaw/Sumter/Williamsburg shape). NOT SHIPPED: an
+        # 8-parcel live satellite ground-truth spot-check (World Imagery, cropped to each
+        # parcel's own polygon extent, true area centroid) on small (<1 acre) Buildings=0
+        # parcels found only 1-2 clearly clean, 1 ambiguous, and 3-4 with what look like
+        # real structures (sheds, a car, a mobile-home-shaped building) visible at or near
+        # the parcel -- far short of the 5/5-10/10 clean bar every other fallback in this
+        # file shipped on, and worse than Florence's 2/7 false-positive rate that got
+        # Florence DECLINED (see declined_registry.json). Plausible cause: Chester's many
+        # thin/narrow parcels sit in dense mill-village-style clusters, so a fixed-radius
+        # crop can catch a neighbor's structure, or "Buildings" may not count the kind of
+        # small/manufactured structures visible here. Needs a parcel-boundary-aware check
+        # (not just a centroid crop) before this can be trusted -- do not map
+        # improvement_value/Buildings or add "Chester" to _VALUE_ONLY_NO_LANDUSE off of
+        # this pass's evidence alone.
         "state": "SC",
         "url": "https://services8.arcgis.com/7uCc8YS9s04rg0sr/arcgis/rest/services/Parcels_10_7_24/FeatureServer/0/query",
         "id_fields": ["Map_Number", "Name"],
@@ -917,6 +964,16 @@ PARCEL_LAYERS: dict[str, dict] = {
         # ZIP. StreetNumberE911 + StreetNameE911 is the situs. TotMarketAppr is the market
         # appraisal; Consideration is the deed consideration (sale price). YearBuilt is on
         # 2% of rows, and the cache has no year column, so it is not read.
+        #
+        # vacant_lot re-check 2026-11-16 (gap_matrix "sourced-not-built" sweep): same miss
+        # as Dorchester above -- the 2026-10-29 session claimed Jasper had no parcel_cache
+        # file, but this entry was added 2026-10-07. Separately, this item's own ?f=json
+        # (both the layer metadata AND a /query call) now answers HTTP 499 "Token
+        # Required" (GWM_0003) -- it has gone from the "access public, no license text"
+        # state documented above on 2026-10-07 to login-walled as of today. jasper.sqlite
+        # (20,258 rows) is therefore now STALE and this source can no longer be refreshed
+        # or field-checked for land_use until the item's sharing changes back or a
+        # replacement source is found.
         "state": "SC",
         "url": "https://services6.arcgis.com/UXJOITFCLbn0Ibm0/arcgis/rest/services/Jasper_County_Parcels/FeatureServer/2/query",
         "id_fields": ["TaxPIN"],
@@ -975,6 +1032,14 @@ SC_DUAL_LAYERS: dict[str, dict] = {
 #: FULL_TMS ("003-00-00-037.000") normalises to the board's 14-digit TMS; all 17 Dorchester rows
 #: of the 249 big-old tax rows with no mailing matched on it (2026-10-07). No value field exists
 #: on this layer. Config as written up in docs/county_breadth_research_2026-09-21.md section 3c.
+#:
+#: vacant_lot re-check 2026-11-16 (gap_matrix "sourced-not-built" sweep): the 2026-10-29
+#: session that scoped this bucket claimed Dorchester had NO parcel_cache file at all --
+#: wrong even then, this entry was added 2026-10-07, three weeks earlier (a miss in that
+#: session, not drift since). The live host itself is unreachable today (curl exit 28,
+#: 20s, 3/3 attempts) so a fresh field list could not be pulled; this layer's own comment
+#: above already establishes no value field exists here regardless, so a land_use/
+#: improvement-value fallback was never going to be available on this layer either way.
 PARCEL_LAYERS["Dorchester"] = {
     "state": "SC",
     "url": ("https://gisportal.dorchestercounty.net/hosting/rest/services/General_Data/"
