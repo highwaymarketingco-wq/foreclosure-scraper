@@ -721,7 +721,8 @@ SPECS: dict[str, Spec] = {
     "multi_year_delinquent_tax": Spec(_S, "row", "tax", ledger="tax_lien|lien_registry_wall",
                                       producers=("enrichment_tax_owed.py",
                                                  "scrapers/counties_generic/multi_year_delinquent_tax.py",
-                                                 "enrichment_gaston_multiyear_tax.py"),
+                                                 "enrichment_gaston_multiyear_tax.py",
+                                                 "enrichment_pasquotank_delinquent_tax.py"),
                                       doc="raw.multi_year_delinquent_tax present; checked = the tax roll was read "
                                           "(any property-tax block on the row)"),
     "repeat_tax_loss": Spec(_S, "derived", "tax", producers=("enrichment_repeat_tax_loss.py",),
@@ -1345,8 +1346,14 @@ def checked_columns(rec: dict, pos: set[str], verdicts: dict[str, Optional[str]]
     # raw["multi_year_delinquent_tax"] on a negative screen (avoids a null placeholder on
     # ~85-90% of rows); it stamps raw["_gaston_mydt_checked"] instead. Without this, the
     # 2026-10-16 "each column's own raw key is the only honest signal" fix (above) silently
-    # undercounts every genuinely-screened-but-negative Gaston row as still open.
-    if raw.get("multi_year_delinquent_tax") not in _EMPTY or raw.get("_gaston_mydt_checked"):
+    # undercounts every genuinely-screened-but-negative Gaston row as still open. Pasquotank
+    # NC's own producer (enrichment_pasquotank_delinquent_tax.py, wired 2026-11-10, first
+    # actually RUN 2026-11-16 -- see scripts/backfill_pasquotank_delinquent_tax.py) does the
+    # identical thing for the identical reason: MIN_YEARS=2 and the county has only ever
+    # published one year's advertisement, so a real screen on a no-match/ambiguous-owner row
+    # never earns the literal key -- it stamps raw["_pasquotank_tax_checked"] instead.
+    if (raw.get("multi_year_delinquent_tax") not in _EMPTY
+            or raw.get("_gaston_mydt_checked") or raw.get("_pasquotank_tax_checked")):
         out.add("multi_year_delinquent_tax")
     if raw.get("two_year_delinquent") not in _EMPTY:
         out.add("two_year_delinquent")
