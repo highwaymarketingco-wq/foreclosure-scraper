@@ -1331,3 +1331,35 @@ def test_divorce_no_subsequent_deed_walled_counties_stay_walled():
     assert gm.classify_cell(spec, 100, 0, False, "no", walled_src) == "walled (CAPTCHA)"
     assert gm.classify_cell(spec, 100, 0, False, "code", walled_src) == "walled (CAPTCHA)"
     assert gm.declined_override("NC", "Mecklenburg", "storm_damage", None) is None
+
+
+# ---------------------------------------------------------------- 2026-11-16 email (SC) no-free-source sweep
+
+def test_email_declined_statewide_for_sc():
+    """email's only live, owner-sourced producer is liensnc_handoff.py, reading a filed LiensNC
+    lien-agent-designation record -- a NC-only mechanism that exists because NC Gen. Stat.
+    44A-11.1/44A-11.2 uniquely requires owners of qualifying construction projects to designate a
+    lien agent and record that designation. South Carolina's mechanics-lien law (Title 29 Ch.5)
+    has no equivalent lien-agent-designation-with-public-registry requirement, and every other
+    raw e-mail source in this codebase (notice_contact.email -- the filing attorney/trustee from
+    Column legal notices, which IS live for SC; distressed/homeharvest agent_email; sc_sos_entity's
+    registered_agent, which carries a name only, never an address or email) is correctly excluded
+    from owner_email_of() by design (not the owner, and outreach-useless even if included). Fixed
+    via the existing declined_registry.json override (county=None, statewide) -- the SAME
+    mechanism and shape as the SC marriage_license and NC lt_tax_sale_overage statewide entries,
+    not a change to classify_cell/SPECS. All 46 SC counties showing email as 'no source known' on
+    the 2026-11-16 gap list flip to 'declined (...)' on the next regeneration."""
+    for county in gm.SC_COUNTIES:
+        got = gm.declined_override("SC", county, "email", "no source known")
+        assert got is not None and got.startswith("declined ("), (county, got)
+    # a DIFFERENT column for the same SC county is untouched (column-scoped, not blanket)
+    assert gm.declined_override("SC", "York", "phone", "no source known") == "no source known"
+
+
+def test_email_not_declined_for_nc():
+    """NC keeps its real LiensNC-sourced email producer -- the SC registry entry must never
+    bleed across the state line (declined_override's own (state, county, column) key is
+    state-scoped, but this guards the actual registry content, not just the lookup mechanics)."""
+    for county in ("Mecklenburg", "Wake", "Forsyth"):
+        got = gm.declined_override("NC", county, "email", "no source known")
+        assert got == "no source known", (county, got)
