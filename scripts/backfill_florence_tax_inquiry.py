@@ -65,6 +65,7 @@ from foreclosure_scraper.enrichment_florence_tax_inquiry import (  # noqa: E402
 from foreclosure_scraper.enrichment_florence_two_year_delinquent import (  # noqa: E402
     enrich_florence_two_year_delinquent,
 )
+from foreclosure_scraper.enrichment_tax_aging import enrich_tax_aging  # noqa: E402
 from foreclosure_scraper.models import Listing  # noqa: E402
 from foreclosure_scraper.web_artifact import (  # noqa: E402
     _APPEND_SIG_FIELDS, board_lock, board_patch_size_state, patch_existing_rows,
@@ -74,7 +75,13 @@ _IS_FLORENCE = lambda rec: (
     str(rec.get("state") or "").upper() == "SC"
     and str(rec.get("county") or "").strip().lower().replace(" county", "") == "florence"
 )
-_WATCH_KEYS = ("florence_tax_inquiry", "tax_owed", "two_year_delinquent")
+# florence_tax_inquiry/tax_owed/two_year_delinquent: enrichment_florence_tax_inquiry.py +
+# its sibling restate. tax_aging_surfaced/tax_aging_high/tax_not_yet_late/tax_big_old:
+# enrichment_tax_aging.py's own derivation off the raw['tax_owed'] this run just populated --
+# already wired board-wide in main.py with no county gate, called directly here (pure,
+# no network) so BOTH gap_matrix columns land in the SAME pass/patch, not a later run.
+_WATCH_KEYS = ("florence_tax_inquiry", "tax_owed", "two_year_delinquent",
+               "tax_aging_surfaced", "tax_aging_high", "tax_not_yet_late", "tax_big_old")
 
 
 def main() -> int:
@@ -139,6 +146,9 @@ def main() -> int:
     tyd_stats = enrich_florence_two_year_delinquent(list(keyed.values()))
     print(f"enrich_florence_two_year_delinquent: {tyd_stats}", flush=True)
 
+    tas_stats = enrich_tax_aging(list(keyed.values()))
+    print(f"enrich_tax_aging: {tas_stats}", flush=True)
+
     patches: dict[str, dict] = {}
     for key, li in keyed.items():
         raw = li.raw if isinstance(li.raw, dict) else {}
@@ -146,10 +156,10 @@ def main() -> int:
         if changed != before[key]:
             patches[key] = {"raw": changed}
 
-    print(f"rows changed (new tax_owed/florence_tax_inquiry/two_year_delinquent): {len(patches):,}",
-          flush=True)
+    print(f"rows changed (tax_owed/florence_tax_inquiry/two_year_delinquent/tax_aging_surfaced): "
+          f"{len(patches):,}", flush=True)
     result = {"total_florence": total_florence, "eligible": eligible,
-              "ftx_stats": ftx_stats, "tyd_stats": tyd_stats,
+              "ftx_stats": ftx_stats, "tyd_stats": tyd_stats, "tas_stats": tas_stats,
               "patches_staged": len(patches), "elapsed_s": round(elapsed, 1)}
 
     if args.dry_run:
