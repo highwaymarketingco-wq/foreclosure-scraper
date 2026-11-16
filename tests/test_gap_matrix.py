@@ -1110,7 +1110,6 @@ def test_board_rows_reads_a_checkpoint(tmp_path):
     assert len(rows) == 1 and rows[0]["county"] == "Buncombe"
 
 
-
 # ---------------------------------------------------------------- 2026-11-16 storm_damage dead-end sweep
 
 def test_storm_damage_declined_for_confirmed_no_qualifying_event_counties():
@@ -1158,4 +1157,62 @@ def test_declined_override_never_fires_on_not_applicable_or_at_target():
     for -- a future narrowing of in_storm_scope must never be silently overridden back to
     'declined' by this registry."""
     assert gm.declined_override("NC", "Mecklenburg", "storm_damage", "not applicable") == "not applicable"
+
+
+# ---------------------------------------------------------------- 2026-11-16 divorce_no_subsequent_deed sweep
+
+def test_divorce_no_subsequent_deed_credited_for_every_nc_county():
+    """enrichment_divorce_no_subsequent_deed.py (this column's only producer) has zero
+    per-county registry, allowlist or skip-list -- it gates only on listing_type ==
+    DIVORCE_NOTICE and state == 'NC' -- so the real 'built' set is every NC county, not
+    whatever a blanket counties_named_in() text match over the file happens to find. That
+    blanket match found exactly one ('NC', 'Person'), an accident of the English word "PERSON"
+    inside the module's own docstring, not real per-county code (confirmed
+    project_divorce_no_subsequent_deed_false_gap_2026-11-12.md, re-confirmed live 2026-11-16:
+    Person's board rows show zero resolved/tagged, identical to every other NC county). Before
+    this fix, 63 real NC counties (the 2026-11-16 gap list's single highest-cell-count
+    'sourced-not-built' cluster, 4,043 est_rows) plus 3 more ('no source known': New Hanover,
+    Lee, Hoke) read as a code gap purely because code_counties had nothing for them -- same
+    bug-class shape as repeat_tax_loss/deed_chain_*/child_support above, not a per-county dead
+    end (contrast test_storm_damage_declined_for_confirmed_no_qualifying_event_counties, which
+    IS one)."""
+    credit = gm.built_in_code()["divorce_no_subsequent_deed"]
+    assert all(("NC", c) in credit for c in
+               ("Mecklenburg", "Guilford", "Forsyth", "Johnston", "Cabarrus", "Durham",
+                "Davidson", "Jones", "New Hanover", "Lee", "Hoke", "Person"))
+    assert credit == {("NC", c) for c in gm.NC_COUNTIES}
+    assert not any(st == "SC" for st, co in credit)      # the producer hard-skips every SC row
+
+
+@pytest.mark.parametrize("src,before,after", [
+    (("free", "", "register: some county portal"), "sourced-not-built", "built-but-low-yield"),
+    (("unknown", "", ""), "no source known", "built-but-low-yield"),
+])
+def test_divorce_no_subsequent_deed_reclassifies_once_credited(src, before, after):
+    """The exact (app, target, ran, src) shape the 2026-11-16 board read for the 66 affected
+    cells (63 'sourced-not-built' + 3 'no source known'): app > target, never ran (0% of this
+    column's divorce_notice rows in these counties have been through the shared name resolver
+    yet). With the old, empty code_counties credit (built='no') classify_cell read the gap as a
+    missing-source problem; with this fix's credit (built='code') it reads built-but-low-yield
+    -- which next_action's own spec.scope == 'derived' branch already states correctly ("rows
+    lack the inputs ... fill the inputs, then recompute"), matching the real cause (the shared
+    resolver backlog, not missing code)."""
+    spec = gm.SPECS["divorce_no_subsequent_deed"]
+    assert gm.classify_cell(spec, 100, 0, False, "no", src) == before
+    assert gm.classify_cell(spec, 100, 0, False, "code", src) == after
+
+
+def test_divorce_no_subsequent_deed_walled_counties_stay_walled():
+    """The 16 counties the 2026-11-16 gap list reads as 'walled' for this column (7 CAPTCHA + 9
+    bot-check/Cloudflare) read that from the unrelated 'rod' family's OWN register-portal wall
+    for that county (source_status(), family == 'rod') -- a county_records_matrix
+    family-assignment imprecision this derived, resolver-only module never actually touches,
+    same shape repeat_tax_loss's own docstring flags and explicitly leaves alone. Guard: the
+    new built='code' credit must never override an already-walled cell -- classify_cell()
+    checks a declared wall before it ever looks at `built`, by design (the explicit
+    `status != "walled"` guard on the built == "code" branch)."""
+    spec = gm.SPECS["divorce_no_subsequent_deed"]
+    walled_src = ("walled", "CAPTCHA", "register: some county portal")
+    assert gm.classify_cell(spec, 100, 0, False, "no", walled_src) == "walled (CAPTCHA)"
+    assert gm.classify_cell(spec, 100, 0, False, "code", walled_src) == "walled (CAPTCHA)"
     assert gm.declined_override("NC", "Mecklenburg", "storm_damage", None) is None
