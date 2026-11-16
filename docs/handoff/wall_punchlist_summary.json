@@ -1,7 +1,7 @@
 {
  "board_rows": 586837,
  "by_category": {
-  "uncovered": 274739,
+  "uncovered": 274701,
   "wall": 78029
  },
  "format_version": 1,
@@ -57,8 +57,8 @@
    "generated_at": "2026-10-17T14:28:27Z"
   },
   "probate_heir": {
-   "entries": 93,
-   "generated_at": "2026-11-16T20:49:58Z"
+   "entries": 131,
+   "generated_at": "2026-11-16T21:50:13Z"
   },
   "tax_lien": {
    "entries": 68815,
@@ -73,7 +73,7 @@
    "generated_at": "2026-11-16T21:00:28Z"
   }
  },
- "listings": 352768,
+ "listings": 352730,
  "uncovered": {
   "by_scraper_source": {
    "city_websites.charlotte_open_data": 4585,

@@ -6,7 +6,7 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 
 ## 1. Hermes lane -- CAPTCHA or required login
 
-511 cells, 1,069,171 est_rows_affected combined.
+511 cells, 1,069,170 est_rows_affected combined.
 
 | state | county | column | est_rows | reason | source |
 |---|---|---|---|---|---|
@@ -215,7 +215,7 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 
 ## 2. Bot-wall, build in-house -- Cloudflare/WAF, not Hermes
 
-107 cells, 573,322 est_rows_affected combined.
+105 cells, 568,382 est_rows_affected combined.
 
 | state | county | column | est_rows | reason | source |
 |---|---|---|---|---|---|
@@ -245,8 +245,6 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | NC | Union | two_year_delinquent | 3,163 | bot check (Cloudflare/WAF) | tax/property card:  |
 | NC | Polk | atty_tax_verified_confirmed | 2,752 | bot check (Cloudflare/WAF) | tax/property card: www.polknc.gov |
 | SC | Colleton | assessed_value | 2,563 | Cloudflare check on the county property card | county GIS: services1.arcgis.com |
-| NC | Pasquotank | atty_rod_lien_checked | 2,470 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
-| NC | Pasquotank | liens | 2,470 | bot check (Cloudflare/WAF) | register: Courthouse Computer Systems (CCS) hosted search us |
 | SC | Richland | multi_year_delinquent_tax | 2,316 | bot check (Cloudflare/WAF) | tax/property card:  |
 | SC | Richland | rollback_exposure | 2,316 | bot check (Cloudflare/WAF) | tax/property card:  |
 | SC | Richland | tax_aging_surfaced | 2,316 | bot check (Cloudflare/WAF) | tax/property card:  |
