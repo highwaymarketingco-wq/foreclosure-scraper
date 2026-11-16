@@ -236,6 +236,21 @@
       "state": "SC", "county": "Aiken", "column": "rollback_exposure",
       "reason": "Same Catalis/Sturgis shared-host wall as Chester (see that entry for the full reasoning) -- Aiken is CATALIS_COUNTIES['Aiken'] on the identical CloudFront CDN host. Confirmed blocked by the same live 403 2026-11-16 (one request, against Chester's GUID; the block is host-level, not re-tested against Aiken's own GUID to avoid a second request against an already-confirmed-blocking host, and Aiken's own responses already run ~3MB/prefix per the module's docstring, the worst case to probe twice for the same answer).",
       "confirmed_date": "2026-11-16", "confidence": "medium"
+    },
+    {
+      "state": "NC", "county": "Robeson", "column": "rollback_exposure",
+      "reason": "This vendor (ustaxdata.com, enrichment_ustaxdata_tax_search.py) has no present-use/land-use-deferral field of any kind -- already directly checked and documented in that module's own docstring, independent of this session: every row's 'Asset Description' cell reads the literal static placeholder '> CONTACT COUNTY FOR' on EVERY year and EVERY county tried (confirmed live 2026-10-16, not a fetch error), so there is no per-bill descriptive text at all for a '<year> ROLLBACK TAX...'-style marker (the qPayBill-vendor signal this sweep found 2026-11-05) to ever appear in. The summary table has no dollar amount either (that lives one click deeper, on a separate per-bill page this module already reads for tax_owed, which also carries no use-value split). Structurally weaker than a vendor that has real but merely-unexploited Description text -- here the field itself is dead on arrival.",
+      "confirmed_date": "2026-10-16", "confidence": "high"
+    },
+    {
+      "state": "NC", "county": "Alexander", "column": "rollback_exposure",
+      "reason": "Same ustaxdata.com vendor limitation as Robeson (see that entry -- the 'Asset Description' placeholder is vendor-wide, not county-specific). Alexander's own tenant (alexander.ustaxdata.com) is additionally a confirmed live dead end independent of this question: its taxbill.cfm answered 'Connection Timeout Alexander County Tax Record Application... We are experiencing technical difficulties' (HTTP 200, not a bill) per enrichment_ustaxdata_tax_search.py's own docstring -- a pre-existing condition on the county's own server, not something this project caused, and not independently re-checked here as still current.",
+      "confirmed_date": "2026-10-20", "confidence": "medium"
+    },
+    {
+      "state": "NC", "county": "Granville", "column": "rollback_exposure",
+      "reason": "Granville is the SAME bttaxpayerportal/ITSPublic vendor as the Anson entry above (nc_its_public_tax.py PORTALS['Granville'], just hosted on the county's own domain tax.granvillecounty.org rather than the shared bttaxpayerportal.com name, which is why it did not group with the other 6 by hostname). The 'no value/use-split field in TaxBillSearch's own column set' argument is a PLATFORM-level fact (re-confirmed this session by reading parse_row_cols()/parse_description_cols() directly, not per-tenant), so it applies here unchanged. The Description-text live check (2 years, 7,386 rows, zero 'ROLLBACK' hits) was run directly against Anson/Yadkin/Caswell/Jones/Graham/Alleghany, NOT against Granville's own tenant -- kept at 'medium' confidence rather than 'high' for that reason; a county-specific live recheck would raise it.",
+      "confirmed_date": "2026-11-16", "confidence": "medium"
     }
   ]
 }
