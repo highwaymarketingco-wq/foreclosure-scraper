@@ -1063,7 +1063,54 @@ SPECS: dict[str, Spec] = {
                                       "rod_docs or nc_rod)"),
     "atty_deed_chain_fetched": Spec(_F, "row", "gis_deed", producers=("enrichment_deed_chain.py",),
                                     doc="raw.deed_chain.transfers is non-empty"),
+    # 2026-11-16 (SC Colleton atty_probate_case gap sweep): this column's `producers` was never
+    # set at all (empty by the dataclass default), so built_in_code()'s blanket counties_named_in()
+    # grep has nothing to scan for it -- code_counties["atty_probate_case"] is permanently empty,
+    # same bug-class shape as repeat_tax_loss/deed_chain_*/divorce_no_subsequent_deed above, just
+    # never applied to this column before. Live-confirmed effect: SC/Colleton (2,125 applicable,
+    # 0 hit) reads "sourced-not-built" / "add a probate reader for probate: www.southcarolinaprobate.net"
+    # even though scrapers/counties_sc/sc_probate_net.py's own COUNTIES tuple already queries
+    # Colleton every run (RE-confirmed live today, board_stream.iter_board_rows, no load_board():
+    # 0 of 507 accumulated sc_probate_net-sourced rows statewide are Colleton's, vs 386
+    # Charleston/101 Dorchester/19 York -- a real, reliably-reached, genuinely-empty court per
+    # that module's own docstring, NOT a repeat of York's rotation-starvation bug
+    # (project_york_sc_probate_starvation_fix_2026-10-29.md): Colleton sits 2nd in COUNTIES,
+    # before the Charleston-Marriage/Dorchester entries that York memory's own two timed-out
+    # unscoped dry-runs both reached before stopping -- so Colleton IS reached every run, it just
+    # never returns a hit; SC_PROBATE_NET_COUNTIES scoping would not change that). Named here:
+    # every LIVE producer of this predicate's raw keys (probate_case_present() above), each
+    # confirmed wired in main.py's own scraper registry today (checked by slug, not filename --
+    # greenville_hard_distress.py's real slug is "counties_sc.greenville_tax_distress", gated
+    # behind FORECLOSURE_INCLUDE_GREENVILLE, the same "flag-off hold, not missing code" shape as
+    # nc_harris marriage_license elsewhere in this file): sc_probate_net.py (raw.sc_probate_net/
+    # top-level case_number), sc_probate_notices.py + publicnoticesc_estates.py (raw.
+    # sc_probate_notice.case_number), horry_probate.py/greenville_hard_distress.py (raw.probate.
+    # case_number). Deliberately NOT included: enrichment_probate_search.py -- also writes raw.
+    # probate.case_number, and names 10 SC counties as real code text (SC_PROBATE_COUNTY_CODES),
+    # but is RETIRED 2026-10-09 (confirmed fresh today: zero references in main.py; see the
+    # sibling 'probate' column's own Spec comment just above, which already caught and excluded
+    # this exact false-credit source for a different column -- reusing it here would reintroduce
+    # the identical bug-class this file's own tests guard against,
+    # test_built_in_code_drops_retired_probate_search_false_credit). Also NOT included:
+    # column_legal_notices.py (writes raw.probate.nc_estate_file_no) -- a much larger, separately-
+    # scoped NC-wide newspaper-notice vendor already being actively re-scoped this same session
+    # (commit 39655cca, a different column pair) -- deferred to its own dedicated pass rather
+    # than bundled in here unverified. Georgetown/Oconee already read built-but-low-yield today
+    # purely because each happens to carry exactly 1 incidental hit (ran=True via pos>0, unrelated
+    # to this fix); this is what makes a GENUINELY zero-hit probate-covered county read correctly
+    # too. Live-measured on today's gap list: Colleton was not the only one -- Barnwell (1,152
+    # applicable) and Lancaster (125) carry the identical fill-layer shape (0 hit, "sourced-not-
+    # built"), and both are also on sc_probate_net.py's own already-probed "no records" list
+    # (its module docstring's 2026-10-02 BREADTH EXTENSION note) -- this one fix resolves all
+    # three. The column's separate "verify" layer (probate_heir|heir_roll ledger coverage over
+    # the rows that DO have a case number -- Charleston/Dorchester/Sumter/York/etc.) is a
+    # different mechanism entirely (not built_in_code()-driven) and is NOT touched by this fix.
     "atty_probate_case": Spec(_F, "row", "probate", applies="deceased", ledger="probate_heir|heir_roll",
+                              producers=("scrapers/counties_sc/sc_probate_net.py",
+                                         "scrapers/counties_sc/sc_probate_notices.py",
+                                         "scrapers/public_notices/publicnoticesc_estates.py",
+                                         "scrapers/counties_sc/horry_probate.py",
+                                         "scrapers/counties_sc/greenville_hard_distress.py"),
                               doc="an estate file number (probate, sc_probate_notice, sc_probate_net, or a "
                                   "probate_notice/estate_lead row's case_number); applies to dead/estate owners"),
     "atty_tax_verified_confirmed": Spec(_S, "row", "tax", applies="tax_claim", ledger="tax_lien",
