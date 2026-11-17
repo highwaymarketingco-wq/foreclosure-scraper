@@ -5401,6 +5401,406 @@
       "reason": "Graham County NC's Building Inspections office (Robbinsville) is phone-only; nuisance abatement runs through the Sheriff/county attorney in court per a 2023 NCDPS consent-judgment release, not a public portal; the one third-party-listed AGOL app link found is undated and unverifiable. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding (same phone-only + court-route conclusion), zero AGOL hits.",
       "confirmed_date": "2026-11-17",
       "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Lee",
+      "column": "atty_rod_lien_checked",
+      "reason": "Register of Deeds (leencrod.org) runs Logan Systems' Blazor Server app; a plain HTTP GET renders only the app's generic 'An unhandled error has occurred' shell (confirmed live 2026-11-17), because a Blazor Server page needs a persistent SignalR circuit no plain httpx/curl client can establish -- a different problem from a CAPTCHA/login wall. docs/county_records/nc_rod_platform_clusters.md already flags Lee as 'Logan Blazor per the matrix, access not established: check, then add to the Blazor adapter' -- a genuine future build item (a SignalR-aware client), not a quick producers-tuple fix.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Lee",
+      "column": "liens",
+      "reason": "Register of Deeds (leencrod.org) runs Logan Systems' Blazor Server app; a plain HTTP GET renders only the app's generic 'An unhandled error has occurred' shell (confirmed live 2026-11-17), because a Blazor Server page needs a persistent SignalR circuit no plain httpx/curl client can establish -- a different problem from a CAPTCHA/login wall. docs/county_records/nc_rod_platform_clusters.md already flags Lee as 'Logan Blazor per the matrix, access not established: check, then add to the Blazor adapter' -- a genuine future build item (a SignalR-aware client), not a quick producers-tuple fix.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Hoke",
+      "column": "atty_rod_lien_checked",
+      "reason": "Register of Deeds (hokencrod.org) runs Logan Systems' Blazor Server app; a plain HTTP GET renders only the app's generic 'An unhandled error has occurred' shell (confirmed live 2026-11-17), because a Blazor Server page needs a persistent SignalR circuit no plain httpx/curl client can establish -- a different problem from a CAPTCHA/login wall. docs/county_records/nc_rod_platform_clusters.md already flags Hoke as 'Logan Blazor per the matrix, access not established: check, then add to the Blazor adapter' -- a genuine future build item (a SignalR-aware client), not a quick producers-tuple fix.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Hoke",
+      "column": "liens",
+      "reason": "Register of Deeds (hokencrod.org) runs Logan Systems' Blazor Server app; a plain HTTP GET renders only the app's generic 'An unhandled error has occurred' shell (confirmed live 2026-11-17), because a Blazor Server page needs a persistent SignalR circuit no plain httpx/curl client can establish -- a different problem from a CAPTCHA/login wall. docs/county_records/nc_rod_platform_clusters.md already flags Hoke as 'Logan Blazor per the matrix, access not established: check, then add to the Blazor adapter' -- a genuine future build item (a SignalR-aware client), not a quick producers-tuple fix.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Dillon",
+      "column": "atty_rod_lien_checked",
+      "reason": "Register of Deeds (dillonsc.avenuinsights.com) is Avenu/Neumo GRIDS, a JS-rendered SPA; a plain GET returns an empty shell (confirmed live 2026-11-17, consistent with a client-side login redirect a static fetch can't follow). docs/county_records/sc_rod_platform_clusters.md's 2026-10-07 research already found the public search on all 7 Neumo GRIDS tenants redirects to account/login with a password form, and that accounts may not be created -- a login wall, not a CAPTCHA or a missing scraper.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Dillon",
+      "column": "liens",
+      "reason": "Register of Deeds (dillonsc.avenuinsights.com) is Avenu/Neumo GRIDS, a JS-rendered SPA; a plain GET returns an empty shell (confirmed live 2026-11-17, consistent with a client-side login redirect a static fetch can't follow). docs/county_records/sc_rod_platform_clusters.md's 2026-10-07 research already found the public search on all 7 Neumo GRIDS tenants redirects to account/login with a password form, and that accounts may not be created -- a login wall, not a CAPTCHA or a missing scraper.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Edgefield",
+      "column": "atty_rod_lien_checked",
+      "reason": "Register of Deeds (edgefieldsc.avenuinsights.com) is Avenu/Neumo GRIDS, a JS-rendered SPA; a plain GET returns an empty shell (confirmed live 2026-11-17, consistent with a client-side login redirect a static fetch can't follow). docs/county_records/sc_rod_platform_clusters.md's 2026-10-07 research already found the public search on all 7 Neumo GRIDS tenants redirects to account/login with a password form, and that accounts may not be created -- a login wall, not a CAPTCHA or a missing scraper.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Edgefield",
+      "column": "liens",
+      "reason": "Register of Deeds (edgefieldsc.avenuinsights.com) is Avenu/Neumo GRIDS, a JS-rendered SPA; a plain GET returns an empty shell (confirmed live 2026-11-17, consistent with a client-side login redirect a static fetch can't follow). docs/county_records/sc_rod_platform_clusters.md's 2026-10-07 research already found the public search on all 7 Neumo GRIDS tenants redirects to account/login with a password form, and that accounts may not be created -- a login wall, not a CAPTCHA or a missing scraper.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Chesterfield",
+      "column": "atty_rod_lien_checked",
+      "reason": "Register of Deeds (chesterfieldsc.avenuinsights.com) is Avenu/Neumo GRIDS, a JS-rendered SPA; a plain GET returns an empty shell (confirmed live 2026-11-17, consistent with a client-side login redirect a static fetch can't follow). docs/county_records/sc_rod_platform_clusters.md's 2026-10-07 research already found the public search on all 7 Neumo GRIDS tenants redirects to account/login with a password form, and that accounts may not be created -- a login wall, not a CAPTCHA or a missing scraper.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Chesterfield",
+      "column": "liens",
+      "reason": "Register of Deeds (chesterfieldsc.avenuinsights.com) is Avenu/Neumo GRIDS, a JS-rendered SPA; a plain GET returns an empty shell (confirmed live 2026-11-17, consistent with a client-side login redirect a static fetch can't follow). docs/county_records/sc_rod_platform_clusters.md's 2026-10-07 research already found the public search on all 7 Neumo GRIDS tenants redirects to account/login with a password form, and that accounts may not be created -- a login wall, not a CAPTCHA or a missing scraper.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Bamberg",
+      "column": "atty_rod_lien_checked",
+      "reason": "Register of Deeds (bambergsc.avenuinsights.com) is Avenu/Neumo GRIDS, a JS-rendered SPA; a plain GET returns an empty shell (confirmed live 2026-11-17, consistent with a client-side login redirect a static fetch can't follow). docs/county_records/sc_rod_platform_clusters.md's 2026-10-07 research already found the public search on all 7 Neumo GRIDS tenants redirects to account/login with a password form, and that accounts may not be created -- a login wall, not a CAPTCHA or a missing scraper.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Bamberg",
+      "column": "liens",
+      "reason": "Register of Deeds (bambergsc.avenuinsights.com) is Avenu/Neumo GRIDS, a JS-rendered SPA; a plain GET returns an empty shell (confirmed live 2026-11-17, consistent with a client-side login redirect a static fetch can't follow). docs/county_records/sc_rod_platform_clusters.md's 2026-10-07 research already found the public search on all 7 Neumo GRIDS tenants redirects to account/login with a password form, and that accounts may not be created -- a login wall, not a CAPTCHA or a missing scraper.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Chester",
+      "column": "atty_rod_lien_checked",
+      "reason": "Register of Deeds (chestersc.avenuinsights.com) is Avenu/Neumo GRIDS, a JS-rendered SPA; a plain GET returns an empty shell (confirmed live 2026-11-17, consistent with a client-side login redirect a static fetch can't follow). docs/county_records/sc_rod_platform_clusters.md's 2026-10-07 research already found the public search on all 7 Neumo GRIDS tenants redirects to account/login with a password form, and that accounts may not be created -- a login wall, not a CAPTCHA or a missing scraper.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Chester",
+      "column": "liens",
+      "reason": "Register of Deeds (chestersc.avenuinsights.com) is Avenu/Neumo GRIDS, a JS-rendered SPA; a plain GET returns an empty shell (confirmed live 2026-11-17, consistent with a client-side login redirect a static fetch can't follow). docs/county_records/sc_rod_platform_clusters.md's 2026-10-07 research already found the public search on all 7 Neumo GRIDS tenants redirects to account/login with a password form, and that accounts may not be created -- a login wall, not a CAPTCHA or a missing scraper.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Fairfield",
+      "column": "atty_rod_lien_checked",
+      "reason": "Register of Deeds (fairfieldsc.avenuinsights.com) is Avenu/Neumo GRIDS, a JS-rendered SPA; a plain GET returns an empty shell (confirmed live 2026-11-17, consistent with a client-side login redirect a static fetch can't follow). docs/county_records/sc_rod_platform_clusters.md's 2026-10-07 research already found the public search on all 7 Neumo GRIDS tenants redirects to account/login with a password form, and that accounts may not be created -- a login wall, not a CAPTCHA or a missing scraper.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Fairfield",
+      "column": "liens",
+      "reason": "Register of Deeds (fairfieldsc.avenuinsights.com) is Avenu/Neumo GRIDS, a JS-rendered SPA; a plain GET returns an empty shell (confirmed live 2026-11-17, consistent with a client-side login redirect a static fetch can't follow). docs/county_records/sc_rod_platform_clusters.md's 2026-10-07 research already found the public search on all 7 Neumo GRIDS tenants redirects to account/login with a password form, and that accounts may not be created -- a login wall, not a CAPTCHA or a missing scraper.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Saluda",
+      "column": "atty_rod_lien_checked",
+      "reason": "Register of Deeds (recordhub.cottsystems.com/SaludaSC/) is Cott RecordHub; a plain GET 302-redirects to /Portal/Account/LoginRoute (confirmed live 2026-11-17), matching docs/county_records/sc_rod_platform_clusters.md's 'unreachable; account platform' finding -- a genuine login wall, not a missing scraper.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Saluda",
+      "column": "liens",
+      "reason": "Register of Deeds (recordhub.cottsystems.com/SaludaSC/) is Cott RecordHub; a plain GET 302-redirects to /Portal/Account/LoginRoute (confirmed live 2026-11-17), matching docs/county_records/sc_rod_platform_clusters.md's 'unreachable; account platform' finding -- a genuine login wall, not a missing scraper.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Allendale",
+      "column": "atty_rod_lien_checked",
+      "reason": "No online register-of-deeds index exists for Allendale County SC: docs/county_records/county_records_matrix.json records no rod.url for Allendale at all, matching docs/county_records/sc_rod_platform_clusters.md's 'none -- no online index; books at the Clerk of Court' finding for this county. A human/manual lane (phone or in-person records request), not a code gap.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Allendale",
+      "column": "liens",
+      "reason": "No online register-of-deeds index exists for Allendale County SC: docs/county_records/county_records_matrix.json records no rod.url for Allendale at all, matching docs/county_records/sc_rod_platform_clusters.md's 'none -- no online index; books at the Clerk of Court' finding for this county. A human/manual lane (phone or in-person records request), not a code gap.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Marion",
+      "column": "atty_rod_lien_checked",
+      "reason": "No online register-of-deeds index exists for Marion County SC: docs/county_records/county_records_matrix.json records rod.access='unreachable' and no rod.url for Marion, matching docs/county_records/sc_rod_platform_clusters.md's 'none -- no online index; books at the Clerk of Court' finding for this county. A human/manual lane (phone or in-person records request), not a code gap.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Marion",
+      "column": "liens",
+      "reason": "No online register-of-deeds index exists for Marion County SC: docs/county_records/county_records_matrix.json records rod.access='unreachable' and no rod.url for Marion, matching docs/county_records/sc_rod_platform_clusters.md's 'none -- no online index; books at the Clerk of Court' finding for this county. A human/manual lane (phone or in-person records request), not a code gap.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "McCormick",
+      "column": "atty_rod_lien_checked",
+      "reason": "No online register-of-deeds index exists for McCormick County SC: docs/county_records/county_records_matrix.json's only rod.url for McCormick is the Clerk of Court's general departments contact page (mccormickcountysc.org/departments/clerk_of_court.php), not a records search, matching docs/county_records/sc_rod_platform_clusters.md's 'none -- no online index; books at the Clerk of Court' finding for this county. A human/manual lane (phone or in-person records request), not a code gap.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "McCormick",
+      "column": "liens",
+      "reason": "No online register-of-deeds index exists for McCormick County SC: docs/county_records/county_records_matrix.json's only rod.url for McCormick is the Clerk of Court's general departments contact page (mccormickcountysc.org/departments/clerk_of_court.php), not a records search, matching docs/county_records/sc_rod_platform_clusters.md's 'none -- no online index; books at the Clerk of Court' finding for this county. A human/manual lane (phone or in-person records request), not a code gap.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Marion",
+      "column": "atty_deed_ref",
+      "reason": "The county's own GIS parcel viewer (WTH 'tgis', marionsc.wthgis.com, DSID=1064) carries NO Deed Book/Page field anywhere in its getftr.aspx detail template -- live-confirmed 2026-11-17 by reading a real parcel's full field set (TMS 0550000196000): Land Value/Building Value/Sale Date/Sale Price/Plat Book/Plat Page/Misc Book/Misc Page are present, Deed Book/Deed Page and Legal Description are not. Chesterfield SC runs the SAME WTH platform and DOES carry both (confirmed the same night), so this is a genuine per-county template difference, not a shared platform limitation -- do not assume Chesterfield's fix generalizes here. Separately: atty_rod_lien_checked/liens are already declined for Marion ('no online register-of-deeds index exists') -- that is a different mechanism (a name-indexed ROD search) and this entry does not restate it; this one is specifically about the GIS parcel card's own embedded field set.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Marion",
+      "column": "atty_legal_description",
+      "reason": "Same WTH 'tgis' getftr.aspx template (DSID=1064) checked for atty_deed_ref above carries no Legal Description field either -- live-confirmed 2026-11-17 against the same real parcel (TMS 0550000196000), full field set read, no label resembling a legal description anywhere in the General/Sale tabs. Chesterfield SC's own deployment of the identical platform DOES carry a Legal&nbsp;Description field (confirmed the same night) -- a per-county template difference, not a platform-wide gap.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Marion",
+      "column": "assessed_value",
+      "reason": "A real source exists (WTH 'tgis' getftr.aspx, marionsc.wthgis.com DSID=1064, Land&nbsp;Value+Building&nbsp;Value fields both live-confirmed 2026-11-17) but cannot be safely bound to this county's board rows: 0 of 280 Marion SC board rows carry a parcel_id (confirmed live via board_stream.iter_board_rows, never load_board()), so the only possible match key is the owner surname search the viewer's custom.aspx exposes -- and a surname is not unique (multiple real people share one), so binding a search hit to a specific board row by name alone risks writing a stranger's assessed value onto this row. Williamsburg/Chesterfield's own WTH ingests only ever bind by exact parcel_id for this reason. Declined for THIS approach, not for lack of a live source -- if Marion board rows ever gain a parcel_id (e.g. via a future owner-name+address GIS resolve), this should be re-attempted, not re-researched from scratch.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Marion",
+      "column": "lot_size",
+      "reason": "Same WTH 'tgis' source and same binding problem as assessed_value above: Total&nbsp;cres (acreage, live-confirmed 2026-11-17 -- note the label itself reads 'cres', a typo baked into this county's own template, not a parsing error) is a real, populated field, but 0 of 280 Marion SC board rows carry a parcel_id to bind a search hit to safely. See the assessed_value entry for the full reasoning; not re-stated in full here.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Gates",
+      "column": "multi_year_delinquent_tax",
+      "reason": "Gates's bttaxpayerportal.com/ITSPublicGT tenant is the OLD ITS 1.0 build (7,699-byte TaxBillSearch page, same family as Clay/Swain/Surry, confirmed live 2026-11-17 via this project's own nc_its_public_tax.fetch_year() call sequence): GET answers 200, but the GetSearchTableData POST answers a hard HTTP 500 on every one of 3 years tried (2025/2024/2020). This supersedes the module's own 2026-10-09 'portal answers 0 bills' note with a more precise mechanism -- it never reaches a working 0-record answer, it 500s before any data is returned. See nc_its_public_tax.py's own UNREADABLE_PORTALS.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Gates",
+      "column": "atty_tax_verified_confirmed",
+      "reason": "Same Gates ITSPublicGT old-1.0-build HTTP-500 finding as this county's multi_year_delinquent_tax entry above -- no verifier can confirm bills from a portal whose data endpoint 500s on every search.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Jackson",
+      "column": "multi_year_delinquent_tax",
+      "reason": "jacksonnctax.com and www.jacksonnctax.com (the only tax-portal URL on record, from the NETR Online directory) fail to resolve at all -- re-confirmed live 2026-11-17 via TWO independent resolvers (this machine's own + Google 8.8.8.8, both 'connection timed out; no servers could be reached' / NXDOMAIN), the same failure county_records_matrix.json's own 2026-10-07 pass recorded. Two independent dates, two independent resolvers, same result: the domain genuinely does not exist, not a local DNS hiccup. No other tax-portal URL is on record for Jackson County NC.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Jackson",
+      "column": "rollback_exposure",
+      "reason": "jacksonnctax.com and www.jacksonnctax.com (the only tax-portal URL on record, from the NETR Online directory) fail to resolve at all -- re-confirmed live 2026-11-17 via TWO independent resolvers (this machine's own + Google 8.8.8.8, both 'connection timed out; no servers could be reached' / NXDOMAIN), the same failure county_records_matrix.json's own 2026-10-07 pass recorded. Two independent dates, two independent resolvers, same result: the domain genuinely does not exist, not a local DNS hiccup. No other tax-portal URL is on record for Jackson County NC.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Jackson",
+      "column": "tax_aging_surfaced",
+      "reason": "jacksonnctax.com and www.jacksonnctax.com (the only tax-portal URL on record, from the NETR Online directory) fail to resolve at all -- re-confirmed live 2026-11-17 via TWO independent resolvers (this machine's own + Google 8.8.8.8, both 'connection timed out; no servers could be reached' / NXDOMAIN), the same failure county_records_matrix.json's own 2026-10-07 pass recorded. Two independent dates, two independent resolvers, same result: the domain genuinely does not exist, not a local DNS hiccup. No other tax-portal URL is on record for Jackson County NC.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Jackson",
+      "column": "two_year_delinquent",
+      "reason": "jacksonnctax.com and www.jacksonnctax.com (the only tax-portal URL on record, from the NETR Online directory) fail to resolve at all -- re-confirmed live 2026-11-17 via TWO independent resolvers (this machine's own + Google 8.8.8.8, both 'connection timed out; no servers could be reached' / NXDOMAIN), the same failure county_records_matrix.json's own 2026-10-07 pass recorded. Two independent dates, two independent resolvers, same result: the domain genuinely does not exist, not a local DNS hiccup. No other tax-portal URL is on record for Jackson County NC.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Jackson",
+      "column": "atty_tax_verified_confirmed",
+      "reason": "jacksonnctax.com and www.jacksonnctax.com (the only tax-portal URL on record, from the NETR Online directory) fail to resolve at all -- re-confirmed live 2026-11-17 via TWO independent resolvers (this machine's own + Google 8.8.8.8, both 'connection timed out; no servers could be reached' / NXDOMAIN), the same failure county_records_matrix.json's own 2026-10-07 pass recorded. Two independent dates, two independent resolvers, same result: the domain genuinely does not exist, not a local DNS hiccup. No other tax-portal URL is on record for Jackson County NC.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Mitchell",
+      "column": "multi_year_delinquent_tax",
+      "reason": "mitchell.webtaxpay.com redirects straight to secure.webtaxpay.com/challenge.php, a Cloudflare Turnstile 'Verification Required' bot-check page -- confirmed live 2026-11-17 (title literally 'Verification Required', turnstile-challenge.css/JS loaded). Same webtaxpay vendor already confirmed bot-walled for Franklin County NC (403) elsewhere in this project; a CAPTCHA/bot-check wall, not a technical gap to route around.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Mitchell",
+      "column": "rollback_exposure",
+      "reason": "mitchell.webtaxpay.com redirects straight to secure.webtaxpay.com/challenge.php, a Cloudflare Turnstile 'Verification Required' bot-check page -- confirmed live 2026-11-17 (title literally 'Verification Required', turnstile-challenge.css/JS loaded). Same webtaxpay vendor already confirmed bot-walled for Franklin County NC (403) elsewhere in this project; a CAPTCHA/bot-check wall, not a technical gap to route around.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Mitchell",
+      "column": "tax_aging_surfaced",
+      "reason": "mitchell.webtaxpay.com redirects straight to secure.webtaxpay.com/challenge.php, a Cloudflare Turnstile 'Verification Required' bot-check page -- confirmed live 2026-11-17 (title literally 'Verification Required', turnstile-challenge.css/JS loaded). Same webtaxpay vendor already confirmed bot-walled for Franklin County NC (403) elsewhere in this project; a CAPTCHA/bot-check wall, not a technical gap to route around.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Mitchell",
+      "column": "atty_tax_verified_confirmed",
+      "reason": "mitchell.webtaxpay.com redirects straight to secure.webtaxpay.com/challenge.php, a Cloudflare Turnstile 'Verification Required' bot-check page -- confirmed live 2026-11-17 (title literally 'Verification Required', turnstile-challenge.css/JS loaded). Same webtaxpay vendor already confirmed bot-walled for Franklin County NC (403) elsewhere in this project; a CAPTCHA/bot-check wall, not a technical gap to route around.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Richmond",
+      "column": "multi_year_delinquent_tax",
+      "reason": "gis3.richmondnc.com (the county-hosted BT ITSPublic tenant, same product as Moore/Carteret) has failed to accept an HTTPS connection on THREE independent attempts over 41 days: county_records_matrix.json's own 2026-10-07 pass ('connect timeout'), this session's live nc_its_public_tax-style probe 2026-11-17 (ConnectTimeout), and a bare curl --max-time 8 the same day (http_code=000 after the full timeout). DNS itself resolves fine (152.28.194.168), so this is the host refusing/not answering the connection, not a missing domain. Medium, not high, confidence: a connect-level failure could in principle be a transient outage rather than a permanent policy, unlike the GATES/JACKSON/MITCHELL findings above which are content-level (500/NXDOMAIN/CAPTCHA) -- worth a periodic re-check, not assumed permanently dead.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Richmond",
+      "column": "rollback_exposure",
+      "reason": "gis3.richmondnc.com (the county-hosted BT ITSPublic tenant, same product as Moore/Carteret) has failed to accept an HTTPS connection on THREE independent attempts over 41 days: county_records_matrix.json's own 2026-10-07 pass ('connect timeout'), this session's live nc_its_public_tax-style probe 2026-11-17 (ConnectTimeout), and a bare curl --max-time 8 the same day (http_code=000 after the full timeout). DNS itself resolves fine (152.28.194.168), so this is the host refusing/not answering the connection, not a missing domain. Medium, not high, confidence: a connect-level failure could in principle be a transient outage rather than a permanent policy, unlike the GATES/JACKSON/MITCHELL findings above which are content-level (500/NXDOMAIN/CAPTCHA) -- worth a periodic re-check, not assumed permanently dead.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Richmond",
+      "column": "tax_aging_surfaced",
+      "reason": "gis3.richmondnc.com (the county-hosted BT ITSPublic tenant, same product as Moore/Carteret) has failed to accept an HTTPS connection on THREE independent attempts over 41 days: county_records_matrix.json's own 2026-10-07 pass ('connect timeout'), this session's live nc_its_public_tax-style probe 2026-11-17 (ConnectTimeout), and a bare curl --max-time 8 the same day (http_code=000 after the full timeout). DNS itself resolves fine (152.28.194.168), so this is the host refusing/not answering the connection, not a missing domain. Medium, not high, confidence: a connect-level failure could in principle be a transient outage rather than a permanent policy, unlike the GATES/JACKSON/MITCHELL findings above which are content-level (500/NXDOMAIN/CAPTCHA) -- worth a periodic re-check, not assumed permanently dead.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Richmond",
+      "column": "two_year_delinquent",
+      "reason": "gis3.richmondnc.com (the county-hosted BT ITSPublic tenant, same product as Moore/Carteret) has failed to accept an HTTPS connection on THREE independent attempts over 41 days: county_records_matrix.json's own 2026-10-07 pass ('connect timeout'), this session's live nc_its_public_tax-style probe 2026-11-17 (ConnectTimeout), and a bare curl --max-time 8 the same day (http_code=000 after the full timeout). DNS itself resolves fine (152.28.194.168), so this is the host refusing/not answering the connection, not a missing domain. Medium, not high, confidence: a connect-level failure could in principle be a transient outage rather than a permanent policy, unlike the GATES/JACKSON/MITCHELL findings above which are content-level (500/NXDOMAIN/CAPTCHA) -- worth a periodic re-check, not assumed permanently dead.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Richmond",
+      "column": "atty_tax_verified_confirmed",
+      "reason": "gis3.richmondnc.com (the county-hosted BT ITSPublic tenant, same product as Moore/Carteret) has failed to accept an HTTPS connection on THREE independent attempts over 41 days: county_records_matrix.json's own 2026-10-07 pass ('connect timeout'), this session's live nc_its_public_tax-style probe 2026-11-17 (ConnectTimeout), and a bare curl --max-time 8 the same day (http_code=000 after the full timeout). DNS itself resolves fine (152.28.194.168), so this is the host refusing/not answering the connection, not a missing domain. Medium, not high, confidence: a connect-level failure could in principle be a transient outage rather than a permanent policy, unlike the GATES/JACKSON/MITCHELL findings above which are content-level (500/NXDOMAIN/CAPTCHA) -- worth a periodic re-check, not assumed permanently dead.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Moore",
+      "column": "rollback_exposure",
+      "reason": "Moore's bttaxpayerportal.com/ITSPublicMO tenant (wired 2026-11-17 for its other 4 columns, real live data confirmed) is the same BT TaxPayer Portal/ITSNet full_model vendor as Anson/Yadkin/Caswell/Jones/Graham/Brunswick, all already confirmed in this registry to expose bills-only fields (TaxYear/BillNumber/AccountNumber/AccountName1/Description/OriginalBillAmount/TotalDue) with no market-vs-use-value or present-use/deferral field of any kind -- see the Anson entry for the full reasoning. Medium confidence: inferred from the same template/vendor, not independently re-checked field by field for Moore's own Description cells this round.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Vance",
+      "column": "rollback_exposure",
+      "reason": "Vance's vance.ustaxdata.com tenant (wired 2026-11-17 for its other 3 columns, real live data confirmed on 2 independent board parcels) is the same ustaxdata.com vendor/template already confirmed in this registry (Robeson entry) to have no present-use/land-use-deferral field of any kind -- every row's 'Asset Description' cell reads the vendor-wide placeholder, confirmed across every ustaxdata tenant tried so far. Medium confidence: inferred from the same template, not independently re-read field by field for Vance's own rows this round (matches how this registry already treats Alexander's identical inference off the Robeson finding).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Edgefield",
+      "column": "atty_deed_ref",
+      "reason": "This county's own register-of-deeds index runs on the Avenu Insights/GRIDS platform (<county>sc.avenuinsights.com) -- the SAME platform and the SAME CustomSearchRequest/Kendo-grid search mechanism project_avenu_darlington_greenville_greenwood_dual_confirmed_blocked_2026-11-12.md already confirmed genuinely broken server-side via two independent methods (httpx-level 'peer closed connection' AND a real-browser session where the search Kendo Grid never populates) -- not a per-county data gap, a platform-level search fault. This county is not one of the ones directly tested there; live-reconfirmed tonight (2026-11-17) only that its own <county>sc.avenuinsights.com subdomain resolves (HTTP 200 on the root page), not that its search step specifically reproduces the fault -- medium confidence (inferred from the same platform/mechanism, not independently re-run through a real login+search for this exact county). This project's own src/foreclosure_scraper/scrapers/counties_sc/sc_avenu_rod.py does not even have this county in its COUNTIES config yet, so there has been no in-house attempt against it specifically -- re-verify live (not just re-read this note) before ruling it out a second time if Avenu ever ships a fix.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Bamberg",
+      "column": "atty_deed_ref",
+      "reason": "This county's own register-of-deeds index runs on the Avenu Insights/GRIDS platform (<county>sc.avenuinsights.com) -- the SAME platform and the SAME CustomSearchRequest/Kendo-grid search mechanism project_avenu_darlington_greenville_greenwood_dual_confirmed_blocked_2026-11-12.md already confirmed genuinely broken server-side via two independent methods (httpx-level 'peer closed connection' AND a real-browser session where the search Kendo Grid never populates) -- not a per-county data gap, a platform-level search fault. This county is not one of the ones directly tested there; live-reconfirmed tonight (2026-11-17) only that its own <county>sc.avenuinsights.com subdomain resolves (HTTP 200 on the root page), not that its search step specifically reproduces the fault -- medium confidence (inferred from the same platform/mechanism, not independently re-run through a real login+search for this exact county). This project's own src/foreclosure_scraper/scrapers/counties_sc/sc_avenu_rod.py does not even have this county in its COUNTIES config yet, so there has been no in-house attempt against it specifically -- re-verify live (not just re-read this note) before ruling it out a second time if Avenu ever ships a fix.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Chester",
+      "column": "atty_deed_ref",
+      "reason": "This county's own register-of-deeds index runs on the Avenu Insights/GRIDS platform (<county>sc.avenuinsights.com) -- the SAME platform and the SAME CustomSearchRequest/Kendo-grid search mechanism project_avenu_darlington_greenville_greenwood_dual_confirmed_blocked_2026-11-12.md already confirmed genuinely broken server-side via two independent methods (httpx-level 'peer closed connection' AND a real-browser session where the search Kendo Grid never populates) -- not a per-county data gap, a platform-level search fault. This county is not one of the ones directly tested there; live-reconfirmed tonight (2026-11-17) only that its own <county>sc.avenuinsights.com subdomain resolves (HTTP 200 on the root page), not that its search step specifically reproduces the fault -- medium confidence (inferred from the same platform/mechanism, not independently re-run through a real login+search for this exact county). This project's own src/foreclosure_scraper/scrapers/counties_sc/sc_avenu_rod.py does not even have this county in its COUNTIES config yet, so there has been no in-house attempt against it specifically -- re-verify live (not just re-read this note) before ruling it out a second time if Avenu ever ships a fix.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Fairfield",
+      "column": "atty_deed_ref",
+      "reason": "This county's own register-of-deeds index runs on the Avenu Insights/GRIDS platform (<county>sc.avenuinsights.com) -- the SAME platform and the SAME CustomSearchRequest/Kendo-grid search mechanism project_avenu_darlington_greenville_greenwood_dual_confirmed_blocked_2026-11-12.md already confirmed genuinely broken server-side via two independent methods (httpx-level 'peer closed connection' AND a real-browser session where the search Kendo Grid never populates) -- not a per-county data gap, a platform-level search fault. This county is not one of the ones directly tested there; live-reconfirmed tonight (2026-11-17) only that its own <county>sc.avenuinsights.com subdomain resolves (HTTP 200 on the root page), not that its search step specifically reproduces the fault -- medium confidence (inferred from the same platform/mechanism, not independently re-run through a real login+search for this exact county). This project's own src/foreclosure_scraper/scrapers/counties_sc/sc_avenu_rod.py does not even have this county in its COUNTIES config yet, so there has been no in-house attempt against it specifically -- re-verify live (not just re-read this note) before ruling it out a second time if Avenu ever ships a fix.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
     }
   ]
 }

@@ -968,7 +968,16 @@ SPECS: dict[str, Spec] = {
                                                "enrichment_lien_stack.py",
                                                # the register-of-deeds name readers (raw['rod'] is this
                                                # column's check): the platform registry names the counties
-                                               "enrichment_generic_rod.py", "enrichment_rod_chain.py"),
+                                               "enrichment_generic_rod.py", "enrichment_rod_chain.py",
+                                               # 2026-11-17: same enrichment_county_lien_sweep.py /
+                                               # rod/county_sweeps.py omission as atty_rod_lien_checked's
+                                               # own Spec comment just above (sibling column, identical
+                                               # check -- checked_columns()'s own 'liens' credit a few
+                                               # hundred lines up already reads raw['rod_lien_sweep'] the
+                                               # same way rod_checked() does). Precise credit below
+                                               # (_county_lien_sweep_lien_credit), not a blanket text
+                                               # match, for the same reason.
+                                               "enrichment_county_lien_sweep.py", "rod/county_sweeps.py"),
                   doc="raw.liens present; checked = a register-of-deeds pull is on the row (raw.rod)"),
     "child_support": Spec(_S, "derived", "court", applies="court_case",
                           producers=("enrichment_case_detail.py", "enrichment_nc_case_status_tyler.py"),
@@ -1107,7 +1116,37 @@ SPECS: dict[str, Spec] = {
                     # 'probate' producer at all (sc_public_notices.py, the column's only live
                     # producer, never queries them), so those 3 county cells wrongly read "built"
                     # from code that never actually runs.
-                    producers=("scrapers/counties_sc/sc_public_notices.py",),
+                    #
+                    # 2026-11-17 ("no source known" probate/liens research round): two more real,
+                    # live producers were missing from this tuple, same bug class as the omission
+                    # just above. (1) scrapers/newspapers/column_legal_notices.py's SC/NC estate
+                    # lanes (SC_PROBATE_EXTRA_COUNTIES/SC_PROBATE_COVERED_COUNTIES/
+                    # NC_ESTATE_EXTRA_COUNTIES -- the EXACT same verified-live county lists
+                    # quiet_title's own statewide_except already reads via
+                    # _sc_without_column_probate()/_nc_without_column_paper()) genuinely reaches
+                    # Chesterfield SC (3 real notices/year, live-verified 2026-11-16) among others,
+                    # but was never named here. (2) scrapers/counties_sc/sc_probate_notices.py and
+                    # scrapers/public_notices/publicnoticesc_estates.py are each genuinely
+                    # STATEWIDE (own docstrings: "all 46, not only the 7-county footprint" /
+                    # "statewide list of estates being opened, all 46 counties") -- they derive
+                    # county from the estate case number's own embedded code via a SHARED import
+                    # (sc_case_county.SC_COUNTY_BY_CODE), so neither file's own text names a single
+                    # county (a blanket counties_named_in() grep finds zero), same dynamic-registry
+                    # shape as the lien-sweep/marriage-license and NC heir-estate fixes elsewhere in
+                    # this file. All three get a precise producers-tuple credit below
+                    # (_column_probate_credit/_sc_probate_notice_statewide_credit) rather than a
+                    # blanket text match, for the same over-crediting reason those other fixes use
+                    # one: column_legal_notices.py alone also carries foreclosure/tax/quiet-title
+                    # county lists that have nothing to do with probate. Neither new producer writes
+                    # raw['probate'] itself (they write raw['sc_probate_notice'], which
+                    # probate_case_present() -- the SEPARATE atty_probate_case predicate -- already
+                    # reads) so this moves 'built', not a live has_real_probate() hit; see
+                    # classify_cell()'s own ran-before-built ordering for why that is still the
+                    # correct class (code genuinely reaches these counties today).
+                    producers=("scrapers/counties_sc/sc_public_notices.py",
+                               "scrapers/newspapers/column_legal_notices.py",
+                               "scrapers/counties_sc/sc_probate_notices.py",
+                               "scrapers/public_notices/publicnoticesc_estates.py"),
                     doc="raw.probate names a decedent, es_case_number or nc_estate_file_no"),
     "vacancy": Spec(_S, "row", "code", ledger="vacant_structure",
                     # 2026-11-10: gastonia_code_enforcement.py also writes a real raw["vacancy"]
@@ -1242,7 +1281,33 @@ SPECS: dict[str, Spec] = {
                                     doc="a name read from the tax roll/parcel record: gis.owner, owner_mailing.owner, "
                                         "qpaybill_roll, lrcpwa, heir_estate, mcdowell_probate, or owner_name on a "
                                         "tax_lien/tax_sale row"),
+    # 2026-11-17 (round-17-misc small-columns survey): same bug-class the 2026-11-16
+    # atty_probate_case gap sweep found and fixed on its sibling column below --
+    # `producers` was never set at all (empty by the dataclass default), so
+    # built_in_code()'s counties_named_in() grep had nothing to scan for it, and
+    # EVERY county read "no source known" regardless of real coverage. This column
+    # shares atty_probate_case's exact ledger family (probate_heir|heir_roll) and
+    # applies("deceased"), and its own doc already names "probate, SC probate" as
+    # valid sources -- the same claim shape, just a different predicate (heir names/
+    # personal representative vs. a case number) on the SAME underlying rows. Reusing
+    # atty_probate_case's already-vetted producer list (each confirmed wired in
+    # main.py's own scraper registry by that sweep, not by filename alone):
+    # publicnoticesc_estates.py's own raw['sc_probate_notice'] shape explicitly
+    # carries `personal_representative` -- a direct heir-candidate claim -- and is
+    # statewide (all 46 SC counties named in its own SC_COUNTY_CODES crosswalk,
+    # confirmed by reading the file, including every one of this round's 8 target
+    # counties: Bamberg/Lee/Dillon/Allendale/Clarendon/McCormick/Chesterfield/
+    # Fairfield). sc_probate_net.py/sc_probate_notices.py do NOT reach those 8
+    # (their own COUNTIES tuples are narrower), so this fix's real effect for this
+    # round's cells rides on publicnoticesc_estates.py specifically; it is included
+    # here because it is a real, live, wired producer of this column's claim, not
+    # because it targets these 8 counties by design.
     "atty_heir_candidates": Spec(_F, "row", "probate", applies="deceased", ledger="probate_heir|heir_roll",
+                                 producers=("scrapers/counties_sc/sc_probate_net.py",
+                                            "scrapers/counties_sc/sc_probate_notices.py",
+                                            "scrapers/public_notices/publicnoticesc_estates.py",
+                                            "scrapers/counties_sc/horry_probate.py",
+                                            "scrapers/counties_sc/greenville_hard_distress.py"),
                                  doc="heir names or a personal representative (heir_estate, probate, SC probate, "
                                      "obituary survivors); applies to rows whose owner is dead or an estate"),
     "atty_obituary_match": Spec(_S, "county", "obituary", applies="person",
@@ -1257,10 +1322,36 @@ SPECS: dict[str, Spec] = {
                                     "for a separate reason until that date -- it built raw['legacy'] "
                                     "instead of raw['obituary'], see its own module docstring."),
     "atty_rod_lien_checked": Spec(_F, "row", "rod",
+                                  # 2026-11-17 ("no source known" probate/liens research round):
+                                  # enrichment_county_lien_sweep.py (+ the rod/county_sweeps.py it
+                                  # drives) was missing from this tuple -- the exact "lien" job half
+                                  # of the SAME registry marriage_license's own Spec comment already
+                                  # fixed for the "marriage" half (_COUNTY_LIEN_SWEEP_REL, defined
+                                  # near that fix). It stamps raw['rod_lien_sweep'] with status+
+                                  # checked_at on 30 NC + 2 SC counties (SWEEP_COUNTIES, lien job) --
+                                  # rod_checked() above already recognizes that exact shape as a real
+                                  # ROD check -- but neither producers tuple ever named the file, so
+                                  # a county whose sweep has run with zero board hits yet (the
+                                  # backfill script's own board scan found several still at zero)
+                                  # reads 'no source known' instead of built-but-low-yield. Given a
+                                  # precise credit below (_county_lien_sweep_lien_credit), same
+                                  # reason the marriage-license fix uses one instead of a blanket
+                                  # producers-tuple text match: this pair also names Orange/Stanly/
+                                  # Surry NC, Sumter/Oconee SC and (via HOSTED_CCHS) 17 more NC
+                                  # counties for the SAME file, and Beaufort/Watauga for the
+                                  # unrelated marriage job. Live-checked against today's gap list:
+                                  # none of the 32 real lien-job counties are in the current 12-cell
+                                  # "no source known" bucket for this column (those 12 -- NC Lee/
+                                  # Hoke, SC Dillon/Edgefield/Chesterfield/Bamberg/Allendale/Saluda/
+                                  # McCormick/Chester/Marion/Fairfield -- are a genuinely different,
+                                  # confirmed-walled/no-index cluster; see declined_registry.json)
+                                  # -- fixed anyway for correctness, same as the other producer-
+                                  # credit helpers in this file.
                                   producers=("enrichment_aumentum_rod.py", "enrichment_cchs_rod.py", "enrichment_gaston_rod.py",
                                              "enrichment_generic_rod.py", "enrichment_spartanburg_rod.py",
                                              "scrapers/counties_nc/nc_rod_logan.py", "scrapers/counties_sc/sc_rod_acclaim.py",
-                                             "scrapers/counties_sc/sc_rod_cott.py"),
+                                             "scrapers/counties_sc/sc_rod_cott.py",
+                                             "enrichment_county_lien_sweep.py", "rod/county_sweeps.py"),
                                   doc="a register-of-deeds instrument pull on the row (raw.rod with instrument_count, "
                                       "rod_docs or nc_rod)"),
     "atty_deed_chain_fetched": Spec(_F, "row", "gis_deed", producers=("enrichment_deed_chain.py",),
@@ -2042,6 +2133,73 @@ def _county_lien_sweep_marriage_credit() -> set[tuple[str, str]]:
     return {key for key, jobs in _cls.SWEEP_COUNTIES.items() if any(j.kind == "marriage" for j in jobs)}
 
 
+def _county_lien_sweep_lien_credit() -> set[tuple[str, str]]:
+    """Precise (state, county) credit for 'atty_rod_lien_checked'/'liens' from the SAME
+    enrichment_county_lien_sweep.py registry just above, this time the "lien" job half (today 30
+    NC + 2 SC: Orange/Stanly/Surry/Beaufort/Watauga + the 17 HOSTED_CCHS counties, Sumter/Oconee
+    SC) rather than the "marriage" one. Same reason a precise credit is used instead of a blanket
+    producers-tuple text match: the pair's text also names Johnston (marriage-only, no lien job)
+    and would double-credit it here if read as a flat grep. Empty set if the module can't be
+    imported."""
+    try:
+        from foreclosure_scraper import enrichment_county_lien_sweep as _cls
+    except Exception:  # noqa: BLE001 - a missing/broken module leaves this column's other credit in place
+        return set()
+    return {key for key, jobs in _cls.SWEEP_COUNTIES.items() if any(j.kind == "lien" for j in jobs)}
+
+
+_COLUMN_PROBATE_REL = "scrapers/newspapers/column_legal_notices.py"
+
+
+def _column_probate_credit() -> set[tuple[str, str]]:
+    """Precise (state, county) credit for the 'probate' column from column_legal_notices.py's own
+    verified estate/probate-notice coverage: SC_PROBATE_EXTRA_COUNTIES + SC_PROBATE_COVERED_COUNTIES
+    and NC_ESTATE_EXTRA_COUNTIES -- the SAME two SC lists quiet_title's own statewide_except already
+    reads via _sc_without_column_probate() (its complement), just never wired into THIS column's own
+    producers tuple before now. A blanket producers-tuple text match over the whole file would
+    over-credit: the file also carries separately-scoped foreclosure/tax/quiet-title county lists
+    (NC_QUIET_TITLE_READ, the SC/NC foreclosure footprints, ...) that have nothing to do with
+    probate. Deliberately NOT a guess at the lane's full default-query breadth: the 23 NC and 25 SC
+    counties the module's own 2026-10-02/10-23/11-16 live probes found genuinely, repeatedly empty
+    stay excluded, since only the verified-hit lists are named here. Empty set if the module can't
+    be imported."""
+    try:
+        from foreclosure_scraper.scrapers.newspapers import column_legal_notices as _cln
+    except Exception:  # noqa: BLE001 - a missing/broken module leaves this column's other credit in place
+        return set()
+    out: set[tuple[str, str]] = {("SC", c) for c in _cln.SC_PROBATE_EXTRA_COUNTIES}
+    out |= {("SC", c) for c in _cln.SC_PROBATE_COVERED_COUNTIES}
+    out |= {("NC", c) for c in _cln.NC_ESTATE_EXTRA_COUNTIES}
+    return out
+
+
+_SC_PROBATE_NOTICE_REL = frozenset({"scrapers/counties_sc/sc_probate_notices.py",
+                                    "scrapers/public_notices/publicnoticesc_estates.py"})
+
+
+def _sc_probate_notice_statewide_credit() -> set[tuple[str, str]]:
+    """Precise (state, county) credit for 'probate': sc_probate_notices.py (own docstring, 2026-10-08
+    BREADTH EXTENSION: "all 46, not only the 7-county footprint") and publicnoticesc_estates.py (own
+    docstring: "the statewide list of estates being opened, all 46 counties") are both genuinely
+    statewide SC Notice-to-Creditors readers -- but neither names a single SC county in its OWN file
+    text: both derive county from the estate case number's embedded 2-digit code via a SHARED import
+    (sc_case_county.SC_COUNTY_BY_CODE), so a blanket counties_named_in() text-grep over either file
+    finds zero of the real 46. Same dynamic-registry bug class as rod/enrich.py's VENDORS dict and
+    the county-lien-sweep pair above, a third shape: a shared import neither file's own text repeats,
+    not a colon-literal regex miss or a cross-module runtime union. Neither module writes
+    raw['probate'] (they write raw['sc_probate_notice']; probate_case_present(), the SEPARATE
+    atty_probate_case predicate, already reads that key) -- so this credit moves 'built' without
+    claiming a has_real_probate() hit the narrower scorer predicate would recognize; see
+    classify_cell()'s ran-before-built ordering for why that is still the correct class here (code
+    genuinely, repeatedly reaches every one of these 46 counties today, regardless of which raw key
+    or predicate later reads the result). Empty set if the shared module can't be imported."""
+    try:
+        from foreclosure_scraper.sc_case_county import SC_COUNTY_BY_CODE
+    except Exception:  # noqa: BLE001 - a missing/broken module leaves this column's other credit in place
+        return set()
+    return {("SC", c) for c in SC_COUNTY_BY_CODE.values()}
+
+
 #: 2026-10-19 systematic sweep of EVERY Spec's producers tuple (the follow-up this session's own
 #: 5 one-at-a-time catches above called for). Same bug class again, but in nc_heir_estate_parcels.py's
 #: OWN text, not a dynamic registry or a shared/multi-purpose file: its COUNTY_GIS dict is keyed by
@@ -2270,6 +2428,26 @@ def built_in_code() -> dict[str, set[tuple[str, str]]]:
         other_files = [PKG / f for f in marriage_spec.producers if f not in _COUNTY_LIEN_SWEEP_REL]
         base = counties_named_in([f for f in other_files if f.exists()], pats) if other_files else set()
         out["marriage_license"] = base | _county_lien_sweep_marriage_credit()
+    # atty_rod_lien_checked / liens: same _COUNTY_LIEN_SWEEP_REL pair, the "lien" job half of the
+    # identical registry (see _county_lien_sweep_lien_credit's own docstring for why a blanket grep
+    # over the pair is wrong here too, same as the marriage refinement just above).
+    for _lien_col in ("atty_rod_lien_checked", "liens"):
+        _lien_spec = SPECS.get(_lien_col)
+        if _lien_spec and _COUNTY_LIEN_SWEEP_REL & set(_lien_spec.producers):
+            _other = [PKG / f for f in _lien_spec.producers if f not in _COUNTY_LIEN_SWEEP_REL]
+            _base = counties_named_in([f for f in _other if f.exists()], pats) if _other else set()
+            out[_lien_col] = _base | _county_lien_sweep_lien_credit()
+    # probate: column_legal_notices.py (SC/NC estate lanes) + sc_probate_notices.py/
+    # publicnoticesc_estates.py (both genuinely statewide via a shared county-code import) --
+    # see _column_probate_credit()/_sc_probate_notice_statewide_credit()'s own docstrings for why
+    # each needs a precise credit instead of a blanket producers-tuple text match.
+    probate_spec = SPECS.get("probate")
+    if probate_spec and (_COLUMN_PROBATE_REL in probate_spec.producers
+                          or _SC_PROBATE_NOTICE_REL & set(probate_spec.producers)):
+        _drop = {_COLUMN_PROBATE_REL} | _SC_PROBATE_NOTICE_REL
+        _other = [PKG / f for f in probate_spec.producers if f not in _drop]
+        _base = counties_named_in([f for f in _other if f.exists()], pats) if _other else set()
+        out["probate"] = _base | _column_probate_credit() | _sc_probate_notice_statewide_credit()
     # marriage licenses: the Cott v4 tenants whose guest search carries a MARRIAGES index are read by
     # enrichment_register_checks (rod/register_checks.MARRIAGE_ADAPTER); the module names no county in text
     try:
