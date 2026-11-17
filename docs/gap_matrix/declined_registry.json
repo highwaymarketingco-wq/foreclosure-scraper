@@ -5857,6 +5857,126 @@
       "confidence": "high",
       "confirmed_date": "2026-11-17",
       "reason": "No listing_type=='estate_lead' producer reaches Fairfield SC. parcel_cache has no entry for this county at all (sc_heir_estate_parcel_cache.py's own _candidate_counties() never surfaces it), and its county GIS/property-card host (beacon.schneidercorp.com) answers a plain unauthenticated GET with a Cloudflare 'Just a moment...' bot-check (HTTP 403) -- live-confirmed by sc_heir_estate_parcel_cache.py's own 2026-11-16 research note, re-reviewed and still current as of this entry (round 18). A real wall, not an unbuilt source; genuine capability gap pending a CAPTCHA-free path onto this county's owner data."
+    },
+    {
+      "state": "NC",
+      "county": "Washington",
+      "column": "atty_tax_verified_confirmed",
+      "reason": "No tax-roll or CAMA source found after an exhaustive 2026-11-17 check: washconc.org's own homepage carries no tax/GIS link (its one tax-adjacent page, Surplus Real Property Listings, is county-owned property for sale, not a delinquency roll); officialpayments.com (round 17) is payment-only; the county's own GIS host (gis11.cama.io) exposes exactly one ArcGIS layer, WashingtonCounty_ParcelLines, pure geometry with zero CAMA/value/tax attributes; gis.washingtoncountync.gov/maps.washconc.org/washingtoncountync.com do not resolve.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Washington",
+      "column": "multi_year_delinquent_tax",
+      "reason": "No tax-roll or CAMA source found after an exhaustive 2026-11-17 check: washconc.org's own homepage carries no tax/GIS link (its one tax-adjacent page, Surplus Real Property Listings, is county-owned property for sale, not a delinquency roll); officialpayments.com (round 17) is payment-only; the county's own GIS host (gis11.cama.io) exposes exactly one ArcGIS layer, WashingtonCounty_ParcelLines, pure geometry with zero CAMA/value/tax attributes; gis.washingtoncountync.gov/maps.washconc.org/washingtoncountync.com do not resolve.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Washington",
+      "column": "rollback_exposure",
+      "reason": "No tax-roll or CAMA source found after an exhaustive 2026-11-17 check: washconc.org's own homepage carries no tax/GIS link (its one tax-adjacent page, Surplus Real Property Listings, is county-owned property for sale, not a delinquency roll); officialpayments.com (round 17) is payment-only; the county's own GIS host (gis11.cama.io) exposes exactly one ArcGIS layer, WashingtonCounty_ParcelLines, pure geometry with zero CAMA/value/tax attributes; gis.washingtoncountync.gov/maps.washconc.org/washingtoncountync.com do not resolve.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Washington",
+      "column": "tax_aging_surfaced",
+      "reason": "No tax-roll or CAMA source found after an exhaustive 2026-11-17 check: washconc.org's own homepage carries no tax/GIS link (its one tax-adjacent page, Surplus Real Property Listings, is county-owned property for sale, not a delinquency roll); officialpayments.com (round 17) is payment-only; the county's own GIS host (gis11.cama.io) exposes exactly one ArcGIS layer, WashingtonCounty_ParcelLines, pure geometry with zero CAMA/value/tax attributes; gis.washingtoncountync.gov/maps.washconc.org/washingtoncountync.com do not resolve.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Tyrrell",
+      "column": "atty_tax_verified_confirmed",
+      "reason": "The county's own official domain (tyrrellcounty.org) times out on connection (2 independent attempts, 2026-11-17); 2 other domain guesses (tyrrellcountync.gov, co.tyrrell.nc.us) fail DNS resolution entirely (NXDOMAIN-equivalent); a web search for the county's own GIS/tax assessor site surfaced no official URL at all, only third-party property aggregators. egovpayments.com (round 17) is payment-only.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Tyrrell",
+      "column": "multi_year_delinquent_tax",
+      "reason": "The county's own official domain (tyrrellcounty.org) times out on connection (2 independent attempts, 2026-11-17); 2 other domain guesses (tyrrellcountync.gov, co.tyrrell.nc.us) fail DNS resolution entirely (NXDOMAIN-equivalent); a web search for the county's own GIS/tax assessor site surfaced no official URL at all, only third-party property aggregators. egovpayments.com (round 17) is payment-only.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Tyrrell",
+      "column": "rollback_exposure",
+      "reason": "The county's own official domain (tyrrellcounty.org) times out on connection (2 independent attempts, 2026-11-17); 2 other domain guesses (tyrrellcountync.gov, co.tyrrell.nc.us) fail DNS resolution entirely (NXDOMAIN-equivalent); a web search for the county's own GIS/tax assessor site surfaced no official URL at all, only third-party property aggregators. egovpayments.com (round 17) is payment-only.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Tyrrell",
+      "column": "tax_aging_surfaced",
+      "reason": "The county's own official domain (tyrrellcounty.org) times out on connection (2 independent attempts, 2026-11-17); 2 other domain guesses (tyrrellcountync.gov, co.tyrrell.nc.us) fail DNS resolution entirely (NXDOMAIN-equivalent); a web search for the county's own GIS/tax assessor site surfaced no official URL at all, only third-party property aggregators. egovpayments.com (round 17) is payment-only.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Bladen",
+      "column": "atty_tax_verified_confirmed",
+      "reason": "bladennc.govoffice3.com (the county's own homepage, round 17) links exactly one GIS tool, bladen2.connectgis.com/Map.aspx -- confirmed DEAD 2026-11-17 on 2 independent attempts: HTTP 504 Gateway Timeout, then a full httpx ReadTimeout (20s, no response at all). No other tax/GIS link exists on the homepage; gis.bladencounty.org/gis.bladenco.org/www.bladencounty.org either 404 or fail to resolve.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Bladen",
+      "column": "multi_year_delinquent_tax",
+      "reason": "bladennc.govoffice3.com (the county's own homepage, round 17) links exactly one GIS tool, bladen2.connectgis.com/Map.aspx -- confirmed DEAD 2026-11-17 on 2 independent attempts: HTTP 504 Gateway Timeout, then a full httpx ReadTimeout (20s, no response at all). No other tax/GIS link exists on the homepage; gis.bladencounty.org/gis.bladenco.org/www.bladencounty.org either 404 or fail to resolve.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Bladen",
+      "column": "tax_aging_surfaced",
+      "reason": "bladennc.govoffice3.com (the county's own homepage, round 17) links exactly one GIS tool, bladen2.connectgis.com/Map.aspx -- confirmed DEAD 2026-11-17 on 2 independent attempts: HTTP 504 Gateway Timeout, then a full httpx ReadTimeout (20s, no response at all). No other tax/GIS link exists on the homepage; gis.bladencounty.org/gis.bladenco.org/www.bladencounty.org either 404 or fail to resolve.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Bladen",
+      "column": "two_year_delinquent",
+      "reason": "bladennc.govoffice3.com (the county's own homepage, round 17) links exactly one GIS tool, bladen2.connectgis.com/Map.aspx -- confirmed DEAD 2026-11-17 on 2 independent attempts: HTTP 504 Gateway Timeout, then a full httpx ReadTimeout (20s, no response at all). No other tax/GIS link exists on the homepage; gis.bladencounty.org/gis.bladenco.org/www.bladencounty.org either 404 or fail to resolve.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Haywood",
+      "column": "multi_year_delinquent_tax",
+      "reason": "maps.haywoodcountync.gov's own Land_Records/Public_Access/MapServer/1 layer carries a 2-years-of-billing mirror (TaxYear1/TaxYear2/Taxbill1_Amt/Taxbill2_Amt) frozen at 2019/2020 on every one of dozens of rows sampled 2026-11-17, while the SAME layer's Sale_Date field has real sales as recent as 2026-11-13 -- the dataset overall is live, this one field was abandoned around 2020 and never updated since, so it cannot support a current delinquency claim. taxes.haywoodcountync.gov/ITSForPublic (round 17's own lead) is confirmed a real, live, but LOGIN-GATED older Bi-Tek deployment (HTTP 200, title 'Bi-Tek - Login', a credentialed POST-back form) -- a genuine wall, not a missing TaxBillSearch sub-path.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Haywood",
+      "column": "tax_aging_surfaced",
+      "reason": "maps.haywoodcountync.gov's own Land_Records/Public_Access/MapServer/1 layer carries a 2-years-of-billing mirror (TaxYear1/TaxYear2/Taxbill1_Amt/Taxbill2_Amt) frozen at 2019/2020 on every one of dozens of rows sampled 2026-11-17, while the SAME layer's Sale_Date field has real sales as recent as 2026-11-13 -- the dataset overall is live, this one field was abandoned around 2020 and never updated since, so it cannot support a current delinquency claim. taxes.haywoodcountync.gov/ITSForPublic (round 17's own lead) is confirmed a real, live, but LOGIN-GATED older Bi-Tek deployment (HTTP 200, title 'Bi-Tek - Login', a credentialed POST-back form) -- a genuine wall, not a missing TaxBillSearch sub-path.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Haywood",
+      "column": "two_year_delinquent",
+      "reason": "maps.haywoodcountync.gov's own Land_Records/Public_Access/MapServer/1 layer carries a 2-years-of-billing mirror (TaxYear1/TaxYear2/Taxbill1_Amt/Taxbill2_Amt) frozen at 2019/2020 on every one of dozens of rows sampled 2026-11-17, while the SAME layer's Sale_Date field has real sales as recent as 2026-11-13 -- the dataset overall is live, this one field was abandoned around 2020 and never updated since, so it cannot support a current delinquency claim. taxes.haywoodcountync.gov/ITSForPublic (round 17's own lead) is confirmed a real, live, but LOGIN-GATED older Bi-Tek deployment (HTTP 200, title 'Bi-Tek - Login', a credentialed POST-back form) -- a genuine wall, not a missing TaxBillSearch sub-path.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
     }
   ]
 }
