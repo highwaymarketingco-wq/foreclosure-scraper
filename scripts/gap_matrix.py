@@ -876,6 +876,26 @@ SPECS: dict[str, Spec] = {
                               "scrapers/counties_nc/wake_code_cases.py"),
                    doc="raw.vacant present (a city/county vacant-structure registry); the real "
                        "check elsewhere in this file is raw['gis']['vacant'] specifically"),
+    #: 2026-11-16 (round 10 individual recheck): the 7 thinnest-sample counties in this 58-cell
+    #: list flagged by the 2026-11-16 survey pass for "a future individual check" -- NC Clay,
+    #: Graham, Lee, Yadkin, Stanly, Surry, Cherokee -- were each pulled individually (not a
+    #: statewide aggregate) from OpenFEMA HousingAssistanceOwners+Renters, DR-4827, same formula
+    #: 2612ed64's declined_registry entries use (sum(totalDamage)/sum(totalInspected),
+    #: sum(femaInspectedDamageGreaterThan30000), sum(totalMaxGrants)). All 7 score $985-$2,461
+    #: avg-damage-per-inspected-home (Lee $985, Clay $1,145, Graham $1,253, Stanly $1,263,
+    #: Yadkin $1,299, Cherokee $2,145, Surry $2,461) -- every one ABOVE the confirmed dead-end
+    #: ceiling (Mecklenburg $810) and at-or-above the explicitly-left-open Lexington SC tier
+    #: ($1,112-1,384) that 2612ed64 itself declined to decline. None has a county-published
+    #: parcel-level damage-assessment dataset (GIS layer, Accela, placards, etc.) -- web
+    #: research found only the generic statewide NC process (contact the tax assessor, who may
+    #: informally adjust value on request); Graham's own local reporting explicitly calls its
+    #: damage "minimal" at the ground level, consistent with its low raw inspection count being
+    #: a population-size artifact (pop. ~8.6K) rather than a signal the storm never reached it
+    #: (it is in FEMA's IA footprint and its severity score clears the dead-end bar).
+    #: Conclusion: real, open build gaps for all 7, same as the other 51 in this list -- a
+    #: genuine producer-capability gap (no source exists to point a scraper at), NOT a
+    #: classification bug and NOT sourced-not-built. No declined_registry change. Do not
+    #: re-flag these 7 for "individual check" again without new county-side evidence.
     "storm_damage": Spec(_S, "county", "disaster", applies="storm_scope",
                          producers=("enrichment_helene_damage.py",),
                          doc="raw.storm_damage present (post-Helene damage-assessment layers); applies "
