@@ -6113,6 +6113,62 @@
       "confidence": "high",
       "confirmed_date": "2026-11-17",
       "reason": "No listing_type=='estate_lead' producer reaches Edgefield SC. Round 18 left this county open, having only tested the qpublic.net/sc/edgefield/ assessor microsite's own landing page (HTTP 200, no search form on that page itself) without following where it actually sends a search. Round 19 live-confirmed the county has exactly ONE owner/property search tool: both edgefieldcounty.sc.gov (the official county site) and qpublic.net/sc/edgefield/ link to it as 'Search Records', and that link is https://qpublic.schneidercorp.com/Application.aspx?AppID=859&LayerID=16089&PageTypeID=2&PageID=7160 -- the SAME Schneider Corp qpublic.schneidercorp.com host already confirmed (Cherokee/Clarendon/Bamberg/Abbeville/Allendale/Lee round 18) to answer a plain unauthenticated GET with a Cloudflare 'Just a moment...' bot-check. Live-reconfirmed for this exact URL 2026-11-17: HTTP 403, title 'Just a moment...', Cloudflare challenge-platform script tags present. A real wall, not an unbuilt source; the qpublic.net landing page is only a static front door to it, not a separate, reachable tool."
+    },
+    {
+      "state": "SC",
+      "county": "Orangeburg",
+      "column": "atty_legal_description",
+      "reason": "The county's only reachable GIS replica (services2.arcgis.com Main_Public_Tax_Parcel_Map_WFL1) carries MAPBLOLOT/parcel_id/owner/acres only, no legal-description field (gis_fill.py's live 2026-10-09 field read, also docs/county_records/county_records_matrix.json's own LAYER_LACKS entry for this county/column). The county's own on-prem GIS host (gis2.orangeburgcounty.org), which might carry a CAMA/legal layer, has been down at the TCP-connect stage since 2026-10-07 and is STILL down live-reconfirmed today 2026-11-17 (connect timeout after 15s, retried twice, both the host root and a specific REST path) -- 41+ days, not a blip. The only other route, the county's own Register of Deeds remote-access site (orangeburgscrod.org), is live-reconfirmed today to require a username/password subscription signup (not a free name search); this project does not self-register new paid/account-gated sources. No free path to a legal description for this county exists today.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Richland",
+      "column": "atty_legal_description",
+      "reason": "The county's GIS presence (richlandmaps.com/apps/dataviewer, a custom Leaflet app) was previously read as having 'no attribute REST endpoint identified' -- live-investigated further today (2026-11-17): the app does carry a real, free, no-auth UTFGrid attribute endpoint for its Parcels layer (https://{e,f,g}.richlandmaps.com/tilestache/rcgeo-parcels-utfgrid/{z}/{x}/{y}.json, found by reading the page's inline APP.MAP_CONFIG and confirmed live by fetching 3 real tiles over the county center at z=17-19, which returned real parcel JSON) -- but its per-parcel data object carries exactly 3 fields (tms, situs_addr, wkt geometry) and nothing else: no legal description, no deed book/page, no value. This is a genuine, confirmed field gap, not an unexplored endpoint. The other route, the county's own 'Online Data Services' Register of Deeds subscription system (richlandcountysc.gov), is a paid service and is live-reconfirmed today still returning HTTP 403 (Akamai) to a plain client. No free path to a legal description for this county exists today.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Chester",
+      "column": "atty_legal_description",
+      "reason": "The county's open parcel GIS layer (services8.arcgis.com Parcels_10_7_24) was live field-read 2026-10-07 and carries TMS/Map_Number/owner/mailing/acreage/appraised-value fields only, no legal or deed book/page (county_records_matrix.json gis.legal_description_field='no'). The register route (chestersc.avenuinsights.com, Avenu/Neumo GRIDS) was live-tested today 2026-11-17 with this project's own working Avenu credentials (the same account that already works for Williamsburg/Kershaw/Newberry, sc_avenu_rod.py): login succeeds (HTTP 200, CSRF token found, 'Logout' present), but both the Search POST and the InstrumentGrid read POST return the same ~18KB login-page HTML shell instead of Kendo JSON grid data -- the exact same platform-level search/grid-read fault project_avenu_darlington_greenville_greenwood_dual_confirmed_blocked_2026-11-12.md already found for 3 other Avenu tenants, now independently reproduced for Chester specifically (upgrading the same-day atty_deed_ref decline for this county from medium to high confidence: this round logged in and ran the real search, not just a root-page reachability check). No free path to a legal description for this county exists today; same underlying Avenu-platform fault closes atty_deed_ref too.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Hampton",
+      "column": "atty_legal_description",
+      "reason": "The county's open parcel GIS layer (services8.arcgis.com Parcels_Published_view) was live field-read 2026-10-07 and carries Deed_Book/Deed_Page/Plat_Book/Plat_Page/owner/consideration/instrument-date fields, no legal description (county_records_matrix.json gis.legal_description_field='no'; atty_deed_ref is fine here since the deed book/page IS present -- this county is not in this round's atty_deed_ref target list). The register route (hamptonsc.avenuinsights.com, Avenu/Neumo) was live-tested today 2026-11-17 with this project's own working Avenu credentials: login succeeds, but the Search POST and InstrumentGrid read POST both return the login-page HTML shell instead of Kendo JSON data -- the identical platform-level search fault just reproduced live for Chester/Fairfield (see those entries), not the plain account-login wall the 2026-10-07 matrix note assumed. No free path to a legal description for this county exists today.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Fairfield",
+      "column": "atty_legal_description",
+      "reason": "The county's GIS presence (county 'Online Maps (GIS)' redirects to Schneider Beacon, beacon.schneidercorp.com) answers a plain GET with a Cloudflare 'Just a moment...' challenge (county_records_matrix.json, confirmed 2026-10-07). The register route (fairfieldsc.avenuinsights.com, Avenu/Neumo GRIDS) was live-tested today 2026-11-17 with this project's own working Avenu credentials: login succeeds, but the Search POST and InstrumentGrid read POST both return the login-page HTML shell instead of Kendo JSON data -- the identical platform-level fault project_avenu_darlington_greenville_greenwood_dual_confirmed_blocked_2026-11-12.md already found for 3 other Avenu tenants, now independently reproduced for Fairfield specifically (upgrading the same-day atty_deed_ref decline for this county from medium to high confidence). Both routes (Cloudflare-walled GIS, broken-mechanism register) are confirmed dead; no free path to a legal description for this county exists today.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Allendale",
+      "column": "atty_deed_ref",
+      "reason": "No online register-of-deeds index exists for Allendale County SC: docs/county_records/county_records_matrix.json records no rod.url for Allendale at all, matching docs/county_records/sc_rod_platform_clusters.md's 'none -- no online index; books at the Clerk of Court' finding for this county (same evidence already used today to decline Allendale/atty_rod_lien_checked and Allendale/liens; extending it here since atty_deed_ref needs the identical register). The other route, the county's GIS/property-card host (qpublic.schneidercorp.com), is live-reconfirmed today 2026-11-17 to answer HTTP 403 with cf-mitigated: challenge (Cloudflare bot check). A human/manual lane (phone or in-person records request), not a code gap.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "McCormick",
+      "column": "atty_deed_ref",
+      "reason": "No online register-of-deeds index exists for McCormick County SC: docs/county_records/county_records_matrix.json's only rod.url for McCormick is the Clerk of Court's general departments contact page (mccormickcountysc.org/departments/clerk_of_court.php), not a records search, matching docs/county_records/sc_rod_platform_clusters.md's 'none -- no online index; books at the Clerk of Court' finding (same evidence already used today to decline McCormick/atty_rod_lien_checked and McCormick/liens; extending it here since atty_deed_ref needs the identical register). The county's only GIS presence (mccormicksc.wthgis.com) is live-confirmed today to be the legacy WTH 'Tgis' ASP.NET viewer (loadTgis()/g_redirectToParcels in its page JS), the same non-standard platform Williamsburg needed a dedicated reverse-engineered script (scripts/ingest_williamsburg_wthgis_parcels.py) to read at all -- no deed book/page field is confirmed on it and no standard ArcGIS REST endpoint exists; evaluating it would need the same per-county reverse-engineering effort as Williamsburg's own build, not a known source today. A human/manual lane, not a code gap.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
     }
   ]
 }
