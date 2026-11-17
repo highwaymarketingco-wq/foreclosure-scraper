@@ -170,18 +170,40 @@ PORTALS: dict[str, ITSPortal] = {
     # parse_row_cols()/parse_description_cols() with no extra wiring beyond this one PORTALS
     # entry -- see verification/verifiers/tax_lien_itspublic.py's own matching Carteret entry.
     "Carteret": ITSPortal("Carteret", "https://www.bttaxpayerportal.com/ITSPublicCE", full_model=True),
+    # added 2026-11-17 (gap_matrix round 17, the 93-cell "no source known" tax-column sweep):
+    # county_records_matrix.json's own tax.url already recorded the tenant
+    # ("bttaxpayerportal.com/ITSPublicMO/TaxBillSearch") from a 2026-10-07 pass that never
+    # opened it. Live-verified directly 2026-11-17 with this file's own fetch_year(): GET
+    # .../ITSPublicMO/TaxBillSearch answers 200, 16,699 bytes (full-model shape), 10 .search-value
+    # form fields read, and a real UnpaidBillsOnly search answers real multi-year data for three
+    # separate years -- 2025: 2,445 records (e.g. parcel 00006870, 106 S RAY STREET CARTHAGE LLC,
+    # $569.99 due); 2024: 1,562 records (same owner/parcel family, $3,153.78 due); 2020: 643
+    # records (parcel 20080002, 7 LAKES SOUTH LLC, $29.57 due) -- real depth, not a one-year
+    # fluke. Same ITSNET/full_model layout as Alleghany/Scotland/Carteret above, no extra parsing
+    # needed beyond this one PORTALS entry.
+    "Moore": ITSPortal("Moore", "https://bttaxpayerportal.com/ITSPublicMO", full_model=True),
 }
 
 #: Counties on this vendor that cannot be read (verdicts, not gaps; read live 2026-10-09):
 #:   Clay, Swain, Surry  the old 1.0 build: no JSON grid routes (404); Clay's plain form post to
 #:                       /TaxBillSearch/Results answers HTTP 500 (Swain and Surry serve the same page)
-#:   Warren, Gates       the portal answers, but every bill search (paid or unpaid, 2022-2025) returns 0 records
+#:   Warren              the portal answers, but every bill search (paid or unpaid, 2022-2025) returns 0 records
+#:   Gates               RE-CHECKED 2026-11-17 (round 17): this file's own GET+fetch_year() call
+#:                       sequence shows the OLD 1.0 build shape (7,699-byte TaxBillSearch page,
+#:                       same family as Clay/Swain/Surry, not the ~14-16KB full-model shape Moore/
+#:                       Carteret have), and the plain-JSON path's GetSearchTableData POST answers
+#:                       a hard HTTP 500 on every one of 3 years tried (2025/2024/2020) -- NOT
+#:                       merely "0 records" from a working query, a more precise finding than the
+#:                       2026-10-09 note below. Matches Clay/Swain/Surry's own mechanism, not
+#:                       Warren's.
 UNREADABLE_PORTALS = {
     "Clay": "old ITS 1.0 build: no JSON routes (404); its results form answers HTTP 500",
     "Swain": "old ITS 1.0 build: no JSON routes (404); same page as Clay, its form was not posted",
     "Surry": "old ITS 1.0 build: no JSON routes (404); same page as Clay, its form was not posted",
     "Warren": "portal answers 0 bills, paid or unpaid, for 2022-2025 (read live 2026-10-09)",
-    "Gates": "portal answers 0 bills, paid or unpaid, for 2022-2025 (read live 2026-10-09)",
+    "Gates": "old ITS 1.0 build (7,699-byte TaxBillSearch page): GetSearchTableData answers HTTP "
+             "500 on every year tried, 2025/2024/2020 (re-checked live 2026-11-17; same mechanism "
+             "as Clay/Swain/Surry, a more precise finding than the original 2026-10-09 '0 bills' note)",
 }
 
 

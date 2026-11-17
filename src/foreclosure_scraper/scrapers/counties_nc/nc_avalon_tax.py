@@ -75,11 +75,64 @@ def _signal_block(detail: str) -> None:
 
 
 # Only Lincoln County — other Catalis domains are DNS-dead
+#
+# ADDED 2026-11-17 (gap_matrix round 17, the 93-cell "no source known" tax-column sweep):
+# Stanly/Martin/Northampton/Hertford/Lenoir were each carrying a "JS single-page app shell,
+# did not render / content not readable" note in county_records_matrix.json (2026-10-07, never
+# opened). Live-checked directly 2026-11-17 (curl_cffi, Chrome TLS impersonation, no browser):
+# every one of these five pages loads real avalonCMS/Avalon markup (ng-app="avalonCMS" or
+# ng-app="Avalon") and references THIS SAME CloudFront distribution
+# (d1ebsyxxbc7tep.cloudfront.net) that lincolncountytax.com already uses -- these are five more
+# tenants on the identical Catalis Avalon/Wildfire platform, not five separate unknowns.
+# Martin/Northampton/Lenoir's own per-county data GUID was read directly out of their homepage
+# HTML (the same `[a-f0-9-]{36}` pattern this file's own fetch() already extracts when no guid
+# is hardcoded): Martin 9f0cd87f-7bf5-4b9e-a378-e26538971a54, Northampton
+# 6e2961f2-6bbe-4316-8721-a77903d98d47, Lenoir 4abcb09d-6cfe-49c3-822c-55fd2ba718fb. Stanly and
+# Hertford's homepages only exposed the shared framework guid (d021b713-5928-4e28-9cf9-
+# 72c496cd1d11, present on all five pages, clearly NOT a per-county data guid since it repeats
+# identically everywhere) -- left with no `guid` below so fetch()'s own existing auto-discovery
+# (GET the page, regex the real data guid out of the rendered views/css/data path) runs for
+# them, the same fallback Lincoln's own code already has for exactly this case.
+# NOT yet live-verified end to end: this module's own docstring already documents that
+# CloudFront is CURRENTLY BLOCKING live Records-API calls project-wide (confirmed from the Mac
+# and the Oracle VM, 2026-11-10) -- re-confirmed again today via curl_cffi/Chrome-impersonation
+# directly against Lincoln's own long-working guid (still a hard CloudFront 403, "ERROR: The
+# request could not be satisfied"), so this is ONE vendor-wide WAF wall, not five unsolved
+# counties, and spinning up this file's own nodriver browser bypass to try past it was
+# deliberately NOT done this round (this Mac's own per-agent-session browser-memory-pressure
+# constraint). Wiring these five in now is zero-risk (an unreadable/blocked county here just logs
+# a block signal and contributes nothing, exactly like Lincoln does right now) and means all five
+# light up automatically, with no further wiring, the moment the existing nodriver bypass clears
+# CloudFront for this platform -- the same auto-light-up philosophy already used for the bcpwa
+# ptscloud tenants with no export blob yet.
 _COUNTY_SITES = {
     "lincoln": {
         "url": "https://www.lincolncountytax.com",
         "state": "NC",
         "guid": "a45b9ca6-46be-4396-9468-56194741a38e",
+    },
+    "stanly": {
+        "url": "https://www.stanlytax.com",
+        "state": "NC",
+    },
+    "martin": {
+        "url": "https://tax.martincountyncgov.com",
+        "state": "NC",
+        "guid": "9f0cd87f-7bf5-4b9e-a378-e26538971a54",
+    },
+    "northampton": {
+        "url": "http://www.northamptonnctax.com",
+        "state": "NC",
+        "guid": "6e2961f2-6bbe-4316-8721-a77903d98d47",
+    },
+    "hertford": {
+        "url": "http://www.hertfordtax.com",
+        "state": "NC",
+    },
+    "lenoir": {
+        "url": "https://www.lenoircountytaxes.com",
+        "state": "NC",
+        "guid": "4abcb09d-6cfe-49c3-822c-55fd2ba718fb",
     },
 }
 
