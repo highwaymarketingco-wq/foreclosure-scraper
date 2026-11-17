@@ -1465,3 +1465,81 @@ def test_round9_declined_entries_cover_every_researched_county_and_column():
     assert gm.declined_override("NC", "Lincoln", "condemned", "no source known").startswith("declined (")
     # a column NOT researched/declined for one of these counties is untouched (column-scoped)
     assert gm.declined_override("SC", "Horry", "probate", "no source known") == "no source known"
+
+
+# ---------------------------------------------------------------- 2026-11-16 jail_booking_new "ran" detector fix:
+# match_cross_county() (enrichment_jail_bookings.py) never lets a hit land in the SAME county as
+# the roster that produced it ("same-county lane's job", its own skip) -- so roll_up()'s plain
+# "ran = pos > 0 or chk > 0" (keyed on the HIT ROW's own county) could never be satisfied by a
+# county's own roster, no matter how many real cross-county hits it produced. Confirmed live
+# 2026-11-16: of 91 real jail_booking_new hits on the board across 29 distinct roster counties
+# (York SC and Stokes NC among them, 4 and 6 respectively), ZERO had home county == roster
+# county -- a board-wide undercount, not a York/Stokes- or first-fetch-specific quirk (round 9's
+# own diagnosis named roster health/no_history as the mechanism; live tracing here shows the
+# real cause is this home-vs-roster attribution mismatch, which persists even after any number
+# of fetches). Fixed by Cube.add() also attributing each hit to the ROSTER's own embedded
+# identity (raw.jail_booking_new["state"]/["county"], never the hit row's own county_key) in a
+# new jbn_roster_hits counter, which roll_up() consults only for jail_booking_new.
+
+def test_jail_booking_new_ran_true_on_first_ever_fetch_with_real_cross_county_hits():
+    """A county whose roster has NEVER run before (no jail_booking_screen, no code credit, no
+    screen-ledger entry -- the genuine 'first-ever fetch' case) but whose roster already produced
+    a real, middle-corroborated cross-county hit on some OTHER county's row must read ran=True:
+    the hit is real evidence this roster ran and found something, even though -- by
+    match_cross_county()'s own design -- it can never land back in the roster's own county."""
+    cube = gm.Cube(today=TODAY)
+    # York's own row: never gets jail_booking_new (match_cross_county skips its own county) and
+    # never got a same-county jail_booking hit either -- exactly what a brand-new roster's OWN
+    # rows look like the very first time it is ever fetched.
+    cube.add(row(state="SC", county="York", owner_name="OWNER ONE", raw={"entity_type": "individual"}))
+    # The real cross-county hit: an unrelated owner's Lexington SC property, flagged because that
+    # same owner's name is a brand-new booking on York's roster (home_county != roster county, as
+    # match_cross_county always writes it).
+    cube.add(row(state="SC", county="Lexington", owner_name="OWNER TWO", raw={
+        "entity_type": "individual",
+        "jail_booking_new": {"county": "York", "state": "SC", "home_county": "Lexington",
+                             "matched_name": "TWO OWNER", "confidence": "middle_corroborated_cross_county"},
+    }))
+    assert cube.jbn_roster_hits[("SC", "York")] == 1       # white-box: attributed to the ROSTER county
+    roll = gm.roll_up(cube, {}, {})                        # {} code_counties, {} screens: no history at all
+    york = roll["cells"][("SC", "York", "jail_booking_new")]
+    assert york["ran"] is True
+    assert york["target"] == york["app"] == 1              # "ran" closes the WHOLE county, same as any
+                                                            # other county-scope roster (SCOPES["county"])
+    lex = roll["cells"][("SC", "Lexington", "jail_booking_new")]
+    assert lex["ran"] is True and lex["pos"] == 1           # the landing county's own cell is unaffected,
+                                                            # still true via the pre-existing pos>0 path
+
+
+def test_jail_booking_new_first_ever_fetch_with_no_hits_stays_ran_false():
+    """A brand-new roster that genuinely found zero corroborated cross-county hits leaves no
+    on-board trace at all for this lane (unlike the same-county lane's jail_booking_screen
+    sentinel) -- ran=False here is honest (indistinguishable from never-attempted), not a
+    regression. The fix must not invent evidence that does not exist."""
+    cube = gm.Cube(today=TODAY)
+    cube.add(row(state="NC", county="Stokes", owner_name="OWNER THREE", raw={"entity_type": "individual"}))
+    assert cube.jbn_roster_hits.get(("NC", "Stokes"), 0) == 0
+    roll = gm.roll_up(cube, {}, {})
+    stokes = roll["cells"][("NC", "Stokes", "jail_booking_new")]
+    assert stokes["ran"] is False
+    assert stokes["target"] == 0
+
+
+def test_jail_booking_new_fix_does_not_disturb_established_jail_booking_screen_county():
+    """An established county with real screen history on the SIBLING jail_booking column (the
+    2026-10-16 fix this one is modeled on) must be completely unaffected: the new jbn_roster_hits
+    branch is gated on col == 'jail_booking_new' and touches nothing else. Also pins that a
+    jail_booking_new cell with no roster-hit evidence at all for a county that DOES have
+    jail_booking history still reads ran=False -- the two columns are independent, by design
+    (jail_booking's own same-county screen says nothing about this county's cross-county lane)."""
+    cube = gm.Cube(today=TODAY)
+    cube.add(row(state="NC", county="Transylvania", owner_name="OWNER FOUR", raw={
+        "entity_type": "individual",
+        "jail_booking_screen": {"county": "Transylvania", "state": "NC", "result": "no_match",
+                                "checked_at": "2026-11-16"},
+    }))
+    roll = gm.roll_up(cube, {}, {})
+    jb = roll["cells"][("NC", "Transylvania", "jail_booking")]
+    assert jb["ran"] is True and jb["target"] == jb["app"] == 1     # unchanged: the pre-existing fix
+    jbn = roll["cells"][("NC", "Transylvania", "jail_booking_new")]
+    assert jbn["ran"] is False and jbn["target"] == 0               # independent column, no bleed-through
