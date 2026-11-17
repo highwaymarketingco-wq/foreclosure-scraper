@@ -4425,6 +4425,982 @@
       "reason": "Building Inspections Dept (828-488-9134 ext 2211/2268, officials Jason Webb and Gina Wiggins) runs an online 'complaint report' form and a separate online permitting/inspection portal; both are one-way submission tools per the county's own pages, not a public violation-case search. Zero AGOL hits.",
       "confirmed_date": "2026-11-17",
       "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Caswell",
+      "column": "condemned",
+      "reason": "Leveraged from the concurrent code_enforcement-column round's own same-day live finding (2026-11-17): only published material is a Building Inspections re-inspection fee schedule PDF and the county's Unified Development Ordinance text -- no code-enforcement case search, complaint portal, or ArcGIS/Socrata dataset found at all. A county with no code-enforcement system of any kind has no condemned/vacant/vacancy-specific subset of it either -- the same code_enforcement-superset inference already used in this file for Williamsburg/Davidson/Alamance. Independently confirmed this round: no ArcGIS REST host or AGOL org for Caswell County NC surfaced in a separate web search.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Caswell",
+      "column": "vacancy",
+      "reason": "Leveraged from the concurrent code_enforcement-column round's own same-day live finding (2026-11-17): only published material is a Building Inspections re-inspection fee schedule PDF and the county's Unified Development Ordinance text -- no code-enforcement case search, complaint portal, or ArcGIS/Socrata dataset found at all. A county with no code-enforcement system of any kind has no condemned/vacant/vacancy-specific subset of it either -- the same code_enforcement-superset inference already used in this file for Williamsburg/Davidson/Alamance. Independently confirmed this round: no ArcGIS REST host or AGOL org for Caswell County NC surfaced in a separate web search.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Caswell",
+      "column": "vacant",
+      "reason": "Leveraged from the concurrent code_enforcement-column round's own same-day live finding (2026-11-17): only published material is a Building Inspections re-inspection fee schedule PDF and the county's Unified Development Ordinance text -- no code-enforcement case search, complaint portal, or ArcGIS/Socrata dataset found at all. A county with no code-enforcement system of any kind has no condemned/vacant/vacancy-specific subset of it either -- the same code_enforcement-superset inference already used in this file for Williamsburg/Davidson/Alamance. Independently confirmed this round: no ArcGIS REST host or AGOL org for Caswell County NC surfaced in a separate web search.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Jones",
+      "column": "condemned",
+      "reason": "Leveraged from the concurrent code_enforcement-column round's same-day finding: County lists a named Code Enforcement Administrator (Caleb Emory, 110 S Market St, Trenton, 252-448-7571) with set office hours -- phone/in-person only, no online complaint form, case search, or dataset. Same code_enforcement-superset inference as Caswell above. Independently confirmed this round via a separate web search: zero ArcGIS/Socrata hit.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Jones",
+      "column": "vacancy",
+      "reason": "Leveraged from the concurrent code_enforcement-column round's same-day finding: County lists a named Code Enforcement Administrator (Caleb Emory, 110 S Market St, Trenton, 252-448-7571) with set office hours -- phone/in-person only, no online complaint form, case search, or dataset. Same code_enforcement-superset inference as Caswell above. Independently confirmed this round via a separate web search: zero ArcGIS/Socrata hit.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Jones",
+      "column": "vacant",
+      "reason": "Leveraged from the concurrent code_enforcement-column round's same-day finding: County lists a named Code Enforcement Administrator (Caleb Emory, 110 S Market St, Trenton, 252-448-7571) with set office hours -- phone/in-person only, no online complaint form, case search, or dataset. Same code_enforcement-superset inference as Caswell above. Independently confirmed this round via a separate web search: zero ArcGIS/Socrata hit.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Chowan",
+      "column": "condemned",
+      "reason": "Leveraged from the concurrent code_enforcement-column round's same-day finding: Building Inspection and Planning Division (305 W. Freemason St, Edenton, 252-482-8422) handles enforcement by phone; only published material is ordinance/noise-permit PDFs, no online case search, complaint portal, or ArcGIS/Socrata dataset. Same code_enforcement-superset inference as Caswell above. Independently confirmed this round via a separate web search.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Chowan",
+      "column": "vacancy",
+      "reason": "Leveraged from the concurrent code_enforcement-column round's same-day finding: Building Inspection and Planning Division (305 W. Freemason St, Edenton, 252-482-8422) handles enforcement by phone; only published material is ordinance/noise-permit PDFs, no online case search, complaint portal, or ArcGIS/Socrata dataset. Same code_enforcement-superset inference as Caswell above. Independently confirmed this round via a separate web search.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Chowan",
+      "column": "vacant",
+      "reason": "Leveraged from the concurrent code_enforcement-column round's same-day finding: Building Inspection and Planning Division (305 W. Freemason St, Edenton, 252-482-8422) handles enforcement by phone; only published material is ordinance/noise-permit PDFs, no online case search, complaint portal, or ArcGIS/Socrata dataset. Same code_enforcement-superset inference as Caswell above. Independently confirmed this round via a separate web search.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Jackson",
+      "column": "condemned",
+      "reason": "Leveraged from the concurrent code_enforcement-column round's same-day finding: the only AGOL items matching 'Jackson County' + code/violation/enforcement terms resolve to jcportal.jacksoncountyor.gov -- Jackson County, OREGON, a name collision, not this NC one. No separate NC Jackson County GIS org or code-enforcement page/portal/dataset found. Same code_enforcement-superset inference as Caswell above. Independently confirmed this round via a separate web search (same Oregon-collision result).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Jackson",
+      "column": "vacancy",
+      "reason": "Leveraged from the concurrent code_enforcement-column round's same-day finding: the only AGOL items matching 'Jackson County' + code/violation/enforcement terms resolve to jcportal.jacksoncountyor.gov -- Jackson County, OREGON, a name collision, not this NC one. No separate NC Jackson County GIS org or code-enforcement page/portal/dataset found. Same code_enforcement-superset inference as Caswell above. Independently confirmed this round via a separate web search (same Oregon-collision result).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Jackson",
+      "column": "vacant",
+      "reason": "Leveraged from the concurrent code_enforcement-column round's same-day finding: the only AGOL items matching 'Jackson County' + code/violation/enforcement terms resolve to jcportal.jacksoncountyor.gov -- Jackson County, OREGON, a name collision, not this NC one. No separate NC Jackson County GIS org or code-enforcement page/portal/dataset found. Same code_enforcement-superset inference as Caswell above. Independently confirmed this round via a separate web search (same Oregon-collision result).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Cherokee",
+      "column": "condemned",
+      "reason": "Leveraged from the concurrent code_enforcement-column round's same-day finding: the county DOES run a live 'Cherokee County, NC Code Enforcement' ArcGIS Web Experience (ccncgis.maps.arcgis.com, orgId UmQCfTNQbyTzAV5N, owner tslovin) -- but its operational layers, read directly from the app's own config JSON, are AndrewsNCZoning/MurphyNCZoning/BuildingCodeContours/FloodHazards/Parcels/Municipalities/RoadCenterlines/PrimaryFireLimit/ProtectedWatersheds: a jurisdiction/zoning-overlay reference map for an officer to determine which town's code applies to a parcel, not a violation case tracker -- no CaseNumber/Status/Violation field anywhere in the org. Same boundary-reference rejection class already established for Sumter/Gaston/Anderson in this file. A reference map with no case data carries no condemned/vacant/vacancy signal either.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Cherokee",
+      "column": "vacancy",
+      "reason": "Leveraged from the concurrent code_enforcement-column round's same-day finding: the county DOES run a live 'Cherokee County, NC Code Enforcement' ArcGIS Web Experience (ccncgis.maps.arcgis.com, orgId UmQCfTNQbyTzAV5N, owner tslovin) -- but its operational layers, read directly from the app's own config JSON, are AndrewsNCZoning/MurphyNCZoning/BuildingCodeContours/FloodHazards/Parcels/Municipalities/RoadCenterlines/PrimaryFireLimit/ProtectedWatersheds: a jurisdiction/zoning-overlay reference map for an officer to determine which town's code applies to a parcel, not a violation case tracker -- no CaseNumber/Status/Violation field anywhere in the org. Same boundary-reference rejection class already established for Sumter/Gaston/Anderson in this file. A reference map with no case data carries no condemned/vacant/vacancy signal either.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Cherokee",
+      "column": "vacant",
+      "reason": "Leveraged from the concurrent code_enforcement-column round's same-day finding: the county DOES run a live 'Cherokee County, NC Code Enforcement' ArcGIS Web Experience (ccncgis.maps.arcgis.com, orgId UmQCfTNQbyTzAV5N, owner tslovin) -- but its operational layers, read directly from the app's own config JSON, are AndrewsNCZoning/MurphyNCZoning/BuildingCodeContours/FloodHazards/Parcels/Municipalities/RoadCenterlines/PrimaryFireLimit/ProtectedWatersheds: a jurisdiction/zoning-overlay reference map for an officer to determine which town's code applies to a parcel, not a violation case tracker -- no CaseNumber/Status/Violation field anywhere in the org. Same boundary-reference rejection class already established for Sumter/Gaston/Anderson in this file. A reference map with no case data carries no condemned/vacant/vacancy signal either.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Greenwood",
+      "column": "vacancy",
+      "reason": "Condemned omitted: NC/SC Greenwood's condemned cell already reads built-but-low-yield (greenwood_cama_condemned Layer, condition_rating=True but condemned=False correctly, per round 15's own finding -- not on this round's gap list). Leveraged from the concurrent code_enforcement-column round's same-day finding for vacancy/vacant: the county's building-permit-and-code-violation lookup tool (linked from the City of Greenwood's code-enforcement FAQ) runs on the CitizenServe SaaS platform (www6.citizenserve.com, installationID=455) and is gated behind an invisible Google reCAPTCHA v3 challenge before any portal content loads -- a genuine bot-wall, not a public dataset, confirmed directly by fetching the raw page HTML. Same bot-wall class already declined for Sumter SC's own Vacant Property Survey token wall in this file.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Greenwood",
+      "column": "vacant",
+      "reason": "Condemned omitted: NC/SC Greenwood's condemned cell already reads built-but-low-yield (greenwood_cama_condemned Layer, condition_rating=True but condemned=False correctly, per round 15's own finding -- not on this round's gap list). Leveraged from the concurrent code_enforcement-column round's same-day finding for vacancy/vacant: the county's building-permit-and-code-violation lookup tool (linked from the City of Greenwood's code-enforcement FAQ) runs on the CitizenServe SaaS platform (www6.citizenserve.com, installationID=455) and is gated behind an invisible Google reCAPTCHA v3 challenge before any portal content loads -- a genuine bot-wall, not a public dataset, confirmed directly by fetching the raw page HTML. Same bot-wall class already declined for Sumter SC's own Vacant Property Survey token wall in this file.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Caldwell",
+      "column": "condemned",
+      "reason": "gis.caldwellcountync.org's full root catalog live-enumerated this round (?f=json): folders NCOnemap/OpenGov/SmartGov/TaxViewPublic/Utilities/WarehouseServices. Both Planning-adjacent folders' actual layer lists were read directly: SmartGov/SmartGovParcels (17 layers -- 12 per-municipality Zoning layers, County Zoning, Municipalities, Flood Hazard Zone, Watershed, SmartGov_parcels) and OpenGov/OpenGov (16 layers -- addresses, TaxParcels, the same 12 municipality Zoning layers, Census Tracts) are zoning/parcel/address basemap only -- no CaseNumber/Status/Violation field in either. Same mislabel trap as Haywood's SmartGovTaxView and Davidson's OpenGovParcelFlags already documented elsewhere in this file. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: code enforcement for the county plus 12 towns runs through a regional body, the Western Piedmont Council of Governments (wpcog.org/ce-contact), not any county dataset.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Caldwell",
+      "column": "vacancy",
+      "reason": "gis.caldwellcountync.org's full root catalog live-enumerated this round (?f=json): folders NCOnemap/OpenGov/SmartGov/TaxViewPublic/Utilities/WarehouseServices. Both Planning-adjacent folders' actual layer lists were read directly: SmartGov/SmartGovParcels (17 layers -- 12 per-municipality Zoning layers, County Zoning, Municipalities, Flood Hazard Zone, Watershed, SmartGov_parcels) and OpenGov/OpenGov (16 layers -- addresses, TaxParcels, the same 12 municipality Zoning layers, Census Tracts) are zoning/parcel/address basemap only -- no CaseNumber/Status/Violation field in either. Same mislabel trap as Haywood's SmartGovTaxView and Davidson's OpenGovParcelFlags already documented elsewhere in this file. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: code enforcement for the county plus 12 towns runs through a regional body, the Western Piedmont Council of Governments (wpcog.org/ce-contact), not any county dataset.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Caldwell",
+      "column": "vacant",
+      "reason": "gis.caldwellcountync.org's full root catalog live-enumerated this round (?f=json): folders NCOnemap/OpenGov/SmartGov/TaxViewPublic/Utilities/WarehouseServices. Both Planning-adjacent folders' actual layer lists were read directly: SmartGov/SmartGovParcels (17 layers -- 12 per-municipality Zoning layers, County Zoning, Municipalities, Flood Hazard Zone, Watershed, SmartGov_parcels) and OpenGov/OpenGov (16 layers -- addresses, TaxParcels, the same 12 municipality Zoning layers, Census Tracts) are zoning/parcel/address basemap only -- no CaseNumber/Status/Violation field in either. Same mislabel trap as Haywood's SmartGovTaxView and Davidson's OpenGovParcelFlags already documented elsewhere in this file. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: code enforcement for the county plus 12 towns runs through a regional body, the Western Piedmont Council of Governments (wpcog.org/ce-contact), not any county dataset.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Richmond",
+      "column": "condemned",
+      "reason": "gis.richmondnc.com's real REST root (the default /arcgis/rest/services 404s; the live one is /server/rest/services, same non-default-path shape as round 15's NC Moore finding) fully enumerated this round: folders GISWebsite (ParcelViewer only), Hosted (empty), Organization (UtilityRichmond only), Orthos, Utilities (Geometry/PrintingTools only). The county's ENTIRE public GIS footprint is a parcel viewer and a water-utility layer -- no code-enforcement, condemned, or vacant-structure layer anywhere in the catalog. Independently corroborated the same day by the concurrent code_enforcement-column round's own AGOL full-text search, which returned only out-of-state Richmond VA/Missouri City TX/Long Beach CA collisions.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Richmond",
+      "column": "vacancy",
+      "reason": "gis.richmondnc.com's real REST root (the default /arcgis/rest/services 404s; the live one is /server/rest/services, same non-default-path shape as round 15's NC Moore finding) fully enumerated this round: folders GISWebsite (ParcelViewer only), Hosted (empty), Organization (UtilityRichmond only), Orthos, Utilities (Geometry/PrintingTools only). The county's ENTIRE public GIS footprint is a parcel viewer and a water-utility layer -- no code-enforcement, condemned, or vacant-structure layer anywhere in the catalog. Independently corroborated the same day by the concurrent code_enforcement-column round's own AGOL full-text search, which returned only out-of-state Richmond VA/Missouri City TX/Long Beach CA collisions.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Richmond",
+      "column": "vacant",
+      "reason": "gis.richmondnc.com's real REST root (the default /arcgis/rest/services 404s; the live one is /server/rest/services, same non-default-path shape as round 15's NC Moore finding) fully enumerated this round: folders GISWebsite (ParcelViewer only), Hosted (empty), Organization (UtilityRichmond only), Orthos, Utilities (Geometry/PrintingTools only). The county's ENTIRE public GIS footprint is a parcel viewer and a water-utility layer -- no code-enforcement, condemned, or vacant-structure layer anywhere in the catalog. Independently corroborated the same day by the concurrent code_enforcement-column round's own AGOL full-text search, which returned only out-of-state Richmond VA/Missouri City TX/Long Beach CA collisions.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Currituck",
+      "column": "condemned",
+      "reason": "maps.currituckcountync.gov's full root catalog live-enumerated this round: folders Currituck/GISWebsite/InternalSite/Orthos/Utilities, plus a root-level 'Energov' MapServer. That Energov service's own layer list was read directly: Address/Street/Building/Parcel/Flood Hazard Zones/5 Official-Zoning-overlay layers -- the identical '32-layer basemap bundle despite the EnerGov name' pattern already documented for NC Pender and SC Horry in this file, no case or violation layer. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: the county's 'Citizen Online Complaint' page is confirmed (by that round's own direct page fetch) to be a one-way complaint-SUBMISSION form only, not a case-search tool.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Currituck",
+      "column": "vacancy",
+      "reason": "maps.currituckcountync.gov's full root catalog live-enumerated this round: folders Currituck/GISWebsite/InternalSite/Orthos/Utilities, plus a root-level 'Energov' MapServer. That Energov service's own layer list was read directly: Address/Street/Building/Parcel/Flood Hazard Zones/5 Official-Zoning-overlay layers -- the identical '32-layer basemap bundle despite the EnerGov name' pattern already documented for NC Pender and SC Horry in this file, no case or violation layer. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: the county's 'Citizen Online Complaint' page is confirmed (by that round's own direct page fetch) to be a one-way complaint-SUBMISSION form only, not a case-search tool.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Currituck",
+      "column": "vacant",
+      "reason": "maps.currituckcountync.gov's full root catalog live-enumerated this round: folders Currituck/GISWebsite/InternalSite/Orthos/Utilities, plus a root-level 'Energov' MapServer. That Energov service's own layer list was read directly: Address/Street/Building/Parcel/Flood Hazard Zones/5 Official-Zoning-overlay layers -- the identical '32-layer basemap bundle despite the EnerGov name' pattern already documented for NC Pender and SC Horry in this file, no case or violation layer. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: the county's 'Citizen Online Complaint' page is confirmed (by that round's own direct page fetch) to be a one-way complaint-SUBMISSION form only, not a case-search tool.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Davie",
+      "column": "condemned",
+      "reason": "gis.daviecountync.gov's full root catalog live-enumerated this round (40+ services). The two Planning-named services' own layer lists were read directly: Zoning_and_Development (a single 'zoning' polygon layer) and Planning_and_Development__internal_use__MIL1 (address/drives/streets basemap layers only) -- no case, violation, or status field in either, despite the Planning-Department name. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: Planning & Development Services is phone/email-only (336-753-6050), with certified-mail notice to owners, not an online case system.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Davie",
+      "column": "vacancy",
+      "reason": "gis.daviecountync.gov's full root catalog live-enumerated this round (40+ services). The two Planning-named services' own layer lists were read directly: Zoning_and_Development (a single 'zoning' polygon layer) and Planning_and_Development__internal_use__MIL1 (address/drives/streets basemap layers only) -- no case, violation, or status field in either, despite the Planning-Department name. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: Planning & Development Services is phone/email-only (336-753-6050), with certified-mail notice to owners, not an online case system.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Davie",
+      "column": "vacant",
+      "reason": "gis.daviecountync.gov's full root catalog live-enumerated this round (40+ services). The two Planning-named services' own layer lists were read directly: Zoning_and_Development (a single 'zoning' polygon layer) and Planning_and_Development__internal_use__MIL1 (address/drives/streets basemap layers only) -- no case, violation, or status field in either, despite the Planning-Department name. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: Planning & Development Services is phone/email-only (336-753-6050), with certified-mail notice to owners, not an online case system.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Alexander",
+      "column": "condemned",
+      "reason": "The county Planning Dept's own page links an 'online portal' at co-alexander-nc.smartgovcommunity.com/Public/Home (Tyler SmartGov Community) for code violations. Live-fetched directly this round (home page + both the 'Contact Us' and 'CodeEnforcement/CodeEnforcementHome' sub-pages): the only code-enforcement-relevant options are 'Report a Concern' (an anonymous complaint-SUBMISSION form) and 'My Requests' (checking the status of a complaint YOU personally filed) -- no public browse/search of the full case list anywhere in the portal. Same one-way-intake vendor class already declined for Sumter/Greenwood SC's CitizenServe systems in this file. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding (same portal, same conclusion).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Alexander",
+      "column": "vacancy",
+      "reason": "The county Planning Dept's own page links an 'online portal' at co-alexander-nc.smartgovcommunity.com/Public/Home (Tyler SmartGov Community) for code violations. Live-fetched directly this round (home page + both the 'Contact Us' and 'CodeEnforcement/CodeEnforcementHome' sub-pages): the only code-enforcement-relevant options are 'Report a Concern' (an anonymous complaint-SUBMISSION form) and 'My Requests' (checking the status of a complaint YOU personally filed) -- no public browse/search of the full case list anywhere in the portal. Same one-way-intake vendor class already declined for Sumter/Greenwood SC's CitizenServe systems in this file. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding (same portal, same conclusion).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Alexander",
+      "column": "vacant",
+      "reason": "The county Planning Dept's own page links an 'online portal' at co-alexander-nc.smartgovcommunity.com/Public/Home (Tyler SmartGov Community) for code violations. Live-fetched directly this round (home page + both the 'Contact Us' and 'CodeEnforcement/CodeEnforcementHome' sub-pages): the only code-enforcement-relevant options are 'Report a Concern' (an anonymous complaint-SUBMISSION form) and 'My Requests' (checking the status of a complaint YOU personally filed) -- no public browse/search of the full case list anywhere in the portal. Same one-way-intake vendor class already declined for Sumter/Greenwood SC's CitizenServe systems in this file. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding (same portal, same conclusion).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Carteret",
+      "column": "condemned",
+      "reason": "arcgisweb.carteretcountync.gov's public catalog (live-checked this round) carries only basemap/reference services -- Road_Base_Map, County_Building_Footprints, a tax-parcel layer, and Website/MainLayersMap -- no code-enforcement or violation-case layer. Carteret's own separately-documented bulk CAMA Condition field (enrichment_cama_condition.py's own docstring: Condition=Average/Good/Fair/Poor/Very Poor/Unsound/Excellent/Very Good + Grade + GradeAndCDU) is NOT a candidate fix here -- round 15's own categorical finding (re-verified this round, not just assumed) is that CAMA condition/occupancy data feeds raw['distressed']/condition_tier by deliberate project-wide design, never raw['condemned']/raw['vacancy']/raw['vacant'] (a 'Poor' appraiser condition rating is not proof a structure is vacant or condemned). Independently corroborated the same day by the concurrent code_enforcement-column round's own finding for this county (phone/in-person-only Planning & Inspections, several incorporated towns inspected separately).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Carteret",
+      "column": "vacancy",
+      "reason": "arcgisweb.carteretcountync.gov's public catalog (live-checked this round) carries only basemap/reference services -- Road_Base_Map, County_Building_Footprints, a tax-parcel layer, and Website/MainLayersMap -- no code-enforcement or violation-case layer. Carteret's own separately-documented bulk CAMA Condition field (enrichment_cama_condition.py's own docstring: Condition=Average/Good/Fair/Poor/Very Poor/Unsound/Excellent/Very Good + Grade + GradeAndCDU) is NOT a candidate fix here -- round 15's own categorical finding (re-verified this round, not just assumed) is that CAMA condition/occupancy data feeds raw['distressed']/condition_tier by deliberate project-wide design, never raw['condemned']/raw['vacancy']/raw['vacant'] (a 'Poor' appraiser condition rating is not proof a structure is vacant or condemned). Independently corroborated the same day by the concurrent code_enforcement-column round's own finding for this county (phone/in-person-only Planning & Inspections, several incorporated towns inspected separately).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Carteret",
+      "column": "vacant",
+      "reason": "arcgisweb.carteretcountync.gov's public catalog (live-checked this round) carries only basemap/reference services -- Road_Base_Map, County_Building_Footprints, a tax-parcel layer, and Website/MainLayersMap -- no code-enforcement or violation-case layer. Carteret's own separately-documented bulk CAMA Condition field (enrichment_cama_condition.py's own docstring: Condition=Average/Good/Fair/Poor/Very Poor/Unsound/Excellent/Very Good + Grade + GradeAndCDU) is NOT a candidate fix here -- round 15's own categorical finding (re-verified this round, not just assumed) is that CAMA condition/occupancy data feeds raw['distressed']/condition_tier by deliberate project-wide design, never raw['condemned']/raw['vacancy']/raw['vacant'] (a 'Poor' appraiser condition rating is not proof a structure is vacant or condemned). Independently corroborated the same day by the concurrent code_enforcement-column round's own finding for this county (phone/in-person-only Planning & Inspections, several incorporated towns inspected separately).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Franklin",
+      "column": "condemned",
+      "reason": "No ArcGIS REST host or AGOL org found anywhere under Franklin County NC's own domain (two separate targeted searches; all hits were Franklin County VA/PA/TN/GA/FL or the unrelated Town of Franklin in Macon County NC). A county job posting confirms zoning code-enforcement complaints route through the Planning Department administratively, with no public complaint form, case search, or dataset surfaced anywhere. Franklin is the #1 cell by est_rows_affected in this round's list (4,107) and got the most search effort of any county this round; still a clean dead end.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Franklin",
+      "column": "vacancy",
+      "reason": "No ArcGIS REST host or AGOL org found anywhere under Franklin County NC's own domain (two separate targeted searches; all hits were Franklin County VA/PA/TN/GA/FL or the unrelated Town of Franklin in Macon County NC). A county job posting confirms zoning code-enforcement complaints route through the Planning Department administratively, with no public complaint form, case search, or dataset surfaced anywhere. Franklin is the #1 cell by est_rows_affected in this round's list (4,107) and got the most search effort of any county this round; still a clean dead end.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Franklin",
+      "column": "vacant",
+      "reason": "No ArcGIS REST host or AGOL org found anywhere under Franklin County NC's own domain (two separate targeted searches; all hits were Franklin County VA/PA/TN/GA/FL or the unrelated Town of Franklin in Macon County NC). A county job posting confirms zoning code-enforcement complaints route through the Planning Department administratively, with no public complaint form, case search, or dataset surfaced anywhere. Franklin is the #1 cell by est_rows_affected in this round's list (4,107) and got the most search effort of any county this round; still a clean dead end.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Sampson",
+      "column": "condemned",
+      "reason": "WithersRavenel's own Sampson County GIS Strategic Plan explicitly scopes the county's GIS to property boundaries, census tracts, public-works infrastructure, zoning, floodplains, and government districts -- code enforcement and vacancy are not on that list. No ArcGIS Open Data portal or AGOL org found. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: enforcement is split across three phone/email-only offices (Inspections, Fire Marshal, Planning & Zoning), zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Sampson",
+      "column": "vacancy",
+      "reason": "WithersRavenel's own Sampson County GIS Strategic Plan explicitly scopes the county's GIS to property boundaries, census tracts, public-works infrastructure, zoning, floodplains, and government districts -- code enforcement and vacancy are not on that list. No ArcGIS Open Data portal or AGOL org found. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: enforcement is split across three phone/email-only offices (Inspections, Fire Marshal, Planning & Zoning), zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Sampson",
+      "column": "vacant",
+      "reason": "WithersRavenel's own Sampson County GIS Strategic Plan explicitly scopes the county's GIS to property boundaries, census tracts, public-works infrastructure, zoning, floodplains, and government districts -- code enforcement and vacancy are not on that list. No ArcGIS Open Data portal or AGOL org found. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: enforcement is split across three phone/email-only offices (Inspections, Fire Marshal, Planning & Zoning), zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Wilkes",
+      "column": "condemned",
+      "reason": "No ArcGIS Open Data portal or code-enforcement layer found for Wilkes County NC; only commercial parcel/LiDAR resellers and an NCSU library archive link surfaced. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: county Inspections Dept is phone-only (336-651-7303); incorporated towns (North Wilkesboro, Wilkesboro) run separate, town-only enforcement; zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Wilkes",
+      "column": "vacancy",
+      "reason": "No ArcGIS Open Data portal or code-enforcement layer found for Wilkes County NC; only commercial parcel/LiDAR resellers and an NCSU library archive link surfaced. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: county Inspections Dept is phone-only (336-651-7303); incorporated towns (North Wilkesboro, Wilkesboro) run separate, town-only enforcement; zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Wilkes",
+      "column": "vacant",
+      "reason": "No ArcGIS Open Data portal or code-enforcement layer found for Wilkes County NC; only commercial parcel/LiDAR resellers and an NCSU library archive link surfaced. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: county Inspections Dept is phone-only (336-651-7303); incorporated towns (North Wilkesboro, Wilkesboro) run separate, town-only enforcement; zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Watauga",
+      "column": "condemned",
+      "reason": "The one live AGOL feature-service org reachable near Watauga (services2.arcgis.com/wdQEqhSQSuYA89VW, enumerated this round) turned out, on inspection, to be Appalachian State University's own research GIS org -- hundreds of academic/ADA-survey/census-research layers (ADA_Parking, 2020_Suicide_Characteristics, Appalachian_Regional_Commission_*, etc.), not Watauga County government's GIS at all. The county's own Planning & Inspections office (Boone) has no online complaint form or case-search tool surfaced in two separate searches -- only ordinance PDFs and a 2021 civil-penalty news story.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Watauga",
+      "column": "vacancy",
+      "reason": "The one live AGOL feature-service org reachable near Watauga (services2.arcgis.com/wdQEqhSQSuYA89VW, enumerated this round) turned out, on inspection, to be Appalachian State University's own research GIS org -- hundreds of academic/ADA-survey/census-research layers (ADA_Parking, 2020_Suicide_Characteristics, Appalachian_Regional_Commission_*, etc.), not Watauga County government's GIS at all. The county's own Planning & Inspections office (Boone) has no online complaint form or case-search tool surfaced in two separate searches -- only ordinance PDFs and a 2021 civil-penalty news story.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Watauga",
+      "column": "vacant",
+      "reason": "The one live AGOL feature-service org reachable near Watauga (services2.arcgis.com/wdQEqhSQSuYA89VW, enumerated this round) turned out, on inspection, to be Appalachian State University's own research GIS org -- hundreds of academic/ADA-survey/census-research layers (ADA_Parking, 2020_Suicide_Characteristics, Appalachian_Regional_Commission_*, etc.), not Watauga County government's GIS at all. The county's own Planning & Inspections office (Boone) has no online complaint form or case-search tool surfaced in two separate searches -- only ordinance PDFs and a 2021 civil-penalty news story.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Columbus",
+      "column": "condemned",
+      "reason": "No ArcGIS/Socrata dataset or AGOL org found for Columbus County NC; only commercial parcel resellers and an unrelated Catawba County example surfaced. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: enforcement is split between the Inspections Dept (Whiteville) and the Fire Marshal, no public case-search/complaint portal for either, zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Columbus",
+      "column": "vacancy",
+      "reason": "No ArcGIS/Socrata dataset or AGOL org found for Columbus County NC; only commercial parcel resellers and an unrelated Catawba County example surfaced. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: enforcement is split between the Inspections Dept (Whiteville) and the Fire Marshal, no public case-search/complaint portal for either, zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Columbus",
+      "column": "vacant",
+      "reason": "No ArcGIS/Socrata dataset or AGOL org found for Columbus County NC; only commercial parcel resellers and an unrelated Catawba County example surfaced. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: enforcement is split between the Inspections Dept (Whiteville) and the Fire Marshal, no public case-search/complaint portal for either, zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Halifax",
+      "column": "condemned",
+      "reason": "No current ArcGIS Open Data portal found for Halifax County NC -- only a GIS help phone line (336-242-2266) and NC State Libraries' 2011-2014 archived vector downloads. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: the county zoning code names an enforcement-officer authority but no public-facing portal was found; Health Dept and Planning Dept handle inspections separately by phone, zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Halifax",
+      "column": "vacancy",
+      "reason": "No current ArcGIS Open Data portal found for Halifax County NC -- only a GIS help phone line (336-242-2266) and NC State Libraries' 2011-2014 archived vector downloads. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: the county zoning code names an enforcement-officer authority but no public-facing portal was found; Health Dept and Planning Dept handle inspections separately by phone, zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Halifax",
+      "column": "vacant",
+      "reason": "No current ArcGIS Open Data portal found for Halifax County NC -- only a GIS help phone line (336-242-2266) and NC State Libraries' 2011-2014 archived vector downloads. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: the county zoning code names an enforcement-officer authority but no public-facing portal was found; Health Dept and Planning Dept handle inspections separately by phone, zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Stokes",
+      "column": "condemned",
+      "reason": "No confirmed ArcGIS platform at all for Stokes County NC's own GIS office in this round's search (one unverified third-party claim the county site runs on a generic CMS, not ArcGIS). Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: Planning & Inspections is phone-only (336-593-2444); permits route through an account-gated 'GovBuilt' portal, in-person submission only per a third-party guide -- not a public violation-case search; zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Stokes",
+      "column": "vacancy",
+      "reason": "No confirmed ArcGIS platform at all for Stokes County NC's own GIS office in this round's search (one unverified third-party claim the county site runs on a generic CMS, not ArcGIS). Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: Planning & Inspections is phone-only (336-593-2444); permits route through an account-gated 'GovBuilt' portal, in-person submission only per a third-party guide -- not a public violation-case search; zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Stokes",
+      "column": "vacant",
+      "reason": "No confirmed ArcGIS platform at all for Stokes County NC's own GIS office in this round's search (one unverified third-party claim the county site runs on a generic CMS, not ArcGIS). Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: Planning & Inspections is phone-only (336-593-2444); permits route through an account-gated 'GovBuilt' portal, in-person submission only per a third-party guide -- not a public violation-case search; zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Dare",
+      "column": "condemned",
+      "reason": "Dare County's own GIS presence is a parcel/tax-bill lookup tool only; code enforcement is explicitly handled by individual incorporated towns (e.g. Southern Shores names its own Building Inspector/Code Enforcement Officer), not the county. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: the county Planning Dept runs phone-only mainland + Hatteras Island satellite offices for unincorporated-area enforcement; no countywide violation-case portal found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Dare",
+      "column": "vacancy",
+      "reason": "Dare County's own GIS presence is a parcel/tax-bill lookup tool only; code enforcement is explicitly handled by individual incorporated towns (e.g. Southern Shores names its own Building Inspector/Code Enforcement Officer), not the county. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: the county Planning Dept runs phone-only mainland + Hatteras Island satellite offices for unincorporated-area enforcement; no countywide violation-case portal found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Dare",
+      "column": "vacant",
+      "reason": "Dare County's own GIS presence is a parcel/tax-bill lookup tool only; code enforcement is explicitly handled by individual incorporated towns (e.g. Southern Shores names its own Building Inspector/Code Enforcement Officer), not the county. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: the county Planning Dept runs phone-only mainland + Hatteras Island satellite offices for unincorporated-area enforcement; no countywide violation-case portal found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Martin",
+      "column": "condemned",
+      "reason": "Martin County NC's own GIS-downloads page offers parcel shapefiles only ('Martin County GIS does not restrict the use of our data... welcome to redistribute') with no code-enforcement layer, and explicitly states staff are not available to assist with usage questions. Independently corroborated the same day by the concurrent code_enforcement-column round's own AGOL full-text search, which returned only unrelated LA County oil/gas and Oregon State University collisions -- no genuine NC Martin County item; no county portal found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Martin",
+      "column": "vacancy",
+      "reason": "Martin County NC's own GIS-downloads page offers parcel shapefiles only ('Martin County GIS does not restrict the use of our data... welcome to redistribute') with no code-enforcement layer, and explicitly states staff are not available to assist with usage questions. Independently corroborated the same day by the concurrent code_enforcement-column round's own AGOL full-text search, which returned only unrelated LA County oil/gas and Oregon State University collisions -- no genuine NC Martin County item; no county portal found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Martin",
+      "column": "vacant",
+      "reason": "Martin County NC's own GIS-downloads page offers parcel shapefiles only ('Martin County GIS does not restrict the use of our data... welcome to redistribute') with no code-enforcement layer, and explicitly states staff are not available to assist with usage questions. Independently corroborated the same day by the concurrent code_enforcement-column round's own AGOL full-text search, which returned only unrelated LA County oil/gas and Oregon State University collisions -- no genuine NC Martin County item; no county portal found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Gates",
+      "column": "condemned",
+      "reason": "Gates County NC's FY26 fee schedule lists 'Code Enforcement' as a fee line item only (not a dataset); its parcel viewer sits on a generic AGOL host with no violation layer found. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: the Inspections Dept is listed only by mailing address on the county's own site, no phone/email surfaced there; zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Gates",
+      "column": "vacancy",
+      "reason": "Gates County NC's FY26 fee schedule lists 'Code Enforcement' as a fee line item only (not a dataset); its parcel viewer sits on a generic AGOL host with no violation layer found. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: the Inspections Dept is listed only by mailing address on the county's own site, no phone/email surfaced there; zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Gates",
+      "column": "vacant",
+      "reason": "Gates County NC's FY26 fee schedule lists 'Code Enforcement' as a fee line item only (not a dataset); its parcel viewer sits on a generic AGOL host with no violation layer found. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: the Inspections Dept is listed only by mailing address on the county's own site, no phone/email surfaced there; zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Ashe",
+      "column": "condemned",
+      "reason": "No ArcGIS Open Data portal confirmed for Ashe County NC beyond an unverified third-party reseller claim; the county's Avineon parcel-fabric migration covers parcels only, not code enforcement. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: the Inspection Dept handles building/electrical/plumbing/mechanical/fire permits (cash/check payment only per the county's own notice); no code-enforcement-specific page, complaint form, or case-search portal found; zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Ashe",
+      "column": "vacancy",
+      "reason": "No ArcGIS Open Data portal confirmed for Ashe County NC beyond an unverified third-party reseller claim; the county's Avineon parcel-fabric migration covers parcels only, not code enforcement. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: the Inspection Dept handles building/electrical/plumbing/mechanical/fire permits (cash/check payment only per the county's own notice); no code-enforcement-specific page, complaint form, or case-search portal found; zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Ashe",
+      "column": "vacant",
+      "reason": "No ArcGIS Open Data portal confirmed for Ashe County NC beyond an unverified third-party reseller claim; the county's Avineon parcel-fabric migration covers parcels only, not code enforcement. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: the Inspection Dept handles building/electrical/plumbing/mechanical/fire permits (cash/check payment only per the county's own notice); no code-enforcement-specific page, complaint form, or case-search portal found; zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Montgomery",
+      "column": "condemned",
+      "reason": "No Montgomery County NC-specific ArcGIS Hub, AGOL org, or open-data page surfaced (search results were dominated by the unrelated Montgomery County MD/VA/PA/TX/AL/GA name collisions). Independently corroborated the same day by the concurrent code_enforcement-column round's own AGOL full-text search, which returned Montgomery County TEXAS sheriff-patrol and census layers only -- no genuine NC item, no county portal found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Montgomery",
+      "column": "vacancy",
+      "reason": "No Montgomery County NC-specific ArcGIS Hub, AGOL org, or open-data page surfaced (search results were dominated by the unrelated Montgomery County MD/VA/PA/TX/AL/GA name collisions). Independently corroborated the same day by the concurrent code_enforcement-column round's own AGOL full-text search, which returned Montgomery County TEXAS sheriff-patrol and census layers only -- no genuine NC item, no county portal found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Montgomery",
+      "column": "vacant",
+      "reason": "No Montgomery County NC-specific ArcGIS Hub, AGOL org, or open-data page surfaced (search results were dominated by the unrelated Montgomery County MD/VA/PA/TX/AL/GA name collisions). Independently corroborated the same day by the concurrent code_enforcement-column round's own AGOL full-text search, which returned Montgomery County TEXAS sheriff-patrol and census layers only -- no genuine NC item, no county portal found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Hertford",
+      "column": "condemned",
+      "reason": "Hertford County NC's GIS & Planning dept (115 Justice Drive, Winton, 252-358-7809) runs a tax-parcel ArcGIS viewer only; no code-enforcement layer, complaint form, or case-search tool surfaced. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: Code Enforcement/Building Inspections (252-358-7813/7814) and the Fire Marshal's office are both phone-only, zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Hertford",
+      "column": "vacancy",
+      "reason": "Hertford County NC's GIS & Planning dept (115 Justice Drive, Winton, 252-358-7809) runs a tax-parcel ArcGIS viewer only; no code-enforcement layer, complaint form, or case-search tool surfaced. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: Code Enforcement/Building Inspections (252-358-7813/7814) and the Fire Marshal's office are both phone-only, zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Hertford",
+      "column": "vacant",
+      "reason": "Hertford County NC's GIS & Planning dept (115 Justice Drive, Winton, 252-358-7809) runs a tax-parcel ArcGIS viewer only; no code-enforcement layer, complaint form, or case-search tool surfaced. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: Code Enforcement/Building Inspections (252-358-7813/7814) and the Fire Marshal's office are both phone-only, zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Macon",
+      "column": "condemned",
+      "reason": "gis.maconnc.org's own SearchableLayers MapServer legend (checked this round) is WaterSheds/Lakes/Rivers/Flood_hazards only -- no code-enforcement layer; gis2.maconnc.org/lightmap is a tax-card viewer, same shape. The county names a Director of Code Enforcement (Bobby Bishop) but only a phone contact (828-349-2073). Independently corroborated the same day by the concurrent code_enforcement-column round's own AGOL full-text search, which returned Macon-Bibb County, GEORGIA's SeeClickFix/Codes-Enforcement items as the only hits -- a name collision, not this NC county; no NC Macon portal found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Macon",
+      "column": "vacancy",
+      "reason": "gis.maconnc.org's own SearchableLayers MapServer legend (checked this round) is WaterSheds/Lakes/Rivers/Flood_hazards only -- no code-enforcement layer; gis2.maconnc.org/lightmap is a tax-card viewer, same shape. The county names a Director of Code Enforcement (Bobby Bishop) but only a phone contact (828-349-2073). Independently corroborated the same day by the concurrent code_enforcement-column round's own AGOL full-text search, which returned Macon-Bibb County, GEORGIA's SeeClickFix/Codes-Enforcement items as the only hits -- a name collision, not this NC county; no NC Macon portal found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Macon",
+      "column": "vacant",
+      "reason": "gis.maconnc.org's own SearchableLayers MapServer legend (checked this round) is WaterSheds/Lakes/Rivers/Flood_hazards only -- no code-enforcement layer; gis2.maconnc.org/lightmap is a tax-card viewer, same shape. The county names a Director of Code Enforcement (Bobby Bishop) but only a phone contact (828-349-2073). Independently corroborated the same day by the concurrent code_enforcement-column round's own AGOL full-text search, which returned Macon-Bibb County, GEORGIA's SeeClickFix/Codes-Enforcement items as the only hits -- a name collision, not this NC county; no NC Macon portal found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Vance",
+      "column": "condemned",
+      "reason": "Vance County NC runs two citizen-facing systems, both identified and live-fetched (partially) this round: GovWell (app.govwell.com/vance-nc, a permitting-application portal) and MyGov.us task-complaint intake (app.mygov.us/task/city/knowledge_base/complaint.php?citiesID=771&mod=ce, labelled 'Make a Request or Complaint'). Direct connection to the live MyGov.us instance timed out this round (inconclusive on its own), but the vendor class is independently documented (via that same vendor's own help docs for another city) as a per-citizen submit-and-track-YOUR-OWN-case tool, not a public bulk case list -- the identical shape already declined for Sumter/Greenwood SC's CitizenServe systems in this file. No ArcGIS/Socrata alternative exists either way. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: the county's Code Enforcement Office page names an officer (Don Eatmon) with no complaint form or case-search tool found online.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Vance",
+      "column": "vacancy",
+      "reason": "Vance County NC runs two citizen-facing systems, both identified and live-fetched (partially) this round: GovWell (app.govwell.com/vance-nc, a permitting-application portal) and MyGov.us task-complaint intake (app.mygov.us/task/city/knowledge_base/complaint.php?citiesID=771&mod=ce, labelled 'Make a Request or Complaint'). Direct connection to the live MyGov.us instance timed out this round (inconclusive on its own), but the vendor class is independently documented (via that same vendor's own help docs for another city) as a per-citizen submit-and-track-YOUR-OWN-case tool, not a public bulk case list -- the identical shape already declined for Sumter/Greenwood SC's CitizenServe systems in this file. No ArcGIS/Socrata alternative exists either way. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: the county's Code Enforcement Office page names an officer (Don Eatmon) with no complaint form or case-search tool found online.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Vance",
+      "column": "vacant",
+      "reason": "Vance County NC runs two citizen-facing systems, both identified and live-fetched (partially) this round: GovWell (app.govwell.com/vance-nc, a permitting-application portal) and MyGov.us task-complaint intake (app.mygov.us/task/city/knowledge_base/complaint.php?citiesID=771&mod=ce, labelled 'Make a Request or Complaint'). Direct connection to the live MyGov.us instance timed out this round (inconclusive on its own), but the vendor class is independently documented (via that same vendor's own help docs for another city) as a per-citizen submit-and-track-YOUR-OWN-case tool, not a public bulk case list -- the identical shape already declined for Sumter/Greenwood SC's CitizenServe systems in this file. No ArcGIS/Socrata alternative exists either way. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: the county's Code Enforcement Office page names an officer (Don Eatmon) with no complaint form or case-search tool found online.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Bladen",
+      "column": "condemned",
+      "reason": "No ArcGIS/Socrata/code-enforcement dataset found for Bladen County NC at all -- only NC State Libraries' GIS directory and commercial parcel resellers. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: enforcement is split between Building Inspections and the Health Dept, and local reporting quotes the County Manager stating the county has 'little' it can do about derelict structures absent a new ordinance still under commissioner review -- a genuine capability gap, not a data-access one; no case-search portal found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Bladen",
+      "column": "vacancy",
+      "reason": "No ArcGIS/Socrata/code-enforcement dataset found for Bladen County NC at all -- only NC State Libraries' GIS directory and commercial parcel resellers. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: enforcement is split between Building Inspections and the Health Dept, and local reporting quotes the County Manager stating the county has 'little' it can do about derelict structures absent a new ordinance still under commissioner review -- a genuine capability gap, not a data-access one; no case-search portal found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Bladen",
+      "column": "vacant",
+      "reason": "No ArcGIS/Socrata/code-enforcement dataset found for Bladen County NC at all -- only NC State Libraries' GIS directory and commercial parcel resellers. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: enforcement is split between Building Inspections and the Health Dept, and local reporting quotes the County Manager stating the county has 'little' it can do about derelict structures absent a new ordinance still under commissioner review -- a genuine capability gap, not a data-access one; no case-search portal found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Alleghany",
+      "column": "condemned",
+      "reason": "Alleghany County NC's named GIS Administrator (Mary Rector) maintains property cadastral data for the county plus the Town of Sparta ETJ only -- no code-enforcement layer named or found. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: Planning & Inspections is phone-only (336-372-8974); no online complaint form or fine schedule published; zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Alleghany",
+      "column": "vacancy",
+      "reason": "Alleghany County NC's named GIS Administrator (Mary Rector) maintains property cadastral data for the county plus the Town of Sparta ETJ only -- no code-enforcement layer named or found. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: Planning & Inspections is phone-only (336-372-8974); no online complaint form or fine schedule published; zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Alleghany",
+      "column": "vacant",
+      "reason": "Alleghany County NC's named GIS Administrator (Mary Rector) maintains property cadastral data for the county plus the Town of Sparta ETJ only -- no code-enforcement layer named or found. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: Planning & Inspections is phone-only (336-372-8974); no online complaint form or fine schedule published; zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Greene",
+      "column": "condemned",
+      "reason": "Greene County NC's Planning & Inspections dept explicitly combines code-enforcement and GIS staff (Brandon Sutton, Daniel Grant), but its public-facing tool (greenecountygis.com) is a parcel-inquiry site only; the published complaint channel is a PDF form for 'abandoned, nuisance, and junked vehicles', not a dataset. Independently corroborated the same day by the concurrent code_enforcement-column round's own AGOL full-text search, which returned Volusia County, FLORIDA's 'Code Compliance'/AMANDA system as the only hit -- a name collision, not this NC county; no county portal found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Greene",
+      "column": "vacancy",
+      "reason": "Greene County NC's Planning & Inspections dept explicitly combines code-enforcement and GIS staff (Brandon Sutton, Daniel Grant), but its public-facing tool (greenecountygis.com) is a parcel-inquiry site only; the published complaint channel is a PDF form for 'abandoned, nuisance, and junked vehicles', not a dataset. Independently corroborated the same day by the concurrent code_enforcement-column round's own AGOL full-text search, which returned Volusia County, FLORIDA's 'Code Compliance'/AMANDA system as the only hit -- a name collision, not this NC county; no county portal found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Greene",
+      "column": "vacant",
+      "reason": "Greene County NC's Planning & Inspections dept explicitly combines code-enforcement and GIS staff (Brandon Sutton, Daniel Grant), but its public-facing tool (greenecountygis.com) is a parcel-inquiry site only; the published complaint channel is a PDF form for 'abandoned, nuisance, and junked vehicles', not a dataset. Independently corroborated the same day by the concurrent code_enforcement-column round's own AGOL full-text search, which returned Volusia County, FLORIDA's 'Code Compliance'/AMANDA system as the only hit -- a name collision, not this NC county; no county portal found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Mitchell",
+      "column": "condemned",
+      "reason": "Mitchell County NC has a single building inspector for the whole county per its own Building & Fire Inspections page; its Online Services page lists phone contacts only, no complaint portal or case-map found. (Its own parcel-GIS host, mapping.mitchellcountync.gov, was already live-checked for lt_elderly_disabled on 2026-11-17 with no exemption-shaped field; that same host's WebMapNew/MapServer layer 12 is a tax-card view, not case data -- no separate code-enforcement layer exists on it either.) Independently corroborated the same day by the concurrent code_enforcement-column round's own finding (same single-inspector conclusion), zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Mitchell",
+      "column": "vacancy",
+      "reason": "Mitchell County NC has a single building inspector for the whole county per its own Building & Fire Inspections page; its Online Services page lists phone contacts only, no complaint portal or case-map found. (Its own parcel-GIS host, mapping.mitchellcountync.gov, was already live-checked for lt_elderly_disabled on 2026-11-17 with no exemption-shaped field; that same host's WebMapNew/MapServer layer 12 is a tax-card view, not case data -- no separate code-enforcement layer exists on it either.) Independently corroborated the same day by the concurrent code_enforcement-column round's own finding (same single-inspector conclusion), zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Mitchell",
+      "column": "vacant",
+      "reason": "Mitchell County NC has a single building inspector for the whole county per its own Building & Fire Inspections page; its Online Services page lists phone contacts only, no complaint portal or case-map found. (Its own parcel-GIS host, mapping.mitchellcountync.gov, was already live-checked for lt_elderly_disabled on 2026-11-17 with no exemption-shaped field; that same host's WebMapNew/MapServer layer 12 is a tax-card view, not case data -- no separate code-enforcement layer exists on it either.) Independently corroborated the same day by the concurrent code_enforcement-column round's own finding (same single-inspector conclusion), zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Northampton",
+      "column": "condemned",
+      "reason": "Northampton County NC's code-compliance-inspector and building-inspector positions are listed as VACANT per the county's own (third-party-hosted) planning page; the one ArcGIS parcel-viewer found for the county sits on a login-gated GeoDecisions staging host, not a production public service. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: an AGOL full-text search (both quoted-phrase and loose forms) returned ZERO results at all for Northampton -- the cleanest dead-end signal of either round's search set.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Northampton",
+      "column": "vacancy",
+      "reason": "Northampton County NC's code-compliance-inspector and building-inspector positions are listed as VACANT per the county's own (third-party-hosted) planning page; the one ArcGIS parcel-viewer found for the county sits on a login-gated GeoDecisions staging host, not a production public service. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: an AGOL full-text search (both quoted-phrase and loose forms) returned ZERO results at all for Northampton -- the cleanest dead-end signal of either round's search set.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Northampton",
+      "column": "vacant",
+      "reason": "Northampton County NC's code-compliance-inspector and building-inspector positions are listed as VACANT per the county's own (third-party-hosted) planning page; the one ArcGIS parcel-viewer found for the county sits on a login-gated GeoDecisions staging host, not a production public service. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding: an AGOL full-text search (both quoted-phrase and loose forms) returned ZERO results at all for Northampton -- the cleanest dead-end signal of either round's search set.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Pamlico",
+      "column": "condemned",
+      "reason": "Pamlico County NC's Inspections Dept (Bayboro courthouse, 252-745-3861) administers the NC Building Code by phone only; its GIS presence is a third-party-hosted parcel/record-card viewer (webapp.agdmaps.com), no case layer. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding (same phone-only office, same address), zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Pamlico",
+      "column": "vacancy",
+      "reason": "Pamlico County NC's Inspections Dept (Bayboro courthouse, 252-745-3861) administers the NC Building Code by phone only; its GIS presence is a third-party-hosted parcel/record-card viewer (webapp.agdmaps.com), no case layer. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding (same phone-only office, same address), zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Pamlico",
+      "column": "vacant",
+      "reason": "Pamlico County NC's Inspections Dept (Bayboro courthouse, 252-745-3861) administers the NC Building Code by phone only; its GIS presence is a third-party-hosted parcel/record-card viewer (webapp.agdmaps.com), no case layer. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding (same phone-only office, same address), zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Swain",
+      "column": "condemned",
+      "reason": "Swain County NC's Code Enforcement Officials (Jason Webb, Gina Wiggins, 828-488-9134) run an online 'complaint report' form and a separate civicgov4.com permitting portal, both one-way submission tools per the county's own pages, not a public violation-case search; its GIS/Mapping office is a parcel-lookup site only. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding (same conclusion, same officers named), zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Swain",
+      "column": "vacancy",
+      "reason": "Swain County NC's Code Enforcement Officials (Jason Webb, Gina Wiggins, 828-488-9134) run an online 'complaint report' form and a separate civicgov4.com permitting portal, both one-way submission tools per the county's own pages, not a public violation-case search; its GIS/Mapping office is a parcel-lookup site only. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding (same conclusion, same officers named), zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Swain",
+      "column": "vacant",
+      "reason": "Swain County NC's Code Enforcement Officials (Jason Webb, Gina Wiggins, 828-488-9134) run an online 'complaint report' form and a separate civicgov4.com permitting portal, both one-way submission tools per the county's own pages, not a public violation-case search; its GIS/Mapping office is a parcel-lookup site only. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding (same conclusion, same officers named), zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Tyrrell",
+      "column": "condemned",
+      "reason": "No ArcGIS host or case-tracking system found at all for Tyrrell County NC (NC's smallest-population county, ~4,000) in two separate searches; the only enforcement contact found is a single combined Building Inspector/Fire Marshal/Ordinance-Enforcement role, phone-only. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding (same single-role conclusion), zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Tyrrell",
+      "column": "vacancy",
+      "reason": "No ArcGIS host or case-tracking system found at all for Tyrrell County NC (NC's smallest-population county, ~4,000) in two separate searches; the only enforcement contact found is a single combined Building Inspector/Fire Marshal/Ordinance-Enforcement role, phone-only. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding (same single-role conclusion), zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Tyrrell",
+      "column": "vacant",
+      "reason": "No ArcGIS host or case-tracking system found at all for Tyrrell County NC (NC's smallest-population county, ~4,000) in two separate searches; the only enforcement contact found is a single combined Building Inspector/Fire Marshal/Ordinance-Enforcement role, phone-only. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding (same single-role conclusion), zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Warren",
+      "column": "condemned",
+      "reason": "Warren County NC's Code Enforcement dept (Warrenton) has a GIS technician on staff, but its public GIS tool is a third-party-hosted parcel map (maps2.roktech.net) only, no violation/case layer found. (Warren already has several unrelated tax-column declines on file from today's own 0-record bttaxpayerportal finding -- independent confirmation the county's digital presence was already under separate survey the same day, not a substitute for this column's own check.) Independently corroborated the same day by the concurrent code_enforcement-column round's own AGOL full-text search, which returned only an unrelated New Jersey statewide environmental-sites layer (NJEMS, owner NJDEPBGIS) -- a name/acronym collision, not a genuine Warren County NC item; no county portal found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Warren",
+      "column": "vacancy",
+      "reason": "Warren County NC's Code Enforcement dept (Warrenton) has a GIS technician on staff, but its public GIS tool is a third-party-hosted parcel map (maps2.roktech.net) only, no violation/case layer found. (Warren already has several unrelated tax-column declines on file from today's own 0-record bttaxpayerportal finding -- independent confirmation the county's digital presence was already under separate survey the same day, not a substitute for this column's own check.) Independently corroborated the same day by the concurrent code_enforcement-column round's own AGOL full-text search, which returned only an unrelated New Jersey statewide environmental-sites layer (NJEMS, owner NJDEPBGIS) -- a name/acronym collision, not a genuine Warren County NC item; no county portal found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Warren",
+      "column": "vacant",
+      "reason": "Warren County NC's Code Enforcement dept (Warrenton) has a GIS technician on staff, but its public GIS tool is a third-party-hosted parcel map (maps2.roktech.net) only, no violation/case layer found. (Warren already has several unrelated tax-column declines on file from today's own 0-record bttaxpayerportal finding -- independent confirmation the county's digital presence was already under separate survey the same day, not a substitute for this column's own check.) Independently corroborated the same day by the concurrent code_enforcement-column round's own AGOL full-text search, which returned only an unrelated New Jersey statewide environmental-sites layer (NJEMS, owner NJDEPBGIS) -- a name/acronym collision, not a genuine Warren County NC item; no county portal found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Yancey",
+      "column": "condemned",
+      "reason": "Yancey County NC's Building Inspections office (828-682-7833) handles state Building Code + NFIP compliance; its Address Coordinator/E-911 GIS staff handle addressing only, not case enforcement; no violation case-search tool found anywhere. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding (same offices, same conclusion), zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Yancey",
+      "column": "vacancy",
+      "reason": "Yancey County NC's Building Inspections office (828-682-7833) handles state Building Code + NFIP compliance; its Address Coordinator/E-911 GIS staff handle addressing only, not case enforcement; no violation case-search tool found anywhere. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding (same offices, same conclusion), zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Yancey",
+      "column": "vacant",
+      "reason": "Yancey County NC's Building Inspections office (828-682-7833) handles state Building Code + NFIP compliance; its Address Coordinator/E-911 GIS staff handle addressing only, not case enforcement; no violation case-search tool found anywhere. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding (same offices, same conclusion), zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Avery",
+      "column": "condemned",
+      "reason": "Avery County NC's code-enforcement/building-inspection contact is phone-only (200 Montezuma St, Newland); the only town-level example found (Beech Mountain) is municipal, not county, scope. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding (same phone-only conclusion), zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Avery",
+      "column": "vacancy",
+      "reason": "Avery County NC's code-enforcement/building-inspection contact is phone-only (200 Montezuma St, Newland); the only town-level example found (Beech Mountain) is municipal, not county, scope. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding (same phone-only conclusion), zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Avery",
+      "column": "vacant",
+      "reason": "Avery County NC's code-enforcement/building-inspection contact is phone-only (200 Montezuma St, Newland); the only town-level example found (Beech Mountain) is municipal, not county, scope. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding (same phone-only conclusion), zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Camden",
+      "column": "condemned",
+      "reason": "Camden County NC's Planning, Zoning & Flood Dept explicitly names 'Code Enforcement, and Minimum Housing' among its duties, but enforcement runs by officer-investigation of reported nuisances, not a public dataset; its GIS site is a parcel-popup map only. Independently corroborated the same day by the concurrent code_enforcement-column round's own AGOL full-text search, which returned the same unrelated New Jersey NJEMS statewide layer as NC Warren above -- a false-positive collision with Camden County, NEW JERSEY, not this NC one; no genuine NC Camden item or portal found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Camden",
+      "column": "vacancy",
+      "reason": "Camden County NC's Planning, Zoning & Flood Dept explicitly names 'Code Enforcement, and Minimum Housing' among its duties, but enforcement runs by officer-investigation of reported nuisances, not a public dataset; its GIS site is a parcel-popup map only. Independently corroborated the same day by the concurrent code_enforcement-column round's own AGOL full-text search, which returned the same unrelated New Jersey NJEMS statewide layer as NC Warren above -- a false-positive collision with Camden County, NEW JERSEY, not this NC one; no genuine NC Camden item or portal found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Camden",
+      "column": "vacant",
+      "reason": "Camden County NC's Planning, Zoning & Flood Dept explicitly names 'Code Enforcement, and Minimum Housing' among its duties, but enforcement runs by officer-investigation of reported nuisances, not a public dataset; its GIS site is a parcel-popup map only. Independently corroborated the same day by the concurrent code_enforcement-column round's own AGOL full-text search, which returned the same unrelated New Jersey NJEMS statewide layer as NC Warren above -- a false-positive collision with Camden County, NEW JERSEY, not this NC one; no genuine NC Camden item or portal found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Clay",
+      "column": "condemned",
+      "reason": "Clay County NC's Tax Mapping/GIS Mapping offices are phone-contact only (828-389-1265); the one ArcGIS item found (a third-party-linked zoning Experience map) is zoning-district reference, not code enforcement. Independently corroborated the same day by the concurrent code_enforcement-column round's own AGOL full-text search, which returned Clayton County, GEORGIA's Community Development Operations item -- a name collision with Clay, not this NC county; no genuine NC Clay portal found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Clay",
+      "column": "vacancy",
+      "reason": "Clay County NC's Tax Mapping/GIS Mapping offices are phone-contact only (828-389-1265); the one ArcGIS item found (a third-party-linked zoning Experience map) is zoning-district reference, not code enforcement. Independently corroborated the same day by the concurrent code_enforcement-column round's own AGOL full-text search, which returned Clayton County, GEORGIA's Community Development Operations item -- a name collision with Clay, not this NC county; no genuine NC Clay portal found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Clay",
+      "column": "vacant",
+      "reason": "Clay County NC's Tax Mapping/GIS Mapping offices are phone-contact only (828-389-1265); the one ArcGIS item found (a third-party-linked zoning Experience map) is zoning-district reference, not code enforcement. Independently corroborated the same day by the concurrent code_enforcement-column round's own AGOL full-text search, which returned Clayton County, GEORGIA's Community Development Operations item -- a name collision with Clay, not this NC county; no genuine NC Clay portal found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Graham",
+      "column": "condemned",
+      "reason": "Graham County NC's Building Inspections office (Robbinsville) is phone-only; nuisance abatement runs through the Sheriff/county attorney in court per a 2023 NCDPS consent-judgment release, not a public portal; the one third-party-listed AGOL app link found is undated and unverifiable. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding (same phone-only + court-route conclusion), zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Graham",
+      "column": "vacancy",
+      "reason": "Graham County NC's Building Inspections office (Robbinsville) is phone-only; nuisance abatement runs through the Sheriff/county attorney in court per a 2023 NCDPS consent-judgment release, not a public portal; the one third-party-listed AGOL app link found is undated and unverifiable. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding (same phone-only + court-route conclusion), zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Graham",
+      "column": "vacant",
+      "reason": "Graham County NC's Building Inspections office (Robbinsville) is phone-only; nuisance abatement runs through the Sheriff/county attorney in court per a 2023 NCDPS consent-judgment release, not a public portal; the one third-party-listed AGOL app link found is undated and unverifiable. Independently corroborated the same day by the concurrent code_enforcement-column round's own finding (same phone-only + court-route conclusion), zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
     }
   ]
 }
