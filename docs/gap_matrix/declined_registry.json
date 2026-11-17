@@ -2825,6 +2825,118 @@
       "reason": "County runs the WTH 'tgis' legacy ASP.NET viewer (marionsc.wthgis.com), the same no-REST platform as Williamsburg's/Kershaw's/Dillon's/Marlboro's/Chesterfield's own subdomain -- live-tested 2026-11-17: /arcgis/rest/services and /server/rest/services both 404; only the HTML viewer root answers.",
       "confirmed_date": "2026-11-17",
       "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Pasquotank",
+      "column": "code_enforcement",
+      "reason": "County's own ArcGIS Online org (owner PasquotankCounty, orgId 0sC2n3LxYOcxBOg0) enumerated live via the ArcGIS sharing/rest search API: two zoning boundary layers (County_Zoning, County_Zoning_2026, CityZoning, Elizabeth_City_Zoning) plus several Animal Control feature services -- zero code-enforcement/violation/complaint-shaped service anywhere in the org. The county's own FAQ PDF (ZONING-CODE-ENFORCEMENT-FREQUENTLY-ASKED-QUESTIONS) and code-enforcement page both describe an online COMPLAINT APPLICATION (a non-anonymous intake form) as the only online function, not a case search. Elizabeth City (the county seat) runs a separate Code Enforcement Division with its own complaint-filing portal (anonymous complaints allowed there), also intake-only. No iWorQ/Socrata/data.gov dataset found. Round 13 left this cell unresolved (an unreadable FAQ PDF); this round gave it the real second look requested and found a clean, stronger negative via live GIS-org enumeration rather than the one dead PDF link.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Perquimans",
+      "column": "code_enforcement",
+      "reason": "No ArcGIS REST services directory found for the county on arcgis.com or the county's own domain (perquimanscountync.gov); building inspector (Erle Solesbee, 252-426-8283) reachable only by phone; third-party aggregators list only ordinance text (addressing, animal control, floodplain), no case-tracking system. Tiny rural county, same shape as Hyde/Tyrrell/Camden/Alleghany (prior rounds).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Wayne",
+      "column": "code_enforcement",
+      "reason": "County's own ArcGIS Online org (Wayne County, NC; orgId q2nSlChj7QgGTANO) enumerated live: Wayne_County_Zoning, Law_Districts, Sex_Offenders, EnerGov_Zoning (a zoning boundary layer, not case data -- same EnerGov zone-mislabel trap rounds 11/13 already generalized), and Incidents_View -- confirmed via its own live field schema (OBJECTID/Incident_Type/Date_Occurred/Closest_Address, Incident_Type values Downed Power Line/Flooded Street/Structural Damage/Road Closed) to be a storm/infrastructure-damage reporting layer, the storm_damage column's universe, not code_enforcement. Zero code-enforcement/violation-shaped service anywhere in the org.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Yadkin",
+      "column": "code_enforcement",
+      "reason": "County (Central Permitting, 213 East Elm St, Yadkinville) and the Town of Yadkinville both offer only a complaint FORM (PDF/web form submission), not a case search; no ArcGIS/Socrata dataset found for the county.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Madison",
+      "column": "code_enforcement",
+      "reason": "County has a Zoning Enforcement Officer and a Board of Adjustment that hears appeals (confirmed via UNC School of Government reference material), but no online case search, map, or dataset surfaced for the county or its towns (Marshall, Mars Hill). Tiny rural western-NC mountain county, same shape as prior tiny-rural declines.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Clarendon",
+      "column": "code_enforcement",
+      "reason": "County's Planning & Zoning / building department online services run entirely through Cloudpermit (a login-gated SaaS permitting platform with no public API or open dataset), named by the vendor on the county's own page, plus a separate payment portal. The county's own code-compliance-process PDF (articlex-codecomplianceprocess.pdf) describes inspections scheduled by phone; no public case list.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Jasper",
+      "column": "code_enforcement",
+      "reason": "Code Enforcement Unit sits under Emergency Services; the county's own pages describe phone/email complaint intake only (codeenforcement@jaspercountysc.gov, 843-547-8290); no case search or dataset found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Robeson",
+      "column": "code_enforcement",
+      "reason": "County GIS runs on ROKMAPS (maps2.roktech.net/ROKMAPS_Robeson), a different vendor than every ArcGIS-based producer in this project's code_enforcement tuple, so the ArcGIS Online org-search method used elsewhere doesn't apply; no code-enforcement-shaped layer named on it. Community Development dept (which houses Code Enforcement) publishes only a fee schedule and contact info; Lumberton (the county seat) also has no online violation portal, phone contact only (910-671-3838/3840).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Craven",
+      "column": "code_enforcement",
+      "reason": "No ArcGIS/Socrata/data.gov dataset found for the county or New Bern. New Bern's Development Services inspections division confirmed (via the city's own site) to handle nuisance abatement and minimum housing code enforcement, but publishes no online case search or dataset.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Moore",
+      "column": "code_enforcement",
+      "reason": "Village of Pinehurst reports violations via the \"MyVOP\" app/hotline (a citizen-reporting intake tool, not a public case search); Southern Pines inspections run through a SmartGov permit portal (permits, not violations); county Planning & Inspections enforces the UDO's enforcement/penalties chapter but publishes no online violation portal. No single county-wide searchable source.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Pender",
+      "column": "code_enforcement",
+      "reason": "County's Code Enforcement page (Zoning + Solid Waste ordinances only) offers an online complaint submission FORM and a phone line (Officer Charlie Ring, 910-259-1519), not a case search; a separate \"PORT Permitting Portal\" is for permits, not violations; no ArcGIS/Socrata dataset found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Dillon",
+      "column": "code_enforcement",
+      "reason": "Both the county's Building Code Enforcement Dept and the separate City of Dillon Dept of Code Enforcement are phone/in-person contact only; no portal, no EnerGov, no ArcGIS/Socrata dataset found for either.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Union",
+      "column": "code_enforcement",
+      "reason": "County's Code Enforcement Division (gearupunionsc.com) and its Building Safety & Floodplain Management dept are phone/email contact only; the City of Union's own Code Enforcement Office (within city limits) is also phone-contact only (864-429-1720); no case-search portal or dataset found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Marlboro",
+      "column": "code_enforcement",
+      "reason": "County's online permit portal (SC AccessGov) is in-person-submission-only per the vendor's own listing; no code-enforcement-specific portal, dataset, or case search found for the county or its towns (Bennettsville, McColl).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
     }
   ]
 }
