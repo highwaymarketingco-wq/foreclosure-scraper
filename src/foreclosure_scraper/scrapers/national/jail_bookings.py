@@ -4326,6 +4326,34 @@ def _to_listing(rec: dict, state: str, county: str) -> Listing:
         source_url = "https://mugshots.spartanburgsheriff.org/bookings/"
     elif state == "NC" and county == "Stokes":
         source_url = f"{CITIZEN_CONNECT_BASE}/bookingsearch/index.php?AgencyID=StokesCoNC"
+    # ROUND 16 FIX 2026-11-17 -- rounds 12/13 wired 8 counties into ROSTERS (7 Citizen
+    # Connect + Alexander's p2c_centralsquare) but never added their branch here, so every
+    # one of their bookings would have landed with source_url="" via the catch-all below
+    # (this function takes only (rec, state, county), never the ROSTERS target string, so
+    # there is no way for it to build the right URL without an explicit branch per county --
+    # same reason every other county above has its own line). Caught before any real run
+    # landed the gap: scripts/backfill_lancaster_code_enforcement.py's sibling check surfaced
+    # it while scoping the round 16 jail_booking catch-up. AgencyID values are each county's
+    # own ROSTERS target string (e.g. "ScotlandCoNC|") minus the trailing "|", same convention
+    # as every other Citizen Connect branch above.
+    elif state == "NC" and county == "Scotland":
+        source_url = f"{CITIZEN_CONNECT_BASE}/bookingsearch/index.php?AgencyID=ScotlandCoNC"
+    elif state == "SC" and county == "Dorchester":
+        source_url = f"{CITIZEN_CONNECT_BASE}/bookingsearch/index.php?AgencyID=DorchesterCoSC"
+    elif state == "NC" and county == "Sampson":
+        source_url = f"{CITIZEN_CONNECT_BASE}/bookingsearch/index.php?AgencyID=SampsonCoNC"
+    elif state == "NC" and county == "Surry":
+        source_url = f"{CITIZEN_CONNECT_BASE}/bookingsearch/index.php?AgencyID=SurryCoNC"
+    elif state == "NC" and county == "Edgecombe":
+        source_url = f"{CITIZEN_CONNECT_BASE}/bookingsearch/index.php?AgencyID=EdgecombeCoNC"
+    elif state == "NC" and county == "Greene":
+        source_url = f"{CITIZEN_CONNECT_BASE}/bookingsearch/index.php?AgencyID=GreeneCoNC"
+    elif state == "NC" and county == "Yancey":
+        source_url = f"{CITIZEN_CONNECT_BASE}/bookingsearch/index.php?AgencyID=YanceyCoNC"
+    elif state == "NC" and county == "Alexander":
+        # Same path convention as Rowan/Lexington's p2c_centralsquare human-facing page
+        # above -- the AgencyId (532) is an API query param, not part of this URL.
+        source_url = "https://alexandercountyso.policetocitizen.com/Inmates"
     else:
         source_url = ""
 
