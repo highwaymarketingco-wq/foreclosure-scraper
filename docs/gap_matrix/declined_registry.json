@@ -1433,6 +1433,574 @@
       "reason": "lincoln_code_violations.py's only structural-category field, VIOLATETYPE, is confirmed NULL on every row (round 8, 2026-10-02, re-confirmed); the only text evidence is free-text VIOLATEDESC. Live-resampled 2026-11-16: of the current 63 open cases, none names a formal condemnation action distinct from the broad 'dilapidated' catch-all (_SEVERE's deteriorat/condemn/uninhabit/unfit match, which also catches ordinary 'uninhabitable'-adjective complaints that never rose to an actual condemnation order). This codebase's own established rule (this file's 2026-11-16 docstring; durham_unsafe_building's narrower Topic-based split; spartanburg_condemned.py's condition_rating-vs-condemned split) is that this broad a match is too weak to assert raw['condemned'] -- only the narrower 'Abandoned structure' phrase (already wired to vacancy/vacant, not condemned) clears that bar here.",
       "confirmed_date": "2026-11-16",
       "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Lexington",
+      "column": "code_enforcement",
+      "reason": "No open-data/GIS portal carrying code-enforcement case data found for Lexington County or any of its incorporated cities (Cayce, West Columbia, Irmo, Chapin, town of Lexington). The county's own Planning & GIS page states most of its GIS layers are sold (a GIS Data Price List), not published; county code enforcement is run by Code Enforcement Officers of the Lexington County SHERIFF'S DEPARTMENT (lex-co.sc.gov/departments/community-development/zoning/code-enforcement), not a GIS/open-data team. Every guessed GIS hostname for the county and its cities (gis.lex-co.sc.gov, maps.lex-co.sc.gov) failed DNS resolution 2026-11-16.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Charleston",
+      "column": "code_enforcement",
+      "reason": "Directly queried the City of Charleston's own ArcGIS Server (gis.charleston-sc.gov/arcgis/rest/services) 2026-11-16: its 8 folders (Basemaps/External/Imagery/Internal/Internal_City/MEOC/Mobile/Utilities) and the public 'External' folder's 15 services (enumerated: geocoders, a StormwaterViewer, tourism/EngineeringStoryMap maps, PDI_Data) contain no code-enforcement/livability case layer. 'External/Service_Energov_Composite' confirms the city's permitting backend is EnerGov (Tyler Technologies) -- the same vendor independently confirmed on this same sweep to expose its case-level FeatureServer behind a hard token wall (Catawba County NC's energov_code_compliance/MapServer returned HTTP 499 'Token Required' live 2026-11-16) while only a zone-boundary layer is ever public (Wilmington NC and Greenville NC EnerGov instances, same sweep). The Livability Dept's own public channel is a phone/web complaint form into Livability Court, not a published dataset. Charleston COUNTY's GIS domain could not be located (gisweb/maps/gis.charlestoncounty.org all failed DNS).",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Rutherford",
+      "column": "code_enforcement",
+      "reason": "No code-enforcement case dataset found for Rutherford County or its two largest towns (Forest City, Rutherfordton); both towns' code enforcement runs through a citizen complaint form with no case-list output. gis.rutherfordcountync.gov resolves but returns a styled HTML page (not the ArcGIS REST JSON API) at the standard /arcgis/rest/services path, so no evidence of a usable public GIS REST service at all, let alone a code-enforcement one, as of 2026-11-16.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Brunswick",
+      "column": "code_enforcement",
+      "reason": "Brunswick County DOES run a real public ArcGIS Server (bcgis.brunswickcountync.gov), directly queried 2026-11-16, but its only case-shaped service is 'Inspections/CurrentInspections' (+FutureInspections/InspAppLayers), whose own field schema -- InspectionsKey, PermitNumber, InspectionType, Inspector, Applicant, permitType, contractor -- is a BUILDING-PERMIT inspection tracker (one row per scheduled permit inspection), not a code-violation case; the 'Layers' folder's Zoning/CondoUnits/Municipalities services carry no violation-case layer either. 'Community Enforcement' (the county's actual code-enforcement division, covering the Unified Development Ordinance + Solid Waste Ordinance) has no identifiable service anywhere in the server's 13 folders.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Horry",
+      "column": "code_enforcement",
+      "reason": "No open-data/GIS portal found for Horry County or Myrtle Beach. The county's own Code Enforcement page describes its function as building permits/inspections in the UNINCORPORATED county plus flood-program and commercial fire inspections -- not a violation-case tracker. Myrtle Beach's code enforcement runs through a monthly 'Quality of Life Court' (Construction Services dept) with no public dataset identified. Every guessed GIS hostname (gis.horrycounty.org, gis/maps.horrycountysc.gov, gis.cityofmyrtlebeach.com) failed DNS or timed out 2026-11-16. For comparison, Rock Hill SC (York County, already a built source per project_rock_hill_sc_code_enforcement_scoped_2026-10-29.md) is the only confirmed open code-enforcement case layer found anywhere in SC across this entire research pass.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Randolph",
+      "column": "code_enforcement",
+      "reason": "Directly queried the county's real public ArcGIS Server (gis.randolphcountync.gov/arcgis/rest/services) 2026-11-16: its 12 folders (EH, EM, Hosted, Pictometry, Planning, PublicWorks, PW, Sheriff, Tax, Test, TylerEPL, Utilities) and 11 root services contain no code-enforcement layer. The only case-shaped service, 'Planning/LandUseCases', is a zoning/land-use permit tracker, not a code-violation case (same paperwork/permit category the project's own gastonia_code_enforcement.py docstring already excludes from this signal). Asheboro's own code enforcement is complaint-driven with no published case list (a 2024 Randolph Hub article cites the city's officer reporting 198 investigations in 2023 verbally to council, not from a dataset).",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "New Hanover",
+      "column": "code_enforcement",
+      "reason": "Wilmington's permitting backend is EnerGov (Tyler Technologies); its own Code Enforcement page (wilmingtonnc.gov/Services/Code-Enforcement, fetched live 2026-11-16) funnels the public to a EnerGov citizen 'self-service' portal (wilmingtonnc-energovweb.tylerhost.net/apps/selfservice) that looks up ONE address/case number at a time -- it has no bulk or spatial-polygon query capability the way the project's Gastonia CityView locator does. geohub.wilmingtonnc.gov itself could not be reached directly today (connection timeout both with and without a longer timeout), but search-engine cache shows its public EnerGov MapServer exposes only a 'Code Enforcement Zones' polygon layer (zone boundaries, last updated 2022) -- the identical degenerate shape directly re-verified live today on a second EnerGov county (Greenville NC, gisonline.greenvillenc.gov: MapServer layer id 3 is the same 'Code Enforcement Zones' polygon layer, nothing case-level anywhere else in that MapServer) and consistent with EnerGov's actual case-level FeatureServer sitting behind a hard token wall (Catawba County NC: HTTP 499 'Token Required', verified live). Confidence held at medium rather than high because Wilmington's own service could not be reached directly this session.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Pickens",
+      "column": "code_enforcement",
+      "reason": "No open-data/GIS portal found for Pickens County or Easley (its largest city). Easley's Code Enforcement Department page is contact-only (no data feed); Pickens County's own public-records route is a FOIA request to the county, not a published dataset. Every guessed GIS hostname (gis.pickenscountysc.com, gis.co.pickens.sc.us, gis.pickenscountysc.gov) failed DNS 2026-11-16.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Sumter",
+      "column": "code_enforcement",
+      "reason": "Directly queried the one code-enforcement-named service the city publishes, gis.sumter-sc.com/server/rest/services/CodeEnforcement/CodeEnforcementZone/MapServer/0, live 2026-11-16: its field schema is Name, FieldID, luworker, Shape, OBJECTID, Headshot -- an OFFICER-ASSIGNMENT zone-boundary polygon layer (luworker = assigned officer, Headshot = officer photo), confirmed to carry no case/address/violation data at all. This is the server's only code-enforcement service; no case-level sibling layer exists in that folder.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Greenville",
+      "column": "code_enforcement",
+      "reason": "Directly queried the City of Greenville's ArcGIS Server (citygis.greenvillesc.gov/arcgis/rest/services) live 2026-11-16: its full 24-folder catalog (AddressSearch, AffordableHousingProjects, Cemetery, CommunityMaps, DevelopmentProjects, GeneralData, ParksandRecreation, RoadClosures, etc.) contains no code/enforcement/violation-named folder or service. Greenville COUNTY's separate Code Compliance division has moved its permit workflow to a third-party eTrakit portal (not open data, per the county's own Building Safety page); its GIS org (gcgis.org) root service catalog has only 1 generic basemap service.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Davidson",
+      "column": "code_enforcement",
+      "reason": "No open-data/GIS portal found for Davidson County or either of its two cities inside the gap cell's reach (Lexington NC, Thomasville NC). The county's own code (amlegal) only publishes ordinance TEXT, not case data. Every guessed GIS hostname (gis.co.davidson.nc.us, gis.davidsoncountync.gov, arcgis.co.davidson.nc.us) failed DNS 2026-11-16.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Cumberland",
+      "column": "code_enforcement",
+      "reason": "Fayetteville's own Code Enforcement Division page (fayettevillenc.gov/city-services/development-services/code-enforcement) offers a static downloadable spreadsheet of open/closed cases from the past 12 months -- a periodic manual export, not a live queryable API or dataset. The city's ArcGIS Open Data Hub (built specifically 'to ensure transparency', per its own Esri case study) publishes its own stated category list -- fire, planning/zoning, transportation, finance, parks -- which does not include code enforcement, confirmed by search of the portal's own description. Every guessed county/city GIS hostname beyond the Hub (gis.cumberlandcountync.gov, maps/gis.fayettevillenc.gov) failed DNS 2026-11-16.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Harnett",
+      "column": "condemned",
+      "reason": "Live-checked 2026-11-16: gis.harnett.org's full ArcGIS Server fully enumerated (33 folders). The one real case-level hit, Planning/Cases/MapServer/0, has a CaseType field whose distinct values include a literal 'CONDEMNTATION' entry -- but the whole layer is only 113 rows system-wide, and exactly 1 of those 113 has CaseType='CONDEMNTATION' (CASE_NO CEBU1812-0002, 'Condemned Structure', 2058 OAKRIDGE DUNCAN RD) -- opened 2018-12-13 (STARTED=1544659200000ms) and still marked STATUS='ACTIVE' eight years later (a stale, never-closed record, not a live signal), with DESCRIPTION/Violations/CODE_SECTION all null on that one row. CityWorks/CityWorksWorkOrders/MapServer/0 ('Facilities') is a county-asset layer (4 real fields: FacilityName/CityWorksID/FacilityID), not case data. Trakit/Trakit/MapServer/4 ('Trakit_Development', 86 fields) is subdivision/platting review data (DEVELOPMENT_STATUS, ZoningClassification, setback fields, etc.), no violation/case field anywhere. Not a viable production source for this county.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Harnett",
+      "column": "vacancy",
+      "reason": "Live-checked 2026-11-16: gis.harnett.org's full ArcGIS Server fully enumerated (33 folders). The one real case-level hit, Planning/Cases/MapServer/0, has a CaseType field whose distinct values include a literal 'CONDEMNTATION' entry -- but the whole layer is only 113 rows system-wide, and exactly 1 of those 113 has CaseType='CONDEMNTATION' (CASE_NO CEBU1812-0002, 'Condemned Structure', 2058 OAKRIDGE DUNCAN RD) -- opened 2018-12-13 (STARTED=1544659200000ms) and still marked STATUS='ACTIVE' eight years later (a stale, never-closed record, not a live signal), with DESCRIPTION/Violations/CODE_SECTION all null on that one row. CityWorks/CityWorksWorkOrders/MapServer/0 ('Facilities') is a county-asset layer (4 real fields: FacilityName/CityWorksID/FacilityID), not case data. Trakit/Trakit/MapServer/4 ('Trakit_Development', 86 fields) is subdivision/platting review data (DEVELOPMENT_STATUS, ZoningClassification, setback fields, etc.), no violation/case field anywhere. Not a viable production source for this county.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Harnett",
+      "column": "vacant",
+      "reason": "Live-checked 2026-11-16: gis.harnett.org's full ArcGIS Server fully enumerated (33 folders). The one real case-level hit, Planning/Cases/MapServer/0, has a CaseType field whose distinct values include a literal 'CONDEMNTATION' entry -- but the whole layer is only 113 rows system-wide, and exactly 1 of those 113 has CaseType='CONDEMNTATION' (CASE_NO CEBU1812-0002, 'Condemned Structure', 2058 OAKRIDGE DUNCAN RD) -- opened 2018-12-13 (STARTED=1544659200000ms) and still marked STATUS='ACTIVE' eight years later (a stale, never-closed record, not a live signal), with DESCRIPTION/Violations/CODE_SECTION all null on that one row. CityWorks/CityWorksWorkOrders/MapServer/0 ('Facilities') is a county-asset layer (4 real fields: FacilityName/CityWorksID/FacilityID), not case data. Trakit/Trakit/MapServer/4 ('Trakit_Development', 86 fields) is subdivision/platting review data (DEVELOPMENT_STATUS, ZoningClassification, setback fields, etc.), no violation/case field anywhere. Not a viable production source for this county.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Duplin",
+      "column": "condemned",
+      "reason": "Live-checked 2026-11-16: gis.duplinnc.gov's full ArcGIS Server fully enumerated (folders GISDB, NG911, OpenData, Orthophotography, PublicAccess, TaxMapping, Utilities). OpenData's own 4 services (Centerlines, Parcels, PublicAccessAuxOpenData, PublicAccessMainOpenData) are boundary/parcel/address layers. No code-enforcement, violation, condemnation or vacant-structure-named folder or service exists anywhere in the catalog.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Duplin",
+      "column": "vacancy",
+      "reason": "Live-checked 2026-11-16: gis.duplinnc.gov's full ArcGIS Server fully enumerated (folders GISDB, NG911, OpenData, Orthophotography, PublicAccess, TaxMapping, Utilities). OpenData's own 4 services (Centerlines, Parcels, PublicAccessAuxOpenData, PublicAccessMainOpenData) are boundary/parcel/address layers. No code-enforcement, violation, condemnation or vacant-structure-named folder or service exists anywhere in the catalog.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Duplin",
+      "column": "vacant",
+      "reason": "Live-checked 2026-11-16: gis.duplinnc.gov's full ArcGIS Server fully enumerated (folders GISDB, NG911, OpenData, Orthophotography, PublicAccess, TaxMapping, Utilities). OpenData's own 4 services (Centerlines, Parcels, PublicAccessAuxOpenData, PublicAccessMainOpenData) are boundary/parcel/address layers. No code-enforcement, violation, condemnation or vacant-structure-named folder or service exists anywhere in the catalog.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Lee",
+      "column": "condemned",
+      "reason": "Live-checked 2026-11-16: lee-arcgis.leecountync.gov's full ArcGIS Server fully enumerated (34 folders). The one EnerGov-branded folder, ENERGOV26 (services ENERGOV26/Map and ENERGOV26/Map1, 74-78 layers each), is reference/basemap data only -- parcels, zoning, utilities, floodplain, districts. Its own 'CodeEnforcement' layer is esriGeometryPolygon (an enforcement-zone boundary, the same rejected shape as this file's existing Alamance/Pitt/Sumter zone-boundary precedent), not case points. EnerGov's actual permitting/case database is not exposed through this county's public REST endpoint.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Lee",
+      "column": "vacancy",
+      "reason": "Live-checked 2026-11-16: lee-arcgis.leecountync.gov's full ArcGIS Server fully enumerated (34 folders). The one EnerGov-branded folder, ENERGOV26 (services ENERGOV26/Map and ENERGOV26/Map1, 74-78 layers each), is reference/basemap data only -- parcels, zoning, utilities, floodplain, districts. Its own 'CodeEnforcement' layer is esriGeometryPolygon (an enforcement-zone boundary, the same rejected shape as this file's existing Alamance/Pitt/Sumter zone-boundary precedent), not case points. EnerGov's actual permitting/case database is not exposed through this county's public REST endpoint.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Lee",
+      "column": "vacant",
+      "reason": "Live-checked 2026-11-16: lee-arcgis.leecountync.gov's full ArcGIS Server fully enumerated (34 folders). The one EnerGov-branded folder, ENERGOV26 (services ENERGOV26/Map and ENERGOV26/Map1, 74-78 layers each), is reference/basemap data only -- parcels, zoning, utilities, floodplain, districts. Its own 'CodeEnforcement' layer is esriGeometryPolygon (an enforcement-zone boundary, the same rejected shape as this file's existing Alamance/Pitt/Sumter zone-boundary precedent), not case points. EnerGov's actual permitting/case database is not exposed through this county's public REST endpoint.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Oconee",
+      "column": "condemned",
+      "reason": "Already checked, live, by this project's 2026-10-03 CAMA-condition recon (see arcgis_distress_layers.py's own comment, 35-county pass): Oconee's parcel layer -- the same endpoint parcel_cache.PARCEL_LAYERS['Oconee'] already queries for owner/mailing resolution -- was checked live for a condition/quality/demolition-style field and came back a genuine negative (no such field in its live schema). Cited here rather than re-run, per that comment's own record.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Oconee",
+      "column": "vacancy",
+      "reason": "Already checked, live, by this project's 2026-10-03 CAMA-condition recon (see arcgis_distress_layers.py's own comment, 35-county pass): Oconee's parcel layer -- the same endpoint parcel_cache.PARCEL_LAYERS['Oconee'] already queries for owner/mailing resolution -- was checked live for a condition/quality/demolition-style field and came back a genuine negative (no such field in its live schema). Cited here rather than re-run, per that comment's own record.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Oconee",
+      "column": "vacant",
+      "reason": "Already checked, live, by this project's 2026-10-03 CAMA-condition recon (see arcgis_distress_layers.py's own comment, 35-county pass): Oconee's parcel layer -- the same endpoint parcel_cache.PARCEL_LAYERS['Oconee'] already queries for owner/mailing resolution -- was checked live for a condition/quality/demolition-style field and came back a genuine negative (no such field in its live schema). Cited here rather than re-run, per that comment's own record.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Florence",
+      "column": "condemned",
+      "reason": "Already checked, live, by this project's 2026-10-03 CAMA-condition recon (see arcgis_distress_layers.py's own comment): Florence was one of the 13 SC parcel_cache.PARCEL_LAYERS counties explicitly swept for a condition/quality/demolition-style field in that 35-county pass and came back a genuine negative. Cited here rather than re-run, per that comment's own record.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Florence",
+      "column": "vacancy",
+      "reason": "Already checked, live, by this project's 2026-10-03 CAMA-condition recon (see arcgis_distress_layers.py's own comment): Florence was one of the 13 SC parcel_cache.PARCEL_LAYERS counties explicitly swept for a condition/quality/demolition-style field in that 35-county pass and came back a genuine negative. Cited here rather than re-run, per that comment's own record.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Florence",
+      "column": "vacant",
+      "reason": "Already checked, live, by this project's 2026-10-03 CAMA-condition recon (see arcgis_distress_layers.py's own comment): Florence was one of the 13 SC parcel_cache.PARCEL_LAYERS counties explicitly swept for a condition/quality/demolition-style field in that 35-county pass and came back a genuine negative. Cited here rather than re-run, per that comment's own record.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Colleton",
+      "column": "condemned",
+      "reason": "Two prior live checks, both already recorded in arcgis_distress_layers.py's own comments: (1) 2026-09-28 code-enforcement pass -- the one shape-matching hit on the county's AGOL org, CitizenProblemReports FeatureServer (layers literally named 'Blight Problems' and 'Building Problems'), is confirmed EMPTY (all 13 sub-layers return count:0), an unconfigured 'ArcGIS for Local Government' template; the real system is Accela Citizen Access, a stateful ASP.NET WebForms app with no plain-GET/JSON endpoint. (2) 2026-10-03 CAMA-condition recon -- Colleton's own PARCEL_LAYERS endpoint also checked for a condition field, genuine negative. Cited here rather than re-run.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Colleton",
+      "column": "vacancy",
+      "reason": "Two prior live checks, both already recorded in arcgis_distress_layers.py's own comments: (1) 2026-09-28 code-enforcement pass -- the one shape-matching hit on the county's AGOL org, CitizenProblemReports FeatureServer (layers literally named 'Blight Problems' and 'Building Problems'), is confirmed EMPTY (all 13 sub-layers return count:0), an unconfigured 'ArcGIS for Local Government' template; the real system is Accela Citizen Access, a stateful ASP.NET WebForms app with no plain-GET/JSON endpoint. (2) 2026-10-03 CAMA-condition recon -- Colleton's own PARCEL_LAYERS endpoint also checked for a condition field, genuine negative. Cited here rather than re-run.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Colleton",
+      "column": "vacant",
+      "reason": "Two prior live checks, both already recorded in arcgis_distress_layers.py's own comments: (1) 2026-09-28 code-enforcement pass -- the one shape-matching hit on the county's AGOL org, CitizenProblemReports FeatureServer (layers literally named 'Blight Problems' and 'Building Problems'), is confirmed EMPTY (all 13 sub-layers return count:0), an unconfigured 'ArcGIS for Local Government' template; the real system is Accela Citizen Access, a stateful ASP.NET WebForms app with no plain-GET/JSON endpoint. (2) 2026-10-03 CAMA-condition recon -- Colleton's own PARCEL_LAYERS endpoint also checked for a condition field, genuine negative. Cited here rather than re-run.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Berkeley",
+      "column": "condemned",
+      "reason": "Two prior live checks, both already recorded in arcgis_distress_layers.py's own comments: (1) 2026-09-28 code-enforcement pass -- the county's ArcGIS Server 'energov' and 'internal' folders return 403 Forbidden; Goose Creek's own EnerGov/OpenGov folders return '499 Token Required' -- explicit login/token walls; everything actually public (a 77-layer composite map, a 'custom' folder) is zoning/parcel/flood/school/voting boundary data only. (2) 2026-10-03 CAMA-condition recon -- Berkeley's own PARCEL_LAYERS endpoint also checked for a condition field, genuine negative. Cited here rather than re-run.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Berkeley",
+      "column": "vacancy",
+      "reason": "Two prior live checks, both already recorded in arcgis_distress_layers.py's own comments: (1) 2026-09-28 code-enforcement pass -- the county's ArcGIS Server 'energov' and 'internal' folders return 403 Forbidden; Goose Creek's own EnerGov/OpenGov folders return '499 Token Required' -- explicit login/token walls; everything actually public (a 77-layer composite map, a 'custom' folder) is zoning/parcel/flood/school/voting boundary data only. (2) 2026-10-03 CAMA-condition recon -- Berkeley's own PARCEL_LAYERS endpoint also checked for a condition field, genuine negative. Cited here rather than re-run.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Berkeley",
+      "column": "vacant",
+      "reason": "Two prior live checks, both already recorded in arcgis_distress_layers.py's own comments: (1) 2026-09-28 code-enforcement pass -- the county's ArcGIS Server 'energov' and 'internal' folders return 403 Forbidden; Goose Creek's own EnerGov/OpenGov folders return '499 Token Required' -- explicit login/token walls; everything actually public (a 77-layer composite map, a 'custom' folder) is zoning/parcel/flood/school/voting boundary data only. (2) 2026-10-03 CAMA-condition recon -- Berkeley's own PARCEL_LAYERS endpoint also checked for a condition field, genuine negative. Cited here rather than re-run.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Laurens",
+      "column": "condemned",
+      "reason": "Already checked, live, by this project's 2026-10-03 CAMA-condition recon (see arcgis_distress_layers.py's own comment): Laurens's own parcel_cache.PARCEL_LAYERS endpoint was checked for a condition/quality/demolition-style field and came back a genuine negative. (The county's separate City-of-Clinton PARCEL_LAYERS-adjacent 'CityOwnedParcels' entry, used elsewhere in this file for a different ledger, is a tax-surplus parcel registry, not a code case source.) Cited here rather than re-run.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Laurens",
+      "column": "vacancy",
+      "reason": "Already checked, live, by this project's 2026-10-03 CAMA-condition recon (see arcgis_distress_layers.py's own comment): Laurens's own parcel_cache.PARCEL_LAYERS endpoint was checked for a condition/quality/demolition-style field and came back a genuine negative. (The county's separate City-of-Clinton PARCEL_LAYERS-adjacent 'CityOwnedParcels' entry, used elsewhere in this file for a different ledger, is a tax-surplus parcel registry, not a code case source.) Cited here rather than re-run.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Laurens",
+      "column": "vacant",
+      "reason": "Already checked, live, by this project's 2026-10-03 CAMA-condition recon (see arcgis_distress_layers.py's own comment): Laurens's own parcel_cache.PARCEL_LAYERS endpoint was checked for a condition/quality/demolition-style field and came back a genuine negative. (The county's separate City-of-Clinton PARCEL_LAYERS-adjacent 'CityOwnedParcels' entry, used elsewhere in this file for a different ledger, is a tax-surplus parcel registry, not a code case source.) Cited here rather than re-run.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Johnston",
+      "column": "condemned",
+      "reason": "Live-checked 2026-11-16: cityworks.johnstonnc.com's full ArcGIS Server fully enumerated (12 folders). The 'Community' folder is EMPTY -- zero services. The 'Planning' folder's two services (Land_Use, Preliminary_Survey_Lots) are subdivision/zoning-review layers, no violation or case field. No code-enforcement, condemnation or vacant-structure-named folder exists anywhere in the catalog.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Johnston",
+      "column": "vacancy",
+      "reason": "Live-checked 2026-11-16: cityworks.johnstonnc.com's full ArcGIS Server fully enumerated (12 folders). The 'Community' folder is EMPTY -- zero services. The 'Planning' folder's two services (Land_Use, Preliminary_Survey_Lots) are subdivision/zoning-review layers, no violation or case field. No code-enforcement, condemnation or vacant-structure-named folder exists anywhere in the catalog.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Johnston",
+      "column": "vacant",
+      "reason": "Live-checked 2026-11-16: cityworks.johnstonnc.com's full ArcGIS Server fully enumerated (12 folders). The 'Community' folder is EMPTY -- zero services. The 'Planning' folder's two services (Land_Use, Preliminary_Survey_Lots) are subdivision/zoning-review layers, no violation or case field. No code-enforcement, condemnation or vacant-structure-named folder exists anywhere in the catalog.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "McDowell",
+      "column": "condemned",
+      "reason": "Already checked, live, by this project's 2026-10-03 CAMA-condition recon (see arcgis_distress_layers.py's own comment, which explicitly names McDowell in its 22-county NC list): no condition/quality/demolition-style field found in its live schema. Cited here rather than re-run.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "McDowell",
+      "column": "vacancy",
+      "reason": "Already checked, live, by this project's 2026-10-03 CAMA-condition recon (see arcgis_distress_layers.py's own comment, which explicitly names McDowell in its 22-county NC list): no condition/quality/demolition-style field found in its live schema. Cited here rather than re-run.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "McDowell",
+      "column": "vacant",
+      "reason": "Already checked, live, by this project's 2026-10-03 CAMA-condition recon (see arcgis_distress_layers.py's own comment, which explicitly names McDowell in its 22-county NC list): no condition/quality/demolition-style field found in its live schema. Cited here rather than re-run.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Hoke",
+      "column": "condemned",
+      "reason": "Live field-list check 2026-11-16 of the county's own already-wired parcel layer (maps.hokecounty.org/server/rest/services/Parcels/MapServer/0 -- the same endpoint parcel_cache.PARCEL_LAYERS['Hoke'] already queries for owner/mailing resolution; Hoke was NOT among the 35 counties the 2026-10-03 CAMA recon covered, so this is a genuinely new check). All 31 fields enumerated: the only two candidates are NOTE_1 (a plat/subdivision text reference -- live sample returns values like '#45 HENDRIX FARMS 3-52/5', not condition text) and STATUS (a degenerate code -- a live distinct-value query returns only {None, '', '0', '1', '01'}, the exact 'field LOOKED right but was degenerate/ambiguous' trap this file's own Greenwood writeup warns against). No condition, violation or case field exists on this layer.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Hoke",
+      "column": "vacancy",
+      "reason": "Live field-list check 2026-11-16 of the county's own already-wired parcel layer (maps.hokecounty.org/server/rest/services/Parcels/MapServer/0 -- the same endpoint parcel_cache.PARCEL_LAYERS['Hoke'] already queries for owner/mailing resolution; Hoke was NOT among the 35 counties the 2026-10-03 CAMA recon covered, so this is a genuinely new check). All 31 fields enumerated: the only two candidates are NOTE_1 (a plat/subdivision text reference -- live sample returns values like '#45 HENDRIX FARMS 3-52/5', not condition text) and STATUS (a degenerate code -- a live distinct-value query returns only {None, '', '0', '1', '01'}, the exact 'field LOOKED right but was degenerate/ambiguous' trap this file's own Greenwood writeup warns against). No condition, violation or case field exists on this layer.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Hoke",
+      "column": "vacant",
+      "reason": "Live field-list check 2026-11-16 of the county's own already-wired parcel layer (maps.hokecounty.org/server/rest/services/Parcels/MapServer/0 -- the same endpoint parcel_cache.PARCEL_LAYERS['Hoke'] already queries for owner/mailing resolution; Hoke was NOT among the 35 counties the 2026-10-03 CAMA recon covered, so this is a genuinely new check). All 31 fields enumerated: the only two candidates are NOTE_1 (a plat/subdivision text reference -- live sample returns values like '#45 HENDRIX FARMS 3-52/5', not condition text) and STATUS (a degenerate code -- a live distinct-value query returns only {None, '', '0', '1', '01'}, the exact 'field LOOKED right but was degenerate/ambiguous' trap this file's own Greenwood writeup warns against). No condition, violation or case field exists on this layer.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Cherokee",
+      "column": "condemned",
+      "reason": "Live-checked 2026-11-16: the county's own GIS page (cherokeecountysc.gov/gis-mapping) states its GIS Analyst position is currently vacant, creating a map-update backlog, and links only a static Assessor parcel-map page (cherokeecountysc.gov/assessor/mapping/) plus a third-party land-records search (sclandrecords.com) -- no ArcGIS REST services directory, portal or web-map application of any kind is published. No case-level or condition data source exists to check.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Cherokee",
+      "column": "vacancy",
+      "reason": "Live-checked 2026-11-16: the county's own GIS page (cherokeecountysc.gov/gis-mapping) states its GIS Analyst position is currently vacant, creating a map-update backlog, and links only a static Assessor parcel-map page (cherokeecountysc.gov/assessor/mapping/) plus a third-party land-records search (sclandrecords.com) -- no ArcGIS REST services directory, portal or web-map application of any kind is published. No case-level or condition data source exists to check.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Cherokee",
+      "column": "vacant",
+      "reason": "Live-checked 2026-11-16: the county's own GIS page (cherokeecountysc.gov/gis-mapping) states its GIS Analyst position is currently vacant, creating a map-update backlog, and links only a static Assessor parcel-map page (cherokeecountysc.gov/assessor/mapping/) plus a third-party land-records search (sclandrecords.com) -- no ArcGIS REST services directory, portal or web-map application of any kind is published. No case-level or condition data source exists to check.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Anderson",
+      "column": "condemned",
+      "reason": "Already checked twice: (1) 2026-10-03 CAMA-condition recon (see arcgis_distress_layers.py's own comment, which explicitly names Anderson in its SC list) -- no condition field found. (2) This file's own 2026-11-10 pass separately live-reconfirmed the city-level Anderson code-enforcement layer (gis.cityofandersonsc.com/MunicipalBusiness/CodeEnforcement/MapServer/0) at only 10 total rows, Address/OwnerName/TMS null on 9 of 10 (the other being an obvious test record, 'Test 1'/'123'). Cited here rather than re-run.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Anderson",
+      "column": "vacancy",
+      "reason": "Already checked twice: (1) 2026-10-03 CAMA-condition recon (see arcgis_distress_layers.py's own comment, which explicitly names Anderson in its SC list) -- no condition field found. (2) This file's own 2026-11-10 pass separately live-reconfirmed the city-level Anderson code-enforcement layer (gis.cityofandersonsc.com/MunicipalBusiness/CodeEnforcement/MapServer/0) at only 10 total rows, Address/OwnerName/TMS null on 9 of 10 (the other being an obvious test record, 'Test 1'/'123'). Cited here rather than re-run.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Anderson",
+      "column": "vacant",
+      "reason": "Already checked twice: (1) 2026-10-03 CAMA-condition recon (see arcgis_distress_layers.py's own comment, which explicitly names Anderson in its SC list) -- no condition field found. (2) This file's own 2026-11-10 pass separately live-reconfirmed the city-level Anderson code-enforcement layer (gis.cityofandersonsc.com/MunicipalBusiness/CodeEnforcement/MapServer/0) at only 10 total rows, Address/OwnerName/TMS null on 9 of 10 (the other being an obvious test record, 'Test 1'/'123'). Cited here rather than re-run.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Polk",
+      "column": "condemned",
+      "reason": "Already checked, live, by this project's 2026-10-03 CAMA-condition recon (see arcgis_distress_layers.py's own comment, which explicitly names Polk in its 22-county NC list -- the same TMS-based parcel layer parcel_cache.PARCEL_LAYERS['Polk'] already uses): no condition/quality/demolition-style field found in its live schema. Cited here rather than re-run.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Polk",
+      "column": "vacancy",
+      "reason": "Already checked, live, by this project's 2026-10-03 CAMA-condition recon (see arcgis_distress_layers.py's own comment, which explicitly names Polk in its 22-county NC list -- the same TMS-based parcel layer parcel_cache.PARCEL_LAYERS['Polk'] already uses): no condition/quality/demolition-style field found in its live schema. Cited here rather than re-run.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Polk",
+      "column": "vacant",
+      "reason": "Already checked, live, by this project's 2026-10-03 CAMA-condition recon (see arcgis_distress_layers.py's own comment, which explicitly names Polk in its 22-county NC list -- the same TMS-based parcel layer parcel_cache.PARCEL_LAYERS['Polk'] already uses): no condition/quality/demolition-style field found in its live schema. Cited here rather than re-run.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Union",
+      "column": "condemned",
+      "reason": "Live-checked 2026-11-16: both of the county's public ArcGIS hosts fully enumerated -- atlas.unioncountync.gov (5 folders, 33+ services) and gis.unioncountync.gov's UnionGoMaps map service (parcels/zoning/schools/parks layers, no case layer). The only enforcement-named layer, BCE_Commercial_Inspections_Zones/MapServer/0, is esriGeometryPolygon (an inspector-zone boundary, the same rejected shape as this file's existing Alamance/Pitt/Sumter zone-boundary precedent), not case points. No violation, condemnation or vacant-structure-named layer exists in either catalog. (This file's own 2026-09-28 pass summary line already named Union NC as checked-and-rejected in this research family; this pass independently re-confirmed it with live layer-level evidence.)",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Union",
+      "column": "vacancy",
+      "reason": "Live-checked 2026-11-16: both of the county's public ArcGIS hosts fully enumerated -- atlas.unioncountync.gov (5 folders, 33+ services) and gis.unioncountync.gov's UnionGoMaps map service (parcels/zoning/schools/parks layers, no case layer). The only enforcement-named layer, BCE_Commercial_Inspections_Zones/MapServer/0, is esriGeometryPolygon (an inspector-zone boundary, the same rejected shape as this file's existing Alamance/Pitt/Sumter zone-boundary precedent), not case points. No violation, condemnation or vacant-structure-named layer exists in either catalog. (This file's own 2026-09-28 pass summary line already named Union NC as checked-and-rejected in this research family; this pass independently re-confirmed it with live layer-level evidence.)",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Union",
+      "column": "vacant",
+      "reason": "Live-checked 2026-11-16: both of the county's public ArcGIS hosts fully enumerated -- atlas.unioncountync.gov (5 folders, 33+ services) and gis.unioncountync.gov's UnionGoMaps map service (parcels/zoning/schools/parks layers, no case layer). The only enforcement-named layer, BCE_Commercial_Inspections_Zones/MapServer/0, is esriGeometryPolygon (an inspector-zone boundary, the same rejected shape as this file's existing Alamance/Pitt/Sumter zone-boundary precedent), not case points. No violation, condemnation or vacant-structure-named layer exists in either catalog. (This file's own 2026-09-28 pass summary line already named Union NC as checked-and-rejected in this research family; this pass independently re-confirmed it with live layer-level evidence.)",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Hyde",
+      "column": "condemned",
+      "reason": "Live-checked 2026-11-16: the only domain found for a dedicated county GIS host, hydecountygis.com, does not resolve (DNS failure, curl exit on connect). The county's own primary domain (hydecountync.gov) redirects to a generic Revize-hosted informational CMS site (cms2.revize.com/revize/hydecounty/), a basic municipal-website platform with no ArcGIS or REST infrastructure. A 2012 county planning-department reorganization document shows the entire code-enforcement function was a single Building Inspector/Floodplain Manager position with no public case system; Hyde is NC's 2nd-least-populous county (~4,500 residents) with no indication this has since grown into a public GIS dataset. No GIS infrastructure exists to check.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Hyde",
+      "column": "vacancy",
+      "reason": "Live-checked 2026-11-16: the only domain found for a dedicated county GIS host, hydecountygis.com, does not resolve (DNS failure, curl exit on connect). The county's own primary domain (hydecountync.gov) redirects to a generic Revize-hosted informational CMS site (cms2.revize.com/revize/hydecounty/), a basic municipal-website platform with no ArcGIS or REST infrastructure. A 2012 county planning-department reorganization document shows the entire code-enforcement function was a single Building Inspector/Floodplain Manager position with no public case system; Hyde is NC's 2nd-least-populous county (~4,500 residents) with no indication this has since grown into a public GIS dataset. No GIS infrastructure exists to check.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Hyde",
+      "column": "vacant",
+      "reason": "Live-checked 2026-11-16: the only domain found for a dedicated county GIS host, hydecountygis.com, does not resolve (DNS failure, curl exit on connect). The county's own primary domain (hydecountync.gov) redirects to a generic Revize-hosted informational CMS site (cms2.revize.com/revize/hydecounty/), a basic municipal-website platform with no ArcGIS or REST infrastructure. A 2012 county planning-department reorganization document shows the entire code-enforcement function was a single Building Inspector/Floodplain Manager position with no public case system; Hyde is NC's 2nd-least-populous county (~4,500 residents) with no indication this has since grown into a public GIS dataset. No GIS infrastructure exists to check.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Orange",
+      "column": "condemned",
+      "reason": "Already checked, live, by this project's 2026-09-28 code-enforcement pass (see arcgis_distress_layers.py's own comment): gis.orangecountync.gov's EnerGov 'Planning' layer carries only Name/Description/CreatedDate (a sampled record was a rezoning case, not a violation); Chapel Hill's ArcGIS Hub has SeeClickFix requests and a permit tool, no violation dataset; Carrboro's old GIS host is dead (NXDOMAIN). Cited here rather than re-run.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Orange",
+      "column": "vacancy",
+      "reason": "Already checked, live, by this project's 2026-09-28 code-enforcement pass (see arcgis_distress_layers.py's own comment): gis.orangecountync.gov's EnerGov 'Planning' layer carries only Name/Description/CreatedDate (a sampled record was a rezoning case, not a violation); Chapel Hill's ArcGIS Hub has SeeClickFix requests and a permit tool, no violation dataset; Carrboro's old GIS host is dead (NXDOMAIN). Cited here rather than re-run.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Orange",
+      "column": "vacant",
+      "reason": "Already checked, live, by this project's 2026-09-28 code-enforcement pass (see arcgis_distress_layers.py's own comment): gis.orangecountync.gov's EnerGov 'Planning' layer carries only Name/Description/CreatedDate (a sampled record was a rezoning case, not a violation); Chapel Hill's ArcGIS Hub has SeeClickFix requests and a permit tool, no violation dataset; Carrboro's old GIS host is dead (NXDOMAIN). Cited here rather than re-run.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Cabarrus",
+      "column": "condemned",
+      "reason": "Live-checked 2026-11-16: both of the county's ArcGIS hosts fully enumerated -- location.cabarruscounty.us/arcgisservices (22 folders, incl. Accela, Current_Accela_Permits, OpenData, CCAWARE, views) and its sibling /arcgishost (6 folders). Accela/APO/MapServer/0 ('APO_Accela') is an address-point geocoding reference layer, no case fields. Current_Accela_Permits/Plan_Reviews is a building-permit PLAN-REVIEW-stage layer (intake review, not code violations). OpenData's 34 services are all boundary/zoning/historical-parcel-snapshot layers. CCAWARE is AED locations + school points, unrelated. No code-enforcement, condemnation or vacant-structure layer exists in either catalog.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Cabarrus",
+      "column": "vacancy",
+      "reason": "Live-checked 2026-11-16: both of the county's ArcGIS hosts fully enumerated -- location.cabarruscounty.us/arcgisservices (22 folders, incl. Accela, Current_Accela_Permits, OpenData, CCAWARE, views) and its sibling /arcgishost (6 folders). Accela/APO/MapServer/0 ('APO_Accela') is an address-point geocoding reference layer, no case fields. Current_Accela_Permits/Plan_Reviews is a building-permit PLAN-REVIEW-stage layer (intake review, not code violations). OpenData's 34 services are all boundary/zoning/historical-parcel-snapshot layers. CCAWARE is AED locations + school points, unrelated. No code-enforcement, condemnation or vacant-structure layer exists in either catalog.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Cabarrus",
+      "column": "vacant",
+      "reason": "Live-checked 2026-11-16: both of the county's ArcGIS hosts fully enumerated -- location.cabarruscounty.us/arcgisservices (22 folders, incl. Accela, Current_Accela_Permits, OpenData, CCAWARE, views) and its sibling /arcgishost (6 folders). Accela/APO/MapServer/0 ('APO_Accela') is an address-point geocoding reference layer, no case fields. Current_Accela_Permits/Plan_Reviews is a building-permit PLAN-REVIEW-stage layer (intake review, not code violations). OpenData's 34 services are all boundary/zoning/historical-parcel-snapshot layers. CCAWARE is AED locations + school points, unrelated. No code-enforcement, condemnation or vacant-structure layer exists in either catalog.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Scotland",
+      "column": "condemned",
+      "reason": "Live-checked 2026-11-16: the county's own linked 'Access GIS Portal' webapp (laurinburg.maps.arcgis.com) resolves to an AGOL org (id bgKigTDifCMNj8OU) whose FULL 22-service catalog was enumerated directly via its REST root, not just the 16 layers on that one public webmap -- cemeteries, roads, railroads, flood zones, soils, zoning, parcels, voting districts, easements, boundaries. Zero code-enforcement, violation, condemnation or vacant-structure content anywhere in the org's entire public offering.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Scotland",
+      "column": "vacancy",
+      "reason": "Live-checked 2026-11-16: the county's own linked 'Access GIS Portal' webapp (laurinburg.maps.arcgis.com) resolves to an AGOL org (id bgKigTDifCMNj8OU) whose FULL 22-service catalog was enumerated directly via its REST root, not just the 16 layers on that one public webmap -- cemeteries, roads, railroads, flood zones, soils, zoning, parcels, voting districts, easements, boundaries. Zero code-enforcement, violation, condemnation or vacant-structure content anywhere in the org's entire public offering.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Scotland",
+      "column": "vacant",
+      "reason": "Live-checked 2026-11-16: the county's own linked 'Access GIS Portal' webapp (laurinburg.maps.arcgis.com) resolves to an AGOL org (id bgKigTDifCMNj8OU) whose FULL 22-service catalog was enumerated directly via its REST root, not just the 16 layers on that one public webmap -- cemeteries, roads, railroads, flood zones, soils, zoning, parcels, voting districts, easements, boundaries. Zero code-enforcement, violation, condemnation or vacant-structure content anywhere in the org's entire public offering.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Davidson",
+      "column": "vacancy",
+      "reason": "Already checked, live, by this project's 2026-09-28 code-enforcement pass (see arcgis_distress_layers.py's own comment): webgis.co.davidson.nc.us's Lexington/OpenGov folders (OpenGovParcelFlags, PlanningWarningLayer) are parcel/assessment master data only, no case number or violation-status field anywhere; the one promising 'Code Enforcement Service Requests' AGOL item is owned by gis_lfucg -- Lexington-Fayette, KENTUCKY, a name collision with Lexington NC (Davidson's own county seat), and org-private besides. Cited here rather than re-run.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Davidson",
+      "column": "vacant",
+      "reason": "Already checked, live, by this project's 2026-09-28 code-enforcement pass (see arcgis_distress_layers.py's own comment): webgis.co.davidson.nc.us's Lexington/OpenGov folders (OpenGovParcelFlags, PlanningWarningLayer) are parcel/assessment master data only, no case number or violation-status field anywhere; the one promising 'Code Enforcement Service Requests' AGOL item is owned by gis_lfucg -- Lexington-Fayette, KENTUCKY, a name collision with Lexington NC (Davidson's own county seat), and org-private besides. Cited here rather than re-run.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     }
   ]
 }
