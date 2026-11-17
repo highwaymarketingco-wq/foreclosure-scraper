@@ -548,6 +548,27 @@ ROSTERS: list[tuple[str, str, str, str]] = [
     # ABET IMPAIRED DRIVING; FAILURE TO APPEAR ON MISD". No JMSAgencyID needed (same as
     # Rutherford above -- this tenant accepts a blank value).
     ("NC", "Stokes", "citizen_connect", "StokesCoNC|"),
+
+    # ROUND 12 DISCOVERIES 2026-11-17 -- gap_matrix jail_booking/jail_booking_new "no source
+    # known" bucket, re-derived fresh (173 cells/177,759 rows) after round 8 (2026-11-16) left
+    # 11 counties genuinely untouched. Same bounded live probe round 8/round-11-sibling sessions
+    # already used (AgencyID="{County}Co{State}" against the Southern Software Citizen Connect
+    # tenant every other entry in this family already proves real), widened this time from the
+    # historically-hardest 12 counties to EVERY county still in the bucket -- these 7 hits came
+    # from OUTSIDE that hard-12 set (only Scotland/Dorchester below were actually on round 8's own
+    # "untouched" list; the other 5 were never manually researched at all before this pass). Zero
+    # new fetcher code -- same already-wired _fetch_citizen_connect. Also re-ran the full p2c_jqgrid
+    # + Southern Software DCN self-hosted-domain guess patterns against all 77 counties still
+    # unresolved after this -- 0 further hits (those two vendor families are genuinely absent from
+    # this bucket, not just unguessed). Live-verified every one of the 7 through the real
+    # _fetch_citizen_connect (not just the probe's own cheap "booking-card present" check):
+    ("NC", "Scotland", "citizen_connect", "ScotlandCoNC|"),   # 154 in custody; e.g. ADAMS DAMIEN, DOB 04/09/1997, arrested 10/21/2026, "F SECOND DEGREE FORCE SEX OFF" -- one of round 8's own 11 named-untouched counties
+    ("SC", "Dorchester", "citizen_connect", "DorchesterCoSC|"),  # 330 in custody; e.g. ACKERMAN ROXANNE, arrested 07/16/2026, "TRAFFICKING FENTANYL 4 GRAMS OR MORE 2ND OR SUB" -- also one of round 8's 11
+    ("NC", "Sampson", "citizen_connect", "SampsonCoNC|"),     # 265 in custody; e.g. ABUHAMMOUD NOUR-AL-DEEN, arrested 09/16/2026, "DWI; Reckless Driving to Endanger; Fail to Maintain Lane Con"
+    ("NC", "Surry", "citizen_connect", "SurryCoNC|"),         # 311 in custody; e.g. ADAMS AMANDA, DOB 09/22/1984, arrested 06/08/2026
+    ("NC", "Edgecombe", "citizen_connect", "EdgecombeCoNC|"), # 267 in custody; e.g. ALFORD EMANUEL, arrested 07/01/2026, "ATEMT FIRST DEGREE FORCE SEX OFFENDER"
+    ("NC", "Greene", "citizen_connect", "GreeneCoNC|"),       # 73 in custody; e.g. ALPUCHE MARIO, arrested 11/06/2026
+    ("NC", "Yancey", "citizen_connect", "YanceyCoNC|"),       # 39 in custody; e.g. BOSTON JARED, arrested 10/09/2026, "FAILURE TO APPEAR ON FELONY"
 ]
 
 # Southern Software hosts every Citizen Connect tenant off one origin; the
