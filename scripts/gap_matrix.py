@@ -744,7 +744,28 @@ SPECS: dict[str, Spec] = {
                                                  # the live evidence (3,570 real matured-arrears rows,
                                                  # TaxYear<=2025, e.g. parcel 6-064-091, $3,311.43
                                                  # still owed since 2017).
-                                                 "scrapers/counties_nc/craven_tax_table.py"),
+                                                 "scrapers/counties_nc/craven_tax_table.py",
+                                                 # 2026-11-17 (round 19): producers-tuple-omission fix,
+                                                 # same bug class flagged but not yet fixed in round 18's
+                                                 # own notes. nc_its_public_tax.py's _canonical_multi_year()
+                                                 # DOES write raw['multi_year_delinquent_tax'] (byte-shape-
+                                                 # compatible with the generic multi_year_delinquent_tax.py
+                                                 # module) for every one of its 15 covered counties
+                                                 # (Onslow/Graham/Alleghany/Anson/Caswell/Duplin/Granville/
+                                                 # Harnett/Jones/Person/Scotland/Yadkin/Brunswick/Carteret/
+                                                 # Moore) whenever a parcel has >=2 distinct years with at
+                                                 # least one matured -- but was only ever in
+                                                 # two_year_delinquent's own producers tuple below, never
+                                                 # this one, so counties_named_in()'s blanket grep never
+                                                 # looked inside it for THIS column. Moore (this round's own
+                                                 # 1,557-row gap) is the one of those 15 counties in this
+                                                 # round's scope; confirmed via classify_cell()'s own logic
+                                                 # that Moore reading "no source known" here (not
+                                                 # built-but-low-yield) requires ran=False, i.e. zero real
+                                                 # Moore board rows currently carry a qualifying multi-year
+                                                 # block -- a real, measured zero-yield-so-far result once
+                                                 # this fix lands, not a wiring gap.
+                                                 "scrapers/counties_nc/nc_its_public_tax.py"),
                                       doc="raw.multi_year_delinquent_tax present; checked = the tax roll was read "
                                           "(any property-tax block on the row)"),
     "repeat_tax_loss": Spec(_S, "derived", "tax", producers=("enrichment_repeat_tax_loss.py",),
@@ -1098,7 +1119,28 @@ SPECS: dict[str, Spec] = {
                                                               # own module docstring and
                                                               # declined_registry.json.
                                                               "enrichment_macon_rollback_exposure.py",
-                                                              "enrichment_haywood_rollback_exposure.py"),
+                                                              "enrichment_haywood_rollback_exposure.py",
+                                                              # 2026-11-17 (round 19): Currituck's own
+                                                              # NC-DOR "AA502" certified-parcel export
+                                                              # (currituckcountync.gov/tax/tax-data/,
+                                                              # a direct XLSX download, not an ArcGIS
+                                                              # REST service -- the county's own live
+                                                              # GIS carries no CAMA/tax field at all,
+                                                              # confirmed again this round). See
+                                                              # enrichment_currituck_rollback_exposure.py's
+                                                              # own module docstring for the live
+                                                              # evidence (1,013 real nonzero USE_VALUE_
+                                                              # deferrals parsed) and the parcel-join
+                                                              # derivation (board parcel_id = the
+                                                              # county's own GLOBAL_PIN digits-only,
+                                                              # zero-padded). Backfilled for real against
+                                                              # the live board this round: 435 eligible
+                                                              # rows, 3 real matches -- a genuine,
+                                                              # measured low-yield result (this board's
+                                                              # own Currituck population mostly isn't the
+                                                              # large-acreage present-use shape), not a
+                                                              # wiring gap.
+                                                              "enrichment_currituck_rollback_exposure.py"),
                               doc="raw.rollback_exposure present (present-use/ag deferral rollback)"),
     "jail_booking": Spec(_S, "county", "jail", applies="person", ledger="jail_booking",
                          producers=("enrichment_jail_bookings.py", "scrapers/national/jail_bookings.py",
@@ -1345,9 +1387,44 @@ SPECS: dict[str, Spec] = {
                                    "scrapers/public_notices/nc_heir_notices.py"),
                         doc="is_quiet_title on raw.column/court/case/rod_docs/heir_naming_publication"),
     # ---- attorney checklist --------------------------------------------------------------
+    # 2026-11-17 (round-19 misc residual "no source known" sweep): same bug-class as
+    # atty_heir_candidates/atty_probate_case/atty_rod_lien_checked above -- `producers` was
+    # never set at all (empty by the dataclass default), so built_in_code()'s counties_named_in()
+    # grep had nothing to scan for it and classify_cell() could never return "built-but-low-yield"
+    # for this column no matter how much real code covers a county; every county with a gap read
+    # "no source known" categorically. legal_description_present() (above) already names the real
+    # raw keys this column's claim can come from: gis_attrs_full (enrichment_gis_attrs.py), the
+    # gis_fill.py-written county_legal, lawyer_lane.py's deed_latest, mcdowell_probate.py, and
+    # enrichment_bt_parcel_info.py's bt_parcel_info (that last one found uncredited anywhere, same
+    # exact shape, by its own 2026-10-16 module comment on legal_description_present itself).
     "atty_legal_description": Spec(_F, "row", "gis_legal",
+                                   producers=("gis_fill.py", "lawyer_lane.py",
+                                              "scrapers/counties_nc/mcdowell_probate.py",
+                                              "enrichment_bt_parcel_info.py", "enrichment_gis_attrs.py"),
                                    doc="legal_description, or a legal field in raw.gis_attrs_full / mcdowell_probate"),
+    # Same omission, same fix, for deed_ref_present()'s own raw keys: deed_chain
+    # (enrichment_deed_chain.py), gis.last_sale (enrichment_gis_attrs.py -- NOT also
+    # enrichment_arcgis.py: that file's gis["last_sale"] writer sits in the SAME module as
+    # SC_LAYER, a 46-county SC numbering crosswalk unrelated to deed data (every SC county is a
+    # key there, for the now-token-walled SCDOT layer id, per that dict's own 2026-08-12
+    # comment) -- a blanket counties_named_in() grep over the whole file credits all 46 SC
+    # counties (confirmed live: 69 state/county pairs matched 2026-11-17, not a small plausible
+    # subset), which would mislabel real "no source known" gaps statewide as built-but-low-yield.
+    # Excluded for that reason; a future round could re-add it IF it writes a scoped
+    # per-county credit helper the way _deed_chain_credit()/_county_lien_sweep_lien_credit() do
+    # for their own producers, not via this blanket producers-tuple grep), rod/nc_rod (the
+    # register scrapers -- nc_rod_logan.py, sc_rod_cott.py, sc_rod_acclaim.py, same three already
+    # named on atty_rod_lien_checked's producers for the identical raw.rod/nc_rod shape), rod_docs
+    # (rod/enrich.py), county_deed_ref (gis_fill.py and county_deed_ref.py directly, plus
+    # enrichment_rod_chain.py and enrichment_florence_colleton_deed_ref.py, which both write the
+    # same key per deed_ref_present()'s own inline comments), and bt_parcel_info
+    # (enrichment_bt_parcel_info.py).
     "atty_deed_ref": Spec(_F, "row", "gis_deed", sources=(("NC", NC_ONEMAP + " (deed reference field)"),),
+                          producers=("enrichment_deed_chain.py", "enrichment_gis_attrs.py",
+                                     "scrapers/counties_nc/nc_rod_logan.py", "scrapers/counties_sc/sc_rod_cott.py",
+                                     "scrapers/counties_sc/sc_rod_acclaim.py", "rod/enrich.py", "gis_fill.py",
+                                     "county_deed_ref.py", "enrichment_rod_chain.py",
+                                     "enrichment_florence_colleton_deed_ref.py", "enrichment_bt_parcel_info.py"),
                           doc="a deed book+page (or instrument no.) in deed_chain, gis.last_sale, rod, nc_rod, "
                               "rod_docs, gis_attrs_full or mcdowell_probate"),
     "atty_taxpayer_of_record": Spec(_F, "row", "tax", statewide=(("NC", NC_ONEMAP + " (owner of record)"),),
