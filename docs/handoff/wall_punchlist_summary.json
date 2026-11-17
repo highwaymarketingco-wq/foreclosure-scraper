@@ -1,7 +1,7 @@
 {
- "board_rows": 586837,
+ "board_rows": 618635,
  "by_category": {
-  "uncovered": 274701,
+  "uncovered": 304411,
   "wall": 78029
  },
  "format_version": 1,
@@ -73,15 +73,13 @@
    "generated_at": "2026-11-16T21:00:28Z"
   }
  },
- "listings": 352730,
+ "listings": 382440,
  "uncovered": {
   "by_scraper_source": {
    "city_websites.charlotte_open_data": 4585,
    "counties_generic.arcgis_distress.burke_storm_damage": 413,
    "counties_generic.arcgis_distress.greensboro_code_housing": 603,
    "counties_generic.arcgis_distress.new_hanover_demolition_permits": 1326,
-   "counties_generic.arcgis_distress.raleigh_structure_fires": 381,
-   "counties_generic.arcgis_distress.rocky_mount_blight_survey_2025": 384,
    "counties_generic.arcgis_distress.spartanburg_infill_eligible": 1062,
    "counties_generic.arcgis_distress.spartanburg_property_cleanup": 2050,
    "counties_generic.epa_frs.acres": 1539,
@@ -98,6 +96,7 @@
    "counties_nc.polk_tax": 2618,
    "counties_nc.transylvania_vacant": 10883,
    "counties_sc.charleston_delinquent_tax": 1757,
+   "counties_sc.charleston_energov_history": 2378,
    "counties_sc.charleston_tax_sale_xlsx": 2393,
    "counties_sc.lexington_homestead": 28099,
    "counties_sc.sc_probate_notices.yourpickenscounty": 442,
@@ -105,8 +104,9 @@
    "counties_sc.sc_public_notices": 1851,
    "counties_sc.sc_ust_registry": 15581,
    "counties_sc.spartanburg_condemned": 913,
+   "counties_sc.spartanburg_homestead": 27344,
    "counties_sc.spartanburg_vacant": 4220,
-   "counties_sc.york_homestead": 78965,
+   "counties_sc.york_homestead": 78953,
    "courtlistener.recap": 730,
    "national.distressed": 4752,
    "national.hud_reac_inspection": 810,
@@ -128,11 +128,11 @@
    "NC:polk": 3048,
    "NC:transylvania": 11368,
    "NC:wake": 3869,
-   "SC:charleston": 7325,
+   "SC:charleston": 9703,
    "SC:lexington": 28912,
    "SC:pickens": 2293,
-   "SC:spartanburg": 10542,
-   "SC:york": 80395
+   "SC:spartanburg": 37886,
+   "SC:york": 80383
   }
  },
  "wall": {
