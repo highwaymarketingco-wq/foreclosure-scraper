@@ -1501,10 +1501,14 @@ def checked_columns(rec: dict, pos: set[str], verdicts: dict[str, Optional[str]]
     # same gap_matrix "no source known" tax-cluster survey) does the identical thing for the
     # identical reason: it aggregates real per-parcel bill-year sets every run, but a parcel
     # that genuinely carries only one unpaid year is a real screen, not an unchecked row --
-    # it stamps raw["_nc_csv_tax_mydt_checked"] instead.
+    # it stamps raw["_nc_csv_tax_mydt_checked"] instead. Hoke/Lee/Davidson/Randolph's shared
+    # producer (nc_tax_lien_ads.py, same 2026-11-17 survey) does the identical thing for a
+    # DIFFERENT reason: each county's annual 105-369 ad is a single-levy-year publication by
+    # nature (no multi-year history is even possible to read from it), so every row it emits
+    # stamps raw["_nc_tax_lien_ads_mydt_checked"] instead.
     if (raw.get("multi_year_delinquent_tax") not in _EMPTY
             or raw.get("_gaston_mydt_checked") or raw.get("_pasquotank_tax_checked")
-            or raw.get("_nc_csv_tax_mydt_checked")):
+            or raw.get("_nc_csv_tax_mydt_checked") or raw.get("_nc_tax_lien_ads_mydt_checked")):
         out.add("multi_year_delinquent_tax")
     if raw.get("two_year_delinquent") not in _EMPTY:
         out.add("two_year_delinquent")
