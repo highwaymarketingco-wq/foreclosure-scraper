@@ -57,6 +57,41 @@ REAL_EXCLUDED_DETAIL = """
 <tr><th>Owner&nbsp;Name</th><td>Walters Real Estate and</td></tr>
 """
 
+# Real search-result row markup, Marion's own shape (DSID=1064, FeatureID 538,
+# live 2026-11-17): mainResultItem renders EMPTY and the real TMS Number is in a
+# sibling secondaryResultItem div instead -- the shape every other county on this
+# platform does NOT use (round 19).
+REAL_MARION_SEARCH_ROW = (
+    "onclick='showf(1064 , 538)'></div><button id=btnViewPropertyRecordCard "
+    "onclick='printPropertyRecordCard(1064 , 538)'>Card</button>"
+    "<button id=btnZoomToParcel onclick='showf(1064 , 538)'>Zoom</button></div>"
+    "<div id=resultsParcelNumber class='mainResultItem'></div>"
+    "<div class='secondaryResultItem'>5081223000000</div>"
+)
+
+# Real getftr.aspx detail-table cells, Marion's own <th> label schema (DSID=1064,
+# FeatureID 538, live 2026-11-17): TMS&nbsp;Number not Map&nbsp;Number,
+# Owner&nbsp;Name1 not Owner&nbsp;Name, Description doing Property&nbsp;Address1's
+# job, and no MarketValueTotalValue/TaxValueTotalValue/MarketValueAcres/Mailing
+# fields at all.
+REAL_MARION_DETAIL = """
+<tr><th>TMS&nbsp;Number</th><td>5081223000000</td></tr>
+<tr><th>Owner&nbsp;Name1</th><td>HARDEES REAL ESTATE INVESTMENT</td></tr>
+<tr><th>Owner&nbsp;Name2</th><td></td></tr>
+<tr><th>Description</th><td>405 CHARLESTON ST</td></tr>
+"""
+
+# Same Marion schema, a real genuine decedent hit (not a business name), FeatureID
+# 14442, live 2026-11-17.
+REAL_MARION_DECEDENT_DETAIL = """
+<tr><th>TMS&nbsp;Number</th><td>0850000191000</td></tr>
+<tr><th>Owner&nbsp;Name1</th><td>ESTATE OF SHELBY MCLELLAN</td></tr>
+<tr><th>Owner&nbsp;Name2</th><td></td></tr>
+<tr><th>Description</th><td></td></tr>
+"""
+
+MARION_FIELDS = m._WTHGIS_COUNTIES["Marion"]["fields"]
+
 
 def test_field_reads_plain_and_styled_cells():
     assert m._field(REAL_LIFE_ESTATE_DETAIL, "Owner&nbsp;Name") == "Blakeney Mavis T Life Estate"
@@ -112,6 +147,68 @@ def test_classify_empty_owner_is_none():
     assert m._classify({"owner": None}) is None
 
 
+def test_parse_search_hits_falls_back_to_secondary_result_item():
+    # Marion's own shape (round 19): mainResultItem is empty, the real TMS Number
+    # lives in the sibling secondaryResultItem div instead.
+    hits = m._parse_search_hits(REAL_MARION_SEARCH_ROW)
+    assert hits == {"5081223000000": 538}
+
+
+def test_parse_search_hits_mixed_shapes_in_one_page():
+    # A page carrying both shapes (never actually happens -- one page is one
+    # county -- but proves the mainResultItem branch still wins when populated,
+    # matching every pre-round-19 county's own behavior unchanged).
+    mixed = REAL_SEARCH_ROW + REAL_MARION_SEARCH_ROW
+    hits = m._parse_search_hits(mixed)
+    assert hits == {"001 000 000 046": 68, "5081223000000": 538}
+
+
+def test_parse_detail_marion_schema_override():
+    rec = m._parse_detail(REAL_MARION_DETAIL, MARION_FIELDS)
+    assert rec["map_number"] == "5081223000000"
+    assert rec["owner"] == "HARDEES REAL ESTATE INVESTMENT"
+    assert rec["address"] == "405 CHARLESTON ST"
+    # Marion's schema has none of these cells -- genuine None, not a parsing miss.
+    assert rec["mailing"] is None
+    assert rec["market_value"] is None
+    assert rec["tax_value"] is None
+    assert rec["acreage"] is None
+
+
+def test_parse_detail_marion_business_name_excluded():
+    rec = m._parse_detail(REAL_MARION_DETAIL, MARION_FIELDS)
+    assert m._classify(rec) is None  # "...REAL ESTATE INVESTMENT" is a business
+
+
+def test_parse_detail_marion_real_decedent_classifies():
+    rec = m._parse_detail(REAL_MARION_DECEDENT_DETAIL, MARION_FIELDS)
+    cls = m._classify(rec)
+    assert cls is not None
+    assert cls["match"] == "estate"
+    assert cls["is_life_estate"] is False
+
+
+def test_parse_detail_without_fields_override_is_unchanged():
+    # Omitting `fields` entirely must behave exactly like round 18 (Chesterfield/
+    # Dillon/McCormick never pass an override).
+    assert m._parse_detail(REAL_LIFE_ESTATE_DETAIL) == m._parse_detail(REAL_LIFE_ESTATE_DETAIL, None)
+
+
+def test_counties_filter_restricts_the_sweep():
+    s = m.SCWthgisHeirEstate(counties=["Dillon", "Marion"])
+    assert set(s._counties) == {"Dillon", "Marion"}
+
+
+def test_counties_filter_rejects_unknown_county():
+    import pytest
+    with pytest.raises(ValueError, match="Someplace"):
+        m.SCWthgisHeirEstate(counties=["Someplace"])
+
+
+def test_default_registry_includes_all_round19_counties():
+    assert set(m._WTHGIS_COUNTIES) == {"Chesterfield", "Dillon", "McCormick", "Marion"}
+
+
 class _FakeResponse:
     def __init__(self, text: str, status_code: int = 200):
         self.text = text
@@ -165,7 +262,10 @@ def test_fetch_dedupes_across_search_tokens_and_tags_estate_lead(monkeypatch):
 
     monkeypatch.setattr(m.httpx, "AsyncClient", _fake_client)
 
-    s = m.SCWthgisHeirEstate()
+    # Scoped to Chesterfield alone (round 19 added Dillon/McCormick/Marion to the
+    # registry; the fake client's URL-substring routing would otherwise also
+    # "find" these same canned fixtures under every other county's own DSID).
+    s = m.SCWthgisHeirEstate(counties=["Chesterfield"])
     rows = asyncio.run(s.fetch())
 
     assert len(rows) == 2  # FeatureID 68 once (deduped) + 212; 999 skipped (404)

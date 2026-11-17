@@ -1,17 +1,25 @@
 #!/usr/bin/env python3
 """Landing script for counties_sc.sc_wthgis_heir_estate.py (SCWthgisHeirEstate --
-round 18, 2026-11-17, closing part of gap_matrix's lt_estate_lead "no source known"
-bucket for Chesterfield SC). Runs the live WTH decedent/life-estate sweep and
-appends only the genuinely-new listings onto the board -- same discipline as its
-direct sibling, land_sc_heir_estate_parcel_cache.py: a hit that lands on a parcel
-already represented by some OTHER producer's row is skipped, not merged (fill-only
-Listing.merge() would keep that row's existing listing_type regardless, so forcing
-the merge would not move this column's real count -- see the scraper module's own
-docstring for the full reasoning this script relies on).
+round 18, 2026-11-17, built for Chesterfield SC; round 19, 2026-11-17, added
+Dillon/McCormick/Marion SC), closing gap_matrix's lt_estate_lead "no source known"
+bucket for every county in _WTHGIS_COUNTIES. Runs the live WTH decedent/life-estate
+sweep and appends only the genuinely-new listings onto the board -- same discipline
+as its direct sibling, land_sc_heir_estate_parcel_cache.py: a hit that lands on a
+parcel already represented by some OTHER producer's row is skipped, not merged
+(fill-only Listing.merge() would keep that row's existing listing_type regardless,
+so forcing the merge would not move this column's real count -- see the scraper
+module's own docstring for the full reasoning this script relies on).
+
+--counties restricts the sweep to a comma-separated subset of _WTHGIS_COUNTIES
+(e.g. the 3 counties round 19 added) instead of re-sweeping every enabled county --
+useful once an earlier county (Chesterfield) is already landed, so a later round's
+run does not pay its ~600-hit cost again just to rediscover rows already on the
+board. Omit it to sweep everything, matching round 18's own only mode.
 
     python scripts/land_sc_wthgis_heir_estate.py --dry-run
+    python scripts/land_sc_wthgis_heir_estate.py --dry-run --counties Dillon,McCormick,Marion
     BOARD_PATCH_ALLOW_LARGE=1 BOARD_APPEND_ALLOW_LARGE=1 \
-        python scripts/land_sc_wthgis_heir_estate.py --allow-large
+        python scripts/land_sc_wthgis_heir_estate.py --allow-large --counties Dillon,McCormick,Marion
 """
 from __future__ import annotations
 
@@ -38,7 +46,11 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--allow-large", action="store_true")
+    ap.add_argument("--counties", default=None,
+                     help="comma-separated subset of _WTHGIS_COUNTIES, e.g. "
+                          "Dillon,McCormick,Marion (default: sweep every county)")
     args = ap.parse_args()
+    counties = [c.strip() for c in args.counties.split(",")] if args.counties else None
 
     docs_dir = REPO / "docs"
     if not args.dry_run:
@@ -57,8 +69,9 @@ def main() -> int:
             os.environ["BOARD_PATCH_ALLOW_LARGE"] = "1"
             os.environ["BOARD_APPEND_ALLOW_LARGE"] = "1"
 
-    print("sweeping chesterfieldsc.wthgis.com for heir/estate/life-estate owners...")
-    s = SCWthgisHeirEstate()
+    print(f"sweeping WTH tgis for heir/estate/life-estate owners "
+          f"(counties={counties or 'ALL'})...")
+    s = SCWthgisHeirEstate(counties=counties)
     listings = asyncio.run(s.safe_run())
     print(f"outcome={s.last_outcome} reason={s.last_reason!r} classified={len(listings)} "
           f"stats={s.run_stats}")
