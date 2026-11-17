@@ -1995,6 +1995,134 @@
       "confidence": "high"
     },
     {
+      "state": "NC",
+      "county": "Pitt",
+      "column": "code_enforcement",
+      "reason": "No case-level open-data product. The county's own EnerGov-adjacent GIS host (gisonline.greenvillenc.gov, City of Greenville -- the county seat) was already directly curl'd in round 10 as a cross-check: layer id 3 is a zones-only officer-assignment boundary layer, nothing case-level anywhere else in that MapServer. Pitt County's own apps.pittcountync.gov Public Data Portal publishes parcels, criminal-charge data and permit downloads, but no code-violations dataset; the permitting portal's 'File a Complaint' is an intake form with no anonymous submission and no case search, confirmed via WebSearch 2026-11-16.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Onslow",
+      "column": "code_enforcement",
+      "reason": "Two public layers checked, both non-case: (1) the real (non-Test) EnerGov EG_Onslow_editable FeatureServer (round 10) is generic History/Spatial_Collections point/line/poly layers, nothing code-enforcement-specific; (2) a layer literally named 'Code Enforcement' DOES exist in the county's ArcGIS org (gismaps.onslowcountync.gov/server/rest/services/WEB_PUBLICATIONS/Planning_Data/MapServer/1, found via arcgis.com/sharing/rest/search on orgId RLKshC6KfXm2kCVy) but directly queried live 2026-11-16: only 6 rows, fields are OBJECTID/CO_NAME/DATA/geometry only (DATA values 'A' through 'F'), confirmed by sampling all 6 rows -- an officer-territory zone-boundary layer (one polygon per letter zone), not case data. Same shape as the EnerGov zones-only trap, but on a non-EnerGov generic planning-dept publication -- the trap generalizes beyond the EnerGov vendor specifically.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Rowan",
+      "column": "code_enforcement",
+      "reason": "Round 10 already field-checked this county's real EnerGov MapServer and found only two tempting case-shaped layers, both confirmed NOT code enforcement on direct field inspection: MHPcases (ZONING/PARKNAME/Spaces fields -- a Mobile Home Park registry) and Zoningcases (APPROVAL/CUD/ZONING fields -- rezoning/conditional-use applications). WebSearch 2026-11-16 confirms no open data product exists for either jurisdiction: City of Salisbury Code Services (handles in-city violations) is phone/email-only (codeenforcement@salisburync.gov, 704-216-7559); Rowan County's own enforcement (outside city limits) runs through Building Inspections, phone-only (704-216-8588); no case search tool or dataset found for either.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Orangeburg",
+      "column": "code_enforcement",
+      "reason": "County's own ArcGIS Online org (services2.arcgis.com/bUKn95BqgpYYTnx3, the same tenant hosting the county's tax-parcel layer) was fully enumerated live 2026-11-16: 70 services total, every one roads/fire/EMS/law-enforcement-CAD/flood/parcel/CAD-dispatch shaped (e.g. Fire_Agency_CommandCentral, Law_Beats_CommandCentral, TaxParcels_NotMatching_WFL1) -- zero code/violation/nuisance/complaint-named service of any kind. WebSearch found only a county code-enforcement-officer job posting, no public dataset or portal.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Duplin",
+      "column": "code_enforcement",
+      "reason": "County's own GIS server (gis.duplinnc.gov/server/rest/services/OpenData/) has two public MapServers, both fully enumerated live 2026-11-16: PublicAccessMainOpenData (utilities, towers, zoning, 'Mobile Home Parks 2017' and 'Mobile Home Subdivisions 2017' -- the same MHP-registry-is-not-code-enforcement shape round 10 already flagged elsewhere) and PublicAccessAuxOpenData (voting/fire/water/insurance districts, flood zones). Neither carries any code-enforcement or violations layer. No case-level source found.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Oconee",
+      "column": "code_enforcement",
+      "reason": "County's own GIS server's CitizenServe MapServer (arcserver2.oconeesc.com, the same host the county's parcel layer uses) has only 4 layers live-checked 2026-11-16: Addresses, Parcels, Flood, Municipalities -- no code/violation layer. The county's own code-enforcement page (oconeesc.com, WebSearch 2026-11-16) confirms intake is an online E-Service Request FORM (not a case search), plus phone/mail/in-person; anonymous complaints explicitly refused; CitizenServe account system is used for building PERMITS, not violations search; the county also explicitly does not provide code enforcement inside Salem/Walhalla/West Union/Westminster/Seneca city limits.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Florence",
+      "column": "code_enforcement",
+      "reason": "County's ArcGIS org (services1.arcgis.com/40L6yX6OtdCifNez, same tenant as the tax-parcel layer) was fully enumerated live 2026-11-16: the two layers that sounded most relevant, 'Vacant_Properties' (a single static snapshot literally named 'Vacant Properties as of 03-02-2021', ~5.5 years frozen) and 'Neighborhood_Revitalization' (its one layer's own name is 'Neighborhood_Revitalization_Overlay_Zoning_District' -- a ZONING overlay, not violations), both ruled out on direct field/name inspection. WebSearch confirms the county's Codes Enforcement Division (Chapter 21 Nuisances) takes only written investigation requests, no portal or dataset.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Colleton",
+      "column": "code_enforcement",
+      "reason": "County's ArcGIS org (services1.arcgis.com/m0cnLGKdhwao8WvM) has a genuinely case-shaped 'CitizenProblemReports' FeatureServer with a real 'Blight Problems' layer (fields: LOCDESC/PROBTYPE/DETAILS/STATUS/SUBMITDT/RESOLUTION -- exactly the right shape) and a 'Building Problems' layer, both live-queried 2026-11-16: count=0 on both, confirmed empty. A second candidate, 'CitizenRequests_20161101' (Blight_Complaint_Type field, 522 rows), is a one-time frozen bulk import -- every one of the 522 rows timestamped the same single day, 2026-11-16 sample of the 5 most recent all read 2016-11-01, matching the dataset's own name. No live feed exists.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Berkeley",
+      "column": "code_enforcement",
+      "reason": "County GIS server (gis.berkeleycountysc.gov) has a real 'energov' services folder (confirmed present in the root folder listing) but it returns an explicit 403 'Connection is Denied' custom error page on direct access, live-checked 2026-11-16 -- an access-restricted deployment, consistent with round 10's token-wall pattern. The only other code-adjacent-sounding folder, 'buildingberkeley', was fully enumerated: its MapServers are Capital/Capitol Projects layers (construction capital-improvement projects, not violations) and its one FeatureServer ('dropoffs') is literally 'Recycling Centers'. WebSearch found no public case search; enforcement routes through the courts per a 2026 code-enforcement-officer job posting.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Laurens",
+      "column": "code_enforcement",
+      "reason": "County's own GIS server (laurenscountygis.org) root folder listing confirms a 'Pebble' folder (where the county's own tax-parcel layer lives) but its nested service listing could not be enumerated live 2026-11-16 (the TaxParcel service itself returned 'Service may be stopped or it may not be configured', a transient 500 unrelated to this research) and no other code/violation-named folder exists at the root. WebSearch confirms Laurens County's process is phone/email to 3 named code-enforcement officers (100 Hillcrest Sq., 864-984-6659); City of Laurens runs a separate program with the same contact-only pattern; no case database or search tool found for either jurisdiction.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Darlington",
+      "column": "code_enforcement",
+      "reason": "County's ArcGIS org (services5.arcgis.com/8FJikaProY6O3ncx) has a service literally named 'CODES_ENFORCEMENT_WGS84' -- live-checked 2026-11-16 and it is NOT case data: its only layers are Darco_AddressPnts, Darlington_Rds, City_limits, COUNTY_BOUNDARY2020 and PARCELS -- i.e. the basemap reference layers the Codes department's own internal web map uses, not a violations dataset. Name alone was misleading; confirmed by field/layer inspection per this round's standing caution.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Anderson",
+      "column": "code_enforcement",
+      "reason": "City of Anderson's GIS server (gis.cityofandersonsc.com, MunicipalBusiness/CodeEnforcement/FeatureServer/0 -- a real, well-shaped layer: CaseNumber/ViolationDate/ViolationType/ViolationDesc/Status/TMS/Address/OwnerName/LegalAction/Inspector fields, directly comparable to the Charlotte/Gastonia shape this project already credits at city level toward a county's gap) was live-queried 2026-11-16: only 10 rows total, and sampling all 10 shows test/demo placeholder data, not production cases -- CaseNumber literally 'Test 1' and '123', most Address/TMS/CaseNumber fields null, every dated row frozen at 2018-12-20 or 2019-01-09 (6-7 years stale). A real schema, no real data behind it.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Hoke",
+      "column": "code_enforcement",
+      "reason": "County's own GIS server (maps.hokecounty.org) was fully enumerated live 2026-11-16: only 6 services total (ExportWebMap, OperationalLayers, Overlays, Parcels, RoadsMap, SampleWorldCities) -- no code/violation layer of any kind. WebSearch confirms enforcement runs through the county's Building Inspections dept and a Fire Prevention Ordinance's own 'how to report a hazard or violation' policy text, not a dataset or dashboard.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Williamsburg",
+      "column": "code_enforcement",
+      "reason": "County's GIS host (williamsburgsc.wthgis.com, a WTH GIS-hosted portal) did not answer a standard ArcGIS REST services-directory probe live 2026-11-16 (non-JSON response, inconsistent with a public REST catalog at that path). WebSearch found no code-enforcement dataset, portal or case search for the county; only third-party aggregator listings and the county's general courts page turned up, no official violations source.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Scotland",
+      "column": "code_enforcement",
+      "reason": "WebSearch 2026-11-16 found no open dataset, portal or dashboard for Scotland County or Laurinburg code enforcement -- only the county's Inspections Department contact (517 Peden Street, Laurinburg, 910-277-2415) and a commercial parcel-data vendor listing (property records only, no enforcement data). No GIS host identified for this county in parcel_cache.py to probe directly (NC statewide OneMap coverage, no county-specific entry), consistent with no distinct county GIS deployment to check.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Iredell",
+      "column": "code_enforcement",
+      "reason": "WebSearch 2026-11-16 found no open dataset or case search for Iredell County or the City of Statesville's Code Enforcement program. Statesville's own code-enforcement pages exist in a paginated CMS form (statesvillenc.net/statesville-code-enforcement/?page=N) but are Cloudflare-JS-challenge-walled on direct access (confirmed live 2026-11-16) and, by their own URL shape, read as a news/announcements feed rather than a structured case table -- not pursued further per the project's standing rule that a CAPTCHA/JS-challenge wall is a real wall, not a thing to bypass. Iredell County's own enforcement runs through a Planner/Ordinance Enforcement Officer role with no dataset found.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
+    },
+    {
       "state": "SC",
       "county": "Williamsburg",
       "column": "condemned",
