@@ -317,6 +317,20 @@ def build_listing(feat: dict, now: datetime | None = None) -> Listing | None:
         raw["condemned"] = True
     if (occupied is False) or boarded or condemned:
         raw["distressed"] = True
+    if occupied is False:
+        # 2026-11-17 (round 14, vacant_structure "no source known" breadth pass):
+        # raw["vacancy"]["vacant"] above was already real, live, confirmed-on-site
+        # evidence (occupied is False, not merely unknown), but was never mirrored
+        # into raw["gis"]["vacant"] -- the SEPARATE key the sibling 'vacant' column
+        # actually checks (gap_matrix.py's own comment: "the real check elsewhere
+        # in this file is raw['gis']['vacant'] specifically"). Same dual-key mirror
+        # kinston_proposed_demolition.py's utility_cutoff branch and lincoln_code_
+        # violations.py's "Abandoned structure" branch already use for this exact
+        # pair of keys. This single county (Henderson NC) was the #1 cell by
+        # est_rows_affected in the whole 2026-11-16 ledger sweep (3,977 rows) for
+        # 'vacant' specifically -- 'condemned'/'vacancy' were already correctly
+        # credited to this same file, 'vacant' alone had the omission.
+        raw.setdefault("gis", {})["vacant"] = True
     if tax:
         raw["hendersonville_delinquent_tax"] = tax
         # 2026-10-02 breadth fix (same raw-key naming gap shape as

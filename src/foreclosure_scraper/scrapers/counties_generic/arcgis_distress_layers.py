@@ -523,15 +523,55 @@ LAYERS: tuple[Layer, ...] = (
         url=("https://services1.arcgis.com/Mnt8FoJcogKtoVBs/arcgis/rest/services/"
              "CodeViolationProperty/FeatureServer/0"),
         listing_type=ListingType.DISTRESSED,
+        # 2026-11-17 (round 14, vacant_structure "no source known" breadth pass):
+        # excludes Problem LIKE '%Demolition%' -- peeled into its own
+        # columbia_code_demolition entry immediately below, mutually exclusive
+        # with this where-clause (same clean split durham_open_code_violations/
+        # durham_unsafe_building and rockhill_code_housing/rockhill_code_
+        # demolition already use, here applied to this file's own Richland
+        # layer). Live-verified 2026-11-17: 894 rows here (Boarded Building/
+        # Vacant Building only) + 126 Demolition rows below = 1,020 total,
+        # exactly matching the original unsplit where= clause's count -- no
+        # double-fetch, no row lost.
         where=("CaseStatus IN ('In Violation','Open') AND "
-               "(Problem LIKE '%Boarded Building%' OR Problem LIKE '%Demolition%' "
-               "OR Problem LIKE 'Vacant Building%')"),
+               "(Problem LIKE '%Boarded Building%' OR Problem LIKE 'Vacant Building%') "
+               "AND Problem NOT LIKE '%Demolition%'"),
         fields=("CaseNum", "OpenedDate", "Problem", "CaseStatus", "ADDRESS"),
         situs="ADDRESS", detail="Problem", process="code_enforcement",
         # See Layer.vacancy docstring: the where= clause above already restricts
-        # every row here to a Boarded Building / Demolition / Vacant Building
-        # case, so this layer's rows are vacant-structure evidence by construction.
+        # every row here to a Boarded Building / Vacant Building case, so this
+        # layer's rows are vacant-structure evidence by construction.
         vacancy=True,
+        source_page="https://www.columbiasc.gov/",
+    ),
+    # 2026-11-17 (round 14): Richland's own "Demolition" Problem category, on the
+    # SAME service/layer as columbia_code_vacant_boarded above (CodeViolationProperty/
+    # FeatureServer/0), peeled into its own where-filtered entry -- 126 live open
+    # cases (113 Residential Demolition + 13 Commercial Demolition), case numbers
+    # back to 2017 (CERD-2017-0025, live-verified 2026-11-17: a real multi-year
+    # registry, not a one-day snapshot). A city demolition order is the same
+    # condemnation-equivalent action rockhill_code_demolition/durham_unsafe_building
+    # already admit as condemned=True elsewhere in this file -- same reasoning,
+    # same precedent, applied here. This was the SC/Richland "condemned" column's
+    # own "no source known" gap (2,316 est_rows_affected, the #2 cell in the
+    # 2026-11-16 vacant_structure ledger sweep): the layer already existed and was
+    # already wired for 'vacancy'/'vacant' (2026-11-10/11 rounds), but its where=
+    # clause had never been split to isolate the one Problem category strong
+    # enough to also claim 'condemned' -- a genuine new-source peel, not a
+    # producers-tuple omission (arcgis_distress_layers.py was already correctly
+    # listed in the 'condemned' Spec's producers tuple; _arcgis_distress_layers_
+    # credit() reads Layer.condemned directly, so this one-field edit is the
+    # entire fix).
+    Layer(
+        slug="columbia_code_demolition",
+        state="SC", county="Richland",
+        url=("https://services1.arcgis.com/Mnt8FoJcogKtoVBs/arcgis/rest/services/"
+             "CodeViolationProperty/FeatureServer/0"),
+        listing_type=ListingType.DISTRESSED,
+        where="CaseStatus IN ('In Violation','Open') AND Problem LIKE '%Demolition%'",
+        fields=("CaseNum", "OpenedDate", "Problem", "CaseStatus", "ADDRESS"),
+        situs="ADDRESS", detail="Problem", process="code_enforcement",
+        condemned=True, vacancy=True,
         source_page="https://www.columbiasc.gov/",
     ),
     # Greenville County parcels whose tax bill is still unpaid. TOTTAX > 0 with a NULL

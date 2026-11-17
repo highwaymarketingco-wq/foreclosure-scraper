@@ -541,11 +541,19 @@ def test_arcgis_distress_layers_credit_respects_process_and_condemned_fields():
     Building' subset of the SAME durham_open_code_violations service/sub-layer, peeled into a
     mutually-exclusive where-filtered entry (46 live cases, 2026-11-16). Not a mislabel fix like the
     others above; this is new real evidence for a genuinely condemnation-equivalent NC Minimum
-    Housing Code action (see that Layer's own docstring)."""
+    Housing Code action (see that Layer's own docstring).
+
+    2026-11-17 UPDATE (round 14, vacant_structure "no source known" breadth pass): Richland now ALSO
+    sets condemned=True, via the new columbia_code_demolition entry -- the same peel-a-sub-category
+    technique as durham_unsafe_building, applied to columbia_code_vacant_boarded's own Problem field
+    (126 live 'Residential Demolition'/'Commercial Demolition' cases, mutually exclusive with the
+    sibling entry's narrowed where=). Same reasoning as Durham: a city demolition order is as strong
+    "condemned" evidence as rockhill_code_demolition's own precedent, not a mislabel fix."""
     credit = gm._arcgis_distress_layers_credit()
-    # York's rockhill_code_demolition + Durham's new durham_unsafe_building (2026-11-16) are the
-    # only two entries setting condemned=True in this entire file.
-    assert credit["condemned"] == {("SC", "York"), ("NC", "Durham")}
+    # York's rockhill_code_demolition + Durham's durham_unsafe_building + Richland's new
+    # columbia_code_demolition (2026-11-17) are the only three entries setting condemned=True
+    # in this entire file.
+    assert credit["condemned"] == {("SC", "York"), ("NC", "Durham"), ("SC", "Richland")}
     # the 4 real process="code_enforcement" layers left after greensboro_code_housing's 2026-10-28
     # removal (columbia_code_vacant_boarded, durham_open_code_violations, lincoln_code_violations,
     # rockhill_code_housing/_exterior_major) -- durham_unsafe_building shares Durham's existing
@@ -570,7 +578,11 @@ def test_built_in_code_drops_arcgis_distress_layers_false_credit_for_condemned_a
 
     2026-11-16 UPDATE (round 9): Durham moved from "code_enforcement only, no condemned" to "both",
     via the new durham_unsafe_building entry (real evidence, not a mislabel fix -- see the sibling
-    test above)."""
+    test above).
+
+    2026-11-17 UPDATE (round 14): Richland moved from "code_enforcement only, no condemned" to
+    "both" too, via the new columbia_code_demolition entry (same mechanism as Durham's -- see the
+    sibling test's 2026-11-17 note)."""
     built = gm.built_in_code()
     # false positives removed: named in the file, but on an unrelated-process entry only
     for st, co in (("NC", "Transylvania"), ("NC", "Buncombe"), ("NC", "Burke"), ("NC", "New Hanover"),
@@ -592,11 +604,12 @@ def test_built_in_code_drops_arcgis_distress_layers_false_credit_for_condemned_a
     assert ("NC", "Lincoln") in built["code_enforcement"]         # lincoln_code_violations (this file)
     assert ("NC", "Durham") in built["code_enforcement"]          # durham_open_code_violations (this file)
     assert ("NC", "Durham") in built["condemned"]                 # durham_unsafe_building (added 2026-11-16)
+    assert ("SC", "Richland") in built["condemned"]               # columbia_code_demolition (added 2026-11-17)
     assert ("NC", "Buncombe") in built["code_enforcement"]        # asheville_code_enforcement.py (a DIFFERENT file)
-    # Lincoln DOES have a real code_enforcement producer but, same as Richland, no
-    # condemned=True entry -- the narrower, opposite-direction half of the same mislabel. Durham
-    # dropped out of this set 2026-11-16 (see above): it now has a real condemned entry too.
-    for st, co in (("NC", "Lincoln"), ("SC", "Richland")):
+    # Lincoln DOES have a real code_enforcement producer but no condemned=True entry -- the
+    # narrower, opposite-direction half of the same mislabel. Durham and Richland both dropped out
+    # of this set (2026-11-16/2026-11-17, see above): each now has a real condemned entry too.
+    for st, co in (("NC", "Lincoln"),):
         assert (st, co) not in built["condemned"], f"{st}/{co} has a code_enforcement entry, not a condemned one"
 
 
