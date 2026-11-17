@@ -442,6 +442,19 @@ ROSTERS = [
     # AgencyID=StokesCoNC, 114 in custody, full DOB). Zero new fetcher code here either --
     # _fetch_citizen_connect is already imported above.
     ("NC", "Stokes", "citizen_connect", "StokesCoNC|"),
+    # ROUND 12 SYNC 2026-11-17 -- ported verbatim from national.jail_bookings.ROSTERS' own
+    # "ROUND 12 DISCOVERIES" comment (see that module for the full live-verification detail:
+    # counts + sample names/charges for each). Zero new fetcher code -- same already-imported
+    # _fetch_citizen_connect. Wiring both ROSTERS lists in the same pass this time (round 8's own
+    # York fix was needed BECAUSE a prior build only wired one of the two) -- see
+    # project_jail_booking_round12_2026-11-16.md for why this matters for jail_booking_new.
+    ("NC", "Scotland", "citizen_connect", "ScotlandCoNC|"),
+    ("SC", "Dorchester", "citizen_connect", "DorchesterCoSC|"),
+    ("NC", "Sampson", "citizen_connect", "SampsonCoNC|"),
+    ("NC", "Surry", "citizen_connect", "SurryCoNC|"),
+    ("NC", "Edgecombe", "citizen_connect", "EdgecombeCoNC|"),
+    ("NC", "Greene", "citizen_connect", "GreeneCoNC|"),
+    ("NC", "Yancey", "citizen_connect", "YanceyCoNC|"),
 ]
 
 # (state, county, vendor, target) for the PER-NAME search vendors — no bulk
