@@ -565,9 +565,11 @@ def test_arcgis_distress_layers_credit_respects_process_and_condemned_fields():
     # the 4 real process="code_enforcement" layers left after greensboro_code_housing's 2026-10-28
     # removal (columbia_code_vacant_boarded, durham_open_code_violations, lincoln_code_violations,
     # rockhill_code_housing/_exterior_major) -- durham_unsafe_building shares Durham's existing
-    # membership in this SET, so it adds no new county here.
+    # membership in this SET, so it adds no new county here. lancaster_code_violations (round
+    # 15/16, 2026-11-16) adds SC/Lancaster as a 5th real county.
     assert credit["code_enforcement"] == {
         ("SC", "Richland"), ("NC", "Durham"), ("NC", "Lincoln"), ("SC", "York"),
+        ("SC", "Lancaster"),
     }
 
 
