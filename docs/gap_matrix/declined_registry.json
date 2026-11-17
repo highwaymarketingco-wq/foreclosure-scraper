@@ -3201,6 +3201,118 @@
       "reason": "No live GIS REST host found for the county after trying its two plausible dedicated subdomains (gis./gis2.robesoncountync.gov, both DNS-unreachable) and its \"ConnectGIS\" backend (robeson.connectgis.com, confirmed HTTP 504 Gateway Timeout on the live API endpoint and on the bare site). An NC State University Libraries county-GIS reference page -- the only description of the county's GIS capability found -- says the county is still developing its GIS system. Medium confidence (web/API evidence only, no REST catalog reachable to enumerate directly): the weakest-evidenced of this round's 11 counties, re-check if a real county GIS host ever surfaces.",
       "confirmed_date": "2026-11-17",
       "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Person",
+      "column": "code_enforcement",
+      "reason": "County's Inspections/Planning & Zoning/Fire Marshal departments handle code enforcement by phone with named officers (Inspections, 325 S. Morgan St, (336) 597-0570); only published material is a fee schedule PDF and ordinance text (Sec. 9.9). No online complaint form, case search, or ArcGIS/Socrata dataset found; broad AGOL org search for a Person County GIS org returned zero code/violation/nuisance hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Wilson",
+      "column": "code_enforcement",
+      "reason": "County's own citizen portal (countyofwilsonnc.portal.opengov.com) is an Auth0-gated Angular SPA whose own page says 'you MUST have an account' to apply; no public no-login case/violation search found at /public/search or common API paths (404 at /api/* ). City of Wilson (a separate jurisdiction) has its own phone-only code enforcement line (252-399-2220), not a county resource. OpenGov PLC vendor, same login-wall shape already established for other declined counties in this column.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Stanly",
+      "column": "code_enforcement",
+      "reason": "County permit office (Central Permitting, OpenGov-based) is account-required/in-person submission per vendor listing; City of Albemarle (in-town) runs its own phone-only Code Enforcement Division (704-984-9400) coordinating with county Building Inspectors. No online violation case search or ArcGIS/Socrata dataset found for either.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Greenwood",
+      "column": "code_enforcement",
+      "reason": "County's building-permit-and-code-violation lookup tool (linked from the City of Greenwood's code-enforcement FAQ) runs on the CitizenServe SaaS platform (www6.citizenserve.com, installationID=455) and is gated behind an invisible Google reCAPTCHA v3 challenge before any portal content loads -- confirmed directly by fetching the raw page HTML (title 'Citizenserve Online Portal', recaptcha/api.js render key, 'Verifying your request...' challenge gate). A genuine bot-wall, not a public dataset.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Caswell",
+      "column": "code_enforcement",
+      "reason": "Only published material is a Building Inspections re-inspection fee schedule PDF and the county's Unified Development Ordinance text; no code-enforcement case search, complaint portal, or ArcGIS/Socrata dataset found. Tiny rural county, same shape as other already-declined small NC counties in this column.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Newberry",
+      "column": "code_enforcement",
+      "reason": "County ordinance (amlegal mirror) describes a phone/in-person complaint process via the zoning office that keeps the complainant anonymous; a Building, Fire, and Nuisance Codes Board of Appeals hears appeals, but no online case search, complaint portal, or ArcGIS/Socrata dataset exists for the county.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Haywood",
+      "column": "code_enforcement",
+      "reason": "County's own Code Enforcement page (haywoodcountync.gov/456/Code-Enforcement) confirmed directly by fetch: Environmental Health/Planning/Sheriff's Office coordinate enforcement of Chapter 159, contact is a phone line (828-452-6675), and the only reporting link ('Report Abuse') is for abuse/neglect, not code violations. No case search or dataset published online.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Surry",
+      "column": "code_enforcement",
+      "reason": "Only material found is Code of Ordinances text (Ch. 92 nuisance abatement, Ch. 91.29 dust control, junkyard permitting); no dedicated county code-enforcement office page, complaint portal, case search, or ArcGIS/Socrata dataset found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Jones",
+      "column": "code_enforcement",
+      "reason": "County lists a named Code Enforcement Administrator (Caleb Emory, 110 S Market St, Trenton, 252-448-7571) with set office hours; phone/in-person only, no online complaint form, case search, or dataset. Tiny rural county.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Chowan",
+      "column": "code_enforcement",
+      "reason": "Building Inspection and Planning Division (305 W. Freemason St, Edenton, 252-482-8422) handles enforcement by phone; only published material is ordinance/noise-permit PDFs. No online case search, complaint portal, or ArcGIS/Socrata dataset found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Calhoun",
+      "column": "code_enforcement",
+      "reason": "County's Building and Planning Dept links a 'submit or check status of Permit Application or Code Enforcement Complaint' button to app.communitycore.com/app/public-portal/c1606a1d-dd19-4bbd-ba80-dedb5a600725 -- a CommunityCore Angular SPA that renders nothing without JS execution; no public JSON API found at common /api/* paths (404s). New vendor for this project, same vendor-tooling-gap shape as Robeson's ROKMAPS (round 14) -- a future round with CommunityCore-specific tooling could reopen it.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Chesterfield",
+      "column": "code_enforcement",
+      "reason": "The only AGOL item matching 'Chesterfield County' + code/violation/enforcement terms (CodeEnforcementArea_layer, owner Chesterfield_County) is explicitly 'Planning Code Enforcement Areas in Chesterfield County, VA' per its own snippet -- a Virginia county, not this SC one. Zero other hits on a broad arcgis.com full-text search; no county-specific code-enforcement page, portal, or dataset found for Chesterfield SC.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Jackson",
+      "column": "code_enforcement",
+      "reason": "The only AGOL items matching 'Jackson County' + code/violation/enforcement terms ('Code Enforcement areas and officers', owner JCGIS_Owner) resolve to jcportal.jacksoncountyor.gov -- Jackson County, OREGON, not this NC one. No separate NC Jackson County GIS org or code-enforcement page/portal/dataset found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Cherokee",
+      "column": "code_enforcement",
+      "reason": "County DOES run a live 'Cherokee County, NC Code Enforcement' ArcGIS Web Experience (ccncgis.maps.arcgis.com, orgId UmQCfTNQbyTzAV5N, owner tslovin) -- but its operational layers, read directly from the app's own config JSON, are AndrewsNCZoning/MurphyNCZoning/BuildingCodeContours/FloodHazards/Parcels/Municipalities/RoadCenterlines/PrimaryFireLimit/ProtectedWatersheds: a jurisdiction/zoning-overlay reference map for an officer to determine which town's code applies to a parcel, not a violation case tracker. No CaseNumber/Status/Violation field anywhere in the org. Same boundary-reference rejection class already established for Sumter/Gaston/Anderson in this file.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
     }
   ]
 }

@@ -769,6 +769,43 @@ LAYERS: tuple[Layer, ...] = (
         situs="AddressText", detail="Status", process="code_enforcement",
         source_page="https://www.cityofrockhill.com/departments/neighborhood-services",
     ),
+    # 2026-11-17 (round 15, code_enforcement "no source known" breadth pass). Lancaster
+    # County SC was previously marked "no ArcGIS REST host surfaced" (see the rejected-
+    # list note further below) -- that check looked for a county-hosted ArcGIS Server on
+    # the county's own domain and missed the county's ArcGIS ONLINE org entirely (hosted
+    # on arcgis.com, found live via the sharing/rest/search orgid method rounds 13/14
+    # introduced: orgKey LANCOGIS, orgId rJcpRneDUBgTeCT3, surfaced by resolving the
+    # orgId embedded in the county's own GIS Hub site, lancaster-launch-lancogis.hub.
+    # arcgis.com). The org's 588 items include a deployed Esri "Code Enforcement
+    # Operations" solution and this hosted feature service -- shapefile-truncated field
+    # names (Collection/Collecti_1/Collecti_3 survived a shapefile import), 330 live rows
+    # confirmed by a real query, every Topic value some spelling of "Unfit Dwelling",
+    # "Nuisance" or "Derelict Vehicles" (hand-typed, many typos, but no yard-nuisance-only
+    # or pure-zoning category ever mixed in, so severe=True unconditionally is correct
+    # here the same way it is for Lincoln/Greensboro/Rock Hill above). Parcels_OW is one
+    # combined owner-name field (owner_last alone, same convention as OWNAM1/NAME1/Owner/
+    # OWNER_NAME elsewhere in this file); Parcels__2..5 is the OWNER'S MAILING address
+    # (confirmed distinct from situs on-sample -- e.g. a Charlotte Hwy violation's owner
+    # mails to a different McMinn Dr address), not the property's own, so it goes through
+    # mailing_parts/mail_state for absentee detection, never into situs/city/zip_. No
+    # status field exists on this layer at all (unlike Lincoln's STATUS='Open'), so
+    # where="1=1" is the honest default rather than an invented filter. Vis_Link is the
+    # SAME literal W3C placeholder dummy.pdf on every sampled row (not real per-case
+    # evidence) -- deliberately not requested.
+    Layer(
+        slug="lancaster_code_violations",
+        state="SC", county="Lancaster",
+        url=("https://services3.arcgis.com/rJcpRneDUBgTeCT3/arcgis/rest/services/"
+             "LC_ViolationPoints/FeatureServer/0"),
+        listing_type=ListingType.DISTRESSED,
+        fields=("Collection", "Collecti_1", "Collecti_3", "Parcels_OW",
+                "Parcels__2", "Parcels__3", "Parcels__4", "Parcels__5"),
+        situs="Collection", parcel="Collecti_1", detail="Collecti_3",
+        owner_last="Parcels_OW", process="code_enforcement",
+        mailing_parts=("Parcels__2", "Parcels__3", "Parcels__4", "Parcels__5"),
+        mail_state="Parcels__4", mailing_source="lancaster_code_violations",
+        source_page="https://lancaster-launch-lancogis.hub.arcgis.com/",
+    ),
     # ------------------------------------------------------------------
     # 2026-09-28 non-footprint code/vacant discovery pass, ROUND 2 (same day, second batch,
     # 12 more counties beyond the first 12 documented above). Every one came up NOT FOUND after a
@@ -1037,10 +1074,14 @@ LAYERS: tuple[Layer, ...] = (
     #     layer. Fayetteville NC -- the city's own code-enforcement page links a static
     #     spreadsheet, not a service. Wilmington/New Hanover NC -- geohub.wilmingtonnc.gov's only
     #     candidates are a zone-boundary layer inside a service literally named "EnerGovTest" and
-    #     an unconfirmed ZoningEnforcement MapServer. Lancaster SC, Chester SC, Fort Mill SC,
-    #     North Charleston SC, Mount Pleasant SC, Summerville SC, Florence SC, Beaufort SC,
-    #     Georgetown SC, Aiken SC, Hickory NC, Jacksonville NC -- no ArcGIS REST host surfaced for
-    #     any of these.
+    #     an unconfirmed ZoningEnforcement MapServer. Chester SC, Fort Mill SC, North Charleston
+    #     SC, Mount Pleasant SC, Summerville SC, Florence SC, Beaufort SC, Georgetown SC, Aiken
+    #     SC, Hickory NC, Jacksonville NC -- no ArcGIS REST host surfaced for any of these.
+    #     UPDATE 2026-11-17 (round 15): Lancaster SC was wrongly included in this list -- this
+    #     bullet's search method (look for a county-hosted ArcGIS Server) missed the county's
+    #     own ArcGIS ONLINE org entirely; now wired as lancaster_code_violations above (330 real
+    #     rows). Left the rest of this bullet's claims standing since only Lancaster was re-
+    #     checked this round.
     #
     # Durham aside (not pursued -- out of this pass's scope): webgis.durhamnc.gov/server/rest/
     # services/PublicServices/Inspections/MapServer, a sibling of the already-wired
