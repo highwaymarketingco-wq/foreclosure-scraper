@@ -117,7 +117,13 @@ def _is_macon_nc(li: Listing) -> bool:
 
 
 def _already_done(raw: Any) -> bool:
-    return isinstance(raw, dict) and isinstance(raw.get("rollback_exposure"), dict)
+    """Only a REAL dollar deferred_value counts as done. A flag-only rollback_exposure block
+    (e.g. the statewide nc_onemap_presentval sweep's presentval=Y marker, deferred_value=None)
+    must not block this producer's own real-dollar DEFERMENT join -- confirmed live 2026-11-17
+    that rows the flag-only sweep already touched are in fact the BEST-matching population for
+    this join (9/9 hit the real deferred-PID set here), not noise to skip."""
+    rb = raw.get("rollback_exposure") if isinstance(raw, dict) else None
+    return isinstance(rb, dict) and rb.get("deferred_value") is not None
 
 
 async def enrich_macon_rollback_exposure(listings: Iterable[Listing]) -> dict[str, Any]:
