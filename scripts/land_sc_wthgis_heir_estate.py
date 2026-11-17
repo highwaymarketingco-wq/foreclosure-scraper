@@ -47,7 +47,15 @@ def main() -> int:
             print(f"REFUSING: {size_state['reason']}. Re-run with --allow-large.")
             return 1
         if args.allow_large:
+            # The actual write path below is append_new_rows(), not patch_existing_rows(), so
+            # it is BOARD_APPEND_ALLOW_LARGE that actually gates it (confirmed live 2026-11-17:
+            # the first real run threw BoardLoadTooLarge from append_new_rows's own, separate
+            # size check -- board_patch_size_state()/BOARD_PATCH_ALLOW_LARGE above is the wrong
+            # gate for this script's own write, left in only because --dry-run's early refusal
+            # message still reads it). Set both so --allow-large alone matches this script's
+            # own docstring usage example.
             os.environ["BOARD_PATCH_ALLOW_LARGE"] = "1"
+            os.environ["BOARD_APPEND_ALLOW_LARGE"] = "1"
 
     print("sweeping chesterfieldsc.wthgis.com for heir/estate/life-estate owners...")
     s = SCWthgisHeirEstate()
