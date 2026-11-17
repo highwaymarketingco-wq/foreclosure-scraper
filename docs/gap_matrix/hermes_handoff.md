@@ -6,7 +6,7 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 
 ## 1. Hermes lane -- CAPTCHA or required login
 
-511 cells, 1,105,724 est_rows_affected combined.
+511 cells, 1,105,717 est_rows_affected combined.
 
 | state | county | column | est_rows | reason | source |
 |---|---|---|---|---|---|
@@ -97,7 +97,7 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | SC | Williamsburg | atty_rod_lien_checked | 2,956 | login | register: Neumo Records Management (formerly Avenu Insights  |
 | SC | Williamsburg | liens | 2,956 | login | register: Neumo Records Management (formerly Avenu Insights  |
 | SC | Williamsburg | usps_vacancy | 2,956 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
-| NC | Hoke | probate | 2,939 | CAPTCHA | probate: portal-nc.tylertech.cloud |
+| NC | Hoke | probate | 2,932 | CAPTCHA | probate: portal-nc.tylertech.cloud |
 | SC | Darlington | atty_rod_lien_checked | 2,928 | login | register: Cott Systems RECORDhub recordhub.cottsystems.com |
 | SC | Darlington | liens | 2,928 | login | register: Cott Systems RECORDhub recordhub.cottsystems.com |
 | SC | Darlington | usps_vacancy | 2,928 | HUD USPS vacancy data needs a registered login | statewide: HUD USPS vacancy data needs a registered login |
@@ -215,7 +215,7 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 
 ## 2. Bot-wall, build in-house -- Cloudflare/WAF, not Hermes
 
-105 cells, 573,290 est_rows_affected combined.
+103 cells, 565,474 est_rows_affected combined.
 
 | state | county | column | est_rows | reason | source |
 |---|---|---|---|---|---|
@@ -231,9 +231,7 @@ Only **Hermes lane** (CAPTCHA or a required login) actually goes to Hermes. **Bo
 | NC | Rowan | atty_rod_lien_checked | 4,734 | bot check (Cloudflare/WAF) | register: rod.rowancountync.gov (atty_rod_lien_checked: bloc |
 | NC | Rowan | liens | 4,734 | bot check (Cloudflare/WAF) | register: rod.rowancountync.gov (liens: blocked) |
 | SC | Charleston | lt_tax_sale | 4,156 | bot check (Cloudflare/WAF) | tax/property card: sc-charleston.publicaccessnow.com |
-| NC | Lee | multi_year_delinquent_tax | 3,908 | bot check (Cloudflare/WAF) | tax/property card: taxaccess.leecountync.gov |
 | NC | Lee | rollback_exposure | 3,908 | bot check (Cloudflare/WAF) | tax/property card: taxaccess.leecountync.gov |
-| NC | Lee | two_year_delinquent | 3,908 | bot check (Cloudflare/WAF) | tax/property card: taxaccess.leecountync.gov |
 | SC | Florence | assessed_value | 3,838 | Cloudflare check on the county property card | county GIS: services1.arcgis.com |
 | NC | Polk | multi_year_delinquent_tax | 3,385 | bot check (Cloudflare/WAF) | tax/property card: www.polknc.gov |
 | NC | Polk | rollback_exposure | 3,385 | bot check (Cloudflare/WAF) | tax/property card: www.polknc.gov |
