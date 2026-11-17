@@ -80,3 +80,36 @@ async def test_a_parcel_with_no_hit_gets_no_fabricated_record(monkeypatch):
     li = _li("8609-42-0939")
     await enrich_haywood_rollback_exposure([li])
     assert "rollback_exposure" not in li.raw
+
+
+@pytest.mark.asyncio
+async def test_a_real_existing_rollback_record_is_never_re_targeted(monkeypatch):
+    import foreclosure_scraper.enrichment_haywood_rollback_exposure as mod
+
+    async def _fake_fetch(c):
+        return {}
+
+    monkeypatch.setattr(mod, "fetch_deferred_by_pid", _fake_fetch)
+    li = _li("8609-42-0939", raw={"rollback_exposure": {"deferred_value": 1.0}})
+    stats = await enrich_haywood_rollback_exposure([li])
+    assert stats["eligible"] == 0
+
+
+@pytest.mark.asyncio
+async def test_a_flag_only_statewide_sweep_record_is_still_eligible(monkeypatch):
+    """A flag-only rollback_exposure block (e.g. the statewide nc_onemap_presentval sweep's
+    presentval=Y marker, deferred_value=None) must NOT block this producer's own real-dollar
+    join -- same fix/finding as enrichment_macon_rollback_exposure's own sibling test."""
+    import foreclosure_scraper.enrichment_haywood_rollback_exposure as mod
+
+    async def _fake_fetch(c):
+        return {"8609420939": {"deferred_value": 512639.0}}
+
+    monkeypatch.setattr(mod, "fetch_deferred_by_pid", _fake_fetch)
+    li = _li("8609-42-0939", raw={"rollback_exposure": {
+        "deferred_value": None, "basis": "present_use_flag",
+        "source_key": "nc_onemap_presentval"}})
+    stats = await enrich_haywood_rollback_exposure([li])
+    assert stats["eligible"] == 1
+    assert stats["matched"] == 1
+    assert li.raw["rollback_exposure"]["deferred_value"] == 512639.0

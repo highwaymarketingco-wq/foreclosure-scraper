@@ -83,3 +83,24 @@ async def test_an_existing_rollback_record_is_never_re_targeted(monkeypatch):
     li = _li("6468452250", raw={"rollback_exposure": {"deferred_value": 1.0}})
     stats = await enrich_macon_rollback_exposure([li])
     assert stats["eligible"] == 0
+
+
+@pytest.mark.asyncio
+async def test_a_flag_only_statewide_sweep_record_is_still_eligible(monkeypatch):
+    """A flag-only rollback_exposure block (e.g. the statewide nc_onemap_presentval sweep's
+    presentval=Y marker, deferred_value=None) must NOT block this producer's own real-dollar
+    join -- live-confirmed 2026-11-17 that 9/9 of Macon's flag-only rows actually hit the real
+    deferred-PID set (round18's own follow-up fix)."""
+    import foreclosure_scraper.enrichment_macon_rollback_exposure as mod
+
+    async def _fake_fetch(c):
+        return {"6468452250": {"deferred_value": 500.0}}
+
+    monkeypatch.setattr(mod, "fetch_deferred_by_pid", _fake_fetch)
+    li = _li("6468452250", raw={"rollback_exposure": {
+        "deferred_value": None, "basis": "present_use_flag",
+        "source_key": "nc_onemap_presentval"}})
+    stats = await enrich_macon_rollback_exposure([li])
+    assert stats["eligible"] == 1
+    assert stats["matched"] == 1
+    assert li.raw["rollback_exposure"]["deferred_value"] == 500.0

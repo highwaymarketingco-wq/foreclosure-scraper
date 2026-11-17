@@ -128,7 +128,12 @@ def _is_haywood_nc(li: Listing) -> bool:
 
 
 def _already_done(raw: Any) -> bool:
-    return isinstance(raw, dict) and isinstance(raw.get("rollback_exposure"), dict)
+    """Only a REAL dollar deferred_value counts as done -- see the identical fix/finding in
+    enrichment_macon_rollback_exposure.py's own _already_done() (this module's sibling): a
+    flag-only rollback_exposure block from the statewide nc_onemap_presentval sweep must not
+    block this producer's own real-dollar Defer_Value join."""
+    rb = raw.get("rollback_exposure") if isinstance(raw, dict) else None
+    return isinstance(rb, dict) and rb.get("deferred_value") is not None
 
 
 async def enrich_haywood_rollback_exposure(listings: Iterable[Listing]) -> dict[str, Any]:
