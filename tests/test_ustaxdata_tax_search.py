@@ -207,9 +207,18 @@ def _li(parcel=None, county="Robeson", raw=None, owner_name=None, street_address
 # search_url: only the verified tenant, the board's own parcel_id as-is
 # ---------------------------------------------------------------------------
 
-def test_only_robeson_is_wired():
-    assert list(TENANTS) == ["Robeson"]
+def test_only_robeson_and_vance_are_wired():
+    assert list(TENANTS) == ["Robeson", "Vance"]
     assert "Alexander" in REJECTED_TENANTS and "Rockingham" in REJECTED_TENANTS
+
+
+def test_vance_parcel_id_keeps_its_space_unmodified():
+    """Vance's board parcel_id ("0210 06002") is the opposite of a dash-stripping county: the
+    space is REQUIRED by the portal -- stripping it to "021006002" is a confirmed live 0-Records
+    search, so search_url must pass it through exactly as the board stores it, never normalized."""
+    url = search_url("Vance", "0210 06002")
+    assert url.startswith("https://vance.ustaxdata.com/taxlist.cfm?")
+    assert "0210+06002" in url or "0210%2006002" in url
 
 
 def test_url_uses_the_boards_parcel_id_unmodified():

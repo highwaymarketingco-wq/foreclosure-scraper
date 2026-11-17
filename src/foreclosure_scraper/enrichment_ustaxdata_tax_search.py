@@ -139,6 +139,18 @@ _UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
 #: this check).
 TENANTS: dict[str, str] = {
     "Robeson": "https://www.ustaxdata.com/nc/robeson/Robesontaxlist.cfm",
+    # added 2026-11-17 (gap_matrix round 17, the 93-cell "no source known" tax-column sweep):
+    # county_records_matrix.json's own tax.notes named "vance.ustaxdata.com" (never opened, from
+    # a 2026-10-07 pass). Live-verified directly: a real board Vance parcel_id, "0210 06002"
+    # (WITH its inner space, exactly as the board stores it -- stripping the space to
+    # "021006002" answers 0 Records, the OPPOSITE of Scotland's own dash-stripping rule, so
+    # nothing here should normalize it), passed straight to parcelNum returns 18 real records /
+    # account 15907 (owner MSDG HENDERSON LLC). Cross-checked two independent ways: a
+    # businessName="MSDG HENDERSON LLC" search on the same form returns the SAME 18 records/
+    # account, and a second, unrelated real board row (lastName=BELL&firstName=GAVIN) returns 2
+    # more real records/account 1039115 -- so this is Robeson's own direct-parcelNum shape, not
+    # Alexander/Rockingham's name-search-only shape; no NAME_SEARCH_TENANTS entry needed.
+    "Vance": "https://vance.ustaxdata.com/taxlist.cfm",
 }
 
 #: Same vendor, parcel-id search REJECTED (board parcel_id doesn't match this vendor's own

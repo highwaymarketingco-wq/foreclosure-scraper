@@ -350,9 +350,11 @@ def test_portals_rotate_their_starting_county_by_day_of_year(monkeypatch, _fast)
     order = list(m.PORTALS)
     # Carteret added 2026-11-16 (gap_matrix follow-up: live-checked, not actually unreadable --
     # round 2's own "not in PORTALS at all" claim the same day never checked UNREADABLE_PORTALS,
-    # which never names Carteret) -- appended last, after Brunswick.
+    # which never names Carteret) -- appended last, after Brunswick. Moore added 2026-11-17
+    # (round 17, same shape), appended last after Carteret.
     assert order == ["Onslow", "Graham", "Alleghany", "Anson", "Caswell", "Duplin", "Granville",
-                      "Harnett", "Jones", "Person", "Scotland", "Yadkin", "Brunswick", "Carteret"]
+                      "Harnett", "Jones", "Person", "Scotland", "Yadkin", "Brunswick", "Carteret",
+                      "Moore"]
     real = httpx.AsyncClient  # captured once: two sequential monkeypatch.setattr calls below must
                               # both subclass the TRUE original, not each other's patched Fake
 
@@ -377,10 +379,12 @@ def test_portals_rotate_their_starting_county_by_day_of_year(monkeypatch, _fast)
         asyncio.run(s.fetch())
         return seen[0][1].split("/")[1]  # "/<PORTAL_SUFFIX>/TaxBillSearch"
 
-    # 14 portals now (Carteret added 2026-11-16): spin%14==1 is the only value that puts Graham
+    # 15 portals now (Moore added 2026-11-17): spin%15==1 is the only value that puts Graham
     # ahead of Onslow (Onslow/Graham sit adjacent at indices 0/1 in the unrotated dict); every
-    # other spin, including 0, keeps Onslow first. toordinal(jan 5 2026)%14==1, toordinal(jan 6
-    # 2026)%14==2 -- recomputed for 14 items; was 0/1 against the old 13-item count.
+    # other spin, including 0, keeps Onslow first. toordinal(jan 5 2026)%15==1, toordinal(jan 6
+    # 2026)%15==2 -- recomputed for 15 items; these two dates happen to give the SAME residues
+    # they gave against the old 14-item count (verified by direct computation, not assumed), so
+    # no date change was needed, only this comment and the 14->15 count.
     first_a = _try(date(2026, 1, 5))     # spin 1 of 14 -> Graham first
     first_b = _try(date(2026, 1, 6))     # spin 2 of 14 -> Onslow first again
     assert {first_a, first_b} == {"ITSPublicGR2.0", "ITSPublicON"}
@@ -390,6 +394,8 @@ def test_portals_rotate_their_starting_county_by_day_of_year(monkeypatch, _fast)
 def test_portal_config_is_pinned():
     assert m.PORTALS["Onslow"].base == "https://tax.onslowcountync.gov/ITSPublicON"
     assert m.PORTALS["Graham"].base == "https://www.bttaxpayerportal.com/ITSPublicGR2.0"
+    assert m.PORTALS["Moore"].base == "https://bttaxpayerportal.com/ITSPublicMO"
+    assert m.PORTALS["Moore"].full_model
     assert m.PAGE_ROWS == 100 and m.PACE_S >= 1.0
 
 

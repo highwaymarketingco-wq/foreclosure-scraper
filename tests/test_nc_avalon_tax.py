@@ -186,3 +186,26 @@ def test_slim_line_items_handles_missing_or_malformed_line_items():
 
 def test_flag_labels_empty_when_neither_flags_nor_flags_string_present():
     assert m._flag_labels({}) == []
+
+
+# ---------------------------------------------------------------------------
+# _COUNTY_SITES (round 17, 2026-11-17): Stanly/Martin/Northampton/Hertford/Lenoir added as
+# five more tenants on the SAME Catalis Avalon/Wildfire CloudFront platform as Lincoln -- see
+# the module's own dated comment for the live homepage evidence. No network here.
+# ---------------------------------------------------------------------------
+
+def test_the_five_new_avalon_counties_are_configured():
+    for county in ("stanly", "martin", "northampton", "hertford", "lenoir"):
+        cfg = m._COUNTY_SITES[county]
+        assert cfg["state"] == "NC"
+        assert cfg["url"].startswith("http")
+        assert "lincoln" not in cfg["url"]  # each is its own distinct county domain
+
+
+def test_three_of_the_five_have_a_pinned_guid_the_other_two_rely_on_auto_discovery():
+    assert m._COUNTY_SITES["martin"]["guid"] == "9f0cd87f-7bf5-4b9e-a378-e26538971a54"
+    assert m._COUNTY_SITES["northampton"]["guid"] == "6e2961f2-6bbe-4316-8721-a77903d98d47"
+    assert m._COUNTY_SITES["lenoir"]["guid"] == "4abcb09d-6cfe-49c3-822c-55fd2ba718fb"
+    assert "guid" not in m._COUNTY_SITES["stanly"]
+    assert "guid" not in m._COUNTY_SITES["hertford"]
+    assert "guid" in m._COUNTY_SITES["lincoln"]  # unchanged, still pinned
