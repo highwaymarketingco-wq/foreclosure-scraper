@@ -2937,6 +2937,270 @@
       "reason": "County's online permit portal (SC AccessGov) is in-person-submission-only per the vendor's own listing; no code-enforcement-specific portal, dataset, or case search found for the county or its towns (Bennettsville, McColl).",
       "confirmed_date": "2026-11-17",
       "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Dorchester",
+      "column": "condemned",
+      "reason": "Dorchester_GIS's own AGOL org (ehmkfEMN55hUsomR, 278 public items, full title scan) has no code/violation/condemned/vacant-structure layer; its one vacant-named item, \"Imp_Vacant_web\" (tagged \"IMP\", description \"Vacant lands and LMI areas\"), is a CDBG/LMI vacant-LAND classification layer whose own url resolves to an internal-only host (gisapp-2k12.local.dorchestercounty.net:6080, unreachable from the public internet) -- doubly non-viable even setting the vacant-land/vacant-structure distinction aside. No Accela (404) or EnerGov citizen portal (DNS failure) found. County code enforcement runs under a \"Nuisance Control Ordinance\" (littering/unmaintained-premises, enforced by the Health Officer) with 2 Environmental Services officers -- a complaint-driven nuisance program, not a condemnation/vacant-structure registry.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Dorchester",
+      "column": "vacancy",
+      "reason": "Dorchester_GIS's own AGOL org (ehmkfEMN55hUsomR, 278 public items, full title scan) has no code/violation/condemned/vacant-structure layer; its one vacant-named item, \"Imp_Vacant_web\" (tagged \"IMP\", description \"Vacant lands and LMI areas\"), is a CDBG/LMI vacant-LAND classification layer whose own url resolves to an internal-only host (gisapp-2k12.local.dorchestercounty.net:6080, unreachable from the public internet) -- doubly non-viable even setting the vacant-land/vacant-structure distinction aside. No Accela (404) or EnerGov citizen portal (DNS failure) found. County code enforcement runs under a \"Nuisance Control Ordinance\" (littering/unmaintained-premises, enforced by the Health Officer) with 2 Environmental Services officers -- a complaint-driven nuisance program, not a condemnation/vacant-structure registry.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Dorchester",
+      "column": "vacant",
+      "reason": "Dorchester_GIS's own AGOL org (ehmkfEMN55hUsomR, 278 public items, full title scan) has no code/violation/condemned/vacant-structure layer; its one vacant-named item, \"Imp_Vacant_web\" (tagged \"IMP\", description \"Vacant lands and LMI areas\"), is a CDBG/LMI vacant-LAND classification layer whose own url resolves to an internal-only host (gisapp-2k12.local.dorchestercounty.net:6080, unreachable from the public internet) -- doubly non-viable even setting the vacant-land/vacant-structure distinction aside. No Accela (404) or EnerGov citizen portal (DNS failure) found. County code enforcement runs under a \"Nuisance Control Ordinance\" (littering/unmaintained-premises, enforced by the Health Officer) with 2 Environmental Services officers -- a complaint-driven nuisance program, not a condemnation/vacant-structure registry.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Kershaw",
+      "column": "condemned",
+      "reason": "County's AGOL org (owner KershawGIS) has only 4 public items (Municipal Boundaries, Council Districts, a School District web map, an Earthquakes StoryMap) -- zero code-enforcement/condemned/vacant content; direct gis./maps.kershaw.sc.gov REST hosts unreachable (DNS). \"Code Enforcement\" appears only as a county-budget line item (FY23 \"Special Services\"); county GIS data requires a signed GIS Data License Agreement, consistent with no open code-enforcement dataset existing.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Kershaw",
+      "column": "vacancy",
+      "reason": "County's AGOL org (owner KershawGIS) has only 4 public items (Municipal Boundaries, Council Districts, a School District web map, an Earthquakes StoryMap) -- zero code-enforcement/condemned/vacant content; direct gis./maps.kershaw.sc.gov REST hosts unreachable (DNS). \"Code Enforcement\" appears only as a county-budget line item (FY23 \"Special Services\"); county GIS data requires a signed GIS Data License Agreement, consistent with no open code-enforcement dataset existing.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Kershaw",
+      "column": "vacant",
+      "reason": "County's AGOL org (owner KershawGIS) has only 4 public items (Municipal Boundaries, Council Districts, a School District web map, an Earthquakes StoryMap) -- zero code-enforcement/condemned/vacant content; direct gis./maps.kershaw.sc.gov REST hosts unreachable (DNS). \"Code Enforcement\" appears only as a county-budget line item (FY23 \"Special Services\"); county GIS data requires a signed GIS Data License Agreement, consistent with no open code-enforcement dataset existing.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Beaufort",
+      "column": "condemned",
+      "reason": "County's own ArcGIS Server (gis.beaufortcountysc.gov, full root catalog live-enumerated: 43 services + 3 folders, \"Hosted\" folder empty) has exactly one permitting system, EnerGov, split into \"EnerGov\"/\"EnerGovEdit\" (x2) services -- all three return HTTP 499 \"Token Required\" on every request, with no public sibling \"history\" MapServer the way Charleston SC's own EnerGov has (see charleston_energov_history.py). \"BuildingFootPrints\" is building-outline geometry only (no condition/violation attributes, confirmed by field schema). County's own Code Enforcement page states Building Codes/dilapidated-structure violations are handled by the separate Building Inspections dept, which publishes no dataset either.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Beaufort",
+      "column": "vacancy",
+      "reason": "County's own ArcGIS Server (gis.beaufortcountysc.gov, full root catalog live-enumerated: 43 services + 3 folders, \"Hosted\" folder empty) has exactly one permitting system, EnerGov, split into \"EnerGov\"/\"EnerGovEdit\" (x2) services -- all three return HTTP 499 \"Token Required\" on every request, with no public sibling \"history\" MapServer the way Charleston SC's own EnerGov has (see charleston_energov_history.py). \"BuildingFootPrints\" is building-outline geometry only (no condition/violation attributes, confirmed by field schema). County's own Code Enforcement page states Building Codes/dilapidated-structure violations are handled by the separate Building Inspections dept, which publishes no dataset either.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Beaufort",
+      "column": "vacant",
+      "reason": "County's own ArcGIS Server (gis.beaufortcountysc.gov, full root catalog live-enumerated: 43 services + 3 folders, \"Hosted\" folder empty) has exactly one permitting system, EnerGov, split into \"EnerGov\"/\"EnerGovEdit\" (x2) services -- all three return HTTP 499 \"Token Required\" on every request, with no public sibling \"history\" MapServer the way Charleston SC's own EnerGov has (see charleston_energov_history.py). \"BuildingFootPrints\" is building-outline geometry only (no condition/violation attributes, confirmed by field schema). County's own Code Enforcement page states Building Codes/dilapidated-structure violations are handled by the separate Building Inspections dept, which publishes no dataset either.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Burke",
+      "column": "condemned",
+      "reason": "Live-enumerated BOTH of Burke's real GIS hosts in full: the City of Morganton's server (gis.morgantonnc.gov, 16 folders -- CoMPAS/Document_Imaging/Electric/Hosted empty; Public_Safety=greenway/race-routes/archery; Planning=zoning/flood-zones; Open_Data=annexations/city-limits/ETJ; General=basemaps/parcels; ED_Tourism=parks/shopping/art; Executive=election-districts/annexations; Finance/Main_Street/Public_Works/Utilities/Water_Resources=unrelated utility/finance layers) and the COUNTY's own separate server (gis.burkenc.org, 4 folders + ~36 root services). The one lead on the county host, \"Sites_Applications_Projects_and_Inspections\" (71,537 rows), is a parcel-context reference layer joined to water/sewer/zoning/schools/voting-precincts for evaluating NEW development applications -- its own appsite_type field (the only case-type-shaped column) is null on all 71,537 rows (returnDistinctValues query returns zero), confirming it is unused, not a live case tracker. Zero code-enforcement/condemned/vacant layer anywhere across either host. The file's own existing Burke entries (burke_storm_damage, burke_county_owned) are unrelated NCEM-storm/county-surplus sources, already correctly excluded by _arcgis_distress_layers_credit()'s per-flag read.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Burke",
+      "column": "vacancy",
+      "reason": "Live-enumerated BOTH of Burke's real GIS hosts in full: the City of Morganton's server (gis.morgantonnc.gov, 16 folders -- CoMPAS/Document_Imaging/Electric/Hosted empty; Public_Safety=greenway/race-routes/archery; Planning=zoning/flood-zones; Open_Data=annexations/city-limits/ETJ; General=basemaps/parcels; ED_Tourism=parks/shopping/art; Executive=election-districts/annexations; Finance/Main_Street/Public_Works/Utilities/Water_Resources=unrelated utility/finance layers) and the COUNTY's own separate server (gis.burkenc.org, 4 folders + ~36 root services). The one lead on the county host, \"Sites_Applications_Projects_and_Inspections\" (71,537 rows), is a parcel-context reference layer joined to water/sewer/zoning/schools/voting-precincts for evaluating NEW development applications -- its own appsite_type field (the only case-type-shaped column) is null on all 71,537 rows (returnDistinctValues query returns zero), confirming it is unused, not a live case tracker. Zero code-enforcement/condemned/vacant layer anywhere across either host. The file's own existing Burke entries (burke_storm_damage, burke_county_owned) are unrelated NCEM-storm/county-surplus sources, already correctly excluded by _arcgis_distress_layers_credit()'s per-flag read.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Burke",
+      "column": "vacant",
+      "reason": "Live-enumerated BOTH of Burke's real GIS hosts in full: the City of Morganton's server (gis.morgantonnc.gov, 16 folders -- CoMPAS/Document_Imaging/Electric/Hosted empty; Public_Safety=greenway/race-routes/archery; Planning=zoning/flood-zones; Open_Data=annexations/city-limits/ETJ; General=basemaps/parcels; ED_Tourism=parks/shopping/art; Executive=election-districts/annexations; Finance/Main_Street/Public_Works/Utilities/Water_Resources=unrelated utility/finance layers) and the COUNTY's own separate server (gis.burkenc.org, 4 folders + ~36 root services). The one lead on the county host, \"Sites_Applications_Projects_and_Inspections\" (71,537 rows), is a parcel-context reference layer joined to water/sewer/zoning/schools/voting-precincts for evaluating NEW development applications -- its own appsite_type field (the only case-type-shaped column) is null on all 71,537 rows (returnDistinctValues query returns zero), confirming it is unused, not a live case tracker. Zero code-enforcement/condemned/vacant layer anywhere across either host. The file's own existing Burke entries (burke_storm_damage, burke_county_owned) are unrelated NCEM-storm/county-surplus sources, already correctly excluded by _arcgis_distress_layers_credit()'s per-flag read.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Granville",
+      "column": "condemned",
+      "reason": "County's own published FAQ states Granville County does not currently have a minimum housing code -- the NC G.S. 160D-1203 mechanism every other condemnation source in this project (Henderson, Durham, Asheville) is built on. Without that ordinance the county has no legal condemnation process to generate a dataset from. (Site-side re-verification was blocked by the county's own bot protection on a direct fetch; medium confidence pending a live re-check, but the underlying claim is specific and falsifiable.) No county ArcGIS/Socrata dataset found either.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Granville",
+      "column": "vacancy",
+      "reason": "County's own published FAQ states Granville County does not currently have a minimum housing code -- the NC G.S. 160D-1203 mechanism every other condemnation source in this project (Henderson, Durham, Asheville) is built on. Without that ordinance the county has no legal condemnation process to generate a dataset from. (Site-side re-verification was blocked by the county's own bot protection on a direct fetch; medium confidence pending a live re-check, but the underlying claim is specific and falsifiable.) No county ArcGIS/Socrata dataset found either.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Granville",
+      "column": "vacant",
+      "reason": "County's own published FAQ states Granville County does not currently have a minimum housing code -- the NC G.S. 160D-1203 mechanism every other condemnation source in this project (Henderson, Durham, Asheville) is built on. Without that ordinance the county has no legal condemnation process to generate a dataset from. (Site-side re-verification was blocked by the county's own bot protection on a direct fetch; medium confidence pending a live re-check, but the underlying claim is specific and falsifiable.) No county ArcGIS/Socrata dataset found either.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Perquimans",
+      "column": "condemned",
+      "reason": "County's AGOL presence (owner \"tpenegar\", a GIS consultant/contractor, the pattern several small under-resourced NC counties share) fully enumerated by title search: parcel map/app, address points, water utilities, a broadband-grant-area layer, and a historic \"Turtle Tour\" tourism app -- zero code-enforcement/condemned/vacant content. No dedicated gis./maps.perquimanscountync.gov REST host reachable. Building Inspector's own page states \"no public notices at this time.\" County GIS is described only as a basic online mapping/owner-search tool, not a REST-backed open-data catalog.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Perquimans",
+      "column": "vacancy",
+      "reason": "County's AGOL presence (owner \"tpenegar\", a GIS consultant/contractor, the pattern several small under-resourced NC counties share) fully enumerated by title search: parcel map/app, address points, water utilities, a broadband-grant-area layer, and a historic \"Turtle Tour\" tourism app -- zero code-enforcement/condemned/vacant content. No dedicated gis./maps.perquimanscountync.gov REST host reachable. Building Inspector's own page states \"no public notices at this time.\" County GIS is described only as a basic online mapping/owner-search tool, not a REST-backed open-data catalog.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Perquimans",
+      "column": "vacant",
+      "reason": "County's AGOL presence (owner \"tpenegar\", a GIS consultant/contractor, the pattern several small under-resourced NC counties share) fully enumerated by title search: parcel map/app, address points, water utilities, a broadband-grant-area layer, and a historic \"Turtle Tour\" tourism app -- zero code-enforcement/condemned/vacant content. No dedicated gis./maps.perquimanscountync.gov REST host reachable. Building Inspector's own page states \"no public notices at this time.\" County GIS is described only as a basic online mapping/owner-search tool, not a REST-backed open-data catalog.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Wayne",
+      "column": "condemned",
+      "reason": "County's ArcGIS Hub (wayne-county-gis-waynecountync.hub.arcgis.com) DCAT feed fully enumerated: 49 datasets, all zoning/schools/fire/utilities/farms/flood-zones/cemeteries/etc -- zero code-enforcement/condemned/vacant dataset. The City of Goldsboro separately publishes a static \"condemned and unfit for human habitation\" properties list, but the page is behind a Cloudflare JS managed-challenge (live-verified: direct fetch returns only the challenge-platform script, no content) -- a real bot-check wall, not a fake one, and in any case a city list covers only in-city parcels, not the county at large. Wayne County Inspections (unincorporated county) and Goldsboro Inspections (city + 1-mile ETJ) are separate jurisdictions per the county's own site.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Wayne",
+      "column": "vacancy",
+      "reason": "County's ArcGIS Hub (wayne-county-gis-waynecountync.hub.arcgis.com) DCAT feed fully enumerated: 49 datasets, all zoning/schools/fire/utilities/farms/flood-zones/cemeteries/etc -- zero code-enforcement/condemned/vacant dataset. The City of Goldsboro separately publishes a static \"condemned and unfit for human habitation\" properties list, but the page is behind a Cloudflare JS managed-challenge (live-verified: direct fetch returns only the challenge-platform script, no content) -- a real bot-check wall, not a fake one, and in any case a city list covers only in-city parcels, not the county at large. Wayne County Inspections (unincorporated county) and Goldsboro Inspections (city + 1-mile ETJ) are separate jurisdictions per the county's own site.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Wayne",
+      "column": "vacant",
+      "reason": "County's ArcGIS Hub (wayne-county-gis-waynecountync.hub.arcgis.com) DCAT feed fully enumerated: 49 datasets, all zoning/schools/fire/utilities/farms/flood-zones/cemeteries/etc -- zero code-enforcement/condemned/vacant dataset. The City of Goldsboro separately publishes a static \"condemned and unfit for human habitation\" properties list, but the page is behind a Cloudflare JS managed-challenge (live-verified: direct fetch returns only the challenge-platform script, no content) -- a real bot-check wall, not a fake one, and in any case a city list covers only in-city parcels, not the county at large. Wayne County Inspections (unincorporated county) and Goldsboro Inspections (city + 1-mile ETJ) are separate jurisdictions per the county's own site.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Yadkin",
+      "column": "condemned",
+      "reason": "County's own ArcGIS Server (gis.yadkincountync.gov) root fully enumerated: 2 folders (Orthophotography, Utilities) + ~19 services (Addressing, AddressLocator, Anno, BASIC_LOOKUP2, CountyGISmap(_Internal/Pro), Elevation, FireInsuranceMap, Hillshade, LandReportmap, PARCEL_ROADS_ADDRESS_PTS, ProLocator, RoadBaseMap, WebsiteMap) -- zero code-enforcement/condemned/vacant service anywhere. County's own published FY2025 Building Inspections Report (G.S. 160D-1102) is a financial revenue/expenditure summary, not a property-level case list. GIS dept accepts data requests only by phone/email, consistent with no open dataset existing.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Yadkin",
+      "column": "vacancy",
+      "reason": "County's own ArcGIS Server (gis.yadkincountync.gov) root fully enumerated: 2 folders (Orthophotography, Utilities) + ~19 services (Addressing, AddressLocator, Anno, BASIC_LOOKUP2, CountyGISmap(_Internal/Pro), Elevation, FireInsuranceMap, Hillshade, LandReportmap, PARCEL_ROADS_ADDRESS_PTS, ProLocator, RoadBaseMap, WebsiteMap) -- zero code-enforcement/condemned/vacant service anywhere. County's own published FY2025 Building Inspections Report (G.S. 160D-1102) is a financial revenue/expenditure summary, not a property-level case list. GIS dept accepts data requests only by phone/email, consistent with no open dataset existing.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Yadkin",
+      "column": "vacant",
+      "reason": "County's own ArcGIS Server (gis.yadkincountync.gov) root fully enumerated: 2 folders (Orthophotography, Utilities) + ~19 services (Addressing, AddressLocator, Anno, BASIC_LOOKUP2, CountyGISmap(_Internal/Pro), Elevation, FireInsuranceMap, Hillshade, LandReportmap, PARCEL_ROADS_ADDRESS_PTS, ProLocator, RoadBaseMap, WebsiteMap) -- zero code-enforcement/condemned/vacant service anywhere. County's own published FY2025 Building Inspections Report (G.S. 160D-1102) is a financial revenue/expenditure summary, not a property-level case list. GIS dept accepts data requests only by phone/email, consistent with no open dataset existing.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Clarendon",
+      "column": "condemned",
+      "reason": "County's GIS server (gis.clarendoncountysc.gov, hosted by ROK Technologies) live-enumerated at its real root path (/server/rest/services, not the standard /arcgis/ path -- confirmed by first getting an \"Invalid Path\" page at the standard path): only 4 services total board-wide (MooseRESTMap, roktest2 -- each FeatureServer+MapServer pairs) plus a near-empty \"Hosted\" folder (Clarendon_County_Map_WFL1, MooseMap) -- every one of these 4 hosted services returns ZERO layers when queried directly. This is an effectively-empty GIS backend, not merely one missing a code-enforcement layer. County's own published \"Code Compliance Process\" document (citing SC Code 6-29-950) describes an abatement PROCEDURE, not a dataset or case-search tool.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Clarendon",
+      "column": "vacancy",
+      "reason": "County's GIS server (gis.clarendoncountysc.gov, hosted by ROK Technologies) live-enumerated at its real root path (/server/rest/services, not the standard /arcgis/ path -- confirmed by first getting an \"Invalid Path\" page at the standard path): only 4 services total board-wide (MooseRESTMap, roktest2 -- each FeatureServer+MapServer pairs) plus a near-empty \"Hosted\" folder (Clarendon_County_Map_WFL1, MooseMap) -- every one of these 4 hosted services returns ZERO layers when queried directly. This is an effectively-empty GIS backend, not merely one missing a code-enforcement layer. County's own published \"Code Compliance Process\" document (citing SC Code 6-29-950) describes an abatement PROCEDURE, not a dataset or case-search tool.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Clarendon",
+      "column": "vacant",
+      "reason": "County's GIS server (gis.clarendoncountysc.gov, hosted by ROK Technologies) live-enumerated at its real root path (/server/rest/services, not the standard /arcgis/ path -- confirmed by first getting an \"Invalid Path\" page at the standard path): only 4 services total board-wide (MooseRESTMap, roktest2 -- each FeatureServer+MapServer pairs) plus a near-empty \"Hosted\" folder (Clarendon_County_Map_WFL1, MooseMap) -- every one of these 4 hosted services returns ZERO layers when queried directly. This is an effectively-empty GIS backend, not merely one missing a code-enforcement layer. County's own published \"Code Compliance Process\" document (citing SC Code 6-29-950) describes an abatement PROCEDURE, not a dataset or case-search tool.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Jasper",
+      "column": "condemned",
+      "reason": "County's GIS server (gis.jaspercountysc.gov, real root at /server/rest/services) fully enumerated: 8 folders. \"SecureServices\" returns HTTP 499 \"Token Required\" (the same EnerGov-class token-wall pattern this project already treats as a confirmed dead end elsewhere -- Horry SC, Beaufort SC above); \"GeoGov\" is an empty, unused folder (zero services, zero sub-folders); \"DataSharing\" carries only Hardeeville address points/CAMA parcels/school districts/zoning reference layers shared with municipalities, nothing case-shaped. County's own Code Enforcement page lists only a phone/email contact (843-547-8290), consistent with no public dataset.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Jasper",
+      "column": "vacancy",
+      "reason": "County's GIS server (gis.jaspercountysc.gov, real root at /server/rest/services) fully enumerated: 8 folders. \"SecureServices\" returns HTTP 499 \"Token Required\" (the same EnerGov-class token-wall pattern this project already treats as a confirmed dead end elsewhere -- Horry SC, Beaufort SC above); \"GeoGov\" is an empty, unused folder (zero services, zero sub-folders); \"DataSharing\" carries only Hardeeville address points/CAMA parcels/school districts/zoning reference layers shared with municipalities, nothing case-shaped. County's own Code Enforcement page lists only a phone/email contact (843-547-8290), consistent with no public dataset.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Jasper",
+      "column": "vacant",
+      "reason": "County's GIS server (gis.jaspercountysc.gov, real root at /server/rest/services) fully enumerated: 8 folders. \"SecureServices\" returns HTTP 499 \"Token Required\" (the same EnerGov-class token-wall pattern this project already treats as a confirmed dead end elsewhere -- Horry SC, Beaufort SC above); \"GeoGov\" is an empty, unused folder (zero services, zero sub-folders); \"DataSharing\" carries only Hardeeville address points/CAMA parcels/school districts/zoning reference layers shared with municipalities, nothing case-shaped. County's own Code Enforcement page lists only a phone/email contact (843-547-8290), consistent with no public dataset.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Robeson",
+      "column": "condemned",
+      "reason": "No live GIS REST host found for the county after trying its two plausible dedicated subdomains (gis./gis2.robesoncountync.gov, both DNS-unreachable) and its \"ConnectGIS\" backend (robeson.connectgis.com, confirmed HTTP 504 Gateway Timeout on the live API endpoint and on the bare site). An NC State University Libraries county-GIS reference page -- the only description of the county's GIS capability found -- says the county is still developing its GIS system. Medium confidence (web/API evidence only, no REST catalog reachable to enumerate directly): the weakest-evidenced of this round's 11 counties, re-check if a real county GIS host ever surfaces.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Robeson",
+      "column": "vacancy",
+      "reason": "No live GIS REST host found for the county after trying its two plausible dedicated subdomains (gis./gis2.robesoncountync.gov, both DNS-unreachable) and its \"ConnectGIS\" backend (robeson.connectgis.com, confirmed HTTP 504 Gateway Timeout on the live API endpoint and on the bare site). An NC State University Libraries county-GIS reference page -- the only description of the county's GIS capability found -- says the county is still developing its GIS system. Medium confidence (web/API evidence only, no REST catalog reachable to enumerate directly): the weakest-evidenced of this round's 11 counties, re-check if a real county GIS host ever surfaces.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Robeson",
+      "column": "vacant",
+      "reason": "No live GIS REST host found for the county after trying its two plausible dedicated subdomains (gis./gis2.robesoncountync.gov, both DNS-unreachable) and its \"ConnectGIS\" backend (robeson.connectgis.com, confirmed HTTP 504 Gateway Timeout on the live API endpoint and on the bare site). An NC State University Libraries county-GIS reference page -- the only description of the county's GIS capability found -- says the county is still developing its GIS system. Medium confidence (web/API evidence only, no REST catalog reachable to enumerate directly): the weakest-evidenced of this round's 11 counties, re-check if a real county GIS host ever surfaces.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
     }
   ]
 }

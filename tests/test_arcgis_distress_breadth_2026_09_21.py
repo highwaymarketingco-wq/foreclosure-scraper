@@ -16,6 +16,7 @@ import foreclosure_scraper.scrapers.counties_generic.arcgis_distress_layers as M
 from foreclosure_scraper.models import ListingType
 
 COLUMBIA = "columbia_code_vacant_boarded"
+COLUMBIA_DEMO = "columbia_code_demolition"
 
 
 def _lay(slug):
@@ -45,10 +46,31 @@ def test_columbia_layer_is_registered_with_a_structure_only_filter():
     assert lay.url.endswith("/CodeViolationProperty/FeatureServer/0")
     # only the two OPEN case states, and only structure-level problems
     assert "CaseStatus IN ('In Violation','Open')" in lay.where
-    for frag in ("%Boarded Building%", "%Demolition%", "Vacant Building%"):
+    for frag in ("%Boarded Building%", "Vacant Building%"):
         assert frag in lay.where
+    # 2026-11-17 (round 14): Demolition cases are peeled into columbia_code_demolition
+    # below (condemned=True there) -- this layer's own where= now excludes them so the
+    # two never double-fetch the same case.
+    assert "NOT LIKE '%Demolition%'" in lay.where
+    assert lay.condemned is False
     # a yard, parking or roll-cart case must not be able to slip through the filter text
     for noise in ("Vacant Lot", "Roll Cart", "Parking", "Vehicle"):
+        assert noise not in lay.where
+
+
+def test_columbia_demolition_layer_is_registered_as_condemned():
+    # 2026-11-17 (round 14, vacant_structure "no source known" breadth pass): Richland's
+    # own Demolition Problem category, split off columbia_code_vacant_boarded above --
+    # same service/layer, mutually exclusive where=, matching rockhill_code_demolition/
+    # durham_unsafe_building's established condemned=True+vacancy=True precedent.
+    lay = _lay(COLUMBIA_DEMO)
+    assert (lay.state, lay.county) == ("SC", "Richland")
+    assert lay.url == _lay(COLUMBIA).url  # same service as the sibling entry
+    assert lay.condemned is True and lay.vacancy is True
+    assert "CaseStatus IN ('In Violation','Open')" in lay.where
+    assert "Problem LIKE '%Demolition%'" in lay.where
+    # the sibling entry's exclusions must not leak back into this one
+    for noise in ("Boarded Building", "Vacant Building"):
         assert noise not in lay.where
 
 
@@ -79,19 +101,24 @@ def test_columbia_row_without_an_address_is_dropped():
 
 
 def test_columbia_query_carries_the_filter_and_the_explicit_field_list(monkeypatch):
-    seen = {}
+    # 2026-11-17 (round 14): columbia_code_vacant_boarded and columbia_code_demolition
+    # now share this one host/service (CodeViolationProperty), so the mock must keep
+    # every call's params keyed by its own where= rather than overwriting a single
+    # dict -- a URL-substring match alone can no longer tell the two layers apart.
+    seen_by_where = {}
 
     async def get(url, **kw):
         if "CodeViolationProperty" in url:
-            seen.update(kw["params"])
+            seen_by_where[kw["params"]["where"]] = kw["params"]
         return _resp({"features": []})
 
     monkeypatch.setattr(M, "client", _client(get))
     asyncio.run(M.ArcgisDistressLayers().fetch())
-    lay = _lay(COLUMBIA)
-    assert seen["where"] == lay.where
-    assert seen["outFields"] == ",".join(lay.fields)
-    assert seen["returnGeometry"] == "false"
+    for lay in (_lay(COLUMBIA), _lay(COLUMBIA_DEMO)):
+        seen = seen_by_where[lay.where]
+        assert seen["where"] == lay.where
+        assert seen["outFields"] == ",".join(lay.fields)
+        assert seen["returnGeometry"] == "false"
 
 
 # ----------------------------------------------------------------------------- Greenville

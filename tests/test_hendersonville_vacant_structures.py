@@ -221,6 +221,9 @@ def test_listing_shape():
     assert li.owner_name == li.defendant == "BILLY HOLDEN JR & KEISHA"
     assert 35.0 < li.latitude < 35.6 and -82.7 < li.longitude < -82.2
     assert li.raw["vacancy"]["vacant"] is True
+    # 2026-11-17 (round 14): mirrored into raw["gis"]["vacant"] -- the SEPARATE key the
+    # sibling 'vacant' column actually checks (gap_matrix.py's own 'vacant' Spec doc).
+    assert li.raw["gis"]["vacant"] is True
     assert li.raw["absentee_owner"] is True
     # 2026-10-04 audit: enrichment_lead_signals.py / distress_score.py read
     # raw['owner_mailing']['absentee'] (mailing_shape.mailing_of), never the
@@ -246,6 +249,9 @@ def test_occupied_property_is_not_flagged_vacant():
     li = _run(FakeHttp({}, pages=[payload]))[0]
     assert li.raw["vacancy"]["vacant"] is None
     assert "distressed" not in li.raw
+    # 2026-11-17 (round 14): an unconfirmed/occupied row must not claim raw["gis"]["vacant"]
+    # either -- the mirror only fires on occupied is False, never on None/unknown.
+    assert "gis" not in li.raw
 
 
 def test_demolished_row_closes_the_case_but_keeps_the_lot_as_a_lead():

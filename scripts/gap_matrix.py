@@ -867,13 +867,27 @@ SPECS: dict[str, Spec] = {
                    # already computed and fed vacancy_adjacent, but never mirrored into either of
                    # this column's two real keys -- thin (1 of 144 live open cases sampled), but
                    # real -- single-county text match, live-verified correct before this edit.
+                   #
+                   # 2026-11-17 (round 14): hendersonville_vacant_structures.py was ALSO missing
+                   # from this tuple entirely -- same bug class, found by direct code inspection
+                   # rather than a county-specific gap_list lookup. It was already correctly in
+                   # BOTH the 'condemned' and 'vacancy' producers tuples (it writes a bare
+                   # raw["condemned"]=True and a real raw["vacancy"] wrapper), but its vacancy
+                   # determination (occupied is False, a code officer's on-site confirmation) was
+                   # never mirrored into raw["gis"]["vacant"] either -- fixed in that module
+                   # directly, same dual-key shape as kinston_proposed_demolition.py/lincoln_code_
+                   # violations.py above. This was Henderson NC's own 'vacant'-column "no source
+                   # known" gap, the #1 cell by est_rows_affected (3,977 rows) in the whole
+                   # 2026-11-16 ledger sweep -- 'condemned'/'vacancy' were already correctly
+                   # credited for this county via this same file, 'vacant' alone had the omission.
                    producers=("enrichment_arcgis.py", "scrapers/counties_sc/spartanburg_vacant.py",
                               "nc_lincoln_bulk.py", "scrapers/counties_nc/gastonia_code_enforcement.py",
                               "scrapers/counties_nc/kinston_proposed_demolition.py",
                               "scrapers/counties_nc/rocky_mount_blight_survey.py",
                               "scrapers/counties_generic/arcgis_distress_layers.py",
                               "scrapers/counties_nc/lincoln_code_violations.py",
-                              "scrapers/counties_nc/wake_code_cases.py"),
+                              "scrapers/counties_nc/wake_code_cases.py",
+                              "scrapers/counties_nc/hendersonville_vacant_structures.py"),
                    doc="raw.vacant present (a city/county vacant-structure registry); the real "
                        "check elsewhere in this file is raw['gis']['vacant'] specifically"),
     #: 2026-11-16 (round 10 individual recheck): the 7 thinnest-sample counties in this 58-cell
