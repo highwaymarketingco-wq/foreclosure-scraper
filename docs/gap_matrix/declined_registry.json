@@ -3313,6 +3313,742 @@
       "reason": "County DOES run a live 'Cherokee County, NC Code Enforcement' ArcGIS Web Experience (ccncgis.maps.arcgis.com, orgId UmQCfTNQbyTzAV5N, owner tslovin) -- but its operational layers, read directly from the app's own config JSON, are AndrewsNCZoning/MurphyNCZoning/BuildingCodeContours/FloodHazards/Parcels/Municipalities/RoadCenterlines/PrimaryFireLimit/ProtectedWatersheds: a jurisdiction/zoning-overlay reference map for an officer to determine which town's code applies to a parcel, not a violation case tracker. No CaseNumber/Status/Violation field anywhere in the org. Same boundary-reference rejection class already established for Sumter/Gaston/Anderson in this file.",
       "confirmed_date": "2026-11-17",
       "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Craven",
+      "column": "condemned",
+      "reason": "County's own GIS server (gis.cravencountync.gov, 12 folders: Basemaps/E911/EnerGov/Fiber/GProcesses/Imagery/mMaps/Polimorphic/PRQInternal/PRQPublic/Solid_Waste/Utilities) fully enumerated live. The EnerGov1 MapServer carries only a parcel/address/zoning basemap bundle (Address_Points/Parcels/aicuz/city_limits/ETJ/CAZ ZONE/Flood Zone/roads/water_poly/Floodway/CAVParcels) -- no case or violation layer exists despite the EnerGov name. PRQPublic folder is empty; GProcesses is geoprocessing export tools only. No code-enforcement, condemned, or vacant-structure dataset exists on this server.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Craven",
+      "column": "vacancy",
+      "reason": "County's own GIS server (gis.cravencountync.gov, 12 folders: Basemaps/E911/EnerGov/Fiber/GProcesses/Imagery/mMaps/Polimorphic/PRQInternal/PRQPublic/Solid_Waste/Utilities) fully enumerated live. The EnerGov1 MapServer carries only a parcel/address/zoning basemap bundle (Address_Points/Parcels/aicuz/city_limits/ETJ/CAZ ZONE/Flood Zone/roads/water_poly/Floodway/CAVParcels) -- no case or violation layer exists despite the EnerGov name. PRQPublic folder is empty; GProcesses is geoprocessing export tools only. No code-enforcement, condemned, or vacant-structure dataset exists on this server.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Craven",
+      "column": "vacant",
+      "reason": "County's own GIS server (gis.cravencountync.gov, 12 folders: Basemaps/E911/EnerGov/Fiber/GProcesses/Imagery/mMaps/Polimorphic/PRQInternal/PRQPublic/Solid_Waste/Utilities) fully enumerated live. The EnerGov1 MapServer carries only a parcel/address/zoning basemap bundle (Address_Points/Parcels/aicuz/city_limits/ETJ/CAZ ZONE/Flood Zone/roads/water_poly/Floodway/CAVParcels) -- no case or violation layer exists despite the EnerGov name. PRQPublic folder is empty; GProcesses is geoprocessing export tools only. No code-enforcement, condemned, or vacant-structure dataset exists on this server.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Pender",
+      "column": "condemned",
+      "reason": "County's own GIS server (gis.pendercountync.gov) fully enumerated live. Both the Energov and Energov_agsUser MapServer entries carry the identical 32-layer basemap bundle (Street Centerlines/Parcels/zoning_udo/Inspection_Districts/etc.) despite the EnerGov name -- no case or violation layer exists. The county's Code Enforcement Division (Zoning/Solid Waste) has no published GIS layer; its own page gives only a phone contact (Charlie Ring, 910-259-1519).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Pender",
+      "column": "vacancy",
+      "reason": "County's own GIS server (gis.pendercountync.gov) fully enumerated live. Both the Energov and Energov_agsUser MapServer entries carry the identical 32-layer basemap bundle (Street Centerlines/Parcels/zoning_udo/Inspection_Districts/etc.) despite the EnerGov name -- no case or violation layer exists. The county's Code Enforcement Division (Zoning/Solid Waste) has no published GIS layer; its own page gives only a phone contact (Charlie Ring, 910-259-1519).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Pender",
+      "column": "vacant",
+      "reason": "County's own GIS server (gis.pendercountync.gov) fully enumerated live. Both the Energov and Energov_agsUser MapServer entries carry the identical 32-layer basemap bundle (Street Centerlines/Parcels/zoning_udo/Inspection_Districts/etc.) despite the EnerGov name -- no case or violation layer exists. The county's Code Enforcement Division (Zoning/Solid Waste) has no published GIS layer; its own page gives only a phone contact (Charlie Ring, 910-259-1519).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Cleveland",
+      "column": "condemned",
+      "reason": "County's own GIS server (gis.clevelandcounty.com, 5 folders: Basemap/Imagery/Planning/Tax/Utilities) fully enumerated live. Planning folder has only Annexations/LandUse/RV_Parks/VoluntaryAgDistrict/Zoning. Tax folder's Vacant_ImprovedLot_Sales layer is vacant-LAND sales comps (fields live-verified: Parcel_Number/Deed_Book/Sales_Amount/Acres), not a vacant-STRUCTURE registry -- the same land-vs-structure mislabel trap this project already tracks for enrichment_arcgis.py/nc_lincoln_bulk.py. No code-enforcement or condemned layer anywhere on this server.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Cleveland",
+      "column": "vacancy",
+      "reason": "County's own GIS server (gis.clevelandcounty.com, 5 folders: Basemap/Imagery/Planning/Tax/Utilities) fully enumerated live. Planning folder has only Annexations/LandUse/RV_Parks/VoluntaryAgDistrict/Zoning. Tax folder's Vacant_ImprovedLot_Sales layer is vacant-LAND sales comps (fields live-verified: Parcel_Number/Deed_Book/Sales_Amount/Acres), not a vacant-STRUCTURE registry -- the same land-vs-structure mislabel trap this project already tracks for enrichment_arcgis.py/nc_lincoln_bulk.py. No code-enforcement or condemned layer anywhere on this server.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Cleveland",
+      "column": "vacant",
+      "reason": "County's own GIS server (gis.clevelandcounty.com, 5 folders: Basemap/Imagery/Planning/Tax/Utilities) fully enumerated live. Planning folder has only Annexations/LandUse/RV_Parks/VoluntaryAgDistrict/Zoning. Tax folder's Vacant_ImprovedLot_Sales layer is vacant-LAND sales comps (fields live-verified: Parcel_Number/Deed_Book/Sales_Amount/Acres), not a vacant-STRUCTURE registry -- the same land-vs-structure mislabel trap this project already tracks for enrichment_arcgis.py/nc_lincoln_bulk.py. No code-enforcement or condemned layer anywhere on this server.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Chatham",
+      "column": "condemned",
+      "reason": "County's own GIS server (gisservices.chathamcountync.gov) fully enumerated live across all 3 of its live ArcGIS instances (opendataagol: 18 folders; webapps: 3 folders; chathamgis: 5 folders). Zero code-enforcement, condemned, vacant-structure, or nuisance content in any of them; the CAMA-adjacent AssessmentInformation folder carries only FireTaxDistricts/TaxParcelNeighborhoods/VoluntaryAgParcels.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Chatham",
+      "column": "vacancy",
+      "reason": "County's own GIS server (gisservices.chathamcountync.gov) fully enumerated live across all 3 of its live ArcGIS instances (opendataagol: 18 folders; webapps: 3 folders; chathamgis: 5 folders). Zero code-enforcement, condemned, vacant-structure, or nuisance content in any of them; the CAMA-adjacent AssessmentInformation folder carries only FireTaxDistricts/TaxParcelNeighborhoods/VoluntaryAgParcels.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Chatham",
+      "column": "vacant",
+      "reason": "County's own GIS server (gisservices.chathamcountync.gov) fully enumerated live across all 3 of its live ArcGIS instances (opendataagol: 18 folders; webapps: 3 folders; chathamgis: 5 folders). Zero code-enforcement, condemned, vacant-structure, or nuisance content in any of them; the CAMA-adjacent AssessmentInformation folder carries only FireTaxDistricts/TaxParcelNeighborhoods/VoluntaryAgParcels.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Person",
+      "column": "condemned",
+      "reason": "County's own GIS server (gis.personcountync.gov) has a real EnerGov/EnerGovHistory MapServer with CodePoint/CodePoly layers, but live-queried: only 19 all-time rows, 100% CaseType = 'Unified Development Ordinance' (zoning), with no description/severity/status field of any kind on either layer's schema -- confirmed, not inferred, that this is not a vacancy/condemnation signal.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Person",
+      "column": "vacancy",
+      "reason": "County's own GIS server (gis.personcountync.gov) has a real EnerGov/EnerGovHistory MapServer with CodePoint/CodePoly layers, but live-queried: only 19 all-time rows, 100% CaseType = 'Unified Development Ordinance' (zoning), with no description/severity/status field of any kind on either layer's schema -- confirmed, not inferred, that this is not a vacancy/condemnation signal.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Person",
+      "column": "vacant",
+      "reason": "County's own GIS server (gis.personcountync.gov) has a real EnerGov/EnerGovHistory MapServer with CodePoint/CodePoly layers, but live-queried: only 19 all-time rows, 100% CaseType = 'Unified Development Ordinance' (zoning), with no description/severity/status field of any kind on either layer's schema -- confirmed, not inferred, that this is not a vacancy/condemnation signal.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Haywood",
+      "column": "condemned",
+      "reason": "County's own GIS server (maps.haywoodcountync.gov) fully enumerated live; its SmartGov folder's only service (SmartGovTaxView) is a CAMA tax-card view. Its Occupancy_Code/Occupancy_Desc field (live-queried distinct values: Commercial Use/Single-Family/Industrial Use/Duplex/etc.) is a BUILDING-TYPE classification, not an occupancy-status field -- confirmed before use, same mislabel trap as Cleveland's Vacant_ImprovedLot_Sales above. Waynesville's own 'Code Enforcement Map' is a static PDF (dated June 2022/January 2023), not a live feed.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Haywood",
+      "column": "vacancy",
+      "reason": "County's own GIS server (maps.haywoodcountync.gov) fully enumerated live; its SmartGov folder's only service (SmartGovTaxView) is a CAMA tax-card view. Its Occupancy_Code/Occupancy_Desc field (live-queried distinct values: Commercial Use/Single-Family/Industrial Use/Duplex/etc.) is a BUILDING-TYPE classification, not an occupancy-status field -- confirmed before use, same mislabel trap as Cleveland's Vacant_ImprovedLot_Sales above. Waynesville's own 'Code Enforcement Map' is a static PDF (dated June 2022/January 2023), not a live feed.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Haywood",
+      "column": "vacant",
+      "reason": "County's own GIS server (maps.haywoodcountync.gov) fully enumerated live; its SmartGov folder's only service (SmartGovTaxView) is a CAMA tax-card view. Its Occupancy_Code/Occupancy_Desc field (live-queried distinct values: Commercial Use/Single-Family/Industrial Use/Duplex/etc.) is a BUILDING-TYPE classification, not an occupancy-status field -- confirmed before use, same mislabel trap as Cleveland's Vacant_ImprovedLot_Sales above. Waynesville's own 'Code Enforcement Map' is a static PDF (dated June 2022/January 2023), not a live feed.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Wilson",
+      "column": "condemned",
+      "reason": "Wilson County's own ArcGIS Hub open-data portal (county-data-wilsoncounty.opendata.arcgis.com) fully enumerated live via its data.json DCAT feed: 31 datasets, all parcel/zoning/voting/census/water/road layers. Zero code-enforcement or condemned-property content.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Wilson",
+      "column": "vacancy",
+      "reason": "Wilson County's own ArcGIS Hub open-data portal (county-data-wilsoncounty.opendata.arcgis.com) fully enumerated live via its data.json DCAT feed: 31 datasets, all parcel/zoning/voting/census/water/road layers. Zero code-enforcement or condemned-property content.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Wilson",
+      "column": "vacant",
+      "reason": "Wilson County's own ArcGIS Hub open-data portal (county-data-wilsoncounty.opendata.arcgis.com) fully enumerated live via its data.json DCAT feed: 31 datasets, all parcel/zoning/voting/census/water/road layers. Zero code-enforcement or condemned-property content.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Lancaster",
+      "column": "condemned",
+      "reason": "Lancaster County's own AGOL organization (services3.arcgis.com/rJcpRneDUBgTeCT3) enumerated live for case-shaped layers; the only hit, Current_Cases_Viewer, is a REZONING case tracker (fields Case_Number/PIN/current_zoning/Proposal, 17 rows live-queried), not a code-enforcement/condemnation dataset.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Lancaster",
+      "column": "vacancy",
+      "reason": "Lancaster County's own AGOL organization (services3.arcgis.com/rJcpRneDUBgTeCT3) enumerated live for case-shaped layers; the only hit, Current_Cases_Viewer, is a REZONING case tracker (fields Case_Number/PIN/current_zoning/Proposal, 17 rows live-queried), not a code-enforcement/condemnation dataset.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Lancaster",
+      "column": "vacant",
+      "reason": "Lancaster County's own AGOL organization (services3.arcgis.com/rJcpRneDUBgTeCT3) enumerated live for case-shaped layers; the only hit, Current_Cases_Viewer, is a REZONING case tracker (fields Case_Number/PIN/current_zoning/Proposal, 17 rows live-queried), not a code-enforcement/condemnation dataset.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Dillon",
+      "column": "condemned",
+      "reason": "County's parcel viewer (dillonsc.wthgis.com, per SC DNR's own statewide Hosted/SC_County_Parcel_Viewers registry) runs on WTH Technology's proprietary 'TGIS' mapping platform, not ArcGIS REST -- confirmed live via the page's own source (tgisClientInit/custom.aspx parcel-search-form calls). It is an assessor parcel viewer, not a code-enforcement system, and its non-standard API is a fundamentally different integration shape than any existing producer in this codebase.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Dillon",
+      "column": "vacancy",
+      "reason": "County's parcel viewer (dillonsc.wthgis.com, per SC DNR's own statewide Hosted/SC_County_Parcel_Viewers registry) runs on WTH Technology's proprietary 'TGIS' mapping platform, not ArcGIS REST -- confirmed live via the page's own source (tgisClientInit/custom.aspx parcel-search-form calls). It is an assessor parcel viewer, not a code-enforcement system, and its non-standard API is a fundamentally different integration shape than any existing producer in this codebase.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Dillon",
+      "column": "vacant",
+      "reason": "County's parcel viewer (dillonsc.wthgis.com, per SC DNR's own statewide Hosted/SC_County_Parcel_Viewers registry) runs on WTH Technology's proprietary 'TGIS' mapping platform, not ArcGIS REST -- confirmed live via the page's own source (tgisClientInit/custom.aspx parcel-search-form calls). It is an assessor parcel viewer, not a code-enforcement system, and its non-standard API is a fundamentally different integration shape than any existing producer in this codebase.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Chesterfield",
+      "column": "condemned",
+      "reason": "Same WTH Technology TGIS parcel-viewer platform as Dillon/Marion/Marlboro (chesterfieldsc.wthgis.com, per SC DNR registry) -- an assessor parcel viewer only, same non-standard proprietary API confirmed live for Dillon above.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Chesterfield",
+      "column": "vacancy",
+      "reason": "Same WTH Technology TGIS parcel-viewer platform as Dillon/Marion/Marlboro (chesterfieldsc.wthgis.com, per SC DNR registry) -- an assessor parcel viewer only, same non-standard proprietary API confirmed live for Dillon above.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Chesterfield",
+      "column": "vacant",
+      "reason": "Same WTH Technology TGIS parcel-viewer platform as Dillon/Marion/Marlboro (chesterfieldsc.wthgis.com, per SC DNR registry) -- an assessor parcel viewer only, same non-standard proprietary API confirmed live for Dillon above.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Marion",
+      "column": "condemned",
+      "reason": "Same WTH Technology TGIS parcel-viewer platform as Dillon/Chesterfield/Marlboro (marionsc.wthgis.com, per SC DNR registry) -- an assessor parcel viewer only, same non-standard proprietary API confirmed live for Dillon above.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Marion",
+      "column": "vacancy",
+      "reason": "Same WTH Technology TGIS parcel-viewer platform as Dillon/Chesterfield/Marlboro (marionsc.wthgis.com, per SC DNR registry) -- an assessor parcel viewer only, same non-standard proprietary API confirmed live for Dillon above.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Marion",
+      "column": "vacant",
+      "reason": "Same WTH Technology TGIS parcel-viewer platform as Dillon/Chesterfield/Marlboro (marionsc.wthgis.com, per SC DNR registry) -- an assessor parcel viewer only, same non-standard proprietary API confirmed live for Dillon above.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Marlboro",
+      "column": "condemned",
+      "reason": "Same WTH Technology TGIS parcel-viewer platform as Dillon/Chesterfield/Marion (marlborosc.wthgis.com, per SC DNR registry) -- an assessor parcel viewer only, same non-standard proprietary API confirmed live for Dillon above.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Marlboro",
+      "column": "vacancy",
+      "reason": "Same WTH Technology TGIS parcel-viewer platform as Dillon/Chesterfield/Marion (marlborosc.wthgis.com, per SC DNR registry) -- an assessor parcel viewer only, same non-standard proprietary API confirmed live for Dillon above.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Marlboro",
+      "column": "vacant",
+      "reason": "Same WTH Technology TGIS parcel-viewer platform as Dillon/Chesterfield/Marion (marlborosc.wthgis.com, per SC DNR registry) -- an assessor parcel viewer only, same non-standard proprietary API confirmed live for Dillon above.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Madison",
+      "column": "condemned",
+      "reason": "No live county GIS REST host could be reached (gis.madisoncountync.gov and maps.madisoncountync.gov both DNS-unreachable); web search found only generic planning-department contact info and SEO-spam results for an unverified 'madisongis.com' (not confirmed as an official county source). No code-enforcement or condemned dataset confirmed to exist. Medium confidence (web evidence only, no REST catalog reachable to enumerate directly).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Madison",
+      "column": "vacancy",
+      "reason": "No live county GIS REST host could be reached (gis.madisoncountync.gov and maps.madisoncountync.gov both DNS-unreachable); web search found only generic planning-department contact info and SEO-spam results for an unverified 'madisongis.com' (not confirmed as an official county source). No code-enforcement or condemned dataset confirmed to exist. Medium confidence (web evidence only, no REST catalog reachable to enumerate directly).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Madison",
+      "column": "vacant",
+      "reason": "No live county GIS REST host could be reached (gis.madisoncountync.gov and maps.madisoncountync.gov both DNS-unreachable); web search found only generic planning-department contact info and SEO-spam results for an unverified 'madisongis.com' (not confirmed as an official county source). No code-enforcement or condemned dataset confirmed to exist. Medium confidence (web evidence only, no REST catalog reachable to enumerate directly).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Stanly",
+      "column": "condemned",
+      "reason": "County's GIS brand (stanlygis.net) resolves but has no reachable /arcgis/ REST path (404); the only description found cites 'ArcMap 9.2'-era software, suggesting any public-facing endpoint is not a modern REST service. No code-enforcement or condemned dataset confirmed. Medium confidence (web evidence only, no REST catalog reachable to enumerate directly).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Stanly",
+      "column": "vacancy",
+      "reason": "County's GIS brand (stanlygis.net) resolves but has no reachable /arcgis/ REST path (404); the only description found cites 'ArcMap 9.2'-era software, suggesting any public-facing endpoint is not a modern REST service. No code-enforcement or condemned dataset confirmed. Medium confidence (web evidence only, no REST catalog reachable to enumerate directly).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Stanly",
+      "column": "vacant",
+      "reason": "County's GIS brand (stanlygis.net) resolves but has no reachable /arcgis/ REST path (404); the only description found cites 'ArcMap 9.2'-era software, suggesting any public-facing endpoint is not a modern REST service. No code-enforcement or condemned dataset confirmed. Medium confidence (web evidence only, no REST catalog reachable to enumerate directly).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Surry",
+      "column": "condemned",
+      "reason": "No live county or Mount Airy GIS REST host found. Surry County Inspections (Dobson) and Mount Airy's zoning office are phone-contact only per their own pages; the county ordinance (Ch. 92) describes a nuisance-abatement process, not a published dataset. Medium confidence (web evidence only, no REST catalog reachable to enumerate directly).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Surry",
+      "column": "vacancy",
+      "reason": "No live county or Mount Airy GIS REST host found. Surry County Inspections (Dobson) and Mount Airy's zoning office are phone-contact only per their own pages; the county ordinance (Ch. 92) describes a nuisance-abatement process, not a published dataset. Medium confidence (web evidence only, no REST catalog reachable to enumerate directly).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Surry",
+      "column": "vacant",
+      "reason": "No live county or Mount Airy GIS REST host found. Surry County Inspections (Dobson) and Mount Airy's zoning office are phone-contact only per their own pages; the county ordinance (Ch. 92) describes a nuisance-abatement process, not a published dataset. Medium confidence (web evidence only, no REST catalog reachable to enumerate directly).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Union",
+      "column": "condemned",
+      "reason": "County's only confirmed GIS presence is a Schneider qPublic assessor parcel viewer (per SC DNR's statewide SC_County_Parcel_Viewers registry); a dedicated search for a separate code-enforcement portal for both the City of Union and the county found only phone contacts (864-429-1720 city, 864-429-1666 county unincorporated/Jonesville/Lockhart/Carlisle), no dataset. Medium confidence (no county GIS REST host independently enumerated).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Union",
+      "column": "vacancy",
+      "reason": "County's only confirmed GIS presence is a Schneider qPublic assessor parcel viewer (per SC DNR's statewide SC_County_Parcel_Viewers registry); a dedicated search for a separate code-enforcement portal for both the City of Union and the county found only phone contacts (864-429-1720 city, 864-429-1666 county unincorporated/Jonesville/Lockhart/Carlisle), no dataset. Medium confidence (no county GIS REST host independently enumerated).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Union",
+      "column": "vacant",
+      "reason": "County's only confirmed GIS presence is a Schneider qPublic assessor parcel viewer (per SC DNR's statewide SC_County_Parcel_Viewers registry); a dedicated search for a separate code-enforcement portal for both the City of Union and the county found only phone contacts (864-429-1720 city, 864-429-1666 county unincorporated/Jonesville/Lockhart/Carlisle), no dataset. Medium confidence (no county GIS REST host independently enumerated).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Calhoun",
+      "column": "condemned",
+      "reason": "County's only confirmed GIS presence is a custom AECOM-hosted parcel viewer (gis.aecomonline.net/Calhounparcel/, per SC DNR registry) -- an assessor parcel tool, not code enforcement. Dedicated search found only a complaint-intake form and phone contact (803-874-4201/803-874-3613), no dataset. Medium confidence (no county GIS REST host independently enumerated).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Calhoun",
+      "column": "vacancy",
+      "reason": "County's only confirmed GIS presence is a custom AECOM-hosted parcel viewer (gis.aecomonline.net/Calhounparcel/, per SC DNR registry) -- an assessor parcel tool, not code enforcement. Dedicated search found only a complaint-intake form and phone contact (803-874-4201/803-874-3613), no dataset. Medium confidence (no county GIS REST host independently enumerated).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Calhoun",
+      "column": "vacant",
+      "reason": "County's only confirmed GIS presence is a custom AECOM-hosted parcel viewer (gis.aecomonline.net/Calhounparcel/, per SC DNR registry) -- an assessor parcel tool, not code enforcement. Dedicated search found only a complaint-intake form and phone contact (803-874-4201/803-874-3613), no dataset. Medium confidence (no county GIS REST host independently enumerated).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Newberry",
+      "column": "condemned",
+      "reason": "County's only confirmed GIS presence is a Schneider qPublic assessor parcel viewer (per SC DNR registry, map.newberrycounty.net/parcel/). Dedicated search found the county's unfit-dwelling ordinance text and its Building/Fire/Nuisance Codes Board of Appeals, but no published dataset or GIS layer. Medium confidence (no county GIS REST host independently enumerated).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Newberry",
+      "column": "vacancy",
+      "reason": "County's only confirmed GIS presence is a Schneider qPublic assessor parcel viewer (per SC DNR registry, map.newberrycounty.net/parcel/). Dedicated search found the county's unfit-dwelling ordinance text and its Building/Fire/Nuisance Codes Board of Appeals, but no published dataset or GIS layer. Medium confidence (no county GIS REST host independently enumerated).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Newberry",
+      "column": "vacant",
+      "reason": "County's only confirmed GIS presence is a Schneider qPublic assessor parcel viewer (per SC DNR registry, map.newberrycounty.net/parcel/). Dedicated search found the county's unfit-dwelling ordinance text and its Building/Fire/Nuisance Codes Board of Appeals, but no published dataset or GIS layer. Medium confidence (no county GIS REST host independently enumerated).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Edgefield",
+      "column": "condemned",
+      "reason": "County's only confirmed GIS presence is a Schneider qPublic assessor parcel viewer (per SC DNR registry) -- same category as the other qPublic-only SC counties checked this round; no separate code-enforcement portal found. Medium confidence (no county GIS REST host independently enumerated).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Edgefield",
+      "column": "vacancy",
+      "reason": "County's only confirmed GIS presence is a Schneider qPublic assessor parcel viewer (per SC DNR registry) -- same category as the other qPublic-only SC counties checked this round; no separate code-enforcement portal found. Medium confidence (no county GIS REST host independently enumerated).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Edgefield",
+      "column": "vacant",
+      "reason": "County's only confirmed GIS presence is a Schneider qPublic assessor parcel viewer (per SC DNR registry) -- same category as the other qPublic-only SC counties checked this round; no separate code-enforcement portal found. Medium confidence (no county GIS REST host independently enumerated).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Georgetown",
+      "column": "condemned",
+      "reason": "County's only confirmed GIS presence is a Schneider qPublic assessor parcel viewer (per SC DNR registry). This project's own existing assessor_cards/georgetown_sc.py already reads this exact qPublic card, for heated-sqft/Year-Built only (live-verified 2026-06-29 per that file's own docstring) -- confirming no condition/occupancy field was left on the table there, since the card was already read for a different purpose. Medium confidence (the card itself was not independently re-fetched this round to re-check for a vacancy-specific field).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Georgetown",
+      "column": "vacancy",
+      "reason": "County's only confirmed GIS presence is a Schneider qPublic assessor parcel viewer (per SC DNR registry). This project's own existing assessor_cards/georgetown_sc.py already reads this exact qPublic card, for heated-sqft/Year-Built only (live-verified 2026-06-29 per that file's own docstring) -- confirming no condition/occupancy field was left on the table there, since the card was already read for a different purpose. Medium confidence (the card itself was not independently re-fetched this round to re-check for a vacancy-specific field).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Georgetown",
+      "column": "vacant",
+      "reason": "County's only confirmed GIS presence is a Schneider qPublic assessor parcel viewer (per SC DNR registry). This project's own existing assessor_cards/georgetown_sc.py already reads this exact qPublic card, for heated-sqft/Year-Built only (live-verified 2026-06-29 per that file's own docstring) -- confirming no condition/occupancy field was left on the table there, since the card was already read for a different purpose. Medium confidence (the card itself was not independently re-fetched this round to re-check for a vacancy-specific field).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Bamberg",
+      "column": "condemned",
+      "reason": "County's only confirmed GIS presence is a Schneider qPublic assessor parcel viewer, login-required (per SC DNR registry) -- same category as the other qPublic-only SC counties, and additionally login-walled. Medium confidence (no county GIS REST host independently enumerated).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Bamberg",
+      "column": "vacancy",
+      "reason": "County's only confirmed GIS presence is a Schneider qPublic assessor parcel viewer, login-required (per SC DNR registry) -- same category as the other qPublic-only SC counties, and additionally login-walled. Medium confidence (no county GIS REST host independently enumerated).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Bamberg",
+      "column": "vacant",
+      "reason": "County's only confirmed GIS presence is a Schneider qPublic assessor parcel viewer, login-required (per SC DNR registry) -- same category as the other qPublic-only SC counties, and additionally login-walled. Medium confidence (no county GIS REST host independently enumerated).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Abbeville",
+      "column": "condemned",
+      "reason": "County's only confirmed GIS presence is a Schneider qPublic assessor parcel viewer (per SC DNR registry) -- same category as the other qPublic-only SC counties checked this round. Medium confidence (no county GIS REST host independently enumerated).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Abbeville",
+      "column": "vacancy",
+      "reason": "County's only confirmed GIS presence is a Schneider qPublic assessor parcel viewer (per SC DNR registry) -- same category as the other qPublic-only SC counties checked this round. Medium confidence (no county GIS REST host independently enumerated).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Abbeville",
+      "column": "vacant",
+      "reason": "County's only confirmed GIS presence is a Schneider qPublic assessor parcel viewer (per SC DNR registry) -- same category as the other qPublic-only SC counties checked this round. Medium confidence (no county GIS REST host independently enumerated).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Fairfield",
+      "column": "condemned",
+      "reason": "County's only confirmed GIS presence is a Schneider qPublic assessor parcel viewer (per SC DNR registry) -- same category as the other qPublic-only SC counties checked this round. Medium confidence (no county GIS REST host independently enumerated).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Fairfield",
+      "column": "vacancy",
+      "reason": "County's only confirmed GIS presence is a Schneider qPublic assessor parcel viewer (per SC DNR registry) -- same category as the other qPublic-only SC counties checked this round. Medium confidence (no county GIS REST host independently enumerated).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Fairfield",
+      "column": "vacant",
+      "reason": "County's only confirmed GIS presence is a Schneider qPublic assessor parcel viewer (per SC DNR registry) -- same category as the other qPublic-only SC counties checked this round. Medium confidence (no county GIS REST host independently enumerated).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Hampton",
+      "column": "condemned",
+      "reason": "County's only confirmed GIS presence is a Schneider qPublic assessor parcel viewer, login-required (per SC DNR registry) -- same category as the other qPublic-only SC counties, and additionally login-walled. Medium confidence (no county GIS REST host independently enumerated).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Hampton",
+      "column": "vacancy",
+      "reason": "County's only confirmed GIS presence is a Schneider qPublic assessor parcel viewer, login-required (per SC DNR registry) -- same category as the other qPublic-only SC counties, and additionally login-walled. Medium confidence (no county GIS REST host independently enumerated).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Hampton",
+      "column": "vacant",
+      "reason": "County's only confirmed GIS presence is a Schneider qPublic assessor parcel viewer, login-required (per SC DNR registry) -- same category as the other qPublic-only SC counties, and additionally login-walled. Medium confidence (no county GIS REST host independently enumerated).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Lee",
+      "column": "condemned",
+      "reason": "County's only confirmed GIS presence is a Schneider qPublic assessor parcel viewer (per SC DNR registry) -- same category as the other qPublic-only SC counties checked this round. Medium confidence (no county GIS REST host independently enumerated).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Lee",
+      "column": "vacancy",
+      "reason": "County's only confirmed GIS presence is a Schneider qPublic assessor parcel viewer (per SC DNR registry) -- same category as the other qPublic-only SC counties checked this round. Medium confidence (no county GIS REST host independently enumerated).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Lee",
+      "column": "vacant",
+      "reason": "County's only confirmed GIS presence is a Schneider qPublic assessor parcel viewer (per SC DNR registry) -- same category as the other qPublic-only SC counties checked this round. Medium confidence (no county GIS REST host independently enumerated).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "McCormick",
+      "column": "condemned",
+      "reason": "County's only confirmed GIS presence is a custom WTH-affiliated parcel viewer (thinkopengis.mccormick.sc.wthtechnology.com, per SC DNR registry) -- an assessor parcel tool, same vendor family as the WTH TGIS counties confirmed live this round. Medium confidence (this specific host was not itself live-probed, only inferred from the vendor match).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "McCormick",
+      "column": "vacancy",
+      "reason": "County's only confirmed GIS presence is a custom WTH-affiliated parcel viewer (thinkopengis.mccormick.sc.wthtechnology.com, per SC DNR registry) -- an assessor parcel tool, same vendor family as the WTH TGIS counties confirmed live this round. Medium confidence (this specific host was not itself live-probed, only inferred from the vendor match).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "McCormick",
+      "column": "vacant",
+      "reason": "County's only confirmed GIS presence is a custom WTH-affiliated parcel viewer (thinkopengis.mccormick.sc.wthtechnology.com, per SC DNR registry) -- an assessor parcel tool, same vendor family as the WTH TGIS counties confirmed live this round. Medium confidence (this specific host was not itself live-probed, only inferred from the vendor match).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Allendale",
+      "column": "condemned",
+      "reason": "County's only confirmed GIS presence is a Schneider qPublic assessor parcel viewer, login-required (per SC DNR registry) -- same category as the other qPublic-only SC counties, and additionally login-walled. Medium confidence (no county GIS REST host independently enumerated).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Allendale",
+      "column": "vacancy",
+      "reason": "County's only confirmed GIS presence is a Schneider qPublic assessor parcel viewer, login-required (per SC DNR registry) -- same category as the other qPublic-only SC counties, and additionally login-walled. Medium confidence (no county GIS REST host independently enumerated).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Allendale",
+      "column": "vacant",
+      "reason": "County's only confirmed GIS presence is a Schneider qPublic assessor parcel viewer, login-required (per SC DNR registry) -- same category as the other qPublic-only SC counties, and additionally login-walled. Medium confidence (no county GIS REST host independently enumerated).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Aiken",
+      "column": "condemned",
+      "reason": "County's only confirmed GIS presence is a Beacon/Schneider assessor parcel viewer (per SC DNR registry), run by the county's own GeoServices office. Dedicated search found the county's Property Nuisance program (Sec. 15-22) but no published condemnation/vacant-property dataset from either office. Medium confidence (no county GIS REST host independently enumerated).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Aiken",
+      "column": "vacancy",
+      "reason": "County's only confirmed GIS presence is a Beacon/Schneider assessor parcel viewer (per SC DNR registry), run by the county's own GeoServices office. Dedicated search found the county's Property Nuisance program (Sec. 15-22) but no published condemnation/vacant-property dataset from either office. Medium confidence (no county GIS REST host independently enumerated).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Aiken",
+      "column": "vacant",
+      "reason": "County's only confirmed GIS presence is a Beacon/Schneider assessor parcel viewer (per SC DNR registry), run by the county's own GeoServices office. Dedicated search found the county's Property Nuisance program (Sec. 15-22) but no published condemnation/vacant-property dataset from either office. Medium confidence (no county GIS REST host independently enumerated).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Chester",
+      "column": "condemned",
+      "reason": "County's only confirmed GIS presence is a Beacon/Schneider assessor parcel viewer (per SC DNR registry). Dedicated search found the county's own Code Enforcement and GIS Mapping pages but no published dataset; (803) 385-5133 (GIS office) is the only contact found. Medium confidence (no county GIS REST host independently enumerated).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Chester",
+      "column": "vacancy",
+      "reason": "County's only confirmed GIS presence is a Beacon/Schneider assessor parcel viewer (per SC DNR registry). Dedicated search found the county's own Code Enforcement and GIS Mapping pages but no published dataset; (803) 385-5133 (GIS office) is the only contact found. Medium confidence (no county GIS REST host independently enumerated).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Chester",
+      "column": "vacant",
+      "reason": "County's only confirmed GIS presence is a Beacon/Schneider assessor parcel viewer (per SC DNR registry). Dedicated search found the county's own Code Enforcement and GIS Mapping pages but no published dataset; (803) 385-5133 (GIS office) is the only contact found. Medium confidence (no county GIS REST host independently enumerated).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Saluda",
+      "column": "condemned",
+      "reason": "County's only confirmed GIS presence is a custom parcel viewer (saludacountysc.net/SaludaCountyViewer/, per SC DNR registry) -- an assessor parcel tool, not code enforcement; no separate portal found. Medium confidence (this specific host was not itself live-probed for a REST catalog).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Saluda",
+      "column": "vacancy",
+      "reason": "County's only confirmed GIS presence is a custom parcel viewer (saludacountysc.net/SaludaCountyViewer/, per SC DNR registry) -- an assessor parcel tool, not code enforcement; no separate portal found. Medium confidence (this specific host was not itself live-probed for a REST catalog).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Saluda",
+      "column": "vacant",
+      "reason": "County's only confirmed GIS presence is a custom parcel viewer (saludacountysc.net/SaludaCountyViewer/, per SC DNR registry) -- an assessor parcel tool, not code enforcement; no separate portal found. Medium confidence (this specific host was not itself live-probed for a REST catalog).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Moore",
+      "column": "vacancy",
+      "reason": "County's own GIS server (gis.moorecountync.gov) fully enumerated live, including its real REST catalog at the non-standard /server/rest/services path (the default /arcgis/rest/services path 404s, which is why a naive probe misses this server entirely). Planning/Planning_Public carries only Zoning/Hwy COD/Future Land Use/Voluntary Ag Districts; Tax folder is CAMA/parcel layers only (Archival_Parcels/Soil_Report_Layer/Tax_Layers/Valid_Sales_By_Year), same condition-is-not-vacancy category already established this round. PublicSafety and Hosted folders are both token-walled (HTTP 499) and unreachable; PublicSafety is far more likely fire/EMS/CAD data than code enforcement given the name, but could not be confirmed either way. (condemned not researched -- this county's condemned column is not in the current 'no source known' bucket at all, only vacancy/vacant.)",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Moore",
+      "column": "vacant",
+      "reason": "County's own GIS server (gis.moorecountync.gov) fully enumerated live, including its real REST catalog at the non-standard /server/rest/services path (the default /arcgis/rest/services path 404s, which is why a naive probe misses this server entirely). Planning/Planning_Public carries only Zoning/Hwy COD/Future Land Use/Voluntary Ag Districts; Tax folder is CAMA/parcel layers only (Archival_Parcels/Soil_Report_Layer/Tax_Layers/Valid_Sales_By_Year), same condition-is-not-vacancy category already established this round. PublicSafety and Hosted folders are both token-walled (HTTP 499) and unreachable; PublicSafety is far more likely fire/EMS/CAD data than code enforcement given the name, but could not be confirmed either way. (condemned not researched -- this county's condemned column is not in the current 'no source known' bucket at all, only vacancy/vacant.)",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
     }
   ]
 }
