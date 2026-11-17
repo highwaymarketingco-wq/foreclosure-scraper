@@ -2681,6 +2681,150 @@
       "reason": "The county's shared city/county ArcGIS server (gis.morgantonnc.gov -- the same host enrichment_owner_mailing.py's NC:Burke parcel spec already uses) was enumerated folder-by-folder live for the 3 plausible candidates: Planning (zoning and flood-zone layers only), Public_Safety (greenway/race-route/archery-range layers only), Open_Data (annexation/city-limits/election-district layers only) -- none code/violation-shaped. The one access-restricted folder, Hosted, returns an explicit \"Token Required\" 499 rather than serving a public layer (access-restricted, not absent -- same shape as round 11's Berkeley SC energov folder). Independently, this project's own morganton_nc.py scraper (disabled 2026-10-13) already confirmed the city's actual code-enforcement WEBPAGE (morgantonnc.gov/development-design-services/page/code-enforcement) has zero data tables, just a staff directory -- this round's GIS-server enumeration is the other half of that same investigation (the page vs. the data host) and reaches the same dead-end conclusion independently.",
       "confirmed_date": "2026-11-17",
       "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": null,
+      "column": "lt_elderly_disabled",
+      "reason": "Every NC county without its own dedicated parcel_cache.py layer resolves solely to the shared statewide NC OneMap service (services.nconemap.gov/.../NC1Map_Parcels/FeatureServer/1) -- re-verified live 2026-11-17 (70-field schema fetch + full groupBy enumeration of owntype, 41 distinct values: Private/Taxable/spousal-tenancy/trust/estate/exempt-institutional ownership-TYPE categories, none age/disability-shaped). Identical to round 12's 2026-11-16 check of the same single endpoint. NC's G.S. 105-277.1 elderly/disabled exclusion is tracked as a tax-bill VALUE deduction, not a per-parcel category field, on this statewide layer (confirmed project-wide on every NC county except Buncombe, which has its own dedicated source). A county-specific entry wins over this blanket one the moment that county gets its own dedicated CAMA layer.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Hoke",
+      "column": "lt_elderly_disabled",
+      "reason": "Dedicated layer (maps.hokecounty.org/server/rest/services/Parcels/MapServer/0), full 31-field schema fetched live 2026-11-17: no Exempt/Homestead/Senior/Elderly-named field. The one candidate, A_D (18 distinct values: '00'-'11' plus 'RA'/blank), is a sequential administrative/district code, not exemption-shaped -- same NC G.S. 105-277.1 value-deduction pattern as the statewide layer.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Polk",
+      "column": "lt_elderly_disabled",
+      "reason": "Dedicated layer (services1.arcgis.com/23uf7jKvz6SRPFWJ/.../TaxParcels/FeatureServer/0), full 36-field schema fetched live 2026-11-17: no exemption-shaped field. NEIGHBORHOOD_CLASS/NEIGHBORHOOD_CODE are zoning/appraisal-neighborhood codes, not an exemption category.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Cleveland",
+      "column": "lt_elderly_disabled",
+      "reason": "Dedicated layer (gis.clevelandcounty.com/arcgis/rest/services/Basemap/Parcels/MapServer/0), full 46-field schema fetched live 2026-11-17 (parcel_cache.py's own map uses only 8 of these): no Exempt/Homestead/Senior/Elderly field anywhere in the GIS_*/LOCATE_*/COUNTY_* field groups.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Mitchell",
+      "column": "lt_elderly_disabled",
+      "reason": "Dedicated layer (mapping.mitchellcountync.gov/.../WebMapNew/MapServer/12), full 36-field schema fetched live 2026-11-17: no exemption-shaped field. PropClas/Neighborhood are land-use/appraisal-neighborhood codes, not exemption categories.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Kershaw",
+      "column": "lt_elderly_disabled",
+      "reason": "Third-party survey layer (services9.arcgis.com/RvqSyw3diI7dTKo5/.../Fairfield_Kershaw_Richland_Map_WFL1/FeatureServer/7), full 58-field schema fetched live 2026-11-17: no Exempt/Homestead field. 'Ownership' is literal owner-name text (duplicate of taxOwnerNa), not a category. 'taxPrimary' (33 distinct 2-3 char codes: LR/RG/FM/EX/AC/...) is a SC ad-valorem ratio/land-use class code -- the same institutional/ratio-class trap round 12 found on Richland/Barnwell -- not age/disability-specific.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Beaufort",
+      "column": "lt_elderly_disabled",
+      "reason": "EnerGov layer (gis.beaufortcountysc.gov/server/rest/services/EnerGov/MapServer/1), full 45-field schema fetched live 2026-11-17. The one candidate, GisFile_Exemption (string field, no published domain), has a dominant value '2000' on 21,275/141,568 parcels, 99.99% correlated with GisFile_LEGRES='LegRes' (owner-occupied) -- but that is only 33.5% of the county's 63,410 total LegRes parcels, far short of the near-universal share SC's automatic Act-388 owner-occupied benefit would show, AND owner-name sampling across 5 offsets spanning the full '2000' population (30 owners) shows BOTH modest individually-owned homes ($52,000-$86,000 appraised) and multi-million-dollar properties titled to revocable living trusts ($969,000-$1,427,700 appraised; full range $33,400-$16,063,800, avg $718,798) -- consistent with either an age-unrestricted general homestead benefit or an age-restricted one in this retiree-dense county (Hilton Head/Sun City), and not resolvable from this field alone. No other field (ClassCd/ClassCode = land-use types like 'ResImp SingleFamily'/'MHImp SeveredMH'; EventTypeD = deed-transfer log; Status = active/changed) corroborates an age/disability-specific read. Genuine near-miss, same caliber of caution as Richland's Exemption1/2/3 in round 12 -- not built without a clearer signal.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Jasper",
+      "column": "lt_elderly_disabled",
+      "reason": "Dedicated layer (services6.arcgis.com/UXJOITFCLbn0Ibm0/.../Jasper_County_Parcels/FeatureServer/2) is access-walled: both layer metadata and /query return HTTP 499 'Token Required' (GWM_0003), re-confirmed live 2026-11-17, the second consecutive day (first seen 2026-11-16 during an unrelated vacant_lot re-check) -- a real state change from the 'access public, no license text' state documented when the layer was added 2026-10-07, not a transient blip.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Lancaster",
+      "column": "lt_elderly_disabled",
+      "reason": "Dedicated layer (services3.arcgis.com/rJcpRneDUBgTeCT3/.../LC_Parcels/FeatureServer/0), full 37-field schema fetched live 2026-11-17: no Exempt/Homestead/Senior/Elderly field. 'CLASS' (49 distinct values, 86% blank) is a generic property classification (MKT/R/LA/LN/RN/C/MHR/MHC/...) whose only exemption-shaped codes, EXN (258 rows) and EXG (116 rows), read as Exempt-Nonprofit/Exempt-Government -- institutional, not age/disability.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Dillon",
+      "column": "lt_elderly_disabled",
+      "reason": "County runs the WTH 'tgis' legacy ASP.NET viewer (dillonsc.wthgis.com), the same no-REST platform as Williamsburg's and Kershaw's own subdomain (already documented elsewhere in parcel_cache.py) -- live-reconfirmed 2026-11-17: /arcgis/rest/services and /server/rest/services both 404; only the HTML viewer root answers.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Marlboro",
+      "column": "lt_elderly_disabled",
+      "reason": "County runs the WTH 'tgis' legacy ASP.NET viewer (marlborosc.wthgis.com), the same no-REST platform as Williamsburg's and Kershaw's own subdomain (already documented elsewhere in parcel_cache.py) -- live-reconfirmed 2026-11-17: /arcgis/rest/services and /server/rest/services both 404; only the HTML viewer root answers.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Chesterfield",
+      "column": "lt_elderly_disabled",
+      "reason": "County runs the WTH 'tgis' legacy ASP.NET viewer (chesterfieldsc.wthgis.com), the same no-REST platform as Williamsburg's and Kershaw's own subdomain (already documented elsewhere in parcel_cache.py) -- live-reconfirmed 2026-11-17: /arcgis/rest/services and /server/rest/services both 404; only the HTML viewer root answers.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Clarendon",
+      "column": "lt_elderly_disabled",
+      "reason": "County's GIS host (gis.clarendoncountysc.gov) runs a ROK Technologies system, not ArcGIS -- live-tested 2026-11-17: /arcgis/rest/services returns an 'Invalid Path'/'The path does not exist' page (ROK Technologies Support contact), confirming no ArcGIS REST service exists at this host.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Newberry",
+      "column": "lt_elderly_disabled",
+      "reason": "A GDIT-published 'Parcels - SC - Newberry County' Feature Service item is indexed in ArcGIS Online's public search, but a direct item fetch (arcgis.com/sharing/rest/content/items/<id>) returns HTTP 403 'Subscription is canceled, the item is not accessible' (SB_0006) -- live-confirmed 2026-11-17. A dead vendor subscription (confirmed identically for Edgefield/Bamberg/Abbeville's GDIT items the same day), not a county-side wall.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Edgefield",
+      "column": "lt_elderly_disabled",
+      "reason": "A GDIT-published 'Parcels - SC - Edgefield County' Feature Service item is indexed in ArcGIS Online's public search, but a direct item fetch (arcgis.com/sharing/rest/content/items/<id>) returns HTTP 403 'Subscription is canceled, the item is not accessible' (SB_0006) -- live-confirmed 2026-11-17. A dead vendor subscription (confirmed identically for Newberry/Bamberg/Abbeville's GDIT items the same day), not a county-side wall.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Bamberg",
+      "column": "lt_elderly_disabled",
+      "reason": "A GDIT-published 'Parcels - SC - Bamberg County' Feature Service item is indexed in ArcGIS Online's public search, but a direct item fetch (arcgis.com/sharing/rest/content/items/<id>) returns HTTP 403 'Subscription is canceled, the item is not accessible' (SB_0006) -- live-confirmed 2026-11-17. A dead vendor subscription (confirmed identically for Newberry/Edgefield/Abbeville's GDIT items the same day), not a county-side wall.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Abbeville",
+      "column": "lt_elderly_disabled",
+      "reason": "A GDIT-published 'Parcels - SC - Abbeville County' Feature Service item is indexed in ArcGIS Online's public search, but a direct item fetch (arcgis.com/sharing/rest/content/items/<id>) returns HTTP 403 'Subscription is canceled, the item is not accessible' (SB_0006) -- live-confirmed 2026-11-17. A dead vendor subscription (confirmed identically for Newberry/Edgefield/Bamberg's GDIT items the same day), not a county-side wall.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Marion",
+      "column": "lt_elderly_disabled",
+      "reason": "County runs the WTH 'tgis' legacy ASP.NET viewer (marionsc.wthgis.com), the same no-REST platform as Williamsburg's/Kershaw's/Dillon's/Marlboro's/Chesterfield's own subdomain -- live-tested 2026-11-17: /arcgis/rest/services and /server/rest/services both 404; only the HTML viewer root answers.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
     }
   ]
 }
