@@ -896,6 +896,39 @@ SPECS: dict[str, Spec] = {
     #: genuine producer-capability gap (no source exists to point a scraper at), NOT a
     #: classification bug and NOT sourced-not-built. No declined_registry change. Do not
     #: re-flag these 7 for "individual check" again without new county-side evidence.
+    #: 2026-11-17 (round 12, source-availability pass): round 10's "no county-published
+    #: source" finding was individually checked for only 7 thin-sample counties; this pass
+    #: extended the same real source search to the 18 highest-est_rows_affected counties in
+    #: this list (minus the thin-7, already closed) -- SC York (81,350 est_rows), SC Lexington
+    #: (31,402), NC Transylvania (12,528), NC Rutherford (11,207), NC Catawba (8,310), SC
+    #: Pickens (5,795), SC Greenville (5,548), NC Rowan (4,734), SC Orangeburg (4,676), SC
+    #: Oconee (3,888), SC Laurens (3,624), NC McDowell (3,534), SC Cherokee (3,423), SC Anderson
+    #: (3,388), NC Polk (3,385), NC Iredell (2,870), SC Richland (2,316), SC Barnwell (2,110) --
+    #: together ~70% of this column's total est_rows_affected. ~13 targeted web searches per
+    #: county/cluster found NO county tax-assessor, emergency-management, or GIS-department
+    #: page publishing a parcel- or structure-level post-Helene damage-assessment dataset
+    #: (ArcGIS FeatureServer, Socrata/CKAN portal, Accela export, placard roll) for any of the
+    #: 18 -- only the generic SCEMD/SC-Emergency-Manager-app and NC-tax-assessor self-report
+    #: processes already documented for the thin-7 above, plus county press releases describing
+    #: an internal assessment with no published roster. Re-confirmed (via an independent search
+    #: hit, not just re-reading the code) that the one real ArcGIS layer touching Rutherford/
+    #: McDowell/Polk -- the statewide SARCOP "Helen_Work_Map_WFL1" FeatureServer -- is an
+    #: ICEYE-derived flood-INUNDATION polygon layer (clipped to the SFHA boundary), not a
+    #: structural damage-assessment layer; this matches, independently, what this file's own
+    #: storm_footprint()/SOURCES docstring already concluded, so it is NOT a newly-available
+    #: source. Severity (avg FEMA-inspected-damage/inspected-home) for all 18 was NOT
+    #: re-derived here -- the 2026-11-16 round-8 survey already computed it for literally all
+    #: 58 remaining cells (stated range $1,130-$10,340/home board-wide, with the western-NC
+    #: corridor including Rutherford/McDowell/Polk/Transylvania individually named at
+    #: $4,650-$6,730, all far above the $810 dead-end ceiling) -- redoing that math here would
+    #: just reproduce round 8's own answer. Conclusion: same shape as the thin-7, real and open
+    #: for all 18 -- a genuine producer-capability gap, NOT a classification bug. No
+    #: declined_registry change, no producer wired, no gap_matrix regen run (a documentation-
+    #: only diff has no classification movement to confirm, and the dated snapshot files are
+    #: shared with other concurrently-active agents -- same reasoning round 10 used). Do not
+    #: re-flag these 18 for "source check" again without new county-side evidence; the
+    #: remaining ~33 unchecked cells in this 58-list (the smaller-est_rows tail) are still open
+    #: for a future pass.
     "storm_damage": Spec(_S, "county", "disaster", applies="storm_scope",
                          producers=("enrichment_helene_damage.py",),
                          doc="raw.storm_damage present (post-Helene damage-assessment layers); applies "
@@ -1464,8 +1497,14 @@ def checked_columns(rec: dict, pos: set[str], verdicts: dict[str, Optional[str]]
     # identical thing for the identical reason: MIN_YEARS=2 and the county has only ever
     # published one year's advertisement, so a real screen on a no-match/ambiguous-owner row
     # never earns the literal key -- it stamps raw["_pasquotank_tax_checked"] instead.
+    # New Hanover's own producer (nc_county_csv_delinquent_tax.py, fixed 2026-11-17 in the
+    # same gap_matrix "no source known" tax-cluster survey) does the identical thing for the
+    # identical reason: it aggregates real per-parcel bill-year sets every run, but a parcel
+    # that genuinely carries only one unpaid year is a real screen, not an unchecked row --
+    # it stamps raw["_nc_csv_tax_mydt_checked"] instead.
     if (raw.get("multi_year_delinquent_tax") not in _EMPTY
-            or raw.get("_gaston_mydt_checked") or raw.get("_pasquotank_tax_checked")):
+            or raw.get("_gaston_mydt_checked") or raw.get("_pasquotank_tax_checked")
+            or raw.get("_nc_csv_tax_mydt_checked")):
         out.add("multi_year_delinquent_tax")
     if raw.get("two_year_delinquent") not in _EMPTY:
         out.add("two_year_delinquent")
