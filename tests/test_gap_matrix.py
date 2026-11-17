@@ -865,6 +865,59 @@ def test_built_in_code_adds_county_lien_sweep_lien_credit():
         assert ("NC", "Wake") not in built[col], "Wake is in neither SWEEP_COUNTIES job nor any other producer here"
 
 
+def test_rod_chain_contributes_no_blanket_county_credit():
+    """2026-11-17 over-crediting audit: 'liens' Spec lists enrichment_rod_chain.py as a producer
+    and that module only ever writes raw['rod_chain'] (never raw['rod']/raw['liens'] -- confirmed
+    by reading src/foreclosure_scraper/enrichment_rod_chain.py line 287), so round17's own
+    follow-up note worried this was a blanket-text over-credit (the opposite-direction bug from
+    everything else that round fixed): any county the file's text happens to NAME would get
+    'built=code' credit for a signal the file itself never stamps on a row.
+
+    It isn't. enrichment_rod_chain.py carries NO per-county registry of its own at all -- it
+    imports ROD_CONFIG/RENDER_ROD_CONFIG/CHAIN_ONLY_CONFIG from enrichment_generic_rod.py and
+    dispatches purely off chain_registry()'s keys (no county literal anywhere in real code). The
+    only county NAMES anywhere in the file live inside its module docstring's prose run-log
+    example ("the sixth county (Alamance, Alexander, Avery, Bertie, Buncombe, Clay)") -- a
+    comma-separated list with no quoting and no 'County' suffix, so it fails
+    _county_patterns()'s own match shape (quoted/path-like, or 'X County') even BEFORE
+    _strip_comments_and_docstrings() removes it. counties_named_in() on this file alone, against
+    both the raw and the stripped text, returns the empty set."""
+    hits_stripped = gm.counties_named_in([gm.PKG / "enrichment_rod_chain.py"])
+    assert hits_stripped == set()
+    pats = gm._county_patterns()
+    raw_text = (gm.PKG / "enrichment_rod_chain.py").read_text()
+    hits_raw = {(st, n) for st, n, rx in pats if rx.search(raw_text)}
+    assert hits_raw == set(), "no county name matches even unstripped -- not a stripping artifact"
+
+
+def test_built_in_code_liens_credit_unaffected_by_removing_rod_chain_producer():
+    """End-to-end companion to the test above: since enrichment_rod_chain.py contributes the empty
+    set on its own, it cannot change ANY union it is added to -- confirmed directly rather than
+    trusting that set-theory argument alone. The blanket counties_named_in() portion of
+    built_in_code()['liens']/['atty_rod_lien_checked'] (the part before |-ing in
+    _county_lien_sweep_lien_credit()) is byte-identical whether or not enrichment_rod_chain.py is
+    in the producers tuple. Verdict: NOT an over-crediting bug -- no fix made. (The real source of
+    'built=code' for counties like NC/Mecklenburg -- 39,871 rows, confirmed live 2026-11-17 via
+    iter_board_rows() to carry zero raw.rod/raw.rod_chain/raw.liens/raw.rod_lien_sweep anywhere on
+    the board today -- is enrichment_generic_rod.py's OWN text: that file is a real, correctly-
+    declared producer for both columns, but its source also carries RENDER_ROD_CONFIG and
+    CHAIN_ONLY_CONFIG literal county entries that enrich_generic_rod() itself never acts on, read
+    instead by other modules (enrichment_nc_rod_render.py, enrichment_rod_chain.py). That is the
+    same 'flag-off hold, not missing code' shape this file already credits on purpose elsewhere
+    (NC/Mecklenburg+Carteret's own nc_harris marriage_license credit just below; NC/Johnston's
+    nc_tyler credit in the test above) and already reads correctly against the project's own
+    Bucket-C rod-adapter audit -- a documentation note, not a second bug, and out of scope to
+    'fix' here since it changes no cell's classification.)"""
+    pats = gm._county_patterns()
+    liens_spec = gm.SPECS["liens"]
+    base_files = [gm.PKG / f for f in liens_spec.producers if f not in gm._COUNTY_LIEN_SWEEP_REL]
+    with_chain = gm.counties_named_in([f for f in base_files if f.exists()], pats)
+    without_chain = gm.counties_named_in(
+        [f for f in base_files if f.exists() and f.name != "enrichment_rod_chain.py"], pats)
+    assert with_chain == without_chain
+    assert ("NC", "Mecklenburg") in with_chain, "sanity: Mecklenburg IS credited (via generic_rod.py's text)"
+
+
 def test_built_in_code_adds_nc_harris_marriage_credit():
     """End-to-end: built_in_code()'s real output for 'marriage_license' now credits NC/Mecklenburg
     and NC/Carteret (rod/nc_harris.marriage_search, wired live in main.py via
