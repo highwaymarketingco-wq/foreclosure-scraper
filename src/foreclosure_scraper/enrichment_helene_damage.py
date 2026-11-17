@@ -55,6 +55,47 @@ damage rating and NO estimated-loss field. That is a different (weaker) signal
 than the structural damage-assessment schema this enricher stamps, so those
 counties are intentionally NOT wired here; a flood-footprint enricher is a
 separate future build (slips to GATHER).
+
+ROUND 15 SOURCE-RESEARCH UPDATE (2026-11-17) — gap_matrix storm_damage "no
+source known" bucket, re-derived fresh: still exactly 58 cells / 236,152
+est_rows_affected (unchanged from rounds 8/10/12). Rounds 10+12 had already
+individually source-checked the top 25 by est_rows (NC Clay/Graham/Lee/
+Yadkin/Stanly/Surry/Cherokee + York/Lexington/Transylvania/Rutherford/
+Catawba/Pickens/Greenville/Rowan/Orangeburg/Oconee/Laurens/McDowell/
+Cherokee-SC/Anderson/Polk/Iredell/Richland/Barnwell SC) — ~33 smaller cells
+were left genuinely unchecked. This round individually web-searched the next
+15 by est_rows among that unchecked tail: NC Nash (2,092), SC Kershaw (2,064),
+SC Beaufort (2,044), NC Burke (2,030), NC Madison (1,705), SC Jasper (1,669),
+NC Cleveland (1,607), SC Union (1,496), SC Greenwood (1,303), SC Newberry
+(1,252), NC Haywood (1,249), SC Edgefield (1,076), NC Caldwell (1,054), NC
+Jackson (969), NC Wilkes (930). Same result as every prior round's pass:
+ZERO county-published parcel/structure-level damage-severity GIS layer found
+for any of the 15 — only generic state tools (SCEMD damage-assessment app,
+SC Nat'l Guard Survey123 crowdsourced points, never republished as open
+data), county self-report web FORMS (Beaufort SC's assessor intake form,
+Kershaw's Oct-2024 citizen survey, Greenwood's storm-recovery email) that
+collect reports but publish no dataset back out, NOAA/FEMA narrative
+severity figures (real damage, not a layer), and two specific dead-end leads
+checked and ruled out live: (1) a "Hurricane_Helene_Overview_WFL1"
+FeatureServer surfaced for Union SC turned out to be a storm-track/wind-swath
+polygon ("the direction of Hurricane Helene, the counties...affected by
+hurricane-force winds") — same wrong-shape category as the Rutherford/
+McDowell/Polk SARCOP layer above, not a damage-severity dataset; (2) a
+gis.equatorstudios.com "Madison County GIS Data" portal surfaced for Madison
+NC is a generic commercial parcels/contours/LiDAR product page, not a damage
+layer — same category as the recurring ReportAll commercial-parcel-vendor
+dead end every prior round also ran into. All 15 stay "no source known,"
+correctly: severity is real (every one of these 15 sits well inside round
+8's own stated FEMA per-household severity range for the 58-cell bucket,
+$1,130-$10,340/home, both well above the $810 false-positive decline
+ceiling) and no county-published source exists to point a scraper at — per
+this column's own established taxonomy (rounds 8/10/12), "confirmed real +
+confirmed no source" stays OPEN, it is not grounds for a declined_registry
+entry. No declined_registry change this round. ~18 of the original ~33
+unchecked cells remain untouched for a future pass: SC Bamberg, NC Watauga,
+SC Abbeville, SC Aiken, NC Ashe, SC Allendale, NC Mitchell, NC Alleghany, SC
+Saluda, NC Macon, SC McCormick, NC Yancey, NC Avery, SC Chester, NC
+Alexander, SC Hampton, SC Fairfield, NC Swain (all under ~690 est_rows each).
 """
 from __future__ import annotations
 
