@@ -1118,9 +1118,31 @@ SPECS: dict[str, Spec] = {
                              # as built here despite the module's own comment explicitly tracking this
                              # exact column's literal requirement (see the file's gap_matrix.py reference
                              # near its raw["code_enforcement"] assignment).
+                             #
+                             # 2026-11-16 ("no source known" bucket research, round 10): this tuple's own
+                             # omission bug struck a THIRD time, this one far bigger than Gastonia's --
+                             # scrapers/counties_sc/charleston_energov_history.py has unconditionally
+                             # written a real raw["code_enforcement"] block (county="Charleston",
+                             # open_violations, violations list, the exact Henderson/Gastonia shape) for
+                             # every one of its Charleston County SC leads since the file was added
+                             # (main.py's own 2026-10-07 DATELESS_OK_SOURCES comment dates it), sourced
+                             # from the county's own live EnerGov history MapServer (confirmed live
+                             # 2026-11-16: gisccapps.charlestoncounty.org, 0.2s response, 1,873 real
+                             # Building-Services code cases all-time per the module's own 2026-10-14
+                             # date-coverage audit) -- yet it was never in this tuple, so Charleston SC
+                             # (11,212 est_rows, the #2 cell in this whole "no source known" bucket) read
+                             # as having no source at all. The scraper IS correctly auto-discovered by
+                             # scrapers/_registry.py (every BaseScraper subclass under scrapers/ is found
+                             # by package scan, no main.py-side class import needed -- confirmed by
+                             # reading that registry, not by guessing), so this was a pure gap_matrix.py
+                             # labelling gap, not a missing-from-the-pipeline gap; it had simply never
+                             # actually been run to completion before today (0 board rows prior to this
+                             # date -- a live direct run of the real scraper, not a copy, found and fixed
+                             # the separate reason why: see the module's own 2026-11-16 docstring note).
                              producers=("enrichment_code_enforcement.py", "enrichment_charlotte_code.py",
                                         "enrichment_greensboro_code.py", "scrapers/counties_nc/asheville_code_enforcement.py",
                                         "scrapers/counties_nc/gastonia_code_enforcement.py",
+                                        "scrapers/counties_sc/charleston_energov_history.py",
                                         "scrapers/counties_generic/arcgis_distress_layers.py"),
                              doc="raw.code_enforcement condemned/has_open/severe (or True); checked = wrapper present"),
     "deed_chain_has_history": Spec(_F, "row", "gis_deed", producers=("enrichment_deed_chain.py",),
@@ -2437,6 +2459,8 @@ class Cube:
     v_conf: dict = field(default_factory=lambda: defaultdict(Counter))
     v_applies: dict = field(default_factory=lambda: defaultdict(Counter))  # hit rows a verifier covers
     v_wall: dict = field(default_factory=lambda: defaultdict(Counter))     # hit rows only a WALL verifier covers
+    jbn_roster_hits: Counter = field(default_factory=Counter)  # (state, ROSTER county) -> real jail_booking_new hits;
+                                                                # see roll_up()'s jail_booking_new "ran" override
     slug_county: Counter = field(default_factory=Counter)
     slug_lt: Counter = field(default_factory=Counter)
     slug_rows: Counter = field(default_factory=Counter)
@@ -2477,6 +2501,19 @@ class Cube:
             self.pos[key][c] += 1
         for c in chk & app:
             self.chk[key][c] += 1
+        # jail_booking_new is written by match_cross_county(), which permanently skips a hit
+        # landing in the SAME county as the roster that produced it ("same-county lane's job",
+        # enrichment_jail_bookings.py) -- so this hit's OWN county_key(rec) (the home county the
+        # matched owner's OTHER property sits in) is never the roster county, by construction.
+        # The stamp carries the roster's own identity (state/county) separately; attribute the
+        # hit there too so roll_up() can tell "this county's roster produced a real hit" apart
+        # from "no row anywhere shows one" without relying on the home county's own app/pos/chk
+        # (see 2026-11-16 fix, project_jail_booking_new_ran_detector_fix).
+        jbn = raw.get("jail_booking_new")
+        if isinstance(jbn, dict) and jbn:
+            rk = (str(jbn.get("state") or "").strip().upper(), canonical_county(jbn.get("county")))
+            if rk[0] and rk[1]:
+                self.jbn_roster_hits[rk] += 1
         # verification depth, for hit rows of columns that have a ledger
         sig_applies: dict[str, str] = {}
         for v in self.verifiers:
@@ -2698,6 +2735,23 @@ def roll_up(cube: Cube, matrix: dict, code_counties: dict[str, set], screens: Op
                 ran = state_hits[col][st] > 0
             else:
                 ran = pos > 0 or chk > 0
+            # jail_booking_new (2026-11-16 fix): match_cross_county() never lets a hit land in
+            # the SAME county as the roster that produced it (enrichment_jail_bookings.py's own
+            # "same-county lane's job" skip) -- so pos/chk above, keyed on the HIT ROW's own
+            # county, can never be >0 from THIS county's own roster, no matter how many genuine
+            # cross-county hits it produces or how many times it has been fetched (confirmed
+            # live: of 91 real hits on the board across 29 roster counties, zero have home
+            # county == roster county -- a board-wide undercount, not a York/Stokes- or
+            # first-fetch-specific quirk). cube.jbn_roster_hits is keyed by the hit's OWN
+            # embedded roster identity (raw.jail_booking_new["state"]/["county"]), so a count
+            # there is real evidence this county's own roster ran and found at least one
+            # middle-corroborated hit elsewhere -- independent of where it landed. A roster that
+            # ran and genuinely found nothing still reads ran=False here (same as any other
+            # "ran but silent" county-scope roster: there is no on-board stamp distinguishing
+            # that from "never attempted" for this cross-county lane, same as the detector's
+            # general limitation elsewhere -- not fixed by this change).
+            if col == "jail_booking_new":
+                ran = ran or cube.jbn_roster_hits.get(key, 0) > 0
             scr = bool(screens) and co != UNKNOWN and SL.screened(screens, col, st, co)
             if scr and spec.kind == "signal" and (spec.scope in ("county", "state", "feed")
                                                   or col in SL.COUNTY_ROSTER_ROW_COLUMNS):
