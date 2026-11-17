@@ -182,6 +182,17 @@ def to_listing(rec: dict, county: County, *, now: Optional[datetime] = None) -> 
         "nc_tax_lien_ad": {"county": county.name, "tax_year": year, "amount": rec["amount"],
                            "parcel": rec["pid"], "years_unpaid": [year], "list_page": county.page},
         "tax_owed": to,
+        # 2026-11-17 (gap_matrix "no source known" tax-cluster survey): each of these 4
+        # counties' annual 105-369 ad is a SINGLE levy-year publication (years_unpaid is
+        # always [year] above, never a multi-year history), so this source can never
+        # honestly claim is_two_year_plus=True -- but reading the ad IS a real screen of
+        # the tax roll, not an unchecked row, for both two_year_delinquent (whose own
+        # "checked" test is just "any dict present") and multi_year_delinquent_tax (whose
+        # SIMPLE_PRESENCE_COLS "present=hit" semantics mean it must stay unset here, same
+        # as Gaston/Pasquotank/New Hanover's own "_*_checked" shadow-key pattern that
+        # gap_matrix.py's checked_columns() already recognizes).
+        "two_year_delinquent": {"is_two_year_plus": False, "years_delinquent": 1, "source": SLUG},
+        "_nc_tax_lien_ads_mydt_checked": True,
     }
     return Listing(
         source=SLUG, source_url=county.page,
