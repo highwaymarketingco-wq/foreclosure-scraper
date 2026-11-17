@@ -262,6 +262,24 @@ def test_hoke_parcel_id_passes_through_unchanged():
     assert p.search_id("584950001122") == "584950001122"
 
 
+def test_hoke_dashed_parcel_id_is_undashed_for_the_search():
+    """FIXED 2026-11-16 (the Hoke false-negative: see project_hoke_tax_lien_false_negative_fix_
+    2026-11-16 memory). 584950001122 above (and the module's original 2026-10-18 discovery
+    parcel) is the ONE exception: 2,829 of 2,830 real Hoke board parcel_ids measured on the
+    2026-11-16 board are dashed "NNNNN-NN-NN-NNN" ("59406-00-01-092"), and the portal's search
+    answers that shape with ZERO bills (live-confirmed against 3 real parcels, fresh session and
+    one shared session alike) -- search_id must strip those dashes the same direction Pender's
+    does, scoped to Hoke's own 5-2-2-3 grouping only."""
+    assert p.search_id("59406-00-01-092", "Hoke") == "594060001092"
+    assert p.search_id("59406-00-01-092", "hoke") == "594060001092"   # case-insensitive
+    # a county OTHER than Hoke, or none at all, must not take the undash branch
+    assert p.search_id("59406-00-01-092") == "59406-00-01-092"
+    assert p.search_id("59406-00-01-092", "Lee") == "59406-00-01-092"
+    # already-undashed, or a shape that doesn't match the 5-2-2-3 grouping, passes through
+    assert p.search_id("584950001122", "Hoke") == "584950001122"
+    assert p.search_id("R09999-001-002-000", "Hoke") == "R09999-001-002-000"
+
+
 def test_lee_applies_and_passes_a_flat_parcel_through_unchanged():
     """2026-10-18: Lee is on the same Munis platform (leecountync.munisselfservice.com),
     confirmed live against 5 real board parcels. applies() and search_id() need the same
