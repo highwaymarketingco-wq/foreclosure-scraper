@@ -1993,6 +1993,246 @@
       "reason": "Already checked, live, by this project's 2026-09-28 code-enforcement pass (see arcgis_distress_layers.py's own comment): webgis.co.davidson.nc.us's Lexington/OpenGov folders (OpenGovParcelFlags, PlanningWarningLayer) are parcel/assessment master data only, no case number or violation-status field anywhere; the one promising 'Code Enforcement Service Requests' AGOL item is owned by gis_lfucg -- Lexington-Fayette, KENTUCKY, a name collision with Lexington NC (Davidson's own county seat), and org-private besides. Cited here rather than re-run.",
       "confirmed_date": "2026-11-16",
       "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Williamsburg",
+      "column": "condemned",
+      "reason": "Already checked, live, by this project's 2026-09-28 code/vacant discovery pass (see arcgis_distress_layers.py's own comment): county GIS runs on WTH Technology's proprietary \"ThinkGIS\" viewer (williamsburgsc.wthgis.com) -- no REST/JSON API at all, not Esri/ArcGIS; Kingstree's Code Enforcement page is contact-only. Independently re-confirmed the same day by a concurrent agent's code_enforcement-column entry for this county: a live 2026-11-16 REST services-directory probe of the WTH host returned a non-JSON response. Two independent checks, two months apart, same conclusion -- cited here rather than re-run a third time.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Williamsburg",
+      "column": "vacancy",
+      "reason": "Already checked, live, by this project's 2026-09-28 code/vacant discovery pass (see arcgis_distress_layers.py's own comment): county GIS runs on WTH Technology's proprietary \"ThinkGIS\" viewer (williamsburgsc.wthgis.com) -- no REST/JSON API at all, not Esri/ArcGIS; Kingstree's Code Enforcement page is contact-only. Independently re-confirmed the same day by a concurrent agent's code_enforcement-column entry for this county: a live 2026-11-16 REST services-directory probe of the WTH host returned a non-JSON response. Two independent checks, two months apart, same conclusion -- cited here rather than re-run a third time.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Williamsburg",
+      "column": "vacant",
+      "reason": "Already checked, live, by this project's 2026-09-28 code/vacant discovery pass (see arcgis_distress_layers.py's own comment): county GIS runs on WTH Technology's proprietary \"ThinkGIS\" viewer (williamsburgsc.wthgis.com) -- no REST/JSON API at all, not Esri/ArcGIS; Kingstree's Code Enforcement page is contact-only. Independently re-confirmed the same day by a concurrent agent's code_enforcement-column entry for this county: a live 2026-11-16 REST services-directory probe of the WTH host returned a non-JSON response. Two independent checks, two months apart, same conclusion -- cited here rather than re-run a third time.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Darlington",
+      "column": "condemned",
+      "reason": "County's full ArcGIS Online hosted-service catalog (services5.arcgis.com/8FJikaProY6O3ncx, the org behind the DARCO GIS site) live-enumerated 2026-11-16: 103 services total, all census/boundary/zoning/address/utility/school/voting/flood/FILOT-economic-development data. The one service whose name suggested relevance, CODES_ENFORCEMENT_WGS84, is NOT case data: its 5 sublayers are Darco_AddressPnts/Darlington_Rds/City_limits/COUNTY_BOUNDARY2020/PARCELS -- a reference basemap bundle (apparently just the basemap the Codes department's own internal viewer uses), zero case/violation/status field on any of the 5. Already checked for a CAMA condition field 2026-10-03 (negative, see that pass's own comment). Town of Darlington's own \"Code Compliance\" page (townofdarlington.com/code-compliance, live-fetched 2026-11-16) explicitly says case information \"will be added soon\" -- confirming no case data is published anywhere for this county today, county or city level. Independently corroborated the same day by a concurrent agent's code_enforcement-column entry naming the identical CODES_ENFORCEMENT_WGS84 finding.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Darlington",
+      "column": "vacancy",
+      "reason": "County's full ArcGIS Online hosted-service catalog (services5.arcgis.com/8FJikaProY6O3ncx, the org behind the DARCO GIS site) live-enumerated 2026-11-16: 103 services total, all census/boundary/zoning/address/utility/school/voting/flood/FILOT-economic-development data. The one service whose name suggested relevance, CODES_ENFORCEMENT_WGS84, is NOT case data: its 5 sublayers are Darco_AddressPnts/Darlington_Rds/City_limits/COUNTY_BOUNDARY2020/PARCELS -- a reference basemap bundle (apparently just the basemap the Codes department's own internal viewer uses), zero case/violation/status field on any of the 5. Already checked for a CAMA condition field 2026-10-03 (negative, see that pass's own comment). Town of Darlington's own \"Code Compliance\" page (townofdarlington.com/code-compliance, live-fetched 2026-11-16) explicitly says case information \"will be added soon\" -- confirming no case data is published anywhere for this county today, county or city level. Independently corroborated the same day by a concurrent agent's code_enforcement-column entry naming the identical CODES_ENFORCEMENT_WGS84 finding.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Darlington",
+      "column": "vacant",
+      "reason": "County's full ArcGIS Online hosted-service catalog (services5.arcgis.com/8FJikaProY6O3ncx, the org behind the DARCO GIS site) live-enumerated 2026-11-16: 103 services total, all census/boundary/zoning/address/utility/school/voting/flood/FILOT-economic-development data. The one service whose name suggested relevance, CODES_ENFORCEMENT_WGS84, is NOT case data: its 5 sublayers are Darco_AddressPnts/Darlington_Rds/City_limits/COUNTY_BOUNDARY2020/PARCELS -- a reference basemap bundle (apparently just the basemap the Codes department's own internal viewer uses), zero case/violation/status field on any of the 5. Already checked for a CAMA condition field 2026-10-03 (negative, see that pass's own comment). Town of Darlington's own \"Code Compliance\" page (townofdarlington.com/code-compliance, live-fetched 2026-11-16) explicitly says case information \"will be added soon\" -- confirming no case data is published anywhere for this county today, county or city level. Independently corroborated the same day by a concurrent agent's code_enforcement-column entry naming the identical CODES_ENFORCEMENT_WGS84 finding.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Iredell",
+      "column": "condemned",
+      "reason": "Live-checked 2026-11-16, and genuinely different from this county's sibling code_enforcement finding (a WebSearch-only, medium-confidence negative) -- this is a direct field-level check of the one real candidate. maps.iredellcountync.gov/server/rest/services/PermittingApp/EnerGov_Features/MapServer IS a live, case-level EnerGov integration (ModuleName/CaseType/CaseNumber/WorkClass fields, not a boundary-only layer) -- but the entire sync is frozen: the \"History\" layers (point=15 rows, poly=157 rows, line=0) are ALL dated 2022-02-04 to 2022-03-17 (live outFields query on ApplicationDate), with exactly ONE CodeManagement-module case in the whole dataset (\"Work Without Permit\", WWOP-2022-0001, appearing in both the point and poly layers) against 102 PermitManagement + 48 InspectionManagement + 5 PlanManagement rows. The \"live/current\" SpatialCollection counterpart (the layer that should hold today's open cases) returns count:0 across all three geometry types. A ~4-year-dead GIS sync with a single historical code case, not a wall and not an unbuilt source -- there is nothing current to build.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Iredell",
+      "column": "vacancy",
+      "reason": "Live-checked 2026-11-16, and genuinely different from this county's sibling code_enforcement finding (a WebSearch-only, medium-confidence negative) -- this is a direct field-level check of the one real candidate. maps.iredellcountync.gov/server/rest/services/PermittingApp/EnerGov_Features/MapServer IS a live, case-level EnerGov integration (ModuleName/CaseType/CaseNumber/WorkClass fields, not a boundary-only layer) -- but the entire sync is frozen: the \"History\" layers (point=15 rows, poly=157 rows, line=0) are ALL dated 2022-02-04 to 2022-03-17 (live outFields query on ApplicationDate), with exactly ONE CodeManagement-module case in the whole dataset (\"Work Without Permit\", WWOP-2022-0001, appearing in both the point and poly layers) against 102 PermitManagement + 48 InspectionManagement + 5 PlanManagement rows. The \"live/current\" SpatialCollection counterpart (the layer that should hold today's open cases) returns count:0 across all three geometry types. A ~4-year-dead GIS sync with a single historical code case, not a wall and not an unbuilt source -- there is nothing current to build.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Iredell",
+      "column": "vacant",
+      "reason": "Live-checked 2026-11-16, and genuinely different from this county's sibling code_enforcement finding (a WebSearch-only, medium-confidence negative) -- this is a direct field-level check of the one real candidate. maps.iredellcountync.gov/server/rest/services/PermittingApp/EnerGov_Features/MapServer IS a live, case-level EnerGov integration (ModuleName/CaseType/CaseNumber/WorkClass fields, not a boundary-only layer) -- but the entire sync is frozen: the \"History\" layers (point=15 rows, poly=157 rows, line=0) are ALL dated 2022-02-04 to 2022-03-17 (live outFields query on ApplicationDate), with exactly ONE CodeManagement-module case in the whole dataset (\"Work Without Permit\", WWOP-2022-0001, appearing in both the point and poly layers) against 102 PermitManagement + 48 InspectionManagement + 5 PlanManagement rows. The \"live/current\" SpatialCollection counterpart (the layer that should hold today's open cases) returns count:0 across all three geometry types. A ~4-year-dead GIS sync with a single historical code case, not a wall and not an unbuilt source -- there is nothing current to build.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Anson",
+      "column": "condemned",
+      "reason": "County's complete published GIS layer catalog live-fetched 2026-11-16 (co.anson.nc.us/252/GIS-Data-Downloads): exactly 30 named ZIP layers (airport height restrictions, county/municipal boundaries, delinquent real estate, parcel lines, 3 towns' zoning, cell towers, 4 contour-interval sets, address points, sewer/water lines, soil types, emergency service areas, fire hydrants, flood zones, lakes, map index, railroads, rivers, roads, voting districts/precincts) -- the SAME set the county's own ArcGIS web map (ansoncountygis.com/maps/, an Avineon-built Esri JS Experience app) mirrors. Zero code-enforcement, condemned, vacant, demolition, blight or nuisance layer anywhere in the complete list -- this is the county's whole public GIS offering, not a partial search result.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Anson",
+      "column": "vacancy",
+      "reason": "County's complete published GIS layer catalog live-fetched 2026-11-16 (co.anson.nc.us/252/GIS-Data-Downloads): exactly 30 named ZIP layers (airport height restrictions, county/municipal boundaries, delinquent real estate, parcel lines, 3 towns' zoning, cell towers, 4 contour-interval sets, address points, sewer/water lines, soil types, emergency service areas, fire hydrants, flood zones, lakes, map index, railroads, rivers, roads, voting districts/precincts) -- the SAME set the county's own ArcGIS web map (ansoncountygis.com/maps/, an Avineon-built Esri JS Experience app) mirrors. Zero code-enforcement, condemned, vacant, demolition, blight or nuisance layer anywhere in the complete list -- this is the county's whole public GIS offering, not a partial search result.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Anson",
+      "column": "vacant",
+      "reason": "County's complete published GIS layer catalog live-fetched 2026-11-16 (co.anson.nc.us/252/GIS-Data-Downloads): exactly 30 named ZIP layers (airport height restrictions, county/municipal boundaries, delinquent real estate, parcel lines, 3 towns' zoning, cell towers, 4 contour-interval sets, address points, sewer/water lines, soil types, emergency service areas, fire hydrants, flood zones, lakes, map index, railroads, rivers, roads, voting districts/precincts) -- the SAME set the county's own ArcGIS web map (ansoncountygis.com/maps/, an Avineon-built Esri JS Experience app) mirrors. Zero code-enforcement, condemned, vacant, demolition, blight or nuisance layer anywhere in the complete list -- this is the county's whole public GIS offering, not a partial search result.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Pasquotank",
+      "column": "condemned",
+      "reason": "Both tiers checked live 2026-11-16. County: the full ArcGIS Online hosted-service catalog (services2.arcgis.com/0sC2n3LxYOcxBOg0, the org behind pasquotankcounty.maps.arcgis.com) is ~90 services -- parcels/sales/zoning/utilities/precincts/animal-control/daycare-buffers plus 10 Survey123 field-collection forms; every one of the 10 forms was individually schema-checked and all are youth-program/camp registration intake (applicant/birthday/parent_guardian_name/minors_name fields), not code-case intake. The county's own GIS office page sells its parcel layer for a $200 mailed check rather than publishing one, and its code-enforcement page is contact-only (252-335-1891). City: Elizabeth City's open-data DCAT feed (data-ecity.opendata.arcgis.com/data.json, 34 datasets, fully enumerated) is boundary/zoning/utility/EMS/school/voting/park data only; the city's own Code Enforcement page (under Development Services) is contact-only, no case list or map.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Pasquotank",
+      "column": "vacancy",
+      "reason": "Both tiers checked live 2026-11-16. County: the full ArcGIS Online hosted-service catalog (services2.arcgis.com/0sC2n3LxYOcxBOg0, the org behind pasquotankcounty.maps.arcgis.com) is ~90 services -- parcels/sales/zoning/utilities/precincts/animal-control/daycare-buffers plus 10 Survey123 field-collection forms; every one of the 10 forms was individually schema-checked and all are youth-program/camp registration intake (applicant/birthday/parent_guardian_name/minors_name fields), not code-case intake. The county's own GIS office page sells its parcel layer for a $200 mailed check rather than publishing one, and its code-enforcement page is contact-only (252-335-1891). City: Elizabeth City's open-data DCAT feed (data-ecity.opendata.arcgis.com/data.json, 34 datasets, fully enumerated) is boundary/zoning/utility/EMS/school/voting/park data only; the city's own Code Enforcement page (under Development Services) is contact-only, no case list or map.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Pasquotank",
+      "column": "vacant",
+      "reason": "Both tiers checked live 2026-11-16. County: the full ArcGIS Online hosted-service catalog (services2.arcgis.com/0sC2n3LxYOcxBOg0, the org behind pasquotankcounty.maps.arcgis.com) is ~90 services -- parcels/sales/zoning/utilities/precincts/animal-control/daycare-buffers plus 10 Survey123 field-collection forms; every one of the 10 forms was individually schema-checked and all are youth-program/camp registration intake (applicant/birthday/parent_guardian_name/minors_name fields), not code-case intake. The county's own GIS office page sells its parcel layer for a $200 mailed check rather than publishing one, and its code-enforcement page is contact-only (252-335-1891). City: Elizabeth City's open-data DCAT feed (data-ecity.opendata.arcgis.com/data.json, 34 datasets, fully enumerated) is boundary/zoning/utility/EMS/school/voting/park data only; the city's own Code Enforcement page (under Development Services) is contact-only, no case list or map.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Rockingham",
+      "column": "condemned",
+      "reason": "County's own \"GIS or Tax Maps\" link resolves to webgis.net/nc/rockingham/ -- the SAME Hurt & Proffitt \"WebGIS\" proprietary platform this project's own assessor_cards/cleveland_nc.py already treats as a non-ArcGIS, non-REST PHP property-card system for Cleveland County (confirmed live 2026-11-16: Rockingham's instance loads the same webgis-platform/core/boot.js JS bundle; Cleveland's loads an older version of the same product with a literal \"Hurt & Proffitt\" copyright footer) -- no REST/JSON endpoint exists to query for either county. The county's main website (rockinghamcountync.gov) sits behind a Cloudflare bot-check challenge page (live-confirmed 2026-11-16: \"Just a moment...\" interstitial), and a live search found no ArcGIS Hub/open-data presence for either incorporated city inside the county with its own code-enforcement program (Reidsville, Eden). Medium confidence: the county's own GIS is directly confirmed non-REST, but the two cities' absence of a hub rests on search results, not a full service-catalog walk the way this round's other NC counties got.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Rockingham",
+      "column": "vacancy",
+      "reason": "County's own \"GIS or Tax Maps\" link resolves to webgis.net/nc/rockingham/ -- the SAME Hurt & Proffitt \"WebGIS\" proprietary platform this project's own assessor_cards/cleveland_nc.py already treats as a non-ArcGIS, non-REST PHP property-card system for Cleveland County (confirmed live 2026-11-16: Rockingham's instance loads the same webgis-platform/core/boot.js JS bundle; Cleveland's loads an older version of the same product with a literal \"Hurt & Proffitt\" copyright footer) -- no REST/JSON endpoint exists to query for either county. The county's main website (rockinghamcountync.gov) sits behind a Cloudflare bot-check challenge page (live-confirmed 2026-11-16: \"Just a moment...\" interstitial), and a live search found no ArcGIS Hub/open-data presence for either incorporated city inside the county with its own code-enforcement program (Reidsville, Eden). Medium confidence: the county's own GIS is directly confirmed non-REST, but the two cities' absence of a hub rests on search results, not a full service-catalog walk the way this round's other NC counties got.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Rockingham",
+      "column": "vacant",
+      "reason": "County's own \"GIS or Tax Maps\" link resolves to webgis.net/nc/rockingham/ -- the SAME Hurt & Proffitt \"WebGIS\" proprietary platform this project's own assessor_cards/cleveland_nc.py already treats as a non-ArcGIS, non-REST PHP property-card system for Cleveland County (confirmed live 2026-11-16: Rockingham's instance loads the same webgis-platform/core/boot.js JS bundle; Cleveland's loads an older version of the same product with a literal \"Hurt & Proffitt\" copyright footer) -- no REST/JSON endpoint exists to query for either county. The county's main website (rockinghamcountync.gov) sits behind a Cloudflare bot-check challenge page (live-confirmed 2026-11-16: \"Just a moment...\" interstitial), and a live search found no ArcGIS Hub/open-data presence for either incorporated city inside the county with its own code-enforcement program (Reidsville, Eden). Medium confidence: the county's own GIS is directly confirmed non-REST, but the two cities' absence of a hub rests on search results, not a full service-catalog walk the way this round's other NC counties got.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Bertie",
+      "column": "condemned",
+      "reason": "County's complete ArcGIS Online hosted-service catalog live-enumerated 2026-11-16 (services3.arcgis.com/tiupcc8dC1j2CPV5, the org behind bertiecounty.maps.arcgis.com): exactly 2 services, Bertie_Static (24 layers: orthoimagery, contours, boundary, ETJ, voting district, city limits, drainage, fire/water/utility infrastructure, flood hazard, critical/protected area, soils, landcover, tax map index) and Bertie_Parcel_Viewer (7 layers: parcels, voluntary agricultural, subdivision, parcel hooks, centerlines, fire districts, boundary) -- both already fully listed as operational layers in the county's own \"Bertie County NC Parcel Viewer\" ArcGIS Experience Builder app (item d4b99379027b4492a3034b60c7632acb). Zero code-enforcement/condemned/vacant/demolition layer across the complete 31-layer catalog -- this is the entire public GIS offering, not a partial search.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Bertie",
+      "column": "vacancy",
+      "reason": "County's complete ArcGIS Online hosted-service catalog live-enumerated 2026-11-16 (services3.arcgis.com/tiupcc8dC1j2CPV5, the org behind bertiecounty.maps.arcgis.com): exactly 2 services, Bertie_Static (24 layers: orthoimagery, contours, boundary, ETJ, voting district, city limits, drainage, fire/water/utility infrastructure, flood hazard, critical/protected area, soils, landcover, tax map index) and Bertie_Parcel_Viewer (7 layers: parcels, voluntary agricultural, subdivision, parcel hooks, centerlines, fire districts, boundary) -- both already fully listed as operational layers in the county's own \"Bertie County NC Parcel Viewer\" ArcGIS Experience Builder app (item d4b99379027b4492a3034b60c7632acb). Zero code-enforcement/condemned/vacant/demolition layer across the complete 31-layer catalog -- this is the entire public GIS offering, not a partial search.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Bertie",
+      "column": "vacant",
+      "reason": "County's complete ArcGIS Online hosted-service catalog live-enumerated 2026-11-16 (services3.arcgis.com/tiupcc8dC1j2CPV5, the org behind bertiecounty.maps.arcgis.com): exactly 2 services, Bertie_Static (24 layers: orthoimagery, contours, boundary, ETJ, voting district, city limits, drainage, fire/water/utility infrastructure, flood hazard, critical/protected area, soils, landcover, tax map index) and Bertie_Parcel_Viewer (7 layers: parcels, voluntary agricultural, subdivision, parcel hooks, centerlines, fire districts, boundary) -- both already fully listed as operational layers in the county's own \"Bertie County NC Parcel Viewer\" ArcGIS Experience Builder app (item d4b99379027b4492a3034b60c7632acb). Zero code-enforcement/condemned/vacant/demolition layer across the complete 31-layer catalog -- this is the entire public GIS offering, not a partial search.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Washington",
+      "column": "condemned",
+      "reason": "County runs its permitting on an iWorQ citizen portal (washingtoncountyncpermit.portal.iworq.net, confirmed live 2026-11-16) whose public homepage exposes exactly one module -- \"Search Permits\" / \"Submit An Application,\" both pointed at the same /permits/600 permit type -- with no separate Code Enforcement module tile. The county's own Planning and Inspections page names a Code Enforcement Officer (Connie Barnes) by phone/email contact only, no map or case list; the Town of Plymouth (county seat) names a separate contact-only Code Enforcement Officer (Dennis Brown) for its own jurisdiction. The county's GIS is a fee/request-based parcel tool per the county's own site, not a public API or open-data portal. Medium confidence: no ArcGIS Online org was found for this county to fully enumerate the way Anson/Bertie/Pasquotank's were -- this rests on the iWorQ portal's own module list plus page-content checks (Plymouth's own planning/zoning page returned HTTP 403 and could not be read directly), not a full service-catalog walk.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Washington",
+      "column": "vacancy",
+      "reason": "County runs its permitting on an iWorQ citizen portal (washingtoncountyncpermit.portal.iworq.net, confirmed live 2026-11-16) whose public homepage exposes exactly one module -- \"Search Permits\" / \"Submit An Application,\" both pointed at the same /permits/600 permit type -- with no separate Code Enforcement module tile. The county's own Planning and Inspections page names a Code Enforcement Officer (Connie Barnes) by phone/email contact only, no map or case list; the Town of Plymouth (county seat) names a separate contact-only Code Enforcement Officer (Dennis Brown) for its own jurisdiction. The county's GIS is a fee/request-based parcel tool per the county's own site, not a public API or open-data portal. Medium confidence: no ArcGIS Online org was found for this county to fully enumerate the way Anson/Bertie/Pasquotank's were -- this rests on the iWorQ portal's own module list plus page-content checks (Plymouth's own planning/zoning page returned HTTP 403 and could not be read directly), not a full service-catalog walk.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Washington",
+      "column": "vacant",
+      "reason": "County runs its permitting on an iWorQ citizen portal (washingtoncountyncpermit.portal.iworq.net, confirmed live 2026-11-16) whose public homepage exposes exactly one module -- \"Search Permits\" / \"Submit An Application,\" both pointed at the same /permits/600 permit type -- with no separate Code Enforcement module tile. The county's own Planning and Inspections page names a Code Enforcement Officer (Connie Barnes) by phone/email contact only, no map or case list; the Town of Plymouth (county seat) names a separate contact-only Code Enforcement Officer (Dennis Brown) for its own jurisdiction. The county's GIS is a fee/request-based parcel tool per the county's own site, not a public API or open-data portal. Medium confidence: no ArcGIS Online org was found for this county to fully enumerate the way Anson/Bertie/Pasquotank's were -- this rests on the iWorQ portal's own module list plus page-content checks (Plymouth's own planning/zoning page returned HTTP 403 and could not be read directly), not a full service-catalog walk.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Barnwell",
+      "column": "condemned",
+      "reason": "County's complete ArcGIS Online hosted-service catalog live-enumerated 2026-11-16 (services8.arcgis.com/qqnlHdXochyJPfSY, the org behind parcel_cache.PARCEL_LAYERS[\"Barnwell\"]'s own endpoint): exactly 9 services -- address points, county boundary, city boundary lines, one sales-list extract, 3 parcel-data variants (Parcel_Data/ParcelData/ParcelData_ExportFeatures/PARCELS072626), and 2017 zoning. Zero code-enforcement/condemned/vacant/demolition layer across the complete catalog. County's own \"Building Inspector & Zoning\" page (barnwellcountysc.us/163/Building-Inspector-Zoning) is a static building-codes-adopted notice with no case list, map or portal link anywhere on it. Already checked for a CAMA condition field 2026-10-03 (negative, see that pass's own comment).",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Barnwell",
+      "column": "vacancy",
+      "reason": "County's complete ArcGIS Online hosted-service catalog live-enumerated 2026-11-16 (services8.arcgis.com/qqnlHdXochyJPfSY, the org behind parcel_cache.PARCEL_LAYERS[\"Barnwell\"]'s own endpoint): exactly 9 services -- address points, county boundary, city boundary lines, one sales-list extract, 3 parcel-data variants (Parcel_Data/ParcelData/ParcelData_ExportFeatures/PARCELS072626), and 2017 zoning. Zero code-enforcement/condemned/vacant/demolition layer across the complete catalog. County's own \"Building Inspector & Zoning\" page (barnwellcountysc.us/163/Building-Inspector-Zoning) is a static building-codes-adopted notice with no case list, map or portal link anywhere on it. Already checked for a CAMA condition field 2026-10-03 (negative, see that pass's own comment).",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Barnwell",
+      "column": "vacant",
+      "reason": "County's complete ArcGIS Online hosted-service catalog live-enumerated 2026-11-16 (services8.arcgis.com/qqnlHdXochyJPfSY, the org behind parcel_cache.PARCEL_LAYERS[\"Barnwell\"]'s own endpoint): exactly 9 services -- address points, county boundary, city boundary lines, one sales-list extract, 3 parcel-data variants (Parcel_Data/ParcelData/ParcelData_ExportFeatures/PARCELS072626), and 2017 zoning. Zero code-enforcement/condemned/vacant/demolition layer across the complete catalog. County's own \"Building Inspector & Zoning\" page (barnwellcountysc.us/163/Building-Inspector-Zoning) is a static building-codes-adopted notice with no case list, map or portal link anywhere on it. Already checked for a CAMA condition field 2026-10-03 (negative, see that pass's own comment).",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Alamance",
+      "column": "condemned",
+      "reason": "Already checked, live, by this project's 2026-09-28 code/vacant discovery pass (see arcgis_distress_layers.py's own comment): the ReGIS regional platform (Burlington/Graham/Elon/county, shared Esri Portal) has two real code-enforcement-named layers -- BurlCodeEnforcement and SmartGov_Map layer 6 (\"Code Enforcement Zones\") -- but both are boundary-only enforcement-officer zone polygons (fields: Zone_ID/Enf_Officer only), the same rejection class as Pitt/Gaston/Anderson's boundary-only layers elsewhere in this file; Burlington's SeeClickFix Open311 API can't be scoped to the city. Named by round 10's own memory as a round-11 citation candidate -- cited directly rather than re-run.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Alamance",
+      "column": "vacancy",
+      "reason": "Already checked, live, by this project's 2026-09-28 code/vacant discovery pass (see arcgis_distress_layers.py's own comment): the ReGIS regional platform (Burlington/Graham/Elon/county, shared Esri Portal) has two real code-enforcement-named layers -- BurlCodeEnforcement and SmartGov_Map layer 6 (\"Code Enforcement Zones\") -- but both are boundary-only enforcement-officer zone polygons (fields: Zone_ID/Enf_Officer only), the same rejection class as Pitt/Gaston/Anderson's boundary-only layers elsewhere in this file; Burlington's SeeClickFix Open311 API can't be scoped to the city. Named by round 10's own memory as a round-11 citation candidate -- cited directly rather than re-run.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Alamance",
+      "column": "vacant",
+      "reason": "Already checked, live, by this project's 2026-09-28 code/vacant discovery pass (see arcgis_distress_layers.py's own comment): the ReGIS regional platform (Burlington/Graham/Elon/county, shared Esri Portal) has two real code-enforcement-named layers -- BurlCodeEnforcement and SmartGov_Map layer 6 (\"Code Enforcement Zones\") -- but both are boundary-only enforcement-officer zone polygons (fields: Zone_ID/Enf_Officer only), the same rejection class as Pitt/Gaston/Anderson's boundary-only layers elsewhere in this file; Burlington's SeeClickFix Open311 API can't be scoped to the city. Named by round 10's own memory as a round-11 citation candidate -- cited directly rather than re-run.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     }
   ]
 }
