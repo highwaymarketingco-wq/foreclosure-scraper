@@ -569,6 +569,41 @@ ROSTERS: list[tuple[str, str, str, str]] = [
     ("NC", "Edgecombe", "citizen_connect", "EdgecombeCoNC|"), # 267 in custody; e.g. ALFORD EMANUEL, arrested 07/01/2026, "ATEMT FIRST DEGREE FORCE SEX OFFENDER"
     ("NC", "Greene", "citizen_connect", "GreeneCoNC|"),       # 73 in custody; e.g. ALPUCHE MARIO, arrested 11/06/2026
     ("NC", "Yancey", "citizen_connect", "YanceyCoNC|"),       # 39 in custody; e.g. BOSTON JARED, arrested 10/09/2026, "FAILURE TO APPEAR ON FELONY"
+
+    # ROUND 13 DISCOVERY 2026-11-17 -- Alexander NC. gap_matrix jail_booking/jail_booking_new
+    # "no source known" bucket, re-derived fresh (159 cells/163,947 rows/82 counties after round
+    # 12's 7 Citizen Connect wins). Round 12 widened Citizen Connect + p2c_jqgrid + Southern
+    # Software DCN against the full remaining bucket but left this file's OWN p2c_centralsquare
+    # and zuercher vendors unwidened -- this round filled that gap. Alexander is one of round 8's
+    # own 3 named "P2C CentralSquare XSRF-wall leads" (Rockingham/Dare/Alexander) -- whatever host
+    # that earlier research tried for Alexander apparently hit a real XSRF/session problem, but
+    # widening the same InitialSettings-auto-discovery method already live in
+    # _fetch_p2c_centralsquare (guessing "{county}countyso.policetocitizen.com", the same shape
+    # as Buncombe/Alexander's own sibling tenants) found a DIFFERENT, clean host for this same
+    # county with no wall at all. Live-verified through the real _fetch_p2c_centralsquare (not
+    # just the probe's own InitialSettings check): listId 532 auto-discovered via
+    # /api/Agency/InitialSettings, 110 in custody, e.g. MCELWEE ROBERT, arrested 11/16/2026
+    # (yesterday at verification time), ASSAULT-FEMALE; MCELWEE KATIE, arrested 11/16/2026,
+    # ASSAULT-SIMPLE. Zero new fetcher code -- same already-wired _fetch_p2c_centralsquare every
+    # other modern-P2C county in this file already uses.
+    #
+    # Rockingham and Dare NC (the other 2 of round 8's same "XSRF-wall" 3) were RE-FOUND this
+    # round too -- real tenants exist (rockinghamsonc.policetocitizen.com AgencyId=114;
+    # darecountync.policetocitizen.com AgencyId=71) -- but live diagnosis of the actual POST to
+    # /api/Inmates/<listId> found something more specific than a generic "XSRF wall": Dare's own
+    # InitialSettings Modules list carries exactly one module ("ReportIncident"), and
+    # Rockingham's Modules list is EMPTY -- neither tenant's own vendor configuration offers a
+    # public Inmates module at all (confirmed via the tenant's own structured JSON, not a WAF
+    # block: Rockingham's API answers a clean HTTP 403 "Module is not enabled." for any listId).
+    # This is falsifiable evidence THIS vendor has no public roster for these two, but not proof
+    # no other vendor could -- every other guessable vendor this file has a fetcher for
+    # (Citizen Connect, p2c_jqgrid, DCN already swept round 12; Zuercher swept this round) also
+    # came back empty for both. Per this project's own standing discipline (rounds 8/12): left
+    # genuinely untouched, NOT declined -- a confirmed "this one vendor doesn't publish it" is
+    # not the same falsifiable "no path exists through ANY vendor" the declined_registry bar
+    # requires.
+    ("NC", "Alexander", "p2c_centralsquare",
+     "https://alexandercountyso.policetocitizen.com|532"),
 ]
 
 # Southern Software hosts every Citizen Connect tenant off one origin; the
