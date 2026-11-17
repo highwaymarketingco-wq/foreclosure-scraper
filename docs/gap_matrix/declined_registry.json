@@ -1443,14 +1443,6 @@
       "confidence": "medium"
     },
     {
-      "state": "SC",
-      "county": "Charleston",
-      "column": "code_enforcement",
-      "reason": "Directly queried the City of Charleston's own ArcGIS Server (gis.charleston-sc.gov/arcgis/rest/services) 2026-11-16: its 8 folders (Basemaps/External/Imagery/Internal/Internal_City/MEOC/Mobile/Utilities) and the public 'External' folder's 15 services (enumerated: geocoders, a StormwaterViewer, tourism/EngineeringStoryMap maps, PDI_Data) contain no code-enforcement/livability case layer. 'External/Service_Energov_Composite' confirms the city's permitting backend is EnerGov (Tyler Technologies) -- the same vendor independently confirmed on this same sweep to expose its case-level FeatureServer behind a hard token wall (Catawba County NC's energov_code_compliance/MapServer returned HTTP 499 'Token Required' live 2026-11-16) while only a zone-boundary layer is ever public (Wilmington NC and Greenville NC EnerGov instances, same sweep). The Livability Dept's own public channel is a phone/web complaint form into Livability Court, not a published dataset. Charleston COUNTY's GIS domain could not be located (gisweb/maps/gis.charlestoncounty.org all failed DNS).",
-      "confirmed_date": "2026-11-16",
-      "confidence": "high"
-    },
-    {
       "state": "NC",
       "county": "Rutherford",
       "column": "code_enforcement",
