@@ -5801,6 +5801,62 @@
       "reason": "This county's own register-of-deeds index runs on the Avenu Insights/GRIDS platform (<county>sc.avenuinsights.com) -- the SAME platform and the SAME CustomSearchRequest/Kendo-grid search mechanism project_avenu_darlington_greenville_greenwood_dual_confirmed_blocked_2026-11-12.md already confirmed genuinely broken server-side via two independent methods (httpx-level 'peer closed connection' AND a real-browser session where the search Kendo Grid never populates) -- not a per-county data gap, a platform-level search fault. This county is not one of the ones directly tested there; live-reconfirmed tonight (2026-11-17) only that its own <county>sc.avenuinsights.com subdomain resolves (HTTP 200 on the root page), not that its search step specifically reproduces the fault -- medium confidence (inferred from the same platform/mechanism, not independently re-run through a real login+search for this exact county). This project's own src/foreclosure_scraper/scrapers/counties_sc/sc_avenu_rod.py does not even have this county in its COUNTIES config yet, so there has been no in-house attempt against it specifically -- re-verify live (not just re-read this note) before ruling it out a second time if Avenu ever ships a fix.",
       "confirmed_date": "2026-11-17",
       "confidence": "medium"
+    },
+    {
+      "column": "lt_estate_lead",
+      "state": "SC",
+      "county": "Cherokee",
+      "confidence": "high",
+      "confirmed_date": "2026-11-17",
+      "reason": "No listing_type=='estate_lead' producer reaches Cherokee SC. parcel_cache has no entry for this county at all (sc_heir_estate_parcel_cache.py's own _candidate_counties() never surfaces it), and its county GIS/property-card host (qpublic.schneidercorp.com) answers a plain unauthenticated GET with a Cloudflare 'Just a moment...' bot-check (HTTP 403) -- live-confirmed by sc_heir_estate_parcel_cache.py's own 2026-11-16 research note, re-reviewed and still current as of this entry (round 18). A real wall, not an unbuilt source; genuine capability gap pending a CAPTCHA-free path onto this county's owner data."
+    },
+    {
+      "column": "lt_estate_lead",
+      "state": "SC",
+      "county": "Clarendon",
+      "confidence": "high",
+      "confirmed_date": "2026-11-17",
+      "reason": "No listing_type=='estate_lead' producer reaches Clarendon SC. parcel_cache has no entry for this county at all (sc_heir_estate_parcel_cache.py's own _candidate_counties() never surfaces it), and its county GIS/property-card host (qpublic.schneidercorp.com) answers a plain unauthenticated GET with a Cloudflare 'Just a moment...' bot-check (HTTP 403) -- live-confirmed by sc_heir_estate_parcel_cache.py's own 2026-11-16 research note, re-reviewed and still current as of this entry (round 18). A real wall, not an unbuilt source; genuine capability gap pending a CAPTCHA-free path onto this county's owner data."
+    },
+    {
+      "column": "lt_estate_lead",
+      "state": "SC",
+      "county": "Bamberg",
+      "confidence": "high",
+      "confirmed_date": "2026-11-17",
+      "reason": "No listing_type=='estate_lead' producer reaches Bamberg SC. parcel_cache has no entry for this county at all (sc_heir_estate_parcel_cache.py's own _candidate_counties() never surfaces it), and its county GIS/property-card host (qpublic.schneidercorp.com) answers a plain unauthenticated GET with a Cloudflare 'Just a moment...' bot-check (HTTP 403) -- live-confirmed by sc_heir_estate_parcel_cache.py's own 2026-11-16 research note, re-reviewed and still current as of this entry (round 18). A real wall, not an unbuilt source; genuine capability gap pending a CAPTCHA-free path onto this county's owner data."
+    },
+    {
+      "column": "lt_estate_lead",
+      "state": "SC",
+      "county": "Abbeville",
+      "confidence": "high",
+      "confirmed_date": "2026-11-17",
+      "reason": "No listing_type=='estate_lead' producer reaches Abbeville SC. parcel_cache has no entry for this county at all (sc_heir_estate_parcel_cache.py's own _candidate_counties() never surfaces it), and its county GIS/property-card host (qpublic.schneidercorp.com) answers a plain unauthenticated GET with a Cloudflare 'Just a moment...' bot-check (HTTP 403) -- live-confirmed by sc_heir_estate_parcel_cache.py's own 2026-11-16 research note, re-reviewed and still current as of this entry (round 18). A real wall, not an unbuilt source; genuine capability gap pending a CAPTCHA-free path onto this county's owner data."
+    },
+    {
+      "column": "lt_estate_lead",
+      "state": "SC",
+      "county": "Allendale",
+      "confidence": "high",
+      "confirmed_date": "2026-11-17",
+      "reason": "No listing_type=='estate_lead' producer reaches Allendale SC. parcel_cache has no entry for this county at all (sc_heir_estate_parcel_cache.py's own _candidate_counties() never surfaces it), and its county GIS/property-card host (qpublic.schneidercorp.com) answers a plain unauthenticated GET with a Cloudflare 'Just a moment...' bot-check (HTTP 403) -- live-confirmed by sc_heir_estate_parcel_cache.py's own 2026-11-16 research note, re-reviewed and still current as of this entry (round 18). A real wall, not an unbuilt source; genuine capability gap pending a CAPTCHA-free path onto this county's owner data."
+    },
+    {
+      "column": "lt_estate_lead",
+      "state": "SC",
+      "county": "Lee",
+      "confidence": "high",
+      "confirmed_date": "2026-11-17",
+      "reason": "No listing_type=='estate_lead' producer reaches Lee SC. parcel_cache has no entry for this county at all (sc_heir_estate_parcel_cache.py's own _candidate_counties() never surfaces it), and its county GIS/property-card host (qpublic.schneidercorp.com) answers a plain unauthenticated GET with a Cloudflare 'Just a moment...' bot-check (HTTP 403) -- live-confirmed by sc_heir_estate_parcel_cache.py's own 2026-11-16 research note, re-reviewed and still current as of this entry (round 18). A real wall, not an unbuilt source; genuine capability gap pending a CAPTCHA-free path onto this county's owner data."
+    },
+    {
+      "column": "lt_estate_lead",
+      "state": "SC",
+      "county": "Fairfield",
+      "confidence": "high",
+      "confirmed_date": "2026-11-17",
+      "reason": "No listing_type=='estate_lead' producer reaches Fairfield SC. parcel_cache has no entry for this county at all (sc_heir_estate_parcel_cache.py's own _candidate_counties() never surfaces it), and its county GIS/property-card host (beacon.schneidercorp.com) answers a plain unauthenticated GET with a Cloudflare 'Just a moment...' bot-check (HTTP 403) -- live-confirmed by sc_heir_estate_parcel_cache.py's own 2026-11-16 research note, re-reviewed and still current as of this entry (round 18). A real wall, not an unbuilt source; genuine capability gap pending a CAPTCHA-free path onto this county's owner data."
     }
   ]
 }
