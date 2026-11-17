@@ -2361,6 +2361,214 @@
       "reason": "Already checked, live, by this project's 2026-09-28 code/vacant discovery pass (see arcgis_distress_layers.py's own comment): the ReGIS regional platform (Burlington/Graham/Elon/county, shared Esri Portal) has two real code-enforcement-named layers -- BurlCodeEnforcement and SmartGov_Map layer 6 (\"Code Enforcement Zones\") -- but both are boundary-only enforcement-officer zone polygons (fields: Zone_ID/Enf_Officer only), the same rejection class as Pitt/Gaston/Anderson's boundary-only layers elsewhere in this file; Burlington's SeeClickFix Open311 API can't be scoped to the city. Named by round 10's own memory as a round-11 citation candidate -- cited directly rather than re-run.",
       "confirmed_date": "2026-11-16",
       "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Guilford",
+      "column": "lt_elderly_disabled",
+      "reason": "No dedicated county CAMA layer registered or found; relies on the NC OneMap statewide parcel layer (services.nconemap.gov NC1Map_Parcels/FeatureServer/1, 70 fields, live-refetched 2026-11-16). Full live field-schema enumeration confirms NO field named exempt/homestead/relief/elderly/disabled anywhere on this shared service. The only two categorical fields were enumerated in full: owntype (41 distinct values -- BY DEED, BY WILL, HEIR, TRUSTEE, ESTATE, 'EXEMPT'/'Exempt', Charitable, County, Federal, Municipal, Private Educational, Religious, State, TAXABLE/Taxable -- a deed-conveyance/ownership-class scheme where 'Exempt' means an institutional tax-exempt OWNER category, not a personal age/disability flag) and parusecode/parusedesc (2,253/4,082 distinct values, a pure land-use/building-type classification, e.g. ' CHURCH - COMMERCIAL', ' DUPLEX/TRIPLEX - APARTMENTS'). Since this single statewide service is the ONLY source for Guilford (and for Forsyth/Brunswick/Catawba/McDowell below, which share the identical schema), this one field-schema check rules out all of them for this column at once.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Forsyth",
+      "column": "lt_elderly_disabled",
+      "reason": "Same NC OneMap statewide-layer dead end documented in full under the Guilford entry (identical shared service, identical 70-field schema, no exemption/homestead field of any kind; owntype and parusecode/parusedesc fully enumerated and confirmed unrelated).",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Brunswick",
+      "column": "lt_elderly_disabled",
+      "reason": "Same NC OneMap statewide-layer dead end documented in full under the Guilford entry (identical shared service, identical 70-field schema, no exemption/homestead field of any kind; owntype and parusecode/parusedesc fully enumerated and confirmed unrelated).",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Catawba",
+      "column": "lt_elderly_disabled",
+      "reason": "Same NC OneMap statewide-layer dead end documented in full under the Guilford entry (identical shared service, identical 70-field schema, no exemption/homestead field of any kind; owntype and parusecode/parusedesc fully enumerated and confirmed unrelated).",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "McDowell",
+      "column": "lt_elderly_disabled",
+      "reason": "The county's own registered layer (services9.arcgis.com McDowell_Parcels/FeatureServer/0, 70 fields, parcel_cache.py PARCEL_LAYERS entry) is a verbatim field-for-field clone of the NC OneMap statewide schema (parno/altparno/ownname/owntype/parusecode/parusedesc/etc, live-refetched 2026-11-16) -- not an independent CAMA source. Same dead end as the Guilford entry: no exemption/homestead field exists; owntype is the deed-conveyance/ownership-class scheme, not a personal age/disability flag.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Rutherford",
+      "column": "lt_elderly_disabled",
+      "reason": "The county's registered TaxParcels Web Adaptor URL (gis.rutherfordcountync.gov/arcgis/rest/services/TaxParcels) now answers 'ArcGIS Web Adaptor Application Error' on every request (confirmed down at two separate checks, 2026-11-16) -- the live replacement was found at the same host's direct ArcGIS Server path: gis.rutherfordcountync.gov/server/rest/services/EnerGov/EnerGov/FeatureServer/3 (layer 'Parcel', 65 fields, same Parcel_Number/PIN/Property_Owner/Physical_Address/Total_Property_Value identifiers the existing parcel_cache.py entry already uses). It carries Exemption_Description (20 distinct values, live groupBy) and Other_Exemption (a dollar amount). Every value enumerated and the two largest ambiguous-sounding buckets sampled directly: 'Property Exempt' (454 rows: Forest City/Chimney Rock Village/Rutherfordton town government, Rutherford County, Rutherford County Board of Education, NCDOT) and 'Other' (333 rows: Piedmont Council Boy Scouts Inc, Cliffside Area Fire Department, Nature Conservancy, American Dairy Goat Association, a Florida camp partnership) are both 100% institutional on live sample -- no individual homeowner in either bucket. No value among the 20 names age/disability/elderly/senior (closest is 'Exclusion', 1 row). Matches and extends enrichment_tax_relief.py's existing 2026-08-06 finding ('2 rows in Rutherford').",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Henderson",
+      "column": "lt_elderly_disabled",
+      "reason": "The county's registered Parcels FeatureServer (gisweb.hendersoncountync.gov, 91 fields) carries EXEMPTION_DESC with a literal 'Elderly and Disabled' category -- live-queried 2026-11-16 (the exact Spartanburg-style re-check: never trust the 2026-08-06 note's count without re-measuring live). Countywide count for EXEMPTION_DESC='Elderly and Disabled' is 1 (one) row (PIN 9587255404, JACKSON MALINDA, 87 TAURUS DR, a $17,400 mobile home) -- a vanishing statistical fluke, not a bulk population, and closely matches (rather than overturns) the existing 2026-08-06 finding of '3 rows in Henderson'. Full groupBy of all 31 distinct EXEMPTION_DESC values confirms the rest is exclusively institutional: NONPRO HOME OWNERS (684), Govern-Fed/St/Local (495), Religous (313), BURIAL PROPERTY (76), CONSERVATION (67), PUBLIC SERVICE (56), Charitable-Low Incom (49), and 23 smaller charitable/educational/government categories. No bulk personal age/disability population exists on this field.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Burke",
+      "column": "lt_elderly_disabled",
+      "reason": "The county's registered ProdParcelViewFC layer (gis.burkenc.org, 54 fields, identical regional-CAMA-vendor schema to Henderson) carries EXEMPTION_DESC -- live groupBy of all 27 distinct values (2026-11-16) finds no elderly/disabled/senior/homestead category by name. The one plausible-sounding value, 'Aged/Sick/Infirm', is only 3 rows countywide, and sampling all 3 confirms every one is an institution (Agape Retirement Home Inc, Caldwell Hospice and Palliative Care Inc, Burke Council on Alcoholism & Chemical Dependency Inc) -- a charitable-care-FACILITY exemption category, not a personal homeowner exclusion. The rest of the 27 values (Religious 426, City/State/County/Federal Govt, Homeowners Assoc, Airport Auth, Low Income Housing, Burial Property, Clubs/lodges, ...) are likewise institutional. No bulk personal population exists on this field.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Haywood",
+      "column": "lt_elderly_disabled",
+      "reason": "The county's own Public_Access parcels layer (maps.haywoodcountync.gov/arcgis/rest/services/Land_Records/Public_Access/MapServer/1, 54 fields, live-fetched 2026-11-16) has no field named exempt/homestead/relief/elderly/disabled. Its only multi-value categorical field, Tax_Codes (75 distinct comma-separated combinations, e.g. 'G01,F04,R08,S01'), is a tax-billing-DISTRICT code set (G01=county, F##=fire district, C##=municipal, R##=special district, S01=school), confirmed unrelated by full enumeration -- no code resembles an exemption/homestead abbreviation. A sibling layer object literally named 'exempt' (Public_Access/MapServer/6) was also checked and is a cartographic Annotation SubLayer (map text labels under the 'Parcel Text' group, fields=null) -- not an attribute data layer at all, a red herring from the layer-name listing alone.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Oconee",
+      "column": "lt_elderly_disabled",
+      "reason": "The county's registered CitizenServe layer (arcserver2.oconeesc.com/arcgis/rest/services/CitizenServe/MapServer/5, 12 fields, live-refetched 2026-11-16: pin, current_owner, owner_street, owner_citystate, owner_zip, fire_district, deed_book, deed_page, legal_descr, proval_acres) is an addressing/911-grade layer -- no market/assessed value field and no exemption field of any kind exist on it.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Florence",
+      "column": "lt_elderly_disabled",
+      "reason": "The county's registered County_Tax_Parcel layer (services1.arcgis.com, 19 fields, live-refetched 2026-11-16: TMS, OWNERNAME, TOTBDGVAL, DISTRICT, ADD1-3, MAP/BLOCK/PARCEL, CALCULATED_ACREAGE, ADDR_SITE, TMSNODASH, PROPERTYCARD/PROPERTYHISTORY [document links]) has no exemption/homestead field; DISTRICT is a tax-billing jurisdiction code.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Colleton",
+      "column": "lt_elderly_disabled",
+      "reason": "The county's registered Public_Data layer (services1.arcgis.com, 18 fields, live-refetched 2026-11-16) has no field named exempt/homestead. Its one categorical field, PropertyClass, was fully enumerated (all 98 distinct values, 2026-11-16): a pure property-use/occupancy TYPE classification (APARTMENT, CHURCH, COMMERCIAL, COUNTY GOVERNMENT, DUPLEX, FEDERAL GOVERNMENT, HOSPITAL, MOBILE HOME PARK, SINGLE FAMILY DWELLING, VACANT RESIDENTIAL, ...), already used for this project's own land_use mapping -- no age/disability-shaped value exists among the 98.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Berkeley",
+      "column": "lt_elderly_disabled",
+      "reason": "The county's registered 'internet' MapServer layer (gis.berkeleycountysc.gov, 26 fields, live-refetched 2026-11-16) has no land_use/property-class field and no exemption field of any kind -- confirms and extends the layer's already-documented vacant_lot dead end (parcel_cache.py, 2026-10-20: 'no land_use/property-class field and no building/improvement value of any kind') to this column too; the full 26-field inventory contains nothing exemption-shaped (TISZ, DevAgreement, WindDebrisArea, Section_ are the only non-obvious fields, none relief-related).",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Laurens",
+      "column": "lt_elderly_disabled",
+      "reason": "The county's registered Pebble/TaxParcel layer (laurenscountygis.org, 24 fields, live-refetched 2026-11-16) has already-documented no value field (parcel_cache.py: 'layer has situs but no value field') and, confirmed now, no exemption field either -- its only categorical fields (Neighborhood, District, Fire_Code, Town_Code) are all billing-jurisdiction codes, not relief flags.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Anderson",
+      "column": "lt_elderly_disabled",
+      "reason": "The county's registered County_Parcels layer (gis.cityofandersonsc.gov, 17 fields, 120,384 parcels countywide despite the city-hosted domain -- live-refetched 2026-11-16) has no separate homestead-named field. Its one categorical field, RATIO (9 distinct values: blank/A/'A C'/AR/ARC/C/None/R/RC), is SC's standard Agricultural/Residential/Commercial ratio-class combination code -- the same 4%/6% assessment-ratio trap already declined for this exact county in enrichment_tax_relief.py ('Anderson SC RATIO is the 4%/6% assessment class, not a relief flag'), re-confirmed live rather than assumed.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Darlington",
+      "column": "lt_elderly_disabled",
+      "reason": "The county's registered PARCELS FeatureServer (services5.arcgis.com, 70 fields, live-refetched 2026-11-16) has a boolean-shaped EX field that reads ONLY ' ' (blank) or 'N' on all 41,790 parcels countywide (full distinct-value check) -- 'Y' never appears, a dead/unused flag, not an exemption population. The adjacent OO ('owner-occupied') field (values ' '/'Y') is the general SC 4% legal-residence ratio flag, not age/disability-specific, and has no further breakdown field to narrow it. No field among the 70 is named homestead/elderly/senior/disab.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Richland",
+      "column": "lt_elderly_disabled",
+      "reason": "The county's registered Richland_Parcels layer (services9.arcgis.com Fairfield_Kershaw_Richland_Map_WFL1/FeatureServer/6, 57 fields) carries Exemption1/2/3 fields that looked highly promising by name -- but live groupBy (2026-11-16, 184,916 rows) + owner-name sampling + a cross-tab against PCA (the 4%/6% ratio-class field) rule it out: Exemption1's 13 distinct values are a general ad-valorem institutional-exemption taxonomy (EX-FED/EX-STATE/EX-MUN/EX-CO/EX-AG-USE/UTL/MFG/DOR/ATE-Legacy, plus a bare 'EXEMPT' catch-all and 'EX-PARTIAL'). The two largest ambiguous buckets were sampled live (EXEMPT 11,158 rows: mixes churches with individual homeowners, no separating field; EX-PARTIAL 236 rows: mixes individuals with LLCs). Critically, cross-tabbing 'EXEMPT' against PCA shows 11,093/11,158 (99.4%) sit on PCA='.06' -- the NON-owner-occupied/NOT-legal-residence ratio class -- the OPPOSITE of what SC Code 12-37-250's age/disability/blind $50k exclusion requires (it applies only to the owner's legal residence, PCA='.04'). This field is not the target population.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Williamsburg",
+      "column": "lt_elderly_disabled",
+      "reason": "Not an ArcGIS REST service -- williamsburgsc.wthgis.com is a legacy ASP.NET 'tgis' viewer (re-confirmed 2026-11-16: no /arcgis|server|gis/rest/services path exists on this host). scripts/ingest_williamsburg_wthgis_parcels.py's own research (2026-10-20) already read the full per-parcel detail record (3 tabs: General/Assessment/History, via the CDATA block directly, not a field-name guess) and found no land_use/property-type field exists anywhere on it -- by the same reading, no exemption/homestead field exists either. Even if one did, sourcing this column requires a county-wide BULK sweep (new leads must stand alone, unlike an enrichment that only needs leads already on the board), which would mean sequentially hitting this fragile legacy host across all ~29,400 county parcels -- already measured at a 12% timeout rate at only 10 concurrent requests, infeasible regardless of field availability.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Cherokee",
+      "column": "lt_elderly_disabled",
+      "reason": "No ArcGIS-hosted parcel layer exists for this county at all (parcel_cache.py's own 2026-11-06 re-check, holding today): the county's GIS page links to exactly one parcel source, qpublic.schneidercorp.com, which answers a plain request with Cloudflare's 'Just a moment...' JS challenge (HTTP 403) -- a wall this project does not cross. nc_heir_estate_parcels.py's docstring independently reaches the same conclusion ('SC:Cherokee has no ArcGIS parcel layer at all, qPublic-only').",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Barnwell",
+      "column": "lt_elderly_disabled",
+      "reason": "Exempt_Parcel (ParcelData_ExportFeatures/FeatureServer/2) reads 'N' on every one of 30 sampled live rows (enrichment_tax_relief.py's existing 2026-10-30 breadth-pass finding, 'Barnwell/Saluda's Exempt_Parcel read N on every one of 30 sampled live rows -- not pursued further') -- a field that exists but is never flagged true, not a usable population. PT163_Class is the already-documented 4%/6% ratio class (parcel_cache.py), not an exemption flag.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Greenwood",
+      "column": "lt_elderly_disabled",
+      "reason": "TaxExemption='Exempt' (CAMA/MapServer/9, 2,409 parcels) is institutional-plus-noise, not a clean personal population (enrichment_tax_relief.py's existing 2026-10-30 finding: 'live sample mixed real $0-assessed individually-owned homes with churches, a Masonic lodge, and an LLC, with no field to tell them apart'). PropType (the layer's land-use field, live-refetched 2026-11-16) is Residential/Mobile Home/Commercial/Other/Farm-Timber/Multi-Family -- no exemption-type breakdown to separate the mixed bucket.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Hampton",
+      "column": "lt_elderly_disabled",
+      "reason": "Exempt_Class='Y' sample was 100% churches/cemetery associations/state agencies (CLIFTON BAPTIST, SC DEPT OF NATURAL RESOURCES); Hmstd_Code='H' sample mixed individual owners with an LLC and commercial-class parcels, both rejected as unclean (enrichment_tax_relief.py's existing 2026-10-30 breadth-pass finding). Independently re-confirmed by this layer's own 2026-11-16 vacant_lot re-check (parcel_cache.py): the full 36-field schema has no land_use/class/property-type field of any kind to filter the Hmstd_Code bucket down to a clean residential-only population with.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Saluda",
+      "column": "lt_elderly_disabled",
+      "reason": "Exempt_Parcel reads 'N' on every one of 30 sampled live rows, same Catalis/SDE vendor as Barnwell (enrichment_tax_relief.py's existing 2026-10-30 breadth-pass finding) -- a field that exists but is never flagged true.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Aiken",
+      "column": "lt_elderly_disabled",
+      "reason": "The county's registered PublicGIS layer (gis.cityofaikensc.gov, 34 fields, live-refetched 2026-11-16) has no field named homestead/elderly/senior/disab. Its one categorical field, PropertyClassType, is already fully documented (parcel_cache.py, 2026-10-20) as the 4-6% owner-occupancy ratio class spelled out as text (OWNER OCCUPIED RESIDENTIAL / NON-OWNER OCCUPIED RESIDENTIAL / AGRICULTURAL / COMMERCIAL / EXEMPT / GOVERNMENT / NON-QUALIFIED LAND) -- EXEMPT sits alongside GOVERNMENT as its own institutional bucket in this scheme, not a personal exclusion, and there is no further field to separate it.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Georgetown",
+      "column": "lt_elderly_disabled",
+      "reason": "The county's registered GCGIS_Energov layer (gis1.georgetowncountysc.org, 32 fields, live-refetched 2026-11-16) has no exemption/homestead field; LandUseCode is the only categorical field and is a land-use classification, not a relief flag.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Dorchester",
+      "column": "lt_elderly_disabled",
+      "reason": "The only open bulk parcel source for this county (gisportal.dorchestercounty.net General_Data/Parcels_Public/MapServer/0, per docs/county_breadth_research_2026-09-21.md) has just 10 bare fields (FULL_TMS/TMS/PARCELNO/OWNER/MAILING_ADDRESS/CITY_STATE_ZIP/PROPERTY_LOCATION/TAXED_ACRES/SALE_PRICE/SALE_DATE) -- no value field and no exemption field of any kind, independent of the separate licensing-clause question already noted there for other purposes.",
+      "confirmed_date": "2026-11-16",
+      "confidence": "high"
     }
   ]
 }
