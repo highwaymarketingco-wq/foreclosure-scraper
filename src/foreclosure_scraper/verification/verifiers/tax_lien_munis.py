@@ -28,6 +28,13 @@ rows carry one of those. One parcel checked live (584950001122) had its 2026 bil
 (balance 0.0) despite the county's OWN ad-list PDF (a snapshot) still flagging it -- exactly the
 "the roll is a snapshot, this reads what's owed today" case this verifier exists for.
 
+FIXED 2026-11-16: that one spot-check (and round 13's own later 8-parcel re-check) happened to
+land on 584950001122 / 494550401032, the single Hoke board row whose parcel_id is already plain
+digits. The other 2,829 of 2,830 applicable Hoke rows carry a dashed "NNNNN-NN-NN-NNN" parcel_id
+that search_id() passed straight through unconverted, which this portal's search answers with
+ZERO bills -- see _HOKE_DASHED below for the live-confirmed fix (a parcel-id-shape bug, not a
+session/timing/portal-health one, despite 118/118 live checks reading as parcel_not_found).
+
 Lee (2,703 rows, also nc_tax_lien_ads) is on the SAME platform too (leecountync.munisselfservice.com,
 found via its county site's own "Online Bill Inquiry" page, not guessed). The board's Lee parcel_id
 is overwhelmingly (3,054 of ~3,166, 96.5%) a plain 12-digit number that searches exactly like
@@ -237,6 +244,24 @@ _UNDASHED = re.compile(r"^([A-Z]{1,2}\d{4,5})(\d{3})(\d{3})([0-9A-Z]{3})$")
 #: uses it, so this is scoped to Pender specifically rather than a blanket digit-dash rule that
 #: could misfire for some other county's own dashed-but-different numbering.
 _PENDER_DASHED = re.compile(r"^(\d{4})-(\d{2})-(\d{4})-(\d{4})$")
+#: FIXED 2026-11-16 (the Hoke false-negative: see project_hoke_tax_lien_false_negative_fix_2026-
+#: 11-16 memory). Hoke's board parcel_id is overwhelmingly dashed "NNNNN-NN-NN-NNN" (e.g.
+#: "59406-00-01-092", 2,829 of 2,830 applies()=True rows measured on the 2026-11-16 board), and
+#: the portal's search finds ZERO bills for that shape -- live-confirmed against 3 real parcels,
+#: fresh session and one shared session alike (so NOT a session/timing/concurrency issue): the
+#: dashed string returns 0 bills every time, the SAME parcel's digits with the dashes dropped
+#: returns the full real multi-year grid every time. Before this fix, search_id()'s no-op
+#: passthrough for Hoke (no letter prefix, so _UNDASHED above never matches) sent the dashed
+#: string straight through, and verify() reported parcel_not_found on essentially every live
+#: Hoke check (118/118 all-time before this fix) -- a tenant-specific-LOOKING false negative that
+#: was actually a board-wide parcel-id-shape bug, masked for two passes (2026-10-18's own
+#: discovery check and round 13's 8-parcel spot re-check) because the ONE board row that happens
+#: to already be plain-digit (494550401032) was the parcel both of those checks landed on by
+#: chance. Scoped to this exact 5-2-2-3 digit grouping (12 digits total, same width as the plain
+#: form) rather than a blanket dash-strip: New Hanover's OWN dashed convention
+#: ("R09999-001-002-000") is the OPPOSITE of Hoke's -- that portal WANTS the dashes, which
+#: _UNDASHED above ADDS back in, so a blanket strip would break New Hanover.
+_HOKE_DASHED = re.compile(r"^(\d{5})-(\d{2})-(\d{2})-(\d{3})$")
 
 
 def search_id(parcel: Any, county: Optional[str] = None) -> str:
@@ -244,10 +269,16 @@ def search_id(parcel: Any, county: Optional[str] = None) -> str:
     The board also carries it with the dashes dropped ("R09999001002000", 568 rows on 2026-10-07),
     which the portal does not find; those are dashed again. Pender's board id is dashed digits
     that the portal wants UNDASHED (see _PENDER_DASHED above) -- the opposite direction, and only
-    for Pender. Anything else is passed as it is."""
+    for Pender. Hoke's board id is ALSO dashed digits the portal wants UNDASHED, in Hoke's own
+    5-2-2-3 grouping (see _HOKE_DASHED above) -- same direction as Pender, different shape,
+    scoped to Hoke only. Anything else is passed as it is."""
     s = str(parcel or "").strip().upper()
-    if (county or "").strip().lower() == "pender":
+    c = (county or "").strip().lower()
+    if c == "pender":
         m = _PENDER_DASHED.match(s)
+        return "".join(m.groups()) if m else s
+    if c == "hoke":
+        m = _HOKE_DASHED.match(s)
         return "".join(m.groups()) if m else s
     m = _UNDASHED.match(s)
     return "-".join(m.groups()) if m else s
