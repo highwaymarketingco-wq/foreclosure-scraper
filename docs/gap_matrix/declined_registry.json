@@ -2569,6 +2569,118 @@
       "reason": "The only open bulk parcel source for this county (gisportal.dorchestercounty.net General_Data/Parcels_Public/MapServer/0, per docs/county_breadth_research_2026-09-21.md) has just 10 bare fields (FULL_TMS/TMS/PARCELNO/OWNER/MAILING_ADDRESS/CITY_STATE_ZIP/PROPERTY_LOCATION/TAXED_ACRES/SALE_PRICE/SALE_DATE) -- no value field and no exemption field of any kind, independent of the separate licensing-clause question already noted there for other purposes.",
       "confirmed_date": "2026-11-16",
       "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Cherokee",
+      "column": "code_enforcement",
+      "reason": "Building Safety department (110 Railroad Ave, Gaffney) publishes only an anonymous \"Unpermitted Work Report\" intake form and PDF permit applications (cherokeecountysc.gov/building-safety/*, cherokeecountysc.gov/?p=2037) -- no case database, violation list, or GIS layer anywhere on the domain, confirmed via WebSearch across the county's own site. Consistent with enrichment_owner_mailing.py's own independent COUNTY_GIS note: \"Cherokee SC: no ArcGIS owner/mailing layer (qPublic-only) -> not here\" -- the county has no ArcGIS presence for ANY dataset, code enforcement included.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Polk",
+      "column": "code_enforcement",
+      "reason": "County's own ArcGIS org (services1.arcgis.com/23uf7jKvz6SRPFWJ -- the same org enrichment_owner_mailing.py's NC:Polk parcel spec already uses) enumerated in full live: ~50 named services (Parcels, TaxParcels, Zoning1, Roads, FireDistricts, 8 survey123 citizen-report forms, flood/watershed/census layers) -- none code, violation, or complaint-shaped by name. County's own Building & Fire Inspections page (polknc.gov/building_and_fire_inspections.php) names two code-enforcement officials with no linked data or portal of any kind.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Union",
+      "column": "code_enforcement",
+      "reason": "City of Monroe's own code-enforcement pages (monroenc.org/226 and monroenc.org/Departments/Planning-Development/Code-Enforcement) are a phone hotline (704-282-5770) plus a Minimum Housing brochure PDF -- no case-search tool, confirmed by direct page fetch. A WebSearch hit for a \"Code Enforcement Property Portal\" launched 2020 is a FALSE MATCH for Monroe, LOUISIANA (hosted at monroe-la.tolemi.com) -- not Monroe NC; worth flagging as a same-name-different-state trap for future rounds. County-level: no ArcGIS endpoint exists for Union NC at all (its own union_delinquent_tax.py scraper discovers a CSV, not an ArcGIS service), and both candidate county GIS hosts (co.unioncountync.gov, gis.unioncountync.gov) returned 404/no response live.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Hyde",
+      "column": "code_enforcement",
+      "reason": "Code Enforcement Department (30 Oyster Creek Rd, Swan Quarter) has only a phone/fax (252-926-4372), confirmed via the county's own permit-fee-schedule PDF. No web portal, GIS layer, or online complaint form found anywhere for the county (pop. ~5,000; site runs on a Revize CMS serving only PDF downloads, no application of any kind) -- same category as this project's other tiny-rural-NC-county declines (Tyrrell, Camden, Alleghany).",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Alamance",
+      "column": "code_enforcement",
+      "reason": "County's own ArcGIS org (apps.alamance-nc.com) enumerated by folder live: the one plausible-sounding folder, CCOM, contains exactly one layer -- \"AlamanceCADLayers\" -- which is Computer-Aided-Dispatch (911/emergency call) data, NOT Code Compliance, despite the acronym overlap (verified by the layer name itself, not assumed). BuildingInspections folder is permits, not violations. No Burlington, Graham, or Mebane city-level code-enforcement portal or dataset surfaced via WebSearch for any of the three incorporated cities.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Anson",
+      "column": "code_enforcement",
+      "reason": "Wadesboro's own Fire/Planning pages (wadesboronc.gov) are a zoning-violation fee schedule plus a fire-code-complaint phone line (704-694-1014) only. The county's own GIS domain, ansoncountygis.com, resolves live (HTTP 200) but serves ONLY the unconfigured \"IIS Windows Server\" default placeholder page -- confirmed by reading the raw HTML live, not just a 200 check -- i.e. no real GIS application is running on that host at all, despite the domain name promising one.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Rockingham",
+      "column": "code_enforcement",
+      "reason": "County's own Code Enforcement Complaint form (rockinghamcountync.gov) is an intake form, not a case search -- same non-search-tool pattern this project already declines elsewhere. Reidsville's Community Development/GIS page links only a \"Zoning Districts Web Map\" (parcel/zoning boundaries, not case data) plus a phone line (336-347-2385). Eden has no dataset surfaced at all, only a code-inspector job posting and a generic code-enforcement overview document.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Bertie",
+      "column": "code_enforcement",
+      "reason": "Planning & Inspections office (Windsor, 252-794-5336) is phone-only per the county's own listings. The one incorporated town with any online presence, Ahoskie, has a \"Reporting Potential Violations\" web FORM -- a non-anonymous intake form, not a case-search tool, the same shape this project already declines elsewhere (e.g. Oconee SC's E-Service form, round 11). No county GIS/ArcGIS host surfaced via WebSearch for Bertie at all.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Washington",
+      "column": "code_enforcement",
+      "reason": "County's Planning & Inspections office (116 Adams St, Plymouth, 252-793-4114) and the Town of Plymouth's own code-enforcement page (washingtonnc.gov/departments/planning___zoning/code_enforcement2.php) are contact-only (phone numbers and a named enforcement officer) -- no portal, dataset, or GIS layer found via WebSearch for either the town or the county.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Barnwell",
+      "column": "code_enforcement",
+      "reason": "City of Barnwell's code enforcement runs through SafeBuilt-administered permits with its ordinance posted as PDFs only (cityofbarnwell.com) -- no violations map. No Barnwell COUNTY code-enforcement page, portal, or ArcGIS service surfaced via WebSearch at all; the only SC ArcGIS \"code enforcement\" services found anywhere nearby belong to Sumter and Rock Hill, both different jurisdictions.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Dorchester",
+      "column": "code_enforcement",
+      "reason": "County's Neighborhood Services pages (dorchestercountysc.gov/services/code-enforcement/*) list only phone contacts for the county office (843-832-0326) and the towns of Summerville (843-851-4219) and St. George (843-563-3032) -- no online case search anywhere, confirmed via WebSearch across the county's own site. The county's known ArcGIS host (gisportal.dorchestercounty.net, already used for this county's parcel layer per docs/county_breadth_research_2026-09-21.md) did not answer a standard REST services-directory probe this session (timed out on both /server/rest/services and /arcgis/rest/services roots, 3 attempts) -- recorded alongside the clean WebSearch negative rather than relied on alone, same host-unresponsive-plus-no-WebSearch-hit pattern round 11 used for Williamsburg SC.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Kershaw",
+      "column": "code_enforcement",
+      "reason": "County Code Enforcement (515 Walnut St, Camden, 803-425-6017) is phone-only. The county's own Planning and Zoning complaint form states explicitly: \"the department does not have a zoning code enforcement staff, so complaints are investigated by existing staff as the workload allows\" -- a direct admission of no case-tracking system. Camden city's own ordinance is a PDF chapter, not a dataset. The only SC ArcGIS code-enforcement layer found anywhere nearby (gis.sumter-sc.com) belongs to Sumter, a different county.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Beaufort",
+      "column": "code_enforcement",
+      "reason": "The county's shared regional ArcGIS org (services.arcgis.com/mbPLXL6SDfBjrAmS -- also serving neighboring Jasper County, a Lowcountry-regional GIS deployment) was enumerated in full live: 120 named services. Keyword-filtered programmatically for every token this project's own prior rounds have found code-enforcement layers under (code/violat/complain/nuisance/enforce/blight): zero hits. The one Beaufort layer this project already uses that is adjacent in spirit (InteractiveTaxMap2021_OctoberUpdate, in enrichment_owner_mailing.py's SC:Beaufort spec) is delinquent-TAX parcels, a different distress signal already wired to a different column.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Burke",
+      "column": "code_enforcement",
+      "reason": "The county's shared city/county ArcGIS server (gis.morgantonnc.gov -- the same host enrichment_owner_mailing.py's NC:Burke parcel spec already uses) was enumerated folder-by-folder live for the 3 plausible candidates: Planning (zoning and flood-zone layers only), Public_Safety (greenway/race-route/archery-range layers only), Open_Data (annexation/city-limits/election-district layers only) -- none code/violation-shaped. The one access-restricted folder, Hosted, returns an explicit \"Token Required\" 499 rather than serving a public layer (access-restricted, not absent -- same shape as round 11's Berkeley SC energov folder). Independently, this project's own morganton_nc.py scraper (disabled 2026-10-13) already confirmed the city's actual code-enforcement WEBPAGE (morgantonnc.gov/development-design-services/page/code-enforcement) has zero data tables, just a staff directory -- this round's GIS-server enumeration is the other half of that same investigation (the page vs. the data host) and reaches the same dead-end conclusion independently.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
     }
   ]
 }
