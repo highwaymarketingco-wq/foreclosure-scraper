@@ -4049,6 +4049,382 @@
       "reason": "County's own GIS server (gis.moorecountync.gov) fully enumerated live, including its real REST catalog at the non-standard /server/rest/services path (the default /arcgis/rest/services path 404s, which is why a naive probe misses this server entirely). Planning/Planning_Public carries only Zoning/Hwy COD/Future Land Use/Voluntary Ag Districts; Tax folder is CAMA/parcel layers only (Archival_Parcels/Soil_Report_Layer/Tax_Layers/Valid_Sales_By_Year), same condition-is-not-vacancy category already established this round. PublicSafety and Hosted folders are both token-walled (HTTP 499) and unreachable; PublicSafety is far more likely fire/EMS/CAD data than code enforcement given the name, but could not be confirmed either way. (condemned not researched -- this county's condemned column is not in the current 'no source known' bucket at all, only vacancy/vacant.)",
       "confirmed_date": "2026-11-17",
       "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Warren",
+      "column": "code_enforcement",
+      "reason": "AGOL full-text search for '\"Warren County\" code enforcement violation' returns only one hit: 'New Jersey Environmental Management System (NJEMS) Sites' (owner NJDEPBGIS, orgId QWdNfRs7lkPq4g4Q) -- a statewide NJ environmental-sites layer unrelated to code enforcement, not a genuine Warren County NC item. No county code-enforcement page/portal/dataset found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Lee",
+      "column": "code_enforcement",
+      "reason": "AGOL full-text search for '\"Lee County\" code enforcement violation' returns 'Nuisance Accumulation Violations' and 'What is the Nuisance Accumulation Enforcement Process?' -- both explicitly Lee County, FLORIDA (owner LeeCountyFLGIS / VALDESE@Lee_County_FL.gov_LeeGIS). No SC Lee County item exists on AGOL; no county-specific portal found otherwise.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Camden",
+      "column": "code_enforcement",
+      "reason": "AGOL full-text search for '\"Camden County\" code enforcement violation' returns only the same unrelated NJ 'NJEMS Sites' statewide layer (owner NJDEPBGIS) as NC Warren -- a false-positive collision with Camden County, NEW JERSEY, not this NC one. No NC Camden County code-enforcement item, page, or portal found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Marion",
+      "column": "code_enforcement",
+      "reason": "AGOL full-text search for '\"Marion County\" code enforcement violation' returns only 'Indianapolis Code Enforcement Violations and Investigations' (owner IndyGIS) -- Marion County, INDIANA (home of Indianapolis), not this SC one. No SC Marion County item on AGOL; no county-specific portal found otherwise.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Montgomery",
+      "column": "code_enforcement",
+      "reason": "AGOL full-text search for 'Montgomery county code enforcement' returns Sheriff patrol-district layers and census tracts for Montgomery County, TEXAS (owner GIS.Data_MOCO) plus other out-of-state hits -- no genuine NC Montgomery County code-enforcement item. No county portal found; enforcement is the standard rural inspections-department-by-phone shape.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Richmond",
+      "column": "code_enforcement",
+      "reason": "AGOL full-text search for 'Richmond county code enforcement' returns Richmond VA, Missouri City TX, and Long Beach CA collisions -- no genuine NC Richmond County item. No county code-enforcement portal found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Macon",
+      "column": "code_enforcement",
+      "reason": "AGOL full-text search for 'Macon county code enforcement' returns 'SeeClickFix - Codes Enforcement', 'Code Enforcement by District', and 'SCF_2024_CodeEnforcement' all owned by BMarlin_MaconBibb -- Macon-Bibb County, GEORGIA, not this NC one. No NC Macon County item on AGOL; no county portal found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Greene",
+      "column": "code_enforcement",
+      "reason": "AGOL full-text search for 'Greene county code enforcement' returns 'Code Compliance' / 'Open Folders in AMANDA' (owner VolusiaGIS) -- Volusia County, FLORIDA's code-compliance system, not a genuine NC Greene County item. No county portal found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Chester",
+      "column": "code_enforcement",
+      "reason": "AGOL full-text search for 'Chester county code enforcement' returns only 'Police_Stations' and 'Census2010' (owner dsekkes_Chesco) -- generic county layers with zero code-enforcement/violation/case field, and 'Chesco' is the standard Chester County PENNSYLVANIA GIS naming convention, not SC. No county-specific code-enforcement portal found for Chester SC.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Clay",
+      "column": "code_enforcement",
+      "reason": "AGOL full-text search for 'Clay county code enforcement' returns 'Clayton County Community Development Operations Public' (owner gardner.mayo@claytoncountyga.gov_CCCD_GIS) -- Clayton County, GEORGIA (name-collision with Clay), plus unrelated FL/NY hits. No genuine NC Clay County item; no county portal found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Martin",
+      "column": "code_enforcement",
+      "reason": "AGOL full-text search for 'Martin county code enforcement' returns LA County oil/gas-facility layers, an Oregon State University class project, and other unrelated collisions -- no genuine NC Martin County item. No county portal found.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Northampton",
+      "column": "code_enforcement",
+      "reason": "AGOL full-text search for 'Northampton county code enforcement' (both quoted-phrase and loose query forms) returns zero results -- the cleanest case in this round's screen. No county code-enforcement page, portal, or dataset found otherwise.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Edgefield",
+      "column": "code_enforcement",
+      "reason": "Building & Planning Dept handles code enforcement for unincorporated county property (director Hart Clark, 803-637-4073 per a federal NFIP directory); a separate Town of Edgefield code enforcement office (803-637-4014, 400 Main St) covers only the town. No case-search portal found for either; zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Caldwell",
+      "column": "code_enforcement",
+      "reason": "Code enforcement for the county plus 12 towns (Brookford, Cajah's Mountain, Catawba, Cedar Rock, Drexel, Gamewell, Hildebran, Long View, Maiden, Newton, Rhodhiss, Sawmills) runs through a regional body, the Western Piedmont Council of Governments (wpcog.org/ce-contact, officers Chad Powell 828-485-4217 and Curt Willis 828-485-4263). Direct fetch of that page confirms it is a contact/complaint/appeal FORM only ('To contact code enforcement, lodge a complaint, or start an appeal, please use the form below') -- no public case search or map. County Building Inspections (828-426-8585) is a separate, also phone-only office. Zero AGOL hits, zero AGOL Hub Site hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Edgecombe",
+      "column": "code_enforcement",
+      "reason": "Inspections Office (252-641-7835, 201 St. Andrew St., Tarboro) says enforcement 'is provided on a complaint basis'; direct fetch of the office's own page confirms no case-search tool is linked there. The county site separately has a 'Search Records Online' link, but that is for Register of Deeds / tax-assessor property records, not code-violation cases. Zero AGOL hits, zero AGOL Hub Site hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Georgetown",
+      "column": "code_enforcement",
+      "reason": "Planning and Code Enforcement director handles it under the zoning ordinance; phone-only contact (Zoning Dept 843-545-3602, general line 843-545-3063, 129 Screven St). The county's own 'Quick Links' page lists a court case search, tax payments, and a County Mapping Portal (parcel/zoning only, not violation cases) but no code-enforcement lookup. Zero AGOL hits, zero AGOL Hub Site hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Sampson",
+      "column": "code_enforcement",
+      "reason": "Enforcement is split across three phone/email-only offices: Inspections (inspections@sampsoncountync.gov, 335 County Complex Rd), Fire Marshal (910-592-8996), and Planning & Zoning (910-631-1039) for unincorporated-area zoning. No case-search portal found for any of the three; zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Halifax",
+      "column": "code_enforcement",
+      "reason": "County zoning code names an 'enforcement officer' authority but no public-facing portal was found; the Health Dept handles zoning-statement field inspections by phone (252-583-5021) and Planning Dept (252-583-4891) separately. Zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Wilkes",
+      "column": "code_enforcement",
+      "reason": "County Inspections Dept is phone-only (336-651-7303, director Jacob Patrick, 110 North St, Wilkesboro); Town of North Wilkesboro (336-667-7129) and Town of Wilkesboro run separate, town-only zoning enforcement. No county-level case-search portal found; zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Bamberg",
+      "column": "code_enforcement",
+      "reason": "A named 'Code Enforcement & Litter Control' dept exists (litter hotline 803-245-7959, litterenforcement@bambergcounty.sc.gov) with a 'report an issue' page; direct fetch confirms that page is a one-way complaint-SUBMISSION form only ('please complete the form below,' 'all information will be kept confidential') with no public case list/map described. Zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Graham",
+      "column": "code_enforcement",
+      "reason": "Building Inspections office is phone-only (828-479-7982, Chief Inspector Jacob Nelms, 196 Knight St, Robbinsville); nuisance abatement runs through the Sheriff/county attorney in court (per a 2023 NCDPS consent-judgment press release), not a public portal. Zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Abbeville",
+      "column": "code_enforcement",
+      "reason": "Building and Codes Dept is phone-only (864-366-2400 ext 2224, planner Andy Price, 903 West Greenwood St); the county Zoning Administrator enforces by complaint with no public case-search tool found. Zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Dare",
+      "column": "code_enforcement",
+      "reason": "Planning Dept oversees state building-code enforcement in unincorporated areas via mainland and Hatteras Island satellite offices (phone-only); incorporated towns (Nags Head, Southern Shores, Manteo, Kill Devil Hills) each run their own separate code enforcement. No countywide violation-case portal found. Zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Aiken",
+      "column": "code_enforcement",
+      "reason": "Codes Enforcement office is phone-only (803-642-1500, 1930 University Pkwy); a third-party directory lists 'aikensc.justfoia.com/publicportal', which a direct fetch shows resolves to a bare JustFOIA public-records-REQUEST portal page (no violation case search/map described). Zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Gates",
+      "column": "code_enforcement",
+      "reason": "Inspections Dept listed only by mailing address on the county's own site (Attn: Scott Powell, 200 Court Street, Gatesville) -- no phone/email surfaced on gatescountync.gov itself, only via third-party directories. FY26 fee schedule lists code-enforcement fees but no public case list. Zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Ashe",
+      "column": "code_enforcement",
+      "reason": "Inspection Dept handles building/electrical/plumbing/mechanical/fire inspections (cash/check payment only per the county's own notice); no code-enforcement-specific page, complaint form, or case-search portal found. Zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Lenoir",
+      "column": "code_enforcement",
+      "reason": "Planning & Inspections Dept is phone-only (252-559-2260, 101 N. Queen St, Kinston); minimum-housing violations are instead reported to the City of Kinston (252-939-4022) under a 2023 permit-split agreement. No county case-search tool found. Zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Stokes",
+      "column": "code_enforcement",
+      "reason": "Planning & Inspections is phone-only (336-593-2444, permits@co.stokes.nc.us, 1014 Main St, Danbury); permits route through a 'GovBuilt' portal that is account-gated, and a third-party guide says submission there is in-person only -- not a public violation-case search. Zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Hertford",
+      "column": "code_enforcement",
+      "reason": "Code Enforcement/Building Inspections office is phone-only (252-358-7813 / 252-358-7814, 307 W. Tryon St, Winton); the Fire Marshal's office (102 Industrial Park Rd) is separately phone-only. No case-search portal found. Zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Allendale",
+      "column": "code_enforcement",
+      "reason": "Building/Zoning Administrator (Joe Mole III, 803-584-3438 per a state NFIP directory) handles unincorporated-county enforcement; City of Allendale runs a separate Building/Zoning/Business License dept for in-town properties. No case-search portal found for the county. Zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Currituck",
+      "column": "code_enforcement",
+      "reason": "The county's own 'Code Violations & Compliance' program is the most developed of this round's set, with named officers (Michelle Rogers 252-232-6056, Kirk Smith 252-232-6076) and a 'Citizen Online Complaint' page; direct fetch of that page confirms it is a one-way complaint-SUBMISSION form only ('Alleged violations may be submitted using the form below'), with no public case search or status lookup by address or parcel. Zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Columbus",
+      "column": "code_enforcement",
+      "reason": "Enforcement is split between the Inspections Dept (Whiteville, 127 Webster St -- has issued stop-work orders, confirmed via a 2025 OSFM appeal record) and the Fire Marshal (910-640-6610); no public case-search/complaint portal found for either. Zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Mitchell",
+      "column": "code_enforcement",
+      "reason": "Building & Fire Inspections (828-688-4771, Bakersville) is a single-inspector office per the county's own page; no dedicated code-enforcement page or portal for junk/zoning/nuisance complaints was found. Zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Davie",
+      "column": "code_enforcement",
+      "reason": "Planning & Development Services is phone/email-only (336-753-6050, inspections@daviecountync.gov, 298 E. Depot St, Mocksville); the county's Zoning Enforcement Officer notifies owners by certified mail per the county code. No public case-search portal found. Zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Alleghany",
+      "column": "code_enforcement",
+      "reason": "Planning & Inspections is phone-only (336-372-8974, 348 South Main St, Sparta); no online complaint form or fine schedule was found published on the county's own site. Zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Pamlico",
+      "column": "code_enforcement",
+      "reason": "Inspections Dept is phone-only (252-745-3861, Pamlico County Courthouse, 202 Main St, Bayboro); no general complaint/notice process or case-search tool is published online. Zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Saluda",
+      "column": "code_enforcement",
+      "reason": "Building Code Office names a code enforcement officer (Gary W. Therrell, 864-445-1849 ext 2272); a SAFEbuilt job posting suggests some inspection work may be contracted out. No violation-reporting page or case-search portal found. Zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Tyrrell",
+      "column": "code_enforcement",
+      "reason": "A single combined role -- Building Inspector / Fire Marshal / Ordinance Enforcement -- handles all of it (252-796-2251, Columbia NC), per an older county-sourced listing; no case-search portal found. Zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Vance",
+      "column": "code_enforcement",
+      "reason": "Vance County Code Enforcement Office (305 Young St, Henderson; officer Don Eatmon 252-738-2084) combines the Planning and Inspections divisions under the county's own page; no complaint form or case-search tool was found online. Zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Bladen",
+      "column": "code_enforcement",
+      "reason": "Enforcement is split between Building Inspections and the county Health Dept; local reporting quotes the County Manager stating the county has 'little' it can do about derelict mobile homes / burned-out houses absent a new ordinance still under consideration by Commissioners. No case-search portal found. Zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "McCormick",
+      "column": "code_enforcement",
+      "reason": "Building Dept is phone-only (864-852-2231, 610 South Mine St); the Town of McCormick has separate codes/ordinances for in-town properties. No case-search portal found for the county. Zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Yancey",
+      "column": "code_enforcement",
+      "reason": "Building Inspections (828-682-7833, 202 Medical Campus Dr, Burnsville) handles state Building Code + NFIP compliance; Fire Marshal (828-682-1897) and Environmental Health (828-682-6118) are separate phone-only offices. No violation case-search tool found. Zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Avery",
+      "column": "code_enforcement",
+      "reason": "Inspections Dept (200 Montezuma St, Newland) is phone-only; director/officer names are only in third-party directories, unverified against the county's own site. No case-search portal found. Zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Alexander",
+      "column": "code_enforcement",
+      "reason": "Planning/Building Inspections is phone-based (828-632-1000, 151 West Main Ave, Taylorsville); the Planning Dept's own page links an 'online portal' at co-alexander-nc.smartgovcommunity.com/Public/Home (SmartGov Community) for SUBMITTING complaints. Direct fetch of that portal confirms it has no public 'Search Code Cases' or 'Search Permits' option -- only an account-gated 'My Portal', a 'Contact Us' request form, and a 'Parcel Search' of undocumented scope; common REST API paths (api/parcels, api/v4/parcels, api/v4/codeCompliance, api/codeCases, etc.) all return HTTP 404. Same vendor-tooling-gap class already established for Robeson's ROKMAPS (round 14) and Calhoun's CommunityCore (round 15) -- an account-gated JS SPA with no plain-HTTP public data surface found. Zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Hampton",
+      "column": "code_enforcement",
+      "reason": "Litter/Code Enforcement officer Timothy Latham (803-914-2268) is the named contact; the county's nuisance ordinance was found only in a document explicitly labeled 'DRAFT' (#2004-012). No case-search portal found. Zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Fairfield",
+      "column": "code_enforcement",
+      "reason": "Code Enforcement Division takes complaints by phone only to the named officer (803-712-6596), explicitly anonymous-allowed per the county's own page; the officer files cases with the county Magistrate and keeps written records, but no public-facing case-search tool was found. Zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Swain",
+      "column": "code_enforcement",
+      "reason": "Building Inspections Dept (828-488-9134 ext 2211/2268, officials Jason Webb and Gina Wiggins) runs an online 'complaint report' form and a separate online permitting/inspection portal; both are one-way submission tools per the county's own pages, not a public violation-case search. Zero AGOL hits.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
     }
   ]
 }
