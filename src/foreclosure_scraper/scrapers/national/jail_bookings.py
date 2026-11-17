@@ -606,6 +606,64 @@ ROSTERS: list[tuple[str, str, str, str]] = [
      "https://alexandercountyso.policetocitizen.com|532"),
 ]
 
+# ROUND 15 DCN WIDENING + NEWLY-LIVE-PORTAL RECHECK (2026-11-17) -- gap_matrix
+# jail_booking/jail_booking_new "no source known" bucket, re-derived fresh:
+# unchanged from round 13's end-state, 157 cells / 163,457 est_rows_affected /
+# 81 unique counties. Round 13 itself noted its own DCN re-check ("different,
+# not identical, domain guesses from whatever round 12 tried") was a LIGHT
+# pass -- only 2 candidate counties, 1 shape (bookings.{county}sheriff.org/
+# dcn). This round did the thorough version round 13 flagged as still owed:
+# an async httpx probe generating candidates from BOTH known DCN domain
+# shapes (dcn.{base}/DCN/Inmates and bookings.{base}/dcn, where {base} is
+# EITHER a {county}countync.gov/{county}sheriff.org/{county}countysheriff.org/
+# {county}so.org/{county}nc.gov -style NC base OR a {county}sheriff.org/
+# {county}countysheriff.org/{county}so.org/{county}countysc.gov/{county}sc.gov
+# -style SC base) x 4 url shapes x all 81 remaining counties = 1,620
+# candidate URLs, sem=8/12s-timeout/1-retry (round 12/13's own careful
+# concurrency pattern). Detection marker: the "gvInmates" ASPxGridView
+# control-id substring (Lee NC's own real marker) OR a DXR.axd/
+# WebResource.axd DevExpress resource reference alongside "inmate" text in
+# the body, explicitly rejecting parked-domain and generic "Redirecting..."
+# false positives (round 13's own false-positive shapes). POSITIVE CONTROL
+# run first and passed clean: 2/2 known-good tenants detected (Lee NC via
+# the gvInmates marker, Darlington SC via the DevExpress+inmate-text
+# marker) -- so this sweep's own "zero hits" result is trustworthy, not a
+# silently-broken probe. Full sweep: 0/1,620 hits. Southern Software DCN is
+# genuinely absent from this bucket under every base-domain/subdomain shape
+# either of its 2 known real tenants uses, not just unguessed.
+#
+# Separately, re-checked whether any NEW portal (any vendor, not just DCN)
+# has gone live for the bucket's 10 highest-value counties that round 8/12
+# could only reach via a last-resort single-page homepage scan and came back
+# with "nothing found" (Horry SC, Orangeburg SC, Onslow NC, Hyde NC,
+# Williamsburg SC, Johnston NC, Beaufort NC, Barnwell SC, Yadkin NC, Calhoun
+# SC -- ranks #2-11 of the 81 remaining counties by combined est_rows_affected
+# once Charleston SC/#1 and McDowell NC/#6, both already-diagnosed CAPTCHA/
+# Cloudflare walls flagged for Hermes, are excluded). Real web search (not a
+# repeat of the earlier homepage-only scan) for each: every result is still
+# dominated by the same SEO-spam aggregator pages (jailexchange.com,
+# searchsystems.net, publicrecords.onlinesearches.com, penmateapp.com,
+# VINELink mentions) round 12 already correctly disregarded as not a real
+# source -- zero genuine county-published roster surfaced for any of the 10.
+# Also checked the "Orangeburg-Calhoun Regional Detention Center" shared-
+# facility angle specifically (both Orangeburg and Calhoun's searches
+# independently named this one facility) in case it publishes its own joint
+# roster outside either county's own site -- same result, aggregator-only,
+# no official link found.
+#
+# This is the 4th round to specifically re-check this exact question (8, 12,
+# 13, now 15) with the SAME dry result each time, the last two via
+# increasingly careful, increasingly wide live probes rather than a repeat
+# WebSearch. Per this project's own standing discipline, a confirmed-absent
+# vendor is not the same falsifiable "no path through ANY vendor" the
+# declined_registry bar requires -- no declined_registry entries added, the
+# remaining 81 counties stay exactly where round 13 left them, genuinely
+# untouched/unresolved, NOT declined. Treat this as a legitimate practical
+# floor for domain-guessing + search-based discovery on this bucket: a
+# future pass that wants real further movement most likely needs a
+# multi-click site crawl or browser session per county (round 12's own
+# conclusion too), not another vendor-pattern sweep.
+
 # Southern Software hosts every Citizen Connect tenant off one origin; the
 # AgencyID query param selects the agency and seeds the PHP session.
 CITIZEN_CONNECT_BASE = "https://cc.southernsoftware.com"
