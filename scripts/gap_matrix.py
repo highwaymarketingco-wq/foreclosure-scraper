@@ -880,6 +880,11 @@ SPECS: dict[str, Spec] = {
                    # known" gap, the #1 cell by est_rows_affected (3,977 rows) in the whole
                    # 2026-11-16 ledger sweep -- 'condemned'/'vacancy' were already correctly
                    # credited for this county via this same file, 'vacant' alone had the omission.
+                   # 2026-11-17 (round 15): charlotte_open_data.py was missing from this tuple too --
+                   # same omission as the 'vacancy' Spec below (see that Spec's own 2026-11-17 note
+                   # for the full detail; its fof_ordered branch mirrors into raw["gis"]["vacant"]
+                   # directly, the exact key this column checks). No cell-count movement (Mecklenburg
+                   # is not in the current "no source known" list), fixed for correctness only.
                    producers=("enrichment_arcgis.py", "scrapers/counties_sc/spartanburg_vacant.py",
                               "nc_lincoln_bulk.py", "scrapers/counties_nc/gastonia_code_enforcement.py",
                               "scrapers/counties_nc/kinston_proposed_demolition.py",
@@ -887,7 +892,8 @@ SPECS: dict[str, Spec] = {
                               "scrapers/counties_generic/arcgis_distress_layers.py",
                               "scrapers/counties_nc/lincoln_code_violations.py",
                               "scrapers/counties_nc/wake_code_cases.py",
-                              "scrapers/counties_nc/hendersonville_vacant_structures.py"),
+                              "scrapers/counties_nc/hendersonville_vacant_structures.py",
+                              "scrapers/city_websites/charlotte_open_data.py"),
                    doc="raw.vacant present (a city/county vacant-structure registry); the real "
                        "check elsewhere in this file is raw['gis']['vacant'] specifically"),
     #: 2026-11-16 (round 10 individual recheck): the 7 thinnest-sample counties in this 58-cell
@@ -1146,6 +1152,21 @@ SPECS: dict[str, Spec] = {
                     # vacancy (19,381 rows, the single biggest "no source known" cell in this whole
                     # ledger family after Wake) was reading unbuilt despite already-running,
                     # already-correct code -- zero new scraping, pure producers-tuple omission.
+                    #
+                    # 2026-11-17 (round 15, producers-tuple symmetry re-check): charlotte_open_data.py
+                    # was ALSO missing from this tuple -- same bug class, found by re-running round
+                    # 14's own "diff each producer's condemned/vacancy/vacant coverage against itself"
+                    # check against all 11 named producer files. Its fof_ordered branch has written a
+                    # real raw["vacancy"] wrapper (see that file's own 2026-10-20 docstring note) on
+                    # every "order to vacate" case since that date, and was already correctly in the
+                    # 'condemned'/'vacant' producers tuples -- just never added here. NOTE: this does
+                    # NOT move Mecklenburg's cell count (it is not in the current "no source known"
+                    # list at all -- confirmed via gap_list_2026-11-16.csv) because Mecklenburg's
+                    # vacancy/vacant/condemned cells already read built-but-low-yield via `ran=True`
+                    # real board data, which classify_cell() checks before the static producers-tuple
+                    # credit this fix touches. Fixed anyway for correctness (a county whose board data
+                    # got cleared and re-run from scratch would otherwise silently fall back to a wrong
+                    # "no source known" read for this column alone).
                     producers=("scrapers/counties_nc/hendersonville_vacant_structures.py",
                                "scrapers/counties_nc/rocky_mount_blight_survey.py",
                                "scrapers/counties_nc/kinston_proposed_demolition.py",
@@ -1153,7 +1174,8 @@ SPECS: dict[str, Spec] = {
                                "scrapers/counties_generic/arcgis_distress_layers.py",
                                "scrapers/counties_nc/lincoln_code_violations.py",
                                "scrapers/counties_sc/spartanburg_vacant.py",
-                               "scrapers/counties_nc/wake_code_cases.py"),
+                               "scrapers/counties_nc/wake_code_cases.py",
+                               "scrapers/city_websites/charlotte_open_data.py"),
                     doc="raw.vacancy.vacant/boarded_up/utility_status truthy; checked = vacancy wrapper",
                     ambiguity="a code-officer vacant-structure registry is a rare open-data product; only "
                              "4 tiny city/county sources exist in all of NC+SC as of 2026-11-10 (was 3 at "

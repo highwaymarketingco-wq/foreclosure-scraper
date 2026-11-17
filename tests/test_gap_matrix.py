@@ -470,7 +470,15 @@ def test_built_in_code_known_false_positives_not_silently_fixed():
     correctly credits ('NC', 'Lee') -- a true positive -- but the same bare "Lee" text, being a
     county name shared with SC, mechanically also satisfies SC's pattern (the function's own
     docstring: "a grep cannot tell them apart"), reviving ('SC', 'Lee') as a live false positive.
-    """
+
+    2026-11-17 UPDATE (round 15): the ('NC', 'Davidson')/charlotte_open_data.py false positive
+    documented below for 'condemned' now ALSO reaches the 'vacant' and 'vacancy' columns --
+    charlotte_open_data.py was added to both producers tuples this round (a real, separate fix;
+    see the Spec's own 2026-11-17 note in gap_matrix.py and the dedicated test in
+    test_built_in_code_drops_vacant_cohort_false_credit), which mechanically carries its
+    pre-existing town-name false positive along with it. Not tracked by a THIRD assertion here --
+    this test only reads SPECS["condemned"].producers; the 'vacant' version lives in its own
+    sibling test, which is the right place for an end-to-end built_in_code() check anyway."""
     condemned_files = [gm.PKG / f for f in gm.SPECS["condemned"].producers if (gm.PKG / f).exists()]
     jail_files = [gm.PKG / f for f in gm.SPECS["jail_booking"].producers if (gm.PKG / f).exists()]
     condemned_counties = gm.counties_named_in(condemned_files)
@@ -582,7 +590,13 @@ def test_built_in_code_drops_arcgis_distress_layers_false_credit_for_condemned_a
 
     2026-11-17 UPDATE (round 14): Richland moved from "code_enforcement only, no condemned" to
     "both" too, via the new columbia_code_demolition entry (same mechanism as Durham's -- see the
-    sibling test's 2026-11-17 note)."""
+    sibling test's 2026-11-17 note).
+
+    2026-11-17 UPDATE (round 15): Mecklenburg's charlotte_open_data.py was added to the 'vacant'/
+    'vacancy' producers tuples (previously only in 'condemned') -- a producers-tuple-symmetry check
+    across all 11 named producer files, same bug class as round 14's Richland/Henderson fixes,
+    found by re-running that round's own "diff a producer's condemned/vacancy/vacant coverage
+    against itself" check. See that test function below."""
     built = gm.built_in_code()
     # false positives removed: named in the file, but on an unrelated-process entry only
     for st, co in (("NC", "Transylvania"), ("NC", "Buncombe"), ("NC", "Burke"), ("NC", "New Hanover"),
@@ -611,6 +625,25 @@ def test_built_in_code_drops_arcgis_distress_layers_false_credit_for_condemned_a
     # of this set (2026-11-16/2026-11-17, see above): each now has a real condemned entry too.
     for st, co in (("NC", "Lincoln"),):
         assert (st, co) not in built["condemned"], f"{st}/{co} has a code_enforcement entry, not a condemned one"
+
+
+def test_charlotte_open_data_vacant_vacancy_producers_tuple_symmetry_round15():
+    """2026-11-17 (round 15, producers-tuple symmetry re-check): charlotte_open_data.py's
+    fof_ordered branch has written a real raw["vacancy"] wrapper AND raw["gis"]["vacant"] mirror
+    since its own 2026-10-20 docstring note (same shape as hendersonville_vacant_structures.py's
+    dual-key convention), but the file was only ever in the 'condemned' Spec's producers tuple --
+    never 'vacant' or 'vacancy'. Pins the fix: Mecklenburg now reads built for all three sibling
+    columns via built_in_code()'s plain counties_named_in() text match over this one file (no
+    arcgis_distress_layers.py-style LAYERS registry involved here, so no precise-credit override
+    needed). This does NOT move any cell on the current gap_list -- Mecklenburg is not in the
+    "no source known" bucket (its board already carries real rows, so classify_cell() reads
+    `ran=True` before ever reaching the static producers-tuple check this test covers) -- it is a
+    correctness fix for what the static credit itself says, verified here so it is caught before
+    it does matter (e.g. after a from-scratch board rebuild)."""
+    built = gm.built_in_code()
+    assert ("NC", "Mecklenburg") in built["condemned"]  # pre-existing, unchanged by this fix
+    assert ("NC", "Mecklenburg") in built["vacant"]      # NEW this round
+    assert ("NC", "Mecklenburg") in built["vacancy"]     # NEW this round
 
 
 def test_vacant_cohort_credit_reads_real_registries_not_text():
@@ -658,10 +691,46 @@ def test_built_in_code_drops_vacant_cohort_false_credit():
     blanket-text-match path (wake_code_cases.py literally names "Wake", same mechanism as
     nc_lincoln_bulk.py/Lincoln already in this same `other_files` list), now a true positive since
     wake_code_cases.py's own fix this round made it a real (if currently thin) writer of
-    raw["gis"]["vacant"]."""
+    raw["gis"]["vacant"].
+
+    2026-11-17 UPDATE (round 15): Mecklenburg moves from this test's own "false positive, must stay
+    absent" list to a true positive, same Wake/Durham shape -- charlotte_open_data.py was added to
+    the 'vacant' producers tuple this round (it was already a real, correctly-wired writer of
+    raw["gis"]["vacant"] via its fof_ordered branch, just missing from this one tuple; see that
+    Spec's own 2026-11-17 note in gap_matrix.py), so the ordinary blanket-text-match path now picks
+    up its own real county correctly. Not a refinement like Richland/York's precise-credit path --
+    an ordinary single-county file genuinely naming its own county, same as Wake/Lincoln above.
+
+    Also 2026-11-17 (round 15): found this test's own Henderson assertion was ALREADY stale before
+    this round even started -- round 14 (commit 3f10661a, the same day) added
+    hendersonville_vacant_structures.py to the 'vacant' producers tuple (see that Spec's own
+    2026-11-16/17 notes in gap_matrix.py: Henderson's hendersonville_vacant_structures.py was
+    always a correct 'condemned'/'vacancy' producer, just missing from 'vacant' alone), but never
+    updated this negative-assertion list to match, so this test was silently broken on arrival --
+    caught only now by this round's own full-suite run, not by round 14's targeted one. Moved
+    Henderson out of the false-positive list below alongside Mecklenburg, since both are the exact
+    same stale-test shape and this test already belongs to this round's scope.
+
+    One more 2026-11-17 (round 15) consequence of the same charlotte_open_data.py addition: this
+    file ALSO carries the pre-existing, deliberately-"known-unfixed" ('NC', 'Davidson') false
+    positive that test_built_in_code_known_false_positives_not_silently_fixed already documents for
+    the 'condemned' column -- its `_MUNICIPALITIES` tuple of Mecklenburg-metro town names includes
+    the town of Davidson, NC, zero relation to Davidson County, NC, and that mismatch is in real
+    code (a place-name collection), not a comment or docstring example, so comment-stripping cannot
+    fix it (same reasoning that test's own docstring already gives for why this class of false
+    positive is accepted rather than chased with a fragile per-file allowlist). Adding the file to
+    'vacant'/'vacancy' mechanically carries the SAME false positive into these two sibling columns
+    -- not a new bug, the same accepted one now reachable from two more columns. Real-world blast
+    radius stays the same low-stakes shape it already has for 'condemned': Davidson County's own
+    'vacant'/'vacancy' cells (5,469 est_rows, already built-but-low-yield via OTHER real producers'
+    blanket credit before this round, not a 'no source known' cell either column was ever counted
+    in) read "code covers this county but nothing landed here, screen and stamp it" -- never a
+    false CONFIRMED-clean claim. Acknowledged below rather than silently tolerated or papered over
+    with a bespoke precise-credit filter that would be exactly the "fragile, unvalidated per-file
+    allowlist" the sibling test's own docstring already argues against building."""
     built = gm.built_in_code()
     # false positives removed: named only via enrichment_arcgis.py's unrelated GIS registries
-    for st, co in (("NC", "Mecklenburg"), ("NC", "Buncombe"), ("NC", "Henderson"), ("NC", "Burke"),
+    for st, co in (("NC", "Buncombe"), ("NC", "Burke"),
                    ("NC", "Cleveland"), ("SC", "Greenville")):
         assert (st, co) not in built["vacant"], f"{st}/{co} has no real vacant-cohort producer"
     # real producers keep their credit
@@ -675,7 +744,15 @@ def test_built_in_code_drops_vacant_cohort_false_credit():
     assert ("NC", "Durham") in built["vacant"]            # arcgis_distress_layers.py: durham_unsafe_building (2026-11-16)
     assert ("NC", "Lincoln") in built["vacant"]           # nc_lincoln_bulk.py -- untouched, not part of this bug
     assert ("NC", "Wake") in built["vacant"]              # wake_code_cases.py -- blanket text match (2026-11-16)
-    assert len(built["vacant"]) == 10
+    assert ("NC", "Mecklenburg") in built["vacant"]       # charlotte_open_data.py -- blanket text match (2026-11-17)
+    assert ("NC", "Henderson") in built["vacant"]         # hendersonville_vacant_structures.py -- added round 14, test was stale
+    assert ("NC", "Davidson") in built["vacant"], (
+        "known-unfixed: 'DAVIDSON' the Mecklenburg-metro town, in charlotte_open_data.py's town "
+        "tuple -- same pre-existing false positive test_built_in_code_known_false_positives_"
+        "not_silently_fixed already pins for 'condemned', now also reachable via 'vacant' "
+        "(round 15 added charlotte_open_data.py to this producers tuple)"
+    )
+    assert len(built["vacant"]) == 13
 
 
 def test_sc_heir_estate_parcel_cache_credit_reads_real_registry_not_text():
