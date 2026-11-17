@@ -239,6 +239,52 @@ def test_lincoln_filter_excludes_closed_violations():
     assert "STATUS='Open'" in lay.where
 
 
+def test_lancaster_code_violations_row_maps_to_a_usable_lead():
+    """Live-verified shape (2026-11-17, round 15): shapefile-truncated field names
+    (Collection/Collecti_1/Collecti_3/Parcels_OW survived a shapefile import into this
+    hosted feature service), no status field exists on this layer at all, and Topic
+    text is hand-typed with many spellings of the same three categories. Real sample
+    row: owner LOUGHREN SHANE, parcel 0013-00-080.02, "Unfit and Nuisance" at 126
+    Dogwood Tr."""
+    lay = next(x for x in M.LAYERS if x.slug == "lancaster_code_violations")
+    li = M._to_listing({
+        "Collection": "126 Dogwood Tr", "Collecti_1": "0013-00-080.02",
+        "Collecti_3": "Unfit and Nuisance", "Parcels_OW": "LOUGHREN SHANE",
+        "Parcels__2": "126 DOGWOOD TRAIL LANE", "Parcels__3": "FORT MILL",
+        "Parcels__4": "SC", "Parcels__5": "29715",
+    }, lay)
+    assert li.owner_name == "LOUGHREN SHANE"
+    assert li.parcel_id == "0013-00-080.02"
+    assert li.street_address == "126 Dogwood Tr"
+    assert li.county == "Lancaster" and li.state == "SC"
+    assert li.foreclosure_process == "code_enforcement"
+    ce = li.raw["code_enforcement"]
+    assert ce["violation_types"] == ["Unfit and Nuisance"]
+    # No yard-nuisance-only/pure-zoning Topic ever appears on this layer (live-sampled
+    # distinct values are all some spelling of Unfit Dwelling/Nuisance/Derelict
+    # Vehicles), so severe=True unconditionally is the same call already made for
+    # Lincoln/Greensboro/Rock Hill's housing sub-layers above.
+    assert ce["severe"] is True
+
+
+def test_lancaster_code_violations_mailing_address_shows_absentee():
+    """Live sample: a "116 Charlotte Hwy" violation's owner (MCMINN CARL P & CAROLYN L)
+    is mailed to a different address, 142 Mcminn Dr -- an absentee owner, the same
+    kind of signal Buncombe's mailing_parts already surfaces."""
+    lay = next(x for x in M.LAYERS if x.slug == "lancaster_code_violations")
+    li = M._to_listing({
+        "Collection": "116 Charlotte Hwy", "Collecti_1": "0008-00-067.00",
+        "Collecti_3": "Unfit and Nuisance", "Parcels_OW": "MCMINN CARL P & CAROLYN L",
+        "Parcels__2": "142 MCMINN DR", "Parcels__3": "FORT MILL",
+        "Parcels__4": "SC", "Parcels__5": "29715",
+    }, lay)
+    om = li.raw["owner_mailing"]
+    assert om["absentee"] is True
+    assert om["mail_state"] == "SC"
+    assert om["out_of_state"] is False
+    assert om["source"] == "lancaster_code_violations"
+
+
 def test_every_layer_slug_is_unique():
     slugs = [x.slug for x in M.LAYERS]
     assert len(slugs) == len(set(slugs))
