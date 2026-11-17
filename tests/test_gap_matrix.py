@@ -834,6 +834,37 @@ def test_built_in_code_drops_county_lien_sweep_false_marriage_credit():
     assert ("NC", "Rowan") in built["marriage_license"]
 
 
+def test_county_lien_sweep_lien_credit_reads_real_registry_not_text():
+    """2026-11-17 ('no source known' probate/liens research round): the SAME SWEEP_COUNTIES
+    registry's 'lien' job half (every entry except NC/Beaufort+Watauga's marriage-only rows and
+    NC/Johnston's marriage-only row) was never credited to atty_rod_lien_checked/liens at all --
+    this is the mirror image of _county_lien_sweep_marriage_credit() just above, filtering on
+    kind=='lien' instead of kind=='marriage'."""
+    credit = gm._county_lien_sweep_lien_credit()
+    assert ("NC", "Johnston") not in credit, "Johnston has a marriage job only, no lien job"
+    assert len(credit) == 32
+    for st, co in (("NC", "Orange"), ("NC", "Stanly"), ("NC", "Surry"), ("NC", "Beaufort"),
+                   ("NC", "Watauga"), ("NC", "Burke"), ("NC", "Lincoln"), ("NC", "Henderson"),
+                   ("SC", "Sumter"), ("SC", "Oconee")):
+        assert (st, co) in credit, f"{st}/{co} has a real lien job in SWEEP_COUNTIES"
+
+
+def test_built_in_code_adds_county_lien_sweep_lien_credit():
+    """End-to-end: built_in_code()'s real output for atty_rod_lien_checked/liens now credits
+    enrichment_county_lien_sweep.py's real 'lien' job counties (raw['rod_lien_sweep'] with
+    status+checked_at, the exact shape rod_checked() already recognizes above). NC/Johnston is
+    deliberately NOT asserted absent here: it has a real, unrelated, pre-existing credit of its own
+    (enrichment_generic_rod.py's literal VENDORS-style entry for nc_tyler, flag-gated off by
+    FORECLOSURE_NC_TYLER_ROD -- a flag-off hold, not missing code, same shape as the NC Harris
+    marriage credit below), so it is not a clean negative case for THIS credit specifically; see
+    test_county_lien_sweep_lien_credit_reads_real_registry_not_text for the one that is (reading
+    _county_lien_sweep_lien_credit()'s own output directly)."""
+    built = gm.built_in_code()
+    for col in ("atty_rod_lien_checked", "liens"):
+        assert ("NC", "Orange") in built[col] and ("SC", "Oconee") in built[col]
+        assert ("NC", "Wake") not in built[col], "Wake is in neither SWEEP_COUNTIES job nor any other producer here"
+
+
 def test_built_in_code_adds_nc_harris_marriage_credit():
     """End-to-end: built_in_code()'s real output for 'marriage_license' now credits NC/Mecklenburg
     and NC/Carteret (rod/nc_harris.marriage_search, wired live in main.py via
@@ -896,15 +927,70 @@ def test_built_in_code_drops_retired_probate_search_false_credit():
     title-case match). Added York (plus Sumter/Barnwell/Richland/Calhoun/Lancaster/Newberry/
     Greenwood/Aiken, the same gap's other 8 counties) to those tuples, so York now has a real,
     running probate producer -- same evolution as Gaston/condemned's own 2026-11-10 UPDATE just
-    above test_built_in_code_known_false_positives_not_silently_fixed. Bamberg and Greenville are
-    untouched and remain genuine false positives."""
+    above test_built_in_code_known_false_positives_not_silently_fixed. Bamberg and Greenville were
+    untouched at that point and remained genuine false positives THERE (from
+    enrichment_probate_search.py's retired credit specifically).
+
+    2026-11-17 UPDATE: both are now ALSO true positives, from two different real producers added
+    this round (see 'probate' Spec's own 2026-11-17 comment) -- Greenville via
+    column_legal_notices.py's verified-live SC_PROBATE_EXTRA_COUNTIES (3 real notices/year,
+    live-checked 2026-10-23), Bamberg via sc_probate_notices.py/publicnoticesc_estates.py's
+    genuinely statewide (all 46 SC counties) Notice-to-Creditors coverage
+    (_sc_probate_notice_statewide_credit()). The right thing this test still protects -- the
+    retired module itself never comes back -- is checked directly below instead of via two
+    counties that happen to have no OTHER producer; that coincidence no longer holds for any SC
+    county today."""
     built = gm.built_in_code()
-    for st, co in (("SC", "Bamberg"), ("SC", "Greenville")):
-        assert (st, co) not in built["probate"], f"{st}/{co} has no live probate producer (retired module only)"
-    # sc_public_notices.py's own real text-grep credit (this column's only live producer) stays
+    assert "enrichment_probate_search.py" not in gm.SPECS["probate"].producers, \
+        "the retired module (main.py never runs it) must never be re-added as a producer"
+    # Bamberg and Greenville are genuine true positives now, each via a real, still-running
+    # producer added 2026-11-17 -- not the retired module's stale SC_PROBATE_COUNTY_CODES credit
+    assert ("SC", "Bamberg") in built["probate"] and ("SC", "Greenville") in built["probate"]
+    # sc_public_notices.py's own real text-grep credit (this column's original live producer) stays
     assert ("SC", "Anderson") in built["probate"] and ("NC", "Beaufort") in built["probate"]
-    # York is now a TRUE positive (2026-11-15 UPDATE above) -- a real producer, not stale credit
+    # York is a TRUE positive (2026-11-15 UPDATE above) -- a real producer, not stale credit
     assert ("SC", "York") in built["probate"]
+
+
+def test_column_probate_credit_reads_real_registries_not_text():
+    """2026-11-17 ('no source known' probate/liens research round): column_legal_notices.py's own
+    verified-live SC/NC estate-lane county lists (SC_PROBATE_EXTRA_COUNTIES,
+    SC_PROBATE_COVERED_COUNTIES, NC_ESTATE_EXTRA_COUNTIES) were never credited to the 'probate'
+    column, even though quiet_title's own statewide_except already reads the SC pair's complement.
+    A blanket producers-tuple text match over the whole file would over-credit: it also carries the
+    separately-scoped foreclosure/tax/quiet-title county lists."""
+    from foreclosure_scraper.scrapers.newspapers import column_legal_notices as cln
+    credit = gm._column_probate_credit()
+    assert credit == ({("SC", c) for c in cln.SC_PROBATE_EXTRA_COUNTIES}
+                       | {("SC", c) for c in cln.SC_PROBATE_COVERED_COUNTIES}
+                       | {("NC", c) for c in cln.NC_ESTATE_EXTRA_COUNTIES})
+    assert ("SC", "Chesterfield") in credit and ("SC", "Greenville") in credit
+
+
+def test_sc_probate_notice_statewide_credit_is_all_46_sc_counties():
+    """sc_probate_notices.py (own docstring: 'all 46, not only the 7-county footprint') and
+    publicnoticesc_estates.py (own docstring: 'statewide list of estates being opened, all 46
+    counties') are each genuinely statewide, but derive county from the estate case number's own
+    embedded code via a SHARED import (sc_case_county.SC_COUNTY_BY_CODE) that neither file's own
+    text repeats -- a blanket producers-tuple text match finds zero of the real 46."""
+    credit = gm._sc_probate_notice_statewide_credit()
+    assert len(credit) == 46
+    for co in ("Williamsburg", "Jasper", "Clarendon", "Dillon", "Edgefield", "Abbeville", "Bamberg",
+               "Allendale", "Lee", "Saluda", "McCormick", "Hampton", "Fairfield"):
+        assert ("SC", co) in credit, f"SC/{co} missing from the statewide 46-county credit"
+
+
+def test_built_in_code_adds_column_probate_and_statewide_notice_credit():
+    """End-to-end: built_in_code()'s real output for 'probate' now credits every one of the 14 SC
+    counties the 2026-11-16 gap list's own 'no source known' bucket named for this column (none of
+    them had any live probate producer before this round), via the two new precise credits added
+    above, while the column's original real producer (sc_public_notices.py) keeps its own credit."""
+    built = gm.built_in_code()
+    for co in ("Williamsburg", "Jasper", "Clarendon", "Dillon", "Edgefield", "Chesterfield",
+               "Abbeville", "Bamberg", "Allendale", "Lee", "Saluda", "McCormick", "Hampton",
+               "Fairfield"):
+        assert ("SC", co) in built["probate"], f"SC/{co} was the 2026-11-16 gap list's own no-source-known cell"
+    assert ("SC", "Anderson") in built["probate"] and ("NC", "Beaufort") in built["probate"]
 
 
 def test_nc_heir_estate_parcels_credit_reads_county_gis_keys_not_text():
