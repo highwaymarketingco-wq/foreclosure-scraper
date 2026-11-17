@@ -5977,6 +5977,142 @@
       "reason": "maps.haywoodcountync.gov's own Land_Records/Public_Access/MapServer/1 layer carries a 2-years-of-billing mirror (TaxYear1/TaxYear2/Taxbill1_Amt/Taxbill2_Amt) frozen at 2019/2020 on every one of dozens of rows sampled 2026-11-17, while the SAME layer's Sale_Date field has real sales as recent as 2026-11-13 -- the dataset overall is live, this one field was abandoned around 2020 and never updated since, so it cannot support a current delinquency claim. taxes.haywoodcountync.gov/ITSForPublic (round 17's own lead) is confirmed a real, live, but LOGIN-GATED older Bi-Tek deployment (HTTP 200, title 'Bi-Tek - Login', a credentialed POST-back form) -- a genuine wall, not a missing TaxBillSearch sub-path.",
       "confirmed_date": "2026-11-17",
       "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Hoke",
+      "column": "rollback_exposure",
+      "reason": "Hoke's own ArcGIS Server (maps.hokecounty.org/server/rest/services) was enumerated exhaustively this round: EVERY service (Parcels, OperationalLayers [incl. its own layer-6 'Voluntary Agriculture District', a VAD boundary layer with no value fields], Overlays, RoadsMap, ExportWebMap, SampleWorldCities, plus the Orthos/Utilities folders) was checked field-by-field; none carries a present-use/ag-deferral value field of any kind (only OWNER_NAME/COST_TOTAL/TOTAL_ACRE-style CAMA summary fields, no deferred-value or program-code field). Hoke's real tax billing runs through a separate Munis self-service portal (hokecountytaxes.munisselfservice.com, the SAME vendor already declined vendor-wide for Anson/Yadkin/Caswell/Moore/Vance's rollback_exposure above) which exposes no CAMA/present-use data on its public search either. Hoke's other 4 tax columns (multi_year_delinquent_tax/two_year_delinquent/tax_aging_surfaced/atty_tax_verified_confirmed) are already resolved via nc_tax_lien_ads.py + verification/verifiers/tax_lien_munis.py -- this is a genuinely separate, narrower gap (rollback_exposure alone), not a wiring miss.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Cumberland",
+      "column": "multi_year_delinquent_tax",
+      "reason": "nc_ptscloud_delinquent_tax.py's own live GetTaxpayerDownloadList/DownloadTaxpayerDownloadBlob flow was run directly against this tenant on 2026-11-17 and returned a clean 'no blob with delinquent in the name' answer (HTTP 200, not an error) -- this tenant simply has no delinquent-tax export published today. This is the 4th such live check for this exact tenant (rounds 13, 17 and 18 on 3 separate earlier dates, plus this round), every one returning the identical clean-empty answer; per this project's own 'built but unwired' discipline, a clean empty answer (not an HTTP error / exception) is read as a real, if narrow, possibility that the export is date-gated or periodic rather than permanently absent -- so this is declined with that caveat stated, not asserted as proven-impossible, and should not be re-checked a 5th time without a new signal (e.g. a listing notice or a ptscloud platform change) suggesting the export calendar has moved.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Cumberland",
+      "column": "two_year_delinquent",
+      "reason": "nc_ptscloud_delinquent_tax.py's own live GetTaxpayerDownloadList/DownloadTaxpayerDownloadBlob flow was run directly against this tenant on 2026-11-17 and returned a clean 'no blob with delinquent in the name' answer (HTTP 200, not an error) -- this tenant simply has no delinquent-tax export published today. This is the 4th such live check for this exact tenant (rounds 13, 17 and 18 on 3 separate earlier dates, plus this round), every one returning the identical clean-empty answer; per this project's own 'built but unwired' discipline, a clean empty answer (not an HTTP error / exception) is read as a real, if narrow, possibility that the export is date-gated or periodic rather than permanently absent -- so this is declined with that caveat stated, not asserted as proven-impossible, and should not be re-checked a 5th time without a new signal (e.g. a listing notice or a ptscloud platform change) suggesting the export calendar has moved.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Cumberland",
+      "column": "tax_aging_surfaced",
+      "reason": "nc_ptscloud_delinquent_tax.py's own live GetTaxpayerDownloadList/DownloadTaxpayerDownloadBlob flow was run directly against this tenant on 2026-11-17 and returned a clean 'no blob with delinquent in the name' answer (HTTP 200, not an error) -- this tenant simply has no delinquent-tax export published today. This is the 4th such live check for this exact tenant (rounds 13, 17 and 18 on 3 separate earlier dates, plus this round), every one returning the identical clean-empty answer; per this project's own 'built but unwired' discipline, a clean empty answer (not an HTTP error / exception) is read as a real, if narrow, possibility that the export is date-gated or periodic rather than permanently absent -- so this is declined with that caveat stated, not asserted as proven-impossible, and should not be re-checked a 5th time without a new signal (e.g. a listing notice or a ptscloud platform change) suggesting the export calendar has moved.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Durham",
+      "column": "multi_year_delinquent_tax",
+      "reason": "nc_ptscloud_delinquent_tax.py's own live GetTaxpayerDownloadList/DownloadTaxpayerDownloadBlob flow was run directly against this tenant on 2026-11-17 and returned a clean 'no blob with delinquent in the name' answer (HTTP 200, not an error) -- this tenant simply has no delinquent-tax export published today. This is the 4th such live check for this exact tenant (rounds 13, 17 and 18 on 3 separate earlier dates, plus this round), every one returning the identical clean-empty answer; per this project's own 'built but unwired' discipline, a clean empty answer (not an HTTP error / exception) is read as a real, if narrow, possibility that the export is date-gated or periodic rather than permanently absent -- so this is declined with that caveat stated, not asserted as proven-impossible, and should not be re-checked a 5th time without a new signal (e.g. a listing notice or a ptscloud platform change) suggesting the export calendar has moved.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Durham",
+      "column": "two_year_delinquent",
+      "reason": "nc_ptscloud_delinquent_tax.py's own live GetTaxpayerDownloadList/DownloadTaxpayerDownloadBlob flow was run directly against this tenant on 2026-11-17 and returned a clean 'no blob with delinquent in the name' answer (HTTP 200, not an error) -- this tenant simply has no delinquent-tax export published today. This is the 4th such live check for this exact tenant (rounds 13, 17 and 18 on 3 separate earlier dates, plus this round), every one returning the identical clean-empty answer; per this project's own 'built but unwired' discipline, a clean empty answer (not an HTTP error / exception) is read as a real, if narrow, possibility that the export is date-gated or periodic rather than permanently absent -- so this is declined with that caveat stated, not asserted as proven-impossible, and should not be re-checked a 5th time without a new signal (e.g. a listing notice or a ptscloud platform change) suggesting the export calendar has moved.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Durham",
+      "column": "tax_aging_surfaced",
+      "reason": "nc_ptscloud_delinquent_tax.py's own live GetTaxpayerDownloadList/DownloadTaxpayerDownloadBlob flow was run directly against this tenant on 2026-11-17 and returned a clean 'no blob with delinquent in the name' answer (HTTP 200, not an error) -- this tenant simply has no delinquent-tax export published today. This is the 4th such live check for this exact tenant (rounds 13, 17 and 18 on 3 separate earlier dates, plus this round), every one returning the identical clean-empty answer; per this project's own 'built but unwired' discipline, a clean empty answer (not an HTTP error / exception) is read as a real, if narrow, possibility that the export is date-gated or periodic rather than permanently absent -- so this is declined with that caveat stated, not asserted as proven-impossible, and should not be re-checked a 5th time without a new signal (e.g. a listing notice or a ptscloud platform change) suggesting the export calendar has moved.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Hertford",
+      "column": "multi_year_delinquent_tax",
+      "reason": "nc_ptscloud_delinquent_tax.py's own live GetTaxpayerDownloadList/DownloadTaxpayerDownloadBlob flow was run directly against this tenant on 2026-11-17 and returned a clean 'no blob with delinquent in the name' answer (HTTP 200, not an error) -- this tenant simply has no delinquent-tax export published today. This is the 4th such live check for this exact tenant (rounds 13, 17 and 18 on 3 separate earlier dates, plus this round), every one returning the identical clean-empty answer; per this project's own 'built but unwired' discipline, a clean empty answer (not an HTTP error / exception) is read as a real, if narrow, possibility that the export is date-gated or periodic rather than permanently absent -- so this is declined with that caveat stated, not asserted as proven-impossible, and should not be re-checked a 5th time without a new signal (e.g. a listing notice or a ptscloud platform change) suggesting the export calendar has moved.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Hertford",
+      "column": "two_year_delinquent",
+      "reason": "nc_ptscloud_delinquent_tax.py's own live GetTaxpayerDownloadList/DownloadTaxpayerDownloadBlob flow was run directly against this tenant on 2026-11-17 and returned a clean 'no blob with delinquent in the name' answer (HTTP 200, not an error) -- this tenant simply has no delinquent-tax export published today. This is the 4th such live check for this exact tenant (rounds 13, 17 and 18 on 3 separate earlier dates, plus this round), every one returning the identical clean-empty answer; per this project's own 'built but unwired' discipline, a clean empty answer (not an HTTP error / exception) is read as a real, if narrow, possibility that the export is date-gated or periodic rather than permanently absent -- so this is declined with that caveat stated, not asserted as proven-impossible, and should not be re-checked a 5th time without a new signal (e.g. a listing notice or a ptscloud platform change) suggesting the export calendar has moved.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Hertford",
+      "column": "tax_aging_surfaced",
+      "reason": "nc_ptscloud_delinquent_tax.py's own live GetTaxpayerDownloadList/DownloadTaxpayerDownloadBlob flow was run directly against this tenant on 2026-11-17 and returned a clean 'no blob with delinquent in the name' answer (HTTP 200, not an error) -- this tenant simply has no delinquent-tax export published today. This is the 4th such live check for this exact tenant (rounds 13, 17 and 18 on 3 separate earlier dates, plus this round), every one returning the identical clean-empty answer; per this project's own 'built but unwired' discipline, a clean empty answer (not an HTTP error / exception) is read as a real, if narrow, possibility that the export is date-gated or periodic rather than permanently absent -- so this is declined with that caveat stated, not asserted as proven-impossible, and should not be re-checked a 5th time without a new signal (e.g. a listing notice or a ptscloud platform change) suggesting the export calendar has moved.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Wayne",
+      "column": "multi_year_delinquent_tax",
+      "reason": "nc_ptscloud_delinquent_tax.py's own live GetTaxpayerDownloadList/DownloadTaxpayerDownloadBlob flow was run directly against this tenant on 2026-11-17 and returned a clean 'no blob with delinquent in the name' answer (HTTP 200, not an error) -- this tenant simply has no delinquent-tax export published today. This is the 4th such live check for this exact tenant (rounds 13, 17 and 18 on 3 separate earlier dates, plus this round), every one returning the identical clean-empty answer; per this project's own 'built but unwired' discipline, a clean empty answer (not an HTTP error / exception) is read as a real, if narrow, possibility that the export is date-gated or periodic rather than permanently absent -- so this is declined with that caveat stated, not asserted as proven-impossible, and should not be re-checked a 5th time without a new signal (e.g. a listing notice or a ptscloud platform change) suggesting the export calendar has moved.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Wayne",
+      "column": "two_year_delinquent",
+      "reason": "nc_ptscloud_delinquent_tax.py's own live GetTaxpayerDownloadList/DownloadTaxpayerDownloadBlob flow was run directly against this tenant on 2026-11-17 and returned a clean 'no blob with delinquent in the name' answer (HTTP 200, not an error) -- this tenant simply has no delinquent-tax export published today. This is the 4th such live check for this exact tenant (rounds 13, 17 and 18 on 3 separate earlier dates, plus this round), every one returning the identical clean-empty answer; per this project's own 'built but unwired' discipline, a clean empty answer (not an HTTP error / exception) is read as a real, if narrow, possibility that the export is date-gated or periodic rather than permanently absent -- so this is declined with that caveat stated, not asserted as proven-impossible, and should not be re-checked a 5th time without a new signal (e.g. a listing notice or a ptscloud platform change) suggesting the export calendar has moved.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Wayne",
+      "column": "tax_aging_surfaced",
+      "reason": "nc_ptscloud_delinquent_tax.py's own live GetTaxpayerDownloadList/DownloadTaxpayerDownloadBlob flow was run directly against this tenant on 2026-11-17 and returned a clean 'no blob with delinquent in the name' answer (HTTP 200, not an error) -- this tenant simply has no delinquent-tax export published today. This is the 4th such live check for this exact tenant (rounds 13, 17 and 18 on 3 separate earlier dates, plus this round), every one returning the identical clean-empty answer; per this project's own 'built but unwired' discipline, a clean empty answer (not an HTTP error / exception) is read as a real, if narrow, possibility that the export is date-gated or periodic rather than permanently absent -- so this is declined with that caveat stated, not asserted as proven-impossible, and should not be re-checked a 5th time without a new signal (e.g. a listing notice or a ptscloud platform change) suggesting the export calendar has moved.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Stokes",
+      "column": "multi_year_delinquent_tax",
+      "reason": "nc_ptscloud_delinquent_tax.py's own live GetTaxpayerDownloadList/DownloadTaxpayerDownloadBlob flow was run directly against this tenant on 2026-11-17 and returned a clean 'no blob with delinquent in the name' answer (HTTP 200, not an error) -- this tenant simply has no delinquent-tax export published today. This is the 4th such live check for this exact tenant (rounds 13, 17 and 18 on 3 separate earlier dates, plus this round), every one returning the identical clean-empty answer; per this project's own 'built but unwired' discipline, a clean empty answer (not an HTTP error / exception) is read as a real, if narrow, possibility that the export is date-gated or periodic rather than permanently absent -- so this is declined with that caveat stated, not asserted as proven-impossible, and should not be re-checked a 5th time without a new signal (e.g. a listing notice or a ptscloud platform change) suggesting the export calendar has moved.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Stokes",
+      "column": "two_year_delinquent",
+      "reason": "nc_ptscloud_delinquent_tax.py's own live GetTaxpayerDownloadList/DownloadTaxpayerDownloadBlob flow was run directly against this tenant on 2026-11-17 and returned a clean 'no blob with delinquent in the name' answer (HTTP 200, not an error) -- this tenant simply has no delinquent-tax export published today. This is the 4th such live check for this exact tenant (rounds 13, 17 and 18 on 3 separate earlier dates, plus this round), every one returning the identical clean-empty answer; per this project's own 'built but unwired' discipline, a clean empty answer (not an HTTP error / exception) is read as a real, if narrow, possibility that the export is date-gated or periodic rather than permanently absent -- so this is declined with that caveat stated, not asserted as proven-impossible, and should not be re-checked a 5th time without a new signal (e.g. a listing notice or a ptscloud platform change) suggesting the export calendar has moved.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "NC",
+      "county": "Stokes",
+      "column": "tax_aging_surfaced",
+      "reason": "nc_ptscloud_delinquent_tax.py's own live GetTaxpayerDownloadList/DownloadTaxpayerDownloadBlob flow was run directly against this tenant on 2026-11-17 and returned a clean 'no blob with delinquent in the name' answer (HTTP 200, not an error) -- this tenant simply has no delinquent-tax export published today. This is the 4th such live check for this exact tenant (rounds 13, 17 and 18 on 3 separate earlier dates, plus this round), every one returning the identical clean-empty answer; per this project's own 'built but unwired' discipline, a clean empty answer (not an HTTP error / exception) is read as a real, if narrow, possibility that the export is date-gated or periodic rather than permanently absent -- so this is declined with that caveat stated, not asserted as proven-impossible, and should not be re-checked a 5th time without a new signal (e.g. a listing notice or a ptscloud platform change) suggesting the export calendar has moved.",
+      "confirmed_date": "2026-11-17",
+      "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Edgefield",
+      "column": "lt_estate_lead",
+      "confidence": "high",
+      "confirmed_date": "2026-11-17",
+      "reason": "No listing_type=='estate_lead' producer reaches Edgefield SC. Round 18 left this county open, having only tested the qpublic.net/sc/edgefield/ assessor microsite's own landing page (HTTP 200, no search form on that page itself) without following where it actually sends a search. Round 19 live-confirmed the county has exactly ONE owner/property search tool: both edgefieldcounty.sc.gov (the official county site) and qpublic.net/sc/edgefield/ link to it as 'Search Records', and that link is https://qpublic.schneidercorp.com/Application.aspx?AppID=859&LayerID=16089&PageTypeID=2&PageID=7160 -- the SAME Schneider Corp qpublic.schneidercorp.com host already confirmed (Cherokee/Clarendon/Bamberg/Abbeville/Allendale/Lee round 18) to answer a plain unauthenticated GET with a Cloudflare 'Just a moment...' bot-check. Live-reconfirmed for this exact URL 2026-11-17: HTTP 403, title 'Just a moment...', Cloudflare challenge-platform script tags present. A real wall, not an unbuilt source; the qpublic.net landing page is only a static front door to it, not a separate, reachable tool."
     }
   ]
 }
