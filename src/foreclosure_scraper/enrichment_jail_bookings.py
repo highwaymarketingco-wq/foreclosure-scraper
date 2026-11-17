@@ -455,6 +455,13 @@ ROSTERS = [
     ("NC", "Edgecombe", "citizen_connect", "EdgecombeCoNC|"),
     ("NC", "Greene", "citizen_connect", "GreeneCoNC|"),
     ("NC", "Yancey", "citizen_connect", "YanceyCoNC|"),
+    # ROUND 13 SYNC 2026-11-17 -- ported verbatim from national.jail_bookings.ROSTERS' own
+    # "ROUND 13 DISCOVERY" comment (see that module for the full live-verification detail and
+    # the Rockingham/Dare "Module is not enabled" finding that stayed untouched, not declined).
+    # Zero new fetcher code -- same already-imported _fetch_p2c_centralsquare. Wiring both
+    # ROSTERS lists in the same pass per round 12's own precedent.
+    ("NC", "Alexander", "p2c_centralsquare",
+     "https://alexandercountyso.policetocitizen.com|532"),
 ]
 
 # (state, county, vendor, target) for the PER-NAME search vendors — no bulk
