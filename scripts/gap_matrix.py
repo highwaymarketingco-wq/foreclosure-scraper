@@ -737,7 +737,14 @@ SPECS: dict[str, Spec] = {
                                       producers=("enrichment_tax_owed.py",
                                                  "scrapers/counties_generic/multi_year_delinquent_tax.py",
                                                  "enrichment_gaston_multiyear_tax.py",
-                                                 "enrichment_pasquotank_delinquent_tax.py"),
+                                                 "enrichment_pasquotank_delinquent_tax.py",
+                                                 # 2026-11-17 (round 18): Craven's own
+                                                 # gis.cravencountync.gov ArcGIS "TaxTable" layer --
+                                                 # see craven_tax_table.py's own module docstring for
+                                                 # the live evidence (3,570 real matured-arrears rows,
+                                                 # TaxYear<=2025, e.g. parcel 6-064-091, $3,311.43
+                                                 # still owed since 2017).
+                                                 "scrapers/counties_nc/craven_tax_table.py"),
                                       doc="raw.multi_year_delinquent_tax present; checked = the tax roll was read "
                                           "(any property-tax block on the row)"),
     "repeat_tax_loss": Spec(_S, "derived", "tax", producers=("enrichment_repeat_tax_loss.py",),
@@ -1031,7 +1038,67 @@ SPECS: dict[str, Spec] = {
                                                               # counties_named_in() grep never looked inside it. See
                                                               # project_rollback_exposure_systematic_sweep_2026-11-16.md.
                                                               "enrichment_qpaybill_tax.py",
-                                                              "scrapers/counties_sc/qpaybill_delinquent_roll.py"),
+                                                              "scrapers/counties_sc/qpaybill_delinquent_roll.py",
+                                                              # 2026-11-17 (round 18, the tax-cluster gap_matrix
+                                                              # sweep): Davidson's own taxsearch.co.davidson.nc.us
+                                                              # ItsPublic/BT portal carries NO rollback-relevant field
+                                                              # on its search GRID (same vendor-wide limitation
+                                                              # already declined for Anson/Yadkin/Caswell/etc. above)
+                                                              # -- but its per-bill ViewTaxBill DETAIL page (the SAME
+                                                              # page verification/verifiers/tax_lien_itspublic.py's
+                                                              # own view()/parse_view() already reads for "Current
+                                                              # Balance") carries a real "Deferred Value" line never
+                                                              # checked before: live-sampled 109 real-property bills
+                                                              # with 5+ acres, 6 nonzero (e.g. parcel 0100900000046/
+                                                              # 47.12 AC, Deferred Value $325,610 of $342,800 Parcel
+                                                              # Value Total; Taxable Value = Parcel Value Total -
+                                                              # Deferred Value, exact on every sample) -- a genuine
+                                                              # present-use/ag-deferral signal, not yet a "declined"
+                                                              # vendor limitation for this specific deployment. See
+                                                              # enrichment_davidson_rollback_exposure.py's own module
+                                                              # docstring for the full evidence; the real board's own
+                                                              # 1,008 eligible Davidson rows (owner_name+street_
+                                                              # address, excluding entities) were run for real against
+                                                              # the live portal this round -- 44 confirmed address
+                                                              # matches, 0 of them currently carry a nonzero Deferred
+                                                              # Value (this board's Davidson population skews urban/
+                                                              # subdivision, not the large-acreage shape the nonzero
+                                                              # examples above came from) -- a genuine, measured
+                                                              # zero-yield-so-far result, not a wiring gap.
+                                                              "enrichment_davidson_rollback_exposure.py",
+                                                              # 2026-11-17 (round 18): Craven's own
+                                                              # gis.cravencountync.gov ArcGIS "Parcels in Use Value
+                                                              # Program" layer -- see craven_tax_table.py's own module
+                                                              # docstring for the live evidence (1,817 real nonzero
+                                                              # Deferred Value rows, e.g. parcel 2-018-013, owner
+                                                              # NORMAN CATHY WHITFORD, $65,290 of $98,320 market
+                                                              # value).
+                                                              "scrapers/counties_nc/craven_tax_table.py",
+                                                              # 2026-11-17 (round 18): Macon's own
+                                                              # gis.maconnc.org ArcGIS "Tax Parcels"
+                                                              # layer (DEFERMENT field, 1,273 real
+                                                              # nonzero rows) and Haywood's own
+                                                              # maps.haywoodcountync.gov ArcGIS
+                                                              # "Public_Access" layer (Defer_Value
+                                                              # field, 2,416 real nonzero rows) -- see
+                                                              # each module's own docstring for the
+                                                              # live evidence. Haywood's SIBLING
+                                                              # columns (multi_year_delinquent_tax/
+                                                              # two_year_delinquent/tax_aging_surfaced)
+                                                              # are deliberately NOT wired to this same
+                                                              # layer -- its own TaxYear1/TaxYear2/
+                                                              # Taxbill1_Amt/Taxbill2_Amt fields are
+                                                              # frozen at 2019/2020 on every sampled
+                                                              # row despite the rest of the layer being
+                                                              # actively current (real sales dated into
+                                                              # 2026) -- a vendor-side stale/abandoned
+                                                              # field, not usable for a current
+                                                              # delinquency claim. See
+                                                              # enrichment_haywood_rollback_exposure.py's
+                                                              # own module docstring and
+                                                              # declined_registry.json.
+                                                              "enrichment_macon_rollback_exposure.py",
+                                                              "enrichment_haywood_rollback_exposure.py"),
                               doc="raw.rollback_exposure present (present-use/ag deferral rollback)"),
     "jail_booking": Spec(_S, "county", "jail", applies="person", ledger="jail_booking",
                          producers=("enrichment_jail_bookings.py", "scrapers/national/jail_bookings.py",
@@ -1090,9 +1157,16 @@ SPECS: dict[str, Spec] = {
     "two_year_delinquent": Spec(_S, "row", "tax", ledger="tax_lien|lien_registry_wall",
                                 producers=("scrapers/counties_nc/albemarle_observer_tax_lists.py",
                                            "scrapers/counties_nc/nc_its_public_tax.py",
-                                           "scrapers/counties_sc/sc_catalis_delinquent_roll.py"),
+                                           "scrapers/counties_sc/sc_catalis_delinquent_roll.py",
+                                           # 2026-11-17 (round 18): see multi_year_delinquent_tax's
+                                           # own comment above for the live evidence.
+                                           "scrapers/counties_nc/craven_tax_table.py"),
                                 doc="raw.two_year_delinquent.is_two_year_plus is true; checked = tax roll read"),
-    "tax_aging_surfaced": Spec(_S, "row", "tax", ledger="tax_lien|lien_registry_wall", producers=("enrichment_tax_aging.py",),
+    "tax_aging_surfaced": Spec(_S, "row", "tax", ledger="tax_lien|lien_registry_wall",
+                               producers=("enrichment_tax_aging.py",
+                                          # 2026-11-17 (round 18): see multi_year_delinquent_tax's
+                                          # own comment above for the live evidence.
+                                          "scrapers/counties_nc/craven_tax_table.py"),
                                doc="raw.tax_aging_surfaced.status != 'current' and years_delinquent > 0; "
                                    "checked = tax roll read"),
     "divorce": Spec(_S, "row", "court", applies="person", ledger="divorce",
@@ -1632,10 +1706,14 @@ def checked_columns(rec: dict, pos: set[str], verdicts: dict[str, Optional[str]]
     # producer (nc_tax_lien_ads.py, same 2026-11-17 survey) does the identical thing for a
     # DIFFERENT reason: each county's annual 105-369 ad is a single-levy-year publication by
     # nature (no multi-year history is even possible to read from it), so every row it emits
-    # stamps raw["_nc_tax_lien_ads_mydt_checked"] instead.
+    # stamps raw["_nc_tax_lien_ads_mydt_checked"] instead. Craven's own producer
+    # (craven_tax_table.py, round 18, 2026-11-17) does the identical thing for the same reason
+    # as New Hanover: a parcel with exactly one matured delinquent year is a real screen, not an
+    # unchecked row -- it stamps raw["_craven_tax_mydt_checked"] instead.
     if (raw.get("multi_year_delinquent_tax") not in _EMPTY
             or raw.get("_gaston_mydt_checked") or raw.get("_pasquotank_tax_checked")
-            or raw.get("_nc_csv_tax_mydt_checked") or raw.get("_nc_tax_lien_ads_mydt_checked")):
+            or raw.get("_nc_csv_tax_mydt_checked") or raw.get("_nc_tax_lien_ads_mydt_checked")
+            or raw.get("_craven_tax_mydt_checked")):
         out.add("multi_year_delinquent_tax")
     if raw.get("two_year_delinquent") not in _EMPTY:
         out.add("two_year_delinquent")
