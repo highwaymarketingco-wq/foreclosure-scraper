@@ -1137,8 +1137,11 @@ SPECS: dict[str, Spec] = {
                              # reading that registry, not by guessing), so this was a pure gap_matrix.py
                              # labelling gap, not a missing-from-the-pipeline gap; it had simply never
                              # actually been run to completion before today (0 board rows prior to this
-                             # date -- a live direct run of the real scraper, not a copy, found and fixed
-                             # the separate reason why: see the module's own 2026-11-16 docstring note).
+                             # date, confirmed via a real board_stream pass). No separate bug: a direct
+                             # `safe_run()` of the real scraper (not a copy) finished clean in 126.3s, well
+                             # inside its own 180.0s `timeout_s` -- 5,080 live cases -> 2,789 real leads,
+                             # landed via the new `scripts/land_charleston_energov_history.py`. Same shape
+                             # as `project_round8_sources_landed_2026-11-16.md`: "wired wasn't run."
                              producers=("enrichment_code_enforcement.py", "enrichment_charlotte_code.py",
                                         "enrichment_greensboro_code.py", "scrapers/counties_nc/asheville_code_enforcement.py",
                                         "scrapers/counties_nc/gastonia_code_enforcement.py",
