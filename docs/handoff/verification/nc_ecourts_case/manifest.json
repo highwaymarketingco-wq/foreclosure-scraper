@@ -1,53 +1,53 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 1918,
+  "confirmed": 4399,
   "refuted": 13,
-  "rows": 2131,
-  "stale": 158,
-  "unconfirmed": 42,
+  "rows": 4720,
+  "stale": 265,
+  "unconfirmed": 43,
   "wall": 0
  },
- "generated_at": "2026-11-18T08:38:14Z",
+ "generated_at": "2026-11-18T11:09:38Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-18T08:38:14Z",
-  "county": "Wake",
+  "at": "2026-11-18T11:09:38Z",
+  "county": "Rockingham",
   "host": "SMB-LTSEO05",
-  "max_rows": 400,
+  "max_rows": 500,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "portal-nc.tylertech.cloud": 70
+    "portal-nc.tylertech.cloud": 87
    }
   },
   "result": {
-   "checked": 400,
-   "confirmed": 328,
-   "stale": 72
+   "checked": 497,
+   "confirmed": 494,
+   "stale": 3
   },
-  "seconds": 139,
+  "seconds": 173,
   "selection": {
-   "applies": 1876,
-   "due_new": 1771,
-   "due_ttl": 105
+   "applies": 497,
+   "due_new": 489,
+   "due_ttl": 8
   },
   "source": null,
   "tier": null
  },
- "rows": 2131,
+ "rows": 4720,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 2633189,
+   "bytes": 5834062,
    "file": "000.json",
-   "rows": 2131,
-   "sha256": "b9971daaae9ffe7777fa7445bf84c56506d575e75642deba38fffc77969f6a81"
+   "rows": 4720,
+   "sha256": "b56a263f87251c2a6d4a8acf2a79bafdec26afd15e56abf3254a1b1e64a04170"
   }
  ],
  "signal": "nc_ecourts_case",
