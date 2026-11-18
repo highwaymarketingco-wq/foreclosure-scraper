@@ -1,53 +1,56 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 3851,
+  "confirmed": 4193,
   "refuted": 11,
-  "rows": 3924,
-  "stale": 19,
-  "unconfirmed": 43,
+  "rows": 4273,
+  "stale": 23,
+  "unconfirmed": 46,
   "wall": 0
  },
- "generated_at": "2026-11-18T12:37:20Z",
+ "generated_at": "2026-11-18T13:16:06Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-18T12:37:20Z",
-  "county": "Florence",
+  "at": "2026-11-18T13:16:06Z",
+  "county": "Sumter",
   "host": "SMB-LTSEO05",
   "max_rows": 2000,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "services1.arcgis.com": 346
+    "gis.sumter-sc.com": 351
    }
   },
   "result": {
    "budget_stop": 1,
-   "checked": 172,
-   "confirmed": 172
+   "checked": 349,
+   "confirmed": 342,
+   "stale": 4,
+   "unconfirmed": 3
   },
-  "seconds": 702,
+  "seconds": 701,
   "selection": {
-   "applies": 1297,
-   "due_new": 960,
-   "not_due_ttl": 337
+   "applies": 1339,
+   "due_new": 752,
+   "not_due_retry": 3,
+   "not_due_ttl": 584
   },
   "source": null,
   "tier": null
  },
- "rows": 3924,
+ "rows": 4273,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 3752522,
+   "bytes": 4086652,
    "file": "000.json",
-   "rows": 3924,
-   "sha256": "5cabdc82c70bb4e147d78b115d3514b17f80db5c9ee095688bea9d5244458d2b"
+   "rows": 4273,
+   "sha256": "5e965ebc69a69cc4ce4f431e5784331533e337bf37008bc38d29168c52275c96"
   }
  ],
  "signal": "heir_roll",
