@@ -15,7 +15,21 @@ row says so where the lead is read, and the card id names the manual lane:
                         file itself is an NC eCourts Smart Search record).
   card nc_sp            NC power-of-sale foreclosure claims built from a notice of sale (the SP
                         file: hearing, sale, report of sale, upset bids).
-  card sc_notice_body   SC foreclosure claims from scpublicnotices.com notice bodies.
+  card sc_notice_body   SC foreclosure AND probate-notice claims from scpublicnotices.com notice
+                        bodies (lt_probate_notice added 2026-11-18, gap_matrix built-not-verified
+                        sweep: counties_sc.sc_public_notices.py's own code confirms every row,
+                        whatever category it came from -- Foreclosures, Tax Sales, "Notice to
+                        Creditors", "Probate Notices" -- carries the identical
+                        source_url=Details.aspx?ID=... and the same text_truncated=True marker;
+                        card_of() checked only lt == "foreclosure_sale" before this, so a
+                        probate_notice row from the exact same walled source carried no verdict at
+                        all. Confirmed live 2026-11-18 (6 real Colleton "Notice to Creditors" rows,
+                        category 30 -- e.g. Details.aspx?ID=640383): a plain httpx GET on the
+                        row's own source_url still answers the identical Cloudflare Turnstile +
+                        ReCaptcha "challenge" interstitial the producer's own module docstring
+                        already documented for this host -- nothing category-specific about the
+                        wall, Greenwood/Newberry/Sumter/Barnwell's rows share the same source_url
+                        shape and text_truncated=True marker).
 The human-assisted checker (scripts/verify_lead_human_assisted.py, card nc_verify) writes the
 verdict a person reads into the human lane's own ledgers; this label never displaces one.
 
@@ -66,7 +80,7 @@ def card_of(row: Any) -> Optional[str]:
     if st == "SC" and src in SC_INDEX_SOURCES and co != "charleston" and \
             lt in ("lis_pendens", "foreclosure_sale", "distressed"):
         return "sc_publicindex"
-    if st == "SC" and src in SC_NOTICE_SOURCES and lt == "foreclosure_sale":
+    if st == "SC" and src in SC_NOTICE_SOURCES and lt in ("foreclosure_sale", "probate_notice"):
         return "sc_notice_body"
     if st == "NC" and src in NC_SP_NOTICE_SOURCES and lt == "foreclosure_sale":
         return "nc_sp"
