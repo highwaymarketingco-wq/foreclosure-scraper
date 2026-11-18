@@ -1,55 +1,56 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 5273,
+  "confirmed": 5396,
   "refuted": 11,
-  "rows": 5360,
-  "stale": 27,
-  "unconfirmed": 49,
+  "rows": 5485,
+  "stale": 28,
+  "unconfirmed": 50,
   "wall": 0
  },
- "generated_at": "2026-11-18T20:29:46Z",
+ "generated_at": "2026-11-18T20:58:20Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-18T20:29:46Z",
+  "at": "2026-11-18T20:58:20Z",
   "county": "Colleton",
   "host": "SMB-LTSEO05",
-  "max_rows": 1300,
+  "max_rows": 1106,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "services1.arcgis.com": 227
+    "services1.arcgis.com": 251
    }
   },
   "result": {
    "budget_stop": 1,
-   "checked": 113,
-   "confirmed": 111,
-   "stale": 2
+   "checked": 125,
+   "confirmed": 123,
+   "stale": 1,
+   "unconfirmed": 1
   },
-  "seconds": 453,
+  "seconds": 501,
   "selection": {
    "applies": 1817,
-   "due_new": 1219,
+   "due_new": 1106,
    "not_due_retry": 15,
-   "not_due_ttl": 583
+   "not_due_ttl": 696
   },
   "source": null,
   "tier": null
  },
- "rows": 5360,
+ "rows": 5485,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 5097548,
+   "bytes": 5216552,
    "file": "000.json",
-   "rows": 5360,
-   "sha256": "33e04c67a0170a62f36b98f7c0a1eaabc04579097614f17841d9e9fae350c0ab"
+   "rows": 5485,
+   "sha256": "acdb2699930c1f2d1dc93fe624481036a233f64951b52f0d82a60206cbc45fa0"
   }
  ],
  "signal": "heir_roll",
