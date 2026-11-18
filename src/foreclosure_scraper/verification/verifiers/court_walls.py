@@ -14,7 +14,22 @@ row says so where the lead is read, and the card id names the manual lane:
   card nc_est           NC estate claims from estate notices (notice to creditors: the estate
                         file itself is an NC eCourts Smart Search record).
   card nc_sp            NC power-of-sale foreclosure claims built from a notice of sale (the SP
-                        file: hearing, sale, report of sale, upset bids).
+                        file: hearing, sale, report of sale, upset bids). Also covers a notice
+                        nc_notices_counties.py classified raw.public_notice.kind == "foreclosure"
+                        but then remapped to listing_type lis_pendens (its own deliberate
+                        _FLIP_FOOTPRINT_NAMES rule: FORECLOSURE_SALE's flip semantics don't leak
+                        outside the flip footprint) -- added 2026-11-18, gap_matrix
+                        built-not-verified sweep, same bug class as sc_notice_body below: card_of()
+                        checked only lt == "foreclosure_sale" before this, so a county outside the
+                        flip footprint (e.g. Dare, 20 rows) got no verdict at all even though its
+                        rows are the identical "NOTICE OF FORECLOSURE SALE ... FILE NO. 26SP..."
+                        text behind the identical eCourts picture-CAPTCHA. Confirmed live
+                        2026-11-18 across every NC county this remap touches (board_stream audit:
+                        81 rows, 13 counties -- Dare 20, Brunswick 14, New Hanover 13, Onslow 12,
+                        Carteret 4, Haywood 4, Lincoln 3, Rutherford 3, Gaston 2, Burke 2, McDowell
+                        2, Buncombe 1, Cleveland 1 -- every one carries raw.public_notice.kind ==
+                        "foreclosure" and a real 26SP/25SP case number, not a lis-pendens-only
+                        filing).
   card sc_notice_body   SC foreclosure AND probate-notice claims from scpublicnotices.com notice
                         bodies (lt_probate_notice added 2026-11-18, gap_matrix built-not-verified
                         sweep: counties_sc.sc_public_notices.py's own code confirms every row,
@@ -82,7 +97,9 @@ def card_of(row: Any) -> Optional[str]:
         return "sc_publicindex"
     if st == "SC" and src in SC_NOTICE_SOURCES and lt in ("foreclosure_sale", "probate_notice"):
         return "sc_notice_body"
-    if st == "NC" and src in NC_SP_NOTICE_SOURCES and lt == "foreclosure_sale":
+    if st == "NC" and src in NC_SP_NOTICE_SOURCES and (
+            lt == "foreclosure_sale"
+            or (lt == "lis_pendens" and (raw.get("public_notice") or {}).get("kind") == "foreclosure")):
         return "nc_sp"
     if st == "NC" and src in NC_ESTATE_NOTICE_SOURCES and (
             lt in ("probate_notice", "estate_lead") or isinstance(raw.get("probate"), dict)):
