@@ -1,53 +1,53 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 4310,
+  "confirmed": 4660,
   "refuted": 11,
-  "rows": 4390,
+  "rows": 4740,
   "stale": 23,
   "unconfirmed": 46,
   "wall": 0
  },
- "generated_at": "2026-11-18T13:28:58Z",
+ "generated_at": "2026-11-18T13:41:36Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-18T13:28:58Z",
-  "county": "Barnwell",
+  "at": "2026-11-18T13:41:36Z",
+  "county": "Berkeley",
   "host": "SMB-LTSEO05",
   "max_rows": 2000,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "services8.arcgis.com": 353
+    "gis.berkeleycountysc.gov": 351
    }
   },
   "result": {
    "budget_stop": 1,
-   "checked": 117,
-   "confirmed": 117
+   "checked": 350,
+   "confirmed": 350
   },
-  "seconds": 705,
+  "seconds": 701,
   "selection": {
-   "applies": 819,
-   "due_new": 686,
-   "not_due_ttl": 133
+   "applies": 716,
+   "due_new": 551,
+   "not_due_ttl": 165
   },
   "source": null,
   "tier": null
  },
- "rows": 4390,
+ "rows": 4740,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4195542,
+   "bytes": 4525006,
    "file": "000.json",
-   "rows": 4390,
-   "sha256": "424e712a3efb90452155e509244623204b32362f9add7a7266f57f38c20fa0b8"
+   "rows": 4740,
+   "sha256": "b3a38a79a1ce4c8a092efebcb7dc41c9a80fac5ccc51ae5e5cdcd8f1476cba68"
   }
  ],
  "signal": "heir_roll",
