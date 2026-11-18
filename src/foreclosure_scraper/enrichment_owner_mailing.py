@@ -150,6 +150,23 @@ COUNTY_GIS: dict[str, dict] = {
         "owner": ["OWNER_NAME", "OWNER_NA_1"],
         "mail": ["MAILING_AD", "MAILING__1", "CITY", "STATE_OR_C", "ZIP_CODE"],
         "mail_state": "STATE_OR_C", "situs": ["PHY_ADDRES"], "parcel": "TWN_PIN"},
+    # 2026-11-18 gap_matrix built-not-verified sweep (heir_estate column, round 29
+    # continuation). gap_matrix named "county GIS: lenoirco.maps.arcgis.com" as a source
+    # never checked. The org's webapp viewer (item 68c0618065d04f1182fb86cb5b6647de) only
+    # names its layer by ArcGIS Online's public item-data JSON; resolved live to
+    # Parcels_Zoning_Addressing/FeatureServer/6 ("Parcels", 9 sibling layers on the same
+    # service, id 1 is roads -- do not repoint there). Live-queried: Name1 LIKE '%HEIRS%'
+    # OR '%ESTATE%' returns 1,215 real rows (e.g. "HOLMES ADELL HEIRS" / Name2 "C/O BESSIE
+    # HOLMES LANIER", "BROWN CLARENCE EDWARD HEIRS" / "C/O JESSICA BROWN") -- Name2 is
+    # always either null or a "C/O <name>" line, never a second owner, so it is CareOf
+    # here (Buncombe's shape), not a second "owner" field (Gaston's shape). NCPIN
+    # ("3584-21-4629") is the statewide-format PIN, used over the county-internal
+    # ParcelNum ("4629") so this joins the same way every other NC county's board rows do.
+    "NC:Lenoir": {"url": "https://services3.arcgis.com/bDx73HOFAO3oSeDq/arcgis/rest/services/"
+                         "Parcels_Zoning_Addressing/FeatureServer/6",
+        "owner": ["Name1"], "care_of": "Name2",
+        "mail": ["Addr1", "City", "State", "Zip"],
+        "mail_state": "State", "situs": ["PhysStrAdd"], "parcel": "NCPIN"},
     # --- SC ---
     # 2026-08-03 REPOINT: the old AGOL layer (services9…/Parcel_and_CAMA_Feb_1_2021)
     # is a 29,402-row MUNICIPAL extract — it can only answer ~16% of the 8,919

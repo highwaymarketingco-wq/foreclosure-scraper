@@ -245,6 +245,10 @@ _HEIR_COUNTIES = [
     "NC:Buncombe", "NC:Henderson", "NC:Rutherford", "NC:Gaston", "NC:Transylvania",
     "NC:Polk", "NC:Lincoln", "NC:Mitchell", "NC:Burke", "NC:McDowell", "NC:Cleveland",
     "NC:Hoke",
+    # 2026-11-18 gap_matrix built-not-verified sweep: live-confirmed 1,215 real
+    # "<NAME> HEIRS"/"<NAME> ESTATE" rows on NC:Lenoir's own COUNTY_GIS layer (see that
+    # entry's comment in enrichment_owner_mailing.py for the FeatureServer discovery).
+    "NC:Lenoir",
     "SC:Spartanburg", "SC:Pickens", "SC:Laurens", "SC:Union",
     "SC:Oconee", "SC:York", "SC:Charleston", "SC:Beaufort",
 ]
