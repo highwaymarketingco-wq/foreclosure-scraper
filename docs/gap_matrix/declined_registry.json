@@ -6257,6 +6257,14 @@
       "reason": "enrichment_vacant_landuse.py stamps this signal purely from a county's cached parcel_cache land-class/land-use field (Rutherford Land_Class, Spartanburg LandUse, etc.) -- Dorchester's own parcel_cache.PARCEL_LAYERS entry (gisportal.dorchestercounty.net General_Data/Parcels_Public/MapServer/0, the ONLY open bulk parcel source for this county) maps just 10 bare fields and carries no land-use/zoning/land-class field of any kind: FULL_TMS/TMS/PARCELNO/OWNER/MAILING_ADDRESS/CITY_STATE_ZIP/PROPERTY_LOCATION/TAXED_ACRES/SALE_PRICE/SALE_DATE (re-confirmed live in the layer's own config today, 2026-11-18). This is the SAME field-list finding this registry's own 'lt_elderly_disabled' entry for Dorchester already documents (live-verified 2026-11-16) and dorchester_billtrax_delinquent_tax.py's sibling 'rollback_exposure' finding (this registry, same date) independently reaches from the tax-bill side: there is no classification field anywhere in this county's reachable free data to read a vacant/undeveloped status from. No other producer in this codebase names Dorchester for vacant_lot.",
       "confirmed_date": "2026-11-16",
       "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Surry",
+      "column": "rollback_exposure",
+      "reason": "County's own ArcGIS Server (gis.co.surry.nc.us, real REST root at the non-default /arcgis/rest/services path -- the default /server/rest/services 404s) fully enumerated live 2026-11-18: 24 root services + 3 folders (InternalUse, Utilities, WGS84Orthos). The one parcel/tax candidate, Parcels/MapServer/0 ('PARCEL'), has exactly 26 fields, all basic identity/value/address/deed data (OBJECTID, Parcel, Calculated_Acreage, Name1/Name2, Address1/2, City/State/ZipCode, TotalAssessedValue, HouseNumber, StreetDirection/Name/Type/Suffix, ParcelLandValue, ParcelBuildingValue, ParcelObxfValue, DeedBook, DeedPage, Township, Shape/Shape.STArea()/Shape.STLength()) -- no present-use/deferred-value/rollback/ag-use field of any kind. No other public GIS host or tax-portal field was found naming a deferral signal for this county. No other producer in this codebase names Surry for rollback_exposure.",
+      "confirmed_date": "2026-11-18",
+      "confidence": "high"
     }
   ]
 }
