@@ -1,52 +1,56 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 2117,
+  "confirmed": 2649,
   "refuted": 11,
-  "rows": 2179,
-  "stale": 12,
-  "unconfirmed": 39,
+  "rows": 2715,
+  "stale": 14,
+  "unconfirmed": 41,
   "wall": 0
  },
- "generated_at": "2026-11-18T05:46:18Z",
+ "generated_at": "2026-11-18T08:30:42Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-18T05:46:18Z",
-  "county": "Bertie",
+  "at": "2026-11-18T08:30:42Z",
+  "county": "Sumter",
   "host": "SMB-LTSEO05",
   "max_rows": 1000,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "services.nconemap.gov": 169
+    "gis.sumter-sc.com": 251
    }
   },
   "result": {
    "budget_stop": 1,
-   "checked": 169,
-   "confirmed": 169
+   "checked": 249,
+   "confirmed": 245,
+   "stale": 2,
+   "unconfirmed": 2
   },
-  "seconds": 402,
+  "seconds": 501,
   "selection": {
-   "applies": 367,
-   "due_new": 367
+   "applies": 1339,
+   "due_new": 1175,
+   "not_due_retry": 1,
+   "not_due_ttl": 163
   },
   "source": null,
   "tier": null
  },
- "rows": 2179,
+ "rows": 2715,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 2087211,
+   "bytes": 2597990,
    "file": "000.json",
-   "rows": 2179,
-   "sha256": "7ad88aa352b0481aed28894826ed770de7c68e19bd9d0761348b981aa6c15bd7"
+   "rows": 2715,
+   "sha256": "59b3532b41d5199d577d7a9e77d51c8afaf8e8a7fb7422138c19d2e17d581f66"
   }
  ],
  "signal": "heir_roll",

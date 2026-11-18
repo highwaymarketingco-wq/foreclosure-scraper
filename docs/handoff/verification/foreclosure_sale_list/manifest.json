@@ -1,52 +1,47 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 242,
+  "confirmed": 248,
   "refuted": 0,
-  "rows": 304,
-  "stale": 15,
-  "unconfirmed": 47,
+  "rows": 315,
+  "stale": 16,
+  "unconfirmed": 51,
   "wall": 0
  },
- "generated_at": "2026-11-18T06:59:58Z",
+ "generated_at": "2026-11-18T09:05:02Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-18T06:59:58Z",
-  "county": "Cherokee",
+  "at": "2026-11-18T09:05:02Z",
+  "county": "Union",
   "host": "SMB-LTSEO05",
-  "max_rows": 1000,
+  "max_rows": 1500,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {}
   },
-  "result": {
-   "checked": 21,
-   "confirmed": 11,
-   "unconfirmed": 10
-  },
-  "seconds": 25,
+  "result": {},
+  "seconds": 0,
   "selection": {
-   "applies": 21,
-   "due_new": 12,
-   "due_retry": 1,
-   "due_ttl": 8
+   "applies": 10,
+   "not_due_retry": 2,
+   "not_due_ttl": 8
   },
   "source": null,
   "tier": null
  },
- "rows": 304,
+ "rows": 315,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 323651,
+   "bytes": 336022,
    "file": "000.json",
-   "rows": 304,
-   "sha256": "623e7363cbb41387a30676213b2fce765a81df116a7926885d9a95750c6cfae5"
+   "rows": 315,
+   "sha256": "0992a56af7b30dd378babfff1b565fc9cdf292594290ac22b39e5b77d7778b5c"
   }
  ],
  "signal": "foreclosure_sale_list",
