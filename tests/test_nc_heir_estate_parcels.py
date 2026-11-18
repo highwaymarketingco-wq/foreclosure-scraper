@@ -331,6 +331,41 @@ def test_hoke_cost_total_is_picked_as_the_value_ranking_field():
     ) == "COST_TOTAL"
 
 
+# --------------------------------------------------------------------------- 2026-11-18 Lenoir
+
+#: verbatim `attributes` shape, live-queried 2026-11-18 against Lenoir's own
+#: Parcels_Zoning_Addressing/FeatureServer/6 (gap_matrix built-not-verified sweep,
+#: heir_estate column). Name2 here is always null or a "C/O <name>" line -- CareOf,
+#: never a second owner (unlike Gaston/Polk/McDowell's multi-heir subfields above).
+LENOIR_HEIR = {
+    "NCPIN": "3584-21-4629", "Name1": "HOLMES ADELL HEIRS", "Name2": "C/O BESSIE HOLMES LANIER",
+    "PhysStrAdd": "LOUIE POLLOCK RD", "Addr1": "1083 LOUIE POLLOCK ROAD",
+    "City": "LAGRANGE", "State": "NC", "Zip": "28551",
+}
+
+
+def test_lenoir_heir_row_is_a_probate_signal(canned):
+    """NC:Lenoir added to _HEIR_COUNTIES 2026-11-18: 1,215 real HEIRS/ESTATE rows
+    live on its own COUNTY_GIS layer (previously relying on the weaker statewide
+    NC OneMap fallback). Name2's "C/O ..." line must land in care_of, not be
+    dropped or misread as a second heir."""
+    table, _ = canned
+    table[_url("NC:Lenoir")] = [LENOIR_HEIR]
+    out = asyncio.run(m.NCHeirEstateParcels().fetch())
+    rows = [li for li in out if li.county == "Lenoir"]
+    assert len(rows) == 1
+    li = rows[0]
+    assert li.listing_type == ListingType.ESTATE_LEAD
+    assert li.parcel_id == "3584-21-4629"
+    assert li.street_address == "LOUIE POLLOCK RD"
+    assert li.raw["heir_estate"]["owner_of_record"] == "HOLMES ADELL HEIRS"
+    assert li.raw["heir_estate"]["care_of"] == "C/O BESSIE HOLMES LANIER"
+    assert li.raw["heir_estate"]["match"] == "heirs"
+    assert li.raw["heir_estate"]["life_estate"] is False
+    assert "LAGRANGE" in li.raw["heir_estate"]["mailing"]
+    assert li.raw["relationship_signal"]["kind"] == "probate"
+
+
 # --------------------------------------------------------------------------- 2026-10-02 extension
 # (1) word-boundary fix, (2) new SC counties, (3) NC statewide OneMap fallback.
 
@@ -368,6 +403,7 @@ def test_nc_statewide_fallback_excludes_dedicated_counties_and_covers_the_rest()
     assert dedicated == {
         "Buncombe", "Henderson", "Rutherford", "Gaston", "Transylvania",
         "Polk", "Lincoln", "Mitchell", "Burke", "McDowell", "Cleveland", "Hoke",
+        "Lenoir",
     }
     assert not (fallback & dedicated)
     # Live-verified sample counties (module docstring) must be in the fallback set.
