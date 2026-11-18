@@ -1,56 +1,53 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 2649,
+  "confirmed": 3504,
   "refuted": 11,
-  "rows": 2715,
-  "stale": 14,
-  "unconfirmed": 41,
+  "rows": 3577,
+  "stale": 19,
+  "unconfirmed": 43,
   "wall": 0
  },
- "generated_at": "2026-11-18T08:30:42Z",
+ "generated_at": "2026-11-18T11:21:19Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-18T08:30:42Z",
-  "county": "Sumter",
+  "at": "2026-11-18T11:21:19Z",
+  "county": "Barnwell",
   "host": "SMB-LTSEO05",
-  "max_rows": 1000,
+  "max_rows": 700,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "gis.sumter-sc.com": 251
+    "services8.arcgis.com": 251
    }
   },
   "result": {
    "budget_stop": 1,
-   "checked": 249,
-   "confirmed": 245,
-   "stale": 2,
-   "unconfirmed": 2
+   "checked": 83,
+   "confirmed": 83
   },
   "seconds": 501,
   "selection": {
-   "applies": 1339,
-   "due_new": 1175,
-   "not_due_retry": 1,
-   "not_due_ttl": 163
+   "applies": 819,
+   "due_new": 769,
+   "not_due_ttl": 50
   },
   "source": null,
   "tier": null
  },
- "rows": 2715,
+ "rows": 3577,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 2597990,
+   "bytes": 3422170,
    "file": "000.json",
-   "rows": 2715,
-   "sha256": "59b3532b41d5199d577d7a9e77d51c8afaf8e8a7fb7422138c19d2e17d581f66"
+   "rows": 3577,
+   "sha256": "f91f601e78a98bd5801da8bab6c8ab283bba28148319386332c6d8487856ca15"
   }
  ],
  "signal": "heir_roll",
