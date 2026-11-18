@@ -1419,12 +1419,39 @@ SPECS: dict[str, Spec] = {
     # enrichment_rod_chain.py and enrichment_florence_colleton_deed_ref.py, which both write the
     # same key per deed_ref_present()'s own inline comments), and bt_parcel_info
     # (enrichment_bt_parcel_info.py).
+    # 2026-11-18 (round-31 gap sweep): producers was missing the two ACTUAL per-county chain
+    # readers enrichment_rod_chain.py's own chain_registry() dispatches to for the "older Cott
+    # eSearch" and "Online Record System" platform families -- rod/sc_online_record_system.py
+    # (SC_ORS_COUNTIES: Abbeville/Barnwell/Berkeley/Colleton/Dorchester/Florence/Georgetown/
+    # Lancaster/Laurens/York) and rod/sc_cott_esearch.py (COTT_ESEARCH_COUNTIES: Marlboro).
+    # enrichment_florence_colleton_deed_ref.py was already named (crediting 2 of the 10 ORS
+    # counties by ITS OWN filename text, not by naming the other 8), so Abbeville specifically
+    # read "sourced-not-built" despite enrichment_rod_chain.chain_registry() already dispatching
+    # to it via CHAIN_ONLY_CONFIG -- live-confirmed this round (search_by_name_status('SC',
+    # 'Abbeville', 'SMITH JOHN') returns 4 real DEED rows with book/page off the live site) and a
+    # scoped dry-run (scripts/backfill_abbeville_rod_chain.py) that staged 30 real chain
+    # attempts cleanly. Marlboro (sc_cott_esearch.py) was not named anywhere in this tuple at
+    # all, despite being enabled by default in enrichment_generic_rod.ROD_CONFIG and already
+    # spot-tested successfully per that file's own 2026-10-07 comment ("Marlboro 2 chains of 5")
+    # -- live-reconfirmed this round at a much larger scale (scripts/backfill_marlboro_rod_chain.py,
+    # 30 real chain attempts: 27 ok + 1 partial, a ~93% real-deed-found rate). Neither produced a
+    # CONFIRMED-bound hit yet (Marlboro's bind_chain() can never return "book_page"/"sale_date"
+    # -- only "name_only" -- because this county has no parcel_cache.py entry at all, so
+    # county_deed_ref() never has a parcel-side sale date/book-page to match against; Abbeville's
+    # ceiling is the ORS platform's own measured low name-match rate, same as Florence's), so
+    # c["pos"] stays 0 for both and this fix does not, by itself, change their classification to
+    # "built-but-low-yield" is the correct and accurate read: real, live, wired code already
+    # covers both counties for this exact claim, zero confirmed hits YET is a true yield report,
+    # not an absence of a reader. (Marlboro's bound-hit ceiling is a SEPARATE, larger gap --
+    # parcel_cache coverage -- out of this round's scope; flagged for a future round, not
+    # declined, since it is not a dead end.)
     "atty_deed_ref": Spec(_F, "row", "gis_deed", sources=(("NC", NC_ONEMAP + " (deed reference field)"),),
                           producers=("enrichment_deed_chain.py", "enrichment_gis_attrs.py",
                                      "scrapers/counties_nc/nc_rod_logan.py", "scrapers/counties_sc/sc_rod_cott.py",
                                      "scrapers/counties_sc/sc_rod_acclaim.py", "rod/enrich.py", "gis_fill.py",
                                      "county_deed_ref.py", "enrichment_rod_chain.py",
-                                     "enrichment_florence_colleton_deed_ref.py", "enrichment_bt_parcel_info.py"),
+                                     "enrichment_florence_colleton_deed_ref.py", "enrichment_bt_parcel_info.py",
+                                     "rod/sc_online_record_system.py", "rod/sc_cott_esearch.py"),
                           doc="a deed book+page (or instrument no.) in deed_chain, gis.last_sale, rod, nc_rod, "
                               "rod_docs, gis_attrs_full or mcdowell_probate"),
     "atty_taxpayer_of_record": Spec(_F, "row", "tax", statewide=(("NC", NC_ONEMAP + " (owner of record)"),),
