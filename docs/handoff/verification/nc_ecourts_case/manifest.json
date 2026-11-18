@@ -1,54 +1,54 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 5374,
+  "confirmed": 6325,
   "refuted": 13,
-  "rows": 5720,
-  "stale": 290,
+  "rows": 6720,
+  "stale": 339,
   "unconfirmed": 43,
   "wall": 0
  },
- "generated_at": "2026-11-18T13:48:51Z",
+ "generated_at": "2026-11-18T13:52:49Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-18T13:48:51Z",
-  "county": "Mecklenburg",
+  "at": "2026-11-18T13:52:49Z",
+  "county": "Wake",
   "host": "SMB-LTSEO05",
   "max_rows": 1000,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "portal-nc.tylertech.cloud": 69
+    "portal-nc.tylertech.cloud": 89
    }
   },
   "result": {
    "checked": 1000,
-   "confirmed": 975,
-   "stale": 25
+   "confirmed": 951,
+   "stale": 49
   },
-  "seconds": 144,
+  "seconds": 183,
   "selection": {
-   "applies": 3133,
-   "due_new": 1602,
-   "due_ttl": 131,
-   "not_due_ttl": 1400
+   "applies": 1876,
+   "due_new": 1371,
+   "due_ttl": 105,
+   "not_due_ttl": 400
   },
   "source": null,
   "tier": null
  },
- "rows": 5720,
+ "rows": 6720,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 7077614,
+   "bytes": 8290486,
    "file": "000.json",
-   "rows": 5720,
-   "sha256": "82a31513465f36b5f83cc0ec595367a12aeb7c4aff02d2cd6391fd3bb85a69fb"
+   "rows": 6720,
+   "sha256": "b3ad8ad3b1657bd4b1feb8bf402f414528fa7d3d508d7b941fc3f9cebf76c0d7"
   }
  ],
  "signal": "nc_ecourts_case",
