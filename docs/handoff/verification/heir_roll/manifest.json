@@ -1,57 +1,60 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 4814,
+  "confirmed": 5162,
   "refuted": 11,
-  "rows": 4896,
-  "stale": 24,
-  "unconfirmed": 47,
+  "rows": 5247,
+  "stale": 25,
+  "unconfirmed": 49,
   "wall": 0
  },
- "generated_at": "2026-11-18T15:26:31Z",
+ "generated_at": "2026-11-18T16:34:12Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-18T15:26:31Z",
+  "at": "2026-11-18T16:34:12Z",
   "county": null,
   "host": "SMB-LTSEO05",
-  "max_rows": 2000,
+  "max_rows": 29013,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "services.nconemap.gov": 98
+    "chesterfieldsc.wthgis.com": 340,
+    "services.nconemap.gov": 187
    }
   },
   "result": {
-   "budget_stop": 1,
-   "checked": 98,
-   "confirmed": 98
+   "budget_stop": 2,
+   "checked": 351,
+   "confirmed": 348,
+   "stale": 1,
+   "unconfirmed": 2
   },
-  "seconds": 301,
+  "seconds": 903,
   "selection": {
    "applies": 33853,
-   "due_new": 29111,
+   "due_new": 29013,
    "due_retry": 10,
    "due_ttl": 432,
    "not_due_retry": 33,
-   "not_due_ttl": 4267,
-   "same_property_queued": 3
+   "not_due_ttl": 4365,
+   "same_property_queued": 4
   },
   "source": null,
   "tier": null
  },
- "rows": 4896,
+ "rows": 5247,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4669176,
+   "bytes": 4989829,
    "file": "000.json",
-   "rows": 4896,
-   "sha256": "fd09210caa81d90244142ecd64efb493ce7a18df2c6692733fd2d0ecc6b88109"
+   "rows": 5247,
+   "sha256": "9b4608f748a7480ca514789a82b6593573bf4c806b51b3d3ce1740bd75eb013c"
   }
  ],
  "signal": "heir_roll",
