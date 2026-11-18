@@ -1,63 +1,61 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 6988,
+  "confirmed": 7479,
   "refuted": 13,
-  "rows": 7396,
-  "stale": 351,
+  "rows": 7916,
+  "stale": 380,
   "unconfirmed": 44,
   "wall": 0
  },
- "generated_at": "2026-11-18T13:55:57Z",
+ "generated_at": "2026-11-18T13:59:19Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-18T13:55:57Z",
-  "county": "Cumberland",
+  "at": "2026-11-18T13:59:19Z",
+  "county": "Guilford",
   "host": "SMB-LTSEO05",
   "max_rows": 1000,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "portal-nc.tylertech.cloud": 62
+    "portal-nc.tylertech.cloud": 64
    }
   },
   "result": {
-   "checked": 680,
-   "confirmed": 667,
-   "stale": 12,
-   "unconfirmed": 1
+   "checked": 577,
+   "confirmed": 548,
+   "stale": 29
   },
-  "seconds": 128,
+  "seconds": 133,
   "selection": {
-   "applies": 1280,
-   "due_new": 676,
-   "due_ttl": 4,
-   "not_due_retry": 1,
-   "not_due_ttl": 599
+   "applies": 1077,
+   "due_new": 520,
+   "due_ttl": 57,
+   "not_due_ttl": 500
   },
   "source": null,
   "tier": null
  },
- "rows": 7396,
+ "rows": 7916,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4583112,
+   "bytes": 4895141,
    "file": "000.json",
-   "rows": 3712,
-   "sha256": "69b138ea1ebe9d7bf35a03c6f433066be29d244b165b7ce14f3a8fe738c8fd88"
+   "rows": 3963,
+   "sha256": "499f08ed68754b256e89752d6919c35d84bc9735680758dddff27cc87348a96f"
   },
   {
    "bucket": 1,
-   "bytes": 4551802,
+   "bytes": 4884948,
    "file": "001.json",
-   "rows": 3684,
-   "sha256": "125c4b7497c29f0d2b7d532db1eae3781f670673d1752d83d3025cc5278a42bf"
+   "rows": 3953,
+   "sha256": "fd9925c978a7bbd911ae5ed0bcf2155c4cf68ffab883d26432b3b5b8bb907597"
   }
  ],
  "signal": "nc_ecourts_case",
