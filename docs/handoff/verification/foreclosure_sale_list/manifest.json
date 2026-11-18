@@ -1,59 +1,52 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 81,
+  "confirmed": 128,
   "refuted": 0,
-  "rows": 91,
-  "stale": 4,
-  "unconfirmed": 6,
+  "rows": 161,
+  "stale": 5,
+  "unconfirmed": 28,
   "wall": 0
  },
- "generated_at": "2026-10-17T14:28:27Z",
+ "generated_at": "2026-11-18T04:32:13Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-10-17T14:28:27Z",
-  "county": null,
+  "at": "2026-11-18T04:32:13Z",
+  "county": "Burke",
   "host": "SMB-LTSEO05",
-  "max_rows": 300,
+  "max_rows": 1000,
   "recheck_only": false,
   "requests": {
    "errors": {},
-   "requests": {
-    "berkeleycountysc.paystar.io": 10,
-    "cama.harnett.org": 3,
-    "services1.arcgis.com": 31,
-    "spartanburgcountytax.qpaybill.com": 4,
-    "tax.buncombenc.gov": 41,
-    "tax.transylvaniacounty.org": 56,
-    "taxbill.catawbacountync.gov": 555
-   }
+   "requests": {}
   },
   "result": {
-   "budget_stop": 1
+   "checked": 30,
+   "confirmed": 17,
+   "unconfirmed": 13
   },
-  "seconds": 1513,
+  "seconds": 13,
   "selection": {
-   "applies": 388,
-   "due_new": 301,
-   "due_retry": 5,
-   "due_ttl": 82,
-   "same_property_queued": 3
+   "applies": 32,
+   "due_new": 26,
+   "due_ttl": 6,
+   "same_property_queued": 2
   },
   "source": null,
   "tier": null
  },
- "rows": 91,
+ "rows": 161,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 94699,
+   "bytes": 167462,
    "file": "000.json",
-   "rows": 91,
-   "sha256": "3304a409435fd357c22446735dfd824b3c92d8ca35a9c22eae3607042f70904f"
+   "rows": 161,
+   "sha256": "239e9a2e927177fafdf612f49159b2a07fab0ed03d94c0f87e9b2bb68cd65250"
   }
  ],
  "signal": "foreclosure_sale_list",
