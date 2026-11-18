@@ -213,7 +213,23 @@ _verdict("walled", ("Newberry",), ("assessed_value", "lot_size"),
 # PageID (and the KeyValue/card-field-label shape) off the actual resolved URL, the same way the
 # 4 built counties were confirmed -- gis_fill's own contract is never mis-report a value, and an
 # unconfirmed PageID risks silently rendering the wrong page.
-_verdict("no source", ("Chesterfield", "Marion", "Williamsburg"), ("assessed_value", "lot_size"),
+# 2026-11-17 misc-tiny round 20: Chesterfield/Williamsburg REMOVED from this verdict. Round 17
+# (2026-11-16/17) found and built a real producer against exactly this WTH 'tgis' shell's legacy
+# getftr.aspx detail endpoint (ingest_chesterfield_wthgis.py, backfill_williamsburg_wthgis_board.py)
+# -- not an ArcGIS REST layer (genuinely absent, as this verdict's reasoning says), but a real,
+# usable fill source the reasoning conflated with "no source at all". Live yield, read straight off
+# gap_list_2026-11-17.csv: Chesterfield assessed_value 1303/1613 (80.8%), lot_size 487/1613 (30.2%);
+# Williamsburg assessed_value 2679/2956 (90.6%), lot_size 2674/2956 (90.5%). Leaving this verdict in
+# place for them was masking a real, working, high-yield producer as "no source known"; removing
+# them lets classify_cell's own "built-but-low-yield" branch show through instead, which is what
+# genuinely happened here. Marion KEPT, same WTH source, same (still accurate) "no ArcGIS REST
+# layer" framing -- but Marion's real blocker is a DIFFERENT, still-live problem (0 of 280 Marion SC
+# board rows carry a parcel_id, so a WTH name-search hit can't be bound to a specific board row),
+# already correctly declined with fresh 2026-11-17 evidence in declined_registry.json, which
+# overrides this verdict's downgrade for Marion regardless of this verdict's own continued
+# presence (see declined_override(): it never touches a "built-but-low-yield" cls, only the
+# "no source known" this verdict produces).
+_verdict("no source", ("Marion",), ("assessed_value", "lot_size"),
          "the county's only viewer is a WTH 'tgis' map shell with no open ArcGIS parcel REST layer "
          "(parcel_cache.py research note 2026-09-21; county records matrix 2026-10-07)")
 _verdict("no source", ("Dorchester",), ("assessed_value",),
