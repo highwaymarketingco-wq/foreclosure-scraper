@@ -334,6 +334,28 @@ PORTALS: dict[str, Portal] = {
     #: for the same untested-field reason as Davidson above
     "Person": Portal("Person", "https://www.bttaxpayerportal.com/ITSPublicPR", "ParcelNumber",
                      full_model=True, address_search=False, name_search=True),
+    #: ADDED 2026-11-17 (gap_matrix round 20, atty_tax_verified_confirmed's own primary target).
+    #: Moore was already in nc_its_public_tax.py's own PORTALS (ITSPublicMO, the SAME host as
+    #: Person minus the ".com" -- "https://bttaxpayerportal.com/ITSPublicMO", no "www.") with
+    #: zero verifier coverage. Live-confirmed 2026-11-17, the SAME dead-ParcelNumber /
+    #: working-OwnerName split as Davidson/Person: ParcelNumber with the board's own 12-digit
+    #: GIS PIN as-is ("855212865690") answers 0 records, while OwnerLastName/OwnerFirstName
+    #: (full_model, the Person shape -- an empty partial also 500s here) returns real bills --
+    #: confirmed on 3 of 3 real board rows, each one's own exact 12-digit parcel_id appearing
+    #: among the owner's returned bills: "RESORTS OF PINEHURST INC" (151 bills, 2 carry
+    #: 855212865690, $386,490.50 2026 original, Paid); "BROWN FAMILY BUILDERS, LLC" (1 bill,
+    #: carries 953302793031 exactly, Paid); "WRIGHT"/"MARILYN" (16 bills across 2 Wright
+    #: taxpayers, 2 of them -- 2026 and 2025 -- carry 858406488091 exactly, Paid). The grid's
+    #: own cell order is the module's DEFAULT CELLS (year, bill, account, owner, description,
+    #: levy, balance, action -- an 8-cell row, situs embedded in the description, confirmed by
+    #: the live sample rows above), NOT the separate-Address ITSNET_CELLS layout Carteret/
+    #: Alleghany/Scotland/Brunswick use -- no `cells=` override needed. address_search=False
+    #: for the same untested-field reason as Davidson/Person (FormattedPropertyAddress was never
+    #: tried live). Moore's board rows here are from `counties_generic.liensnc`, not this
+    #: county's own roll (nc_its_public_tax writes Moore's roll block under a DIFFERENT source,
+    #: so `_own_roll()` never matches) -- same as Davidson, no `rolls=` override needed either.
+    "Moore": Portal("Moore", "https://bttaxpayerportal.com/ITSPublicMO", "ParcelNumber",
+                    full_model=True, address_search=False, name_search=True),
     "Transylvania": Portal(
         "Transylvania", "https://tax.transylvaniacounty.org", "ParcelNumber",
         rolls=(ITS_ROLL, TRANSYLVANIA_ROLL), full_model=True, map_ref=r"\bMS\.\d+$",
