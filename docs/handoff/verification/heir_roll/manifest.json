@@ -1,53 +1,54 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 3504,
+  "confirmed": 3679,
   "refuted": 11,
-  "rows": 3577,
+  "rows": 3752,
   "stale": 19,
   "unconfirmed": 43,
   "wall": 0
  },
- "generated_at": "2026-11-18T11:21:19Z",
+ "generated_at": "2026-11-18T12:20:01Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-18T11:21:19Z",
-  "county": "Barnwell",
+  "at": "2026-11-18T12:20:01Z",
+  "county": "Colleton",
   "host": "SMB-LTSEO05",
-  "max_rows": 700,
+  "max_rows": 2000,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "services8.arcgis.com": 251
+    "services1.arcgis.com": 351
    }
   },
   "result": {
    "budget_stop": 1,
-   "checked": 83,
-   "confirmed": 83
+   "checked": 175,
+   "confirmed": 175
   },
-  "seconds": 501,
+  "seconds": 702,
   "selection": {
-   "applies": 819,
-   "due_new": 769,
-   "not_due_ttl": 50
+   "applies": 1817,
+   "due_new": 1394,
+   "not_due_retry": 15,
+   "not_due_ttl": 408
   },
   "source": null,
   "tier": null
  },
- "rows": 3577,
+ "rows": 3752,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 3422170,
+   "bytes": 3589060,
    "file": "000.json",
-   "rows": 3577,
-   "sha256": "f91f601e78a98bd5801da8bab6c8ab283bba28148319386332c6d8487856ca15"
+   "rows": 3752,
+   "sha256": "200594aff8d69bad502c524fa6c0bacf43ea1fb03b266393107be9a2fb2961d9"
   }
  ],
  "signal": "heir_roll",
