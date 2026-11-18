@@ -44,6 +44,14 @@ def test_cards():
                           listing_type="lis_pendens", raw={"public_notice": {"kind": "lien_claim"}})) is None
     assert W.card_of(_row(state="NC", source="public_notices.nc_notices_counties", county="Dare",
                           listing_type="lis_pendens", raw={})) is None
+    # Brock & Scott (NC + SC): foreclosure_sale_list.py's own FIRMS registry never includes it
+    # (its docstring: answers "Forbidden" to a plain fetch, scraper falls back to a stealth
+    # browser a verifier never uses) -- added 2026-11-18, these rows carried no verdict at all.
+    assert W.card_of(_row(state="NC", county="Gaston", source="law_firms.brock_scott",
+                          listing_type="foreclosure_sale")) == "brock_scott_waf"
+    assert W.card_of(_row(state="SC", county="Spartanburg", source="law_firms.brock_scott",
+                          listing_type="foreclosure_sale")) == "brock_scott_waf"
+    assert W.card_of(_row(state="NC", source="law_firms.hutchens", listing_type="foreclosure_sale")) is None
 
 
 def test_never_fetches():

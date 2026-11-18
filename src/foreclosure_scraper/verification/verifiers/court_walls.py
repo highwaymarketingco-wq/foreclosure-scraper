@@ -13,6 +13,25 @@ row says so where the lead is read, and the card id names the manual lane:
                         index is open; no verifier reads it yet, so its rows carry no label).
   card nc_est           NC estate claims from estate notices (notice to creditors: the estate
                         file itself is an NC eCourts Smart Search record).
+  card brock_scott_waf  Brock & Scott trustee-sale rows (foreclosure_sale, every NC/SC county it
+                        files in). foreclosure_sale_list.py's own docstring already names Brock &
+                        Scott as "NOT read (walls, recorded in docs/walls_register.json): ...
+                        answers 'Forbidden' to a plain client; its scraper falls back to a stealth
+                        browser" -- a verifier never takes that fallback, so these rows carried no
+                        verdict at all (not even a wall) until this card. Confirmed live in the
+                        scraper's own code (law_firms/brock_scott.py _page(): "Site now returns
+                        'Forbidden' (9 bytes) to plain httpx. Fall back to StealthyFetcher which
+                        passes the WAF check."): a Cloudflare-style bot check, kind A by this
+                        register's own definition. Added 2026-11-18, gap_matrix built-not-verified
+                        sweep; board_stream audit found 51 rows across 16 counties (NC Gaston,
+                        Burke, Buncombe, Brunswick, Henderson, Onslow, Lincoln, Mitchell,
+                        Rutherford, Cleveland, McDowell; SC Spartanburg, Anderson, Oconee, Laurens,
+                        Pickens), none carrying any prior verification dict. No walls_register.json
+                        card added alongside this one (that file's generator requires several
+                        operational fields -- what to pull, how it is saved, which existing app
+                        ingests the save -- this round found no such ingestion lane for this firm's
+                        page format and declined to invent one; a future round can add the full
+                        manual-lane card once that lane is real).
   card nc_sp            NC power-of-sale foreclosure claims built from a notice of sale (the SP
                         file: hearing, sale, report of sale, upset bids). Also covers a notice
                         nc_notices_counties.py classified raw.public_notice.kind == "foreclosure"
@@ -73,6 +92,13 @@ NC_ESTATE_NOTICE_SOURCES = frozenset({"counties.column_legal_notices",
 NC_SP_NOTICE_SOURCES = frozenset({"public_notices.nc_notices_counties", "public_notices.ncnotices",
                                   "counties.column_legal_notices"})
 SC_NOTICE_SOURCES = frozenset({"counties_sc.sc_public_notices"})
+#: foreclosure_sale_list.py's own FIRMS registry never includes this one (its docstring: "NOT
+#: read ... answers 'Forbidden' to a plain client; its scraper falls back to a stealth browser").
+BROCKSCOTT_SOURCES = frozenset({"law_firms.brock_scott"})
+#: the claim types a trustee sale list (or this wall standing in for one) can govern -- same
+#: universe as foreclosure_sale_list.GOVERNS, kept as a local literal so this module never
+#: imports a sibling verifier just for one tuple.
+_SALE_LIST_TYPES = frozenset({"foreclosure_sale", "upset_bid", "court_sale", "tax_sale"})
 
 _NAME = __name__.rsplit(".", 1)[-1]
 
@@ -104,6 +130,8 @@ def card_of(row: Any) -> Optional[str]:
     if st == "NC" and src in NC_ESTATE_NOTICE_SOURCES and (
             lt in ("probate_notice", "estate_lead") or isinstance(raw.get("probate"), dict)):
         return "nc_est"
+    if st in ("NC", "SC") and src in BROCKSCOTT_SOURCES and lt in _SALE_LIST_TYPES:
+        return "brock_scott_waf"
     return None
 
 
@@ -115,6 +143,9 @@ _WHY = {
     "sc_publicindex": "SC Judicial Public Index: the site's edge refuses scripts (bot check)",
     "sc_notice_body": "scpublicnotices.com notice body: Cloudflare check and a CAPTCHA",
     "nc_sp": "NC eCourts special proceeding file: picture CAPTCHA before every search",
+    "brock_scott_waf": "brockandscott.com foreclosure sale list: plain fetch gets HTTP 'Forbidden'"
+                       " (Cloudflare-style WAF); the scraper's own stealth-browser fallback is"
+                       " never used by a verifier",
     "nc_est": "NC eCourts estate file: picture CAPTCHA before every search",
 }
 
