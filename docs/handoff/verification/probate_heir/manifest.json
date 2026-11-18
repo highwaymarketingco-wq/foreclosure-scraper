@@ -8,32 +8,25 @@
   "unconfirmed": 36,
   "wall": 0
  },
- "generated_at": "2026-11-16T21:50:13Z",
+ "generated_at": "2026-11-18T02:25:45Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-16T21:50:13Z",
-  "county": "Greenville",
+  "at": "2026-11-18T02:25:45Z",
+  "county": "Gaston",
   "host": "SMB-LTSEO05",
-  "max_rows": 2000,
+  "max_rows": 1000,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "www.greenvillecounty.org": 38
+    "gis.gastoncountync.gov": 101
    }
   },
-  "result": {
-   "checked": 38,
-   "confirmed": 23,
-   "stale": 15
-  },
-  "seconds": 153,
-  "selection": {
-   "applies": 38,
-   "due_new": 38
-  },
+  "result": {},
+  "seconds": 200,
+  "selection": {},
   "source": null,
   "tier": null
  },

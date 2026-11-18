@@ -1,51 +1,54 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 661,
+  "confirmed": 1005,
   "refuted": 11,
-  "rows": 703,
+  "rows": 1050,
   "stale": 1,
-  "unconfirmed": 30,
+  "unconfirmed": 33,
   "wall": 0
  },
- "generated_at": "2026-11-16T20:07:24Z",
+ "generated_at": "2026-11-18T02:25:45Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-16T20:07:24Z",
-  "county": "Darlington",
+  "at": "2026-11-18T02:25:45Z",
+  "county": "Gaston",
   "host": "SMB-LTSEO05",
-  "max_rows": 12,
+  "max_rows": 1000,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "services5.arcgis.com": 38
+    "gis.gastoncountync.gov": 101
    }
   },
   "result": {
-   "checked": 12,
-   "confirmed": 12
+   "budget_stop": 1,
+   "checked": 101,
+   "confirmed": 99,
+   "unconfirmed": 2
   },
-  "seconds": 74,
+  "seconds": 200,
   "selection": {
-   "applies": 30,
-   "due_new": 30
+   "applies": 390,
+   "due_new": 385,
+   "due_ttl": 5
   },
   "source": null,
   "tier": null
  },
- "rows": 703,
+ "rows": 1050,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 672531,
+   "bytes": 1004766,
    "file": "000.json",
-   "rows": 703,
-   "sha256": "dd0d0922071d0d4f4e7755bb00d8dab9aab7edb3006904c8a7d0b02995543921"
+   "rows": 1050,
+   "sha256": "caa09d23281f0614d23180d439893c116a822ddf23446bfc109492b4d0d722b6"
   }
  ],
  "signal": "heir_roll",
