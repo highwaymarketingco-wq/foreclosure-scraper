@@ -66,6 +66,27 @@ Marion -- and resolved Edgefield as a real wall (declined in declined_registry.j
 not this module's concern; see project_lt_estate_lead_round19_2026-11-17.md for the
 full writeup).
 
+ROUND 32 (2026-11-18) added Marlboro. Found while fixing Marlboro's SEPARATE
+atty_deed_ref gap (see scripts/backfill_marlboro_wthgis_deed_ref.py's own docstring):
+its DSID (2558) reads straight off marlborosc.wthgis.com's own homepage "Parcel
+Tools Menu" fetchOverlay call, the same spot Chesterfield's/Dillon's/McCormick's
+were each found. LIVE-VERIFIED tonight with the real ESTATE/HEIR tokens (not just
+board owner surnames): 411 + 16 = 427 distinct raw hits, a 20-point spread sample
+run through this module's own `_classify()` (imported here, never reimplemented)
+scored 12/20 life_estate, 7/20 estate, 0/20 heirs, 1/20 a genuine blank-owner miss
+-- 95% real, correctly-classified hits, in line with Chesterfield's own ~96%.
+Marlboro's getftr.aspx schema does NOT match _DEFAULT_FIELDS, though (live-diffed
+across the same 20-row sample): no Owner&nbsp;Name2 at all (single-owner
+template, 0/20); address is Physical&nbsp;Address, not Property&nbsp;Address1
+(0/20 on the default label, 19/20 on the real one); mailing city/state are not
+split out as their own cells -- they ride combined inside Mailing&nbsp;Address3
+(e.g. "WALLACE SC", 19/20) the way Chesterfield's own Mailing&nbsp;City/Mailing
+&nbsp;State are; and value/acreage use this county's own plain-English labels
+(Total&nbsp;Market&nbsp;Appraisal, Total&nbsp;Acreage -- both 19/20) rather than
+Chesterfield's/Williamsburg's MarketValueTotalValue/MarketValueAcres camelCase
+scheme (0/20 on those). Overridden below the same way Marion's own schema
+override already is.
+
 DSID DISCOVERY FIX: round 18's own note said the Chesterfield-style "Parcel Tools
 Menu" JS (the only place a DSID is visible without a headful browser) is "apparently
 rendered only through live, interactive use of the viewer ... not visible in a single
@@ -196,7 +217,8 @@ log = structlog.get_logger()
 #: (search index returns real, classifier-passing owner data -- see module docstring)
 #: are listed; a platform sibling being reachable is not enough on its own. A county
 #: whose getftr.aspx uses different <th> labels sets its own "fields" override (see
-#: _DEFAULT_FIELDS); every county below but Marion matches the default exactly.
+#: _DEFAULT_FIELDS); every county below but Marion and Marlboro matches the default
+#: exactly.
 _WTHGIS_COUNTIES: dict[str, dict] = {
     "Chesterfield": {"dsid": 6796, "base": "https://chesterfieldsc.wthgis.com/tgis/"},
     "Dillon": {"dsid": 1042, "base": "https://dillonsc.wthgis.com/tgis/"},
@@ -216,6 +238,20 @@ _WTHGIS_COUNTIES: dict[str, dict] = {
             "market_value": None,
             "tax_value": None,
             "acreage": None,
+        },
+    },
+    # round 32 (2026-11-18) -- see module docstring for the live-verification numbers.
+    "Marlboro": {
+        "dsid": 2558,
+        "base": "https://marlborosc.wthgis.com/tgis/",
+        "fields": {
+            "owner2": None,
+            "address": "Physical&nbsp;Address",
+            "mailing_city": "Mailing&nbsp;Address3",  # carries "CITY STATE" combined
+            "mailing_state": None,
+            "market_value": "Total&nbsp;Market&nbsp;Appraisal",
+            "tax_value": None,
+            "acreage": "Total&nbsp;Acreage",
         },
     },
 }
