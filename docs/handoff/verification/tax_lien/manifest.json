@@ -1,163 +1,160 @@
 {
  "buckets": 16,
  "counts": {
-  "confirmed": 38051,
+  "confirmed": 38150,
   "refuted": 988,
-  "rows": 70513,
-  "stale": 14525,
+  "rows": 70613,
+  "stale": 14526,
   "unconfirmed": 16949,
   "wall": 0
  },
- "generated_at": "2026-11-18T03:17:40Z",
+ "generated_at": "2026-11-18T03:46:23Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-18T03:17:38Z",
-  "county": "Horry",
+  "at": "2026-11-18T03:46:21Z",
+  "county": "Mecklenburg",
   "host": "SMB-LTSEO05",
-  "max_rows": 1500,
+  "max_rows": 120,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "horrycountytreasurer.qpaybill.com": 148
+    "taxbill.co.mecklenburg.nc.us": 200
    }
   },
   "result": {
    "budget_stop": 1,
-   "checked": 141,
-   "confirmed": 65,
-   "stale": 71,
-   "unconfirmed": 5
+   "checked": 100,
+   "confirmed": 99,
+   "stale": 1
   },
-  "seconds": 303,
+  "seconds": 426,
   "selection": {
-   "applies": 3999,
-   "due_new": 2624,
-   "due_retry": 3,
-   "due_ttl": 395,
-   "due_version": 969,
-   "not_due_ttl": 8
+   "applies": 20904,
+   "due_new": 20676,
+   "not_due_retry": 2,
+   "not_due_ttl": 226
   },
   "source": null,
   "tier": null
  },
- "rows": 70513,
+ "rows": 70613,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 6234722,
+   "bytes": 6246930,
    "file": "000.json",
-   "rows": 4324,
-   "sha256": "ba6623d2205b0709635288f81d2610737003e93957440636551d1f896689dc40"
+   "rows": 4334,
+   "sha256": "65155058a4cc3add109fc040a810695745164074f40e5add31b0a94862a043db"
   },
   {
    "bucket": 1,
-   "bytes": 6243638,
+   "bytes": 6252202,
    "file": "001.json",
-   "rows": 4307,
-   "sha256": "f57162e6a7b92466600cbec9011bcc0f04ee1f841480fbbd81c852013b8cade9"
+   "rows": 4314,
+   "sha256": "2d6404c69846d605e5e891e0ff5f2ae0b7581337c40cb912b26b0ba12a919ddf"
   },
   {
    "bucket": 2,
-   "bytes": 6388626,
+   "bytes": 6398216,
    "file": "002.json",
-   "rows": 4449,
-   "sha256": "ed08b288af53113c3cb968660fe8b48487f1e44ab2cad7b7171f444673056450"
+   "rows": 4457,
+   "sha256": "ce31e1f46ca6d711fca7c4c0116a233aca05da216072f004af1791843dfed5a9"
   },
   {
    "bucket": 3,
-   "bytes": 6376863,
+   "bytes": 6380632,
    "file": "003.json",
-   "rows": 4409,
-   "sha256": "778e9aa0371a8f251f94102ff92366d8323821e55997fbe275377b8db90b753d"
+   "rows": 4412,
+   "sha256": "e58c38485cfec76abc224410cd8a9016f8883e80617f657df6bacf138d06c458"
   },
   {
    "bucket": 4,
-   "bytes": 6352691,
+   "bytes": 6361510,
    "file": "004.json",
-   "rows": 4384,
-   "sha256": "4adcbbf380b026d1cc3823e5ff4f64d3fff1552e88cbf3969388f723ee8b5377"
+   "rows": 4391,
+   "sha256": "4816468fa4d0fdc3e0500ff19243bcd51fbe17966bd5544b5cd61f5f206072ee"
   },
   {
    "bucket": 5,
-   "bytes": 6456190,
+   "bytes": 6463555,
    "file": "005.json",
-   "rows": 4480,
-   "sha256": "9571125572c4b7f3ee599fd5a24ef6d514d23e4233169fb75a0513b34825e115"
+   "rows": 4486,
+   "sha256": "4b2986f4c150b3cf2893ffceaa919c590e3f89cc43778d4b6874d189517d1a65"
   },
   {
    "bucket": 6,
-   "bytes": 6240354,
+   "bytes": 6242918,
    "file": "006.json",
-   "rows": 4324,
-   "sha256": "393d14b2fb5dc7fc3dd2db6c5fd53933a264c9a6019e9dde06beadf700cbd522"
+   "rows": 4326,
+   "sha256": "82403126a1b901b144238a75e3561ce7ab31c4668ce46b8de5639d59d9b66bd7"
   },
   {
    "bucket": 7,
-   "bytes": 6416466,
+   "bytes": 6421644,
    "file": "007.json",
-   "rows": 4442,
-   "sha256": "7788cb47f637ece61d60a21e8b92c57906b7e0045221b23606618ce62ab0c96f"
+   "rows": 4446,
+   "sha256": "f1c666c622e37b29d4f5d11ab3bcacc30d571172d8b612637542b1d012909ff9"
   },
   {
    "bucket": 8,
-   "bytes": 6500801,
+   "bytes": 6509796,
    "file": "008.json",
-   "rows": 4493,
-   "sha256": "e33489df516c58651b7397031a962a1bf8ae9b4d4509073e09650171f68aec98"
+   "rows": 4500,
+   "sha256": "7daab4f2d1e8364672fe8cbb0abda8f2f1a3577eed4928c58e4773ed4d7c5cb8"
   },
   {
    "bucket": 9,
-   "bytes": 6382086,
+   "bytes": 6395746,
    "file": "009.json",
-   "rows": 4427,
-   "sha256": "9164ec9a381d1a4d82cc024a9131b0fdd223fd94e7b4129cbe74bdd737a7b8ad"
+   "rows": 4438,
+   "sha256": "b6ad706c6a81f6ba7bb7d4264949a30c408a7e974dc746fa1a3145d0c3905ffa"
   },
   {
    "bucket": 10,
-   "bytes": 6113159,
+   "bytes": 6119262,
    "file": "010.json",
-   "rows": 4281,
-   "sha256": "62177e604a34f0e64414b38f080d6b0419b3952980d49318d9cef6a8d0afe989"
+   "rows": 4286,
+   "sha256": "e53274840a0600904299f0f395aa8e5951c6142e961d3c6a4f0215d3f7d1db6b"
   },
   {
    "bucket": 11,
-   "bytes": 6312423,
+   "bytes": 6317640,
    "file": "011.json",
-   "rows": 4387,
-   "sha256": "206c8fc94173a6b50ffbe41cecba0f0331d5f7b6f99c0721aa3ba5091a564063"
+   "rows": 4391,
+   "sha256": "5aa929919b806e9b9384a476df5bad4a08e3aff9d717dfe9ea3f8def3b41f036"
   },
   {
    "bucket": 12,
-   "bytes": 6383024,
+   "bytes": 6392729,
    "file": "012.json",
-   "rows": 4445,
-   "sha256": "3e51a2705457986ec187ec126bac5834bea6074279e7b8e2e85870ac3f59f196"
+   "rows": 4453,
+   "sha256": "199ee97f2fd6b76dcd38a5b02923935508db788f4d9eb995946d5d924cab711b"
   },
   {
    "bucket": 13,
-   "bytes": 6423287,
+   "bytes": 6426915,
    "file": "013.json",
-   "rows": 4446,
-   "sha256": "f30841cc168a6aaa3bc9c467cef6c7b8d8046f506292882639f1b83855d8180e"
+   "rows": 4449,
+   "sha256": "8e487eb69857121ccdfbcf76c3fd3373a3f103640f09abad8bc45be090c48336"
   },
   {
    "bucket": 14,
-   "bytes": 6391439,
+   "bytes": 6400063,
    "file": "014.json",
-   "rows": 4444,
-   "sha256": "05f25ace85cd6ebd7054b31ec866e81f472583ff953ad8a43daceb5357b72d74"
+   "rows": 4451,
+   "sha256": "95b324b592cc00cb2f8906e11592dcab851201ea0cfe4e8a373bb5055359ad46"
   },
   {
    "bucket": 15,
-   "bytes": 6509430,
+   "bytes": 6519115,
    "file": "015.json",
-   "rows": 4471,
-   "sha256": "b79a1899192dc283136bd911fe4b78a23faedfe1c2b775e6c6ffbe57b135823b"
+   "rows": 4479,
+   "sha256": "0ea92ff7b6178853fdc628affa99dccfaa98854aadc917e87a614eeebd6d792a"
   }
  ],
  "signal": "tax_lien",
