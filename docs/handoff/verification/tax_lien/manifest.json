@@ -1,46 +1,48 @@
 {
  "buckets": 16,
  "counts": {
-  "confirmed": 37887,
+  "confirmed": 37891,
   "refuted": 988,
-  "rows": 69302,
+  "rows": 69306,
   "stale": 13381,
   "unconfirmed": 17046,
   "wall": 0
  },
- "generated_at": "2026-11-18T02:44:15Z",
+ "generated_at": "2026-11-18T02:51:19Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-18T02:44:13Z",
-  "county": "Rutherford",
+  "at": "2026-11-18T02:51:17Z",
+  "county": "Catawba",
   "host": "SMB-LTSEO05",
-  "max_rows": 3000,
+  "max_rows": 600,
   "recheck_only": false,
   "requests": {
    "errors": {},
-   "requests": {}
+   "requests": {
+    "taxbill.catawbacountync.gov": 123
+   }
   },
   "result": {
-   "checked": 3000,
-   "deferred": 2993,
-   "rechecked_after_deferral": 962,
-   "unconfirmed": 3000
+   "budget_stop": 1,
+   "checked": 19,
+   "confirmed": 7,
+   "stale": 12
   },
-  "seconds": 1067,
+  "seconds": 247,
   "selection": {
-   "applies": 9445,
-   "due_new": 3082,
-   "due_retry": 7,
-   "due_retry_transient": 6201,
-   "due_version": 6,
-   "not_due_ttl": 149
+   "applies": 5128,
+   "due_new": 10,
+   "due_retry": 23,
+   "due_retry_transient": 1,
+   "due_ttl": 91,
+   "not_due_ttl": 5003
   },
   "source": null,
   "tier": null
  },
- "rows": 69302,
+ "rows": 69306,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
@@ -60,24 +62,24 @@
   },
   {
    "bucket": 2,
-   "bytes": 6070945,
+   "bytes": 6073564,
    "file": "002.json",
-   "rows": 4355,
-   "sha256": "77576227d5b964a2e854fdb408649fef274d83a08b18df8c349001035af2077a"
+   "rows": 4357,
+   "sha256": "c2334e0f82cc29fab676870c2b395b9342b97e1da913a2dfc946c4cde18c4d2d"
   },
   {
    "bucket": 3,
-   "bytes": 6072944,
+   "bytes": 6074385,
    "file": "003.json",
-   "rows": 4324,
-   "sha256": "985e8734101f9e66abc8829ee26d6880dfdd62bf75fce1be26637ae30a70e2d4"
+   "rows": 4325,
+   "sha256": "a37fcb999b22efb2476dc211b2a9a448b4563ef9c0fdb4bd22718cbecade19f8"
   },
   {
    "bucket": 4,
-   "bytes": 6067795,
+   "bytes": 6068121,
    "file": "004.json",
    "rows": 4300,
-   "sha256": "6e49bab551bfee4d1778c1565cc05854d3b15849dac588158f834279b7458ffc"
+   "sha256": "a4f312ee53579a8dd7920704921ef82b681fbd55e8f9cf99847eee13549ebf5b"
   },
   {
    "bucket": 5,
@@ -88,52 +90,52 @@
   },
   {
    "bucket": 6,
-   "bytes": 5984596,
+   "bytes": 5984707,
    "file": "006.json",
    "rows": 4253,
-   "sha256": "281002301e7e8c7a196ca44e3f5e8f339ce59f303b06ed65f4357a3fbfbadbd1"
+   "sha256": "67bbb7b28cce319a591bdcbb04fae5d5031383050c8731e295fff467310643c1"
   },
   {
    "bucket": 7,
-   "bytes": 6157749,
+   "bytes": 6157860,
    "file": "007.json",
    "rows": 4366,
-   "sha256": "309f4aa8ddd34ce544aac096d5149db23cf596f39c53c3219f2ef2da32d13370"
+   "sha256": "09218b4972a60322a790da7825143ab919f88b147ec56fc3f1cc5f82eed701fa"
   },
   {
    "bucket": 8,
-   "bytes": 6238415,
+   "bytes": 6239734,
    "file": "008.json",
-   "rows": 4415,
-   "sha256": "ed1537c627acdfdd145df1422bf88b672764a8c72260d7e932f7fafeddc0729f"
+   "rows": 4416,
+   "sha256": "d40c8779400ede0414cf6d7033172647fb0606b706091c6e50cee75a7cfbc71b"
   },
   {
    "bucket": 9,
-   "bytes": 6113978,
+   "bytes": 6114200,
    "file": "009.json",
    "rows": 4348,
-   "sha256": "be2b449d7c398f5cb581071e35d4a0e1fdde7b61a9ad4ed11465fcc3f07336dd"
+   "sha256": "73918e17ef2dd7f5ba3b4ca5d11702c2de98bd82c49e35d2075e593107815222"
   },
   {
    "bucket": 10,
-   "bytes": 5931817,
+   "bytes": 5931928,
    "file": "010.json",
    "rows": 4231,
-   "sha256": "ab0bc50e20737d3ce2fcbb197138dc2a48b0e7018065c0809b89525dba89bdab"
+   "sha256": "e7510fabe4ef4083788e00253e5dfa3252cb0934779f3dc53cc811dbe9da665a"
   },
   {
    "bucket": 11,
-   "bytes": 6026728,
+   "bytes": 6026955,
    "file": "011.json",
    "rows": 4306,
-   "sha256": "6b80eada22f7b7bd489954351b7e6e1b5d66d6c615f5ccae3f63ed31233504a8"
+   "sha256": "fac7c3fe4f1471949d7958414d7785c19e21c0af029ca4daeadcf3ff39429d72"
   },
   {
    "bucket": 12,
-   "bytes": 6149967,
+   "bytes": 6150189,
    "file": "012.json",
    "rows": 4378,
-   "sha256": "5b03a82bf57b2909d77c82369d4a80f8c9aa0b32280408e7865bf426de20dda3"
+   "sha256": "4c5a11e9d99cb0399e14e555c615d8fe8047e501b0cc729997e846285f3d1118"
   },
   {
    "bucket": 13,
@@ -144,10 +146,10 @@
   },
   {
    "bucket": 14,
-   "bytes": 6143388,
+   "bytes": 6143610,
    "file": "014.json",
    "rows": 4374,
-   "sha256": "e40feb84ece8306030bbe7e9d079503f1e55dcf02506cd078c164c2f68a22584"
+   "sha256": "e4cc7c9c668c8ffddd2af4de5288d9ddfd96d9b40723933ac4dadc830f0cd87b"
   },
   {
    "bucket": 15,
