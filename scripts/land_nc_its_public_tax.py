@@ -1,31 +1,36 @@
 #!/usr/bin/env python3
-"""Landing script for NcItsPublicTax scoped to Moore NC (round 20, 2026-11-17 finding).
+"""Landing script for NcItsPublicTax, scoped to one or more counties via --county
+(generalized from the original Moore-only land_moore_its_public_tax.py, round 20b,
+2026-11-17 -- same script, renamed and parameterized after finding the same gap in
+a second county).
 
-WHY THIS EXISTS. counties_nc/nc_its_public_tax.py's PORTALS dict has carried a real,
-wired Moore NC entry since round 18 (live-confirmed 3 separate years of real unpaid
-bills -- 2,445/1,562/643 records) -- but round 20 found Moore has never landed a
-single row on the board. Root cause, from the scraper's own fetch() docstring
-comment ("round-robin-starvation"): its global timeout_s (3300s) divided across
-~16 PORTALS counties at up to 420s each can exhaust before a late-rotation county is
-ever reached in a given day's run, and the starting county rotates by
-date.today().toordinal() -- Moore can go days without being reached by sheer
-rotation luck, with zero indication anything is broken. The module's own
-ITS_TAX_COUNTIES env var exists exactly to bypass this: scope a run to one county
-so it is never starved by its siblings' own budget.
+WHY THIS EXISTS. counties_nc/nc_its_public_tax.py's PORTALS dict wires 15 NC
+counties, but its fetch()'s own documented "round-robin-starvation" shape (a global
+3300s timeout divided across all counties at up to COUNTY_BUDGET_S=420s each, with
+the rotation start picked by date.today().toordinal()) means a county can go
+indefinitely without ever being reached in a normal full run -- silently, with no
+error. Round 20 found Moore (0 rows landed despite being wired since round 18/19);
+checking EVERY PORTALS county's actual board-row count the same way found Carteret
+as a second, even starker case (13 rows vs its peers' 322-3,829). The module's own
+ITS_TAX_COUNTIES env var exists exactly to bypass this for one or more counties at
+a time; ITS_TAX_COUNTY_BUDGET_S (default 420) can be raised too, for a
+high-volume county (Carteret's own per-year page count is large enough that even a
+single-county scoped run can still exhaust the default 420s mid-way through its
+history -- live-confirmed truncated=True at year 2022 on a first attempt).
 
 Appends only genuinely-new rows -- a hit landing on a parcel already represented by
 some OTHER producer's row is skipped (fill-only Listing.merge() semantics would keep
-that row's existing data regardless, so forcing a merge would not move this
-column's real count -- same reasoning as land_sc_wthgis_heir_estate.py's own
-docstring).
+that row's existing data regardless -- same reasoning as land_sc_wthgis_heir_estate.py's
+own docstring).
 
 BOARD I/O: one streaming read-only pass (board_stream.iter_board_rows()) to build
 the existing-keys set; board_lock() wraps ONLY the final append_new_rows() write,
 real absolute repo path. Never load_board().
 
-    python scripts/land_moore_its_public_tax.py --dry-run
+    python scripts/land_nc_its_public_tax.py --county Moore --dry-run
+    python scripts/land_nc_its_public_tax.py --county Carteret --county-budget-s 1800 --dry-run
     BOARD_PATCH_ALLOW_LARGE=1 BOARD_APPEND_ALLOW_LARGE=1 \
-        python scripts/land_moore_its_public_tax.py --allow-large
+        python scripts/land_nc_its_public_tax.py --county Carteret --county-budget-s 1800 --allow-large
 """
 from __future__ import annotations
 
@@ -38,23 +43,28 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "src"))
 
-os.environ["ITS_TAX_COUNTIES"] = "Moore"
-
-from foreclosure_scraper.board_stream import iter_board_rows  # noqa: E402
-from foreclosure_scraper.models import Listing  # noqa: E402
-from foreclosure_scraper.scrapers.counties_nc.nc_its_public_tax import (  # noqa: E402
-    NcItsPublicTax,
-)
-from foreclosure_scraper.web_artifact import (  # noqa: E402
-    append_new_rows, board_lock, board_patch_size_state,
-)
-
 
 def main() -> int:
     ap = argparse.ArgumentParser()
+    ap.add_argument("--county", action="append", required=True,
+                     help="county name, repeatable (e.g. --county Moore --county Carteret)")
+    ap.add_argument("--county-budget-s", type=float, default=None,
+                     help="override ITS_TAX_COUNTY_BUDGET_S (default 420) for "
+                          "high-volume counties that truncate at the default")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--allow-large", action="store_true")
     args = ap.parse_args()
+
+    os.environ["ITS_TAX_COUNTIES"] = ",".join(args.county)
+    if args.county_budget_s:
+        os.environ["ITS_TAX_COUNTY_BUDGET_S"] = str(args.county_budget_s)
+
+    from foreclosure_scraper.board_stream import iter_board_rows
+    from foreclosure_scraper.models import Listing
+    from foreclosure_scraper.scrapers.counties_nc.nc_its_public_tax import NcItsPublicTax
+    from foreclosure_scraper.web_artifact import (
+        append_new_rows, board_lock, board_patch_size_state,
+    )
 
     docs_dir = REPO / "docs"
     if not args.dry_run:
@@ -66,7 +76,8 @@ def main() -> int:
             os.environ["BOARD_PATCH_ALLOW_LARGE"] = "1"
             os.environ["BOARD_APPEND_ALLOW_LARGE"] = "1"
 
-    print("fetching NcItsPublicTax scoped to Moore (ITS_TAX_COUNTIES=Moore)...")
+    print(f"fetching NcItsPublicTax scoped to {args.county} "
+          f"(ITS_TAX_COUNTIES={os.environ['ITS_TAX_COUNTIES']})...")
     s = NcItsPublicTax()
     listings = asyncio.run(s.safe_run())
     print(f"outcome={s.last_outcome} reason={s.last_reason!r} classified={len(listings)} "
@@ -110,7 +121,7 @@ def main() -> int:
         print("nothing new to append.")
         return 0
 
-    with board_lock(REPO, owner="land_moore_its_public_tax", wait=900, poll=10):
+    with board_lock(REPO, owner="land_nc_its_public_tax", wait=900, poll=10):
         stats = append_new_rows(
             new_listings, {"counties_nc.nc_its_public_tax": len(new_listings)},
             docs_dir=docs_dir)
