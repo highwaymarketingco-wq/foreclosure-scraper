@@ -1,7 +1,7 @@
 {
  "board_rows": 622248,
  "by_category": {
-  "uncovered": 305272,
+  "uncovered": 304276,
   "wall": 20939
  },
  "format_version": 1,
@@ -37,12 +37,12 @@
    "generated_at": "2026-10-17T14:28:27Z"
   },
   "foreclosure_sale_list": {
-   "entries": 91,
-   "generated_at": "2026-10-17T14:28:27Z"
+   "entries": 315,
+   "generated_at": "2026-11-18T10:46:08Z"
   },
   "heir_roll": {
-   "entries": 1050,
-   "generated_at": "2026-11-18T02:25:45Z"
+   "entries": 3752,
+   "generated_at": "2026-11-18T12:20:01Z"
   },
   "jail_booking": {
    "entries": 227,
@@ -53,16 +53,16 @@
    "generated_at": "2026-10-17T14:28:27Z"
   },
   "nc_ecourts_case": {
-   "entries": 1331,
-   "generated_at": "2026-10-17T14:28:27Z"
+   "entries": 4720,
+   "generated_at": "2026-11-18T11:09:38Z"
   },
   "probate_heir": {
    "entries": 131,
    "generated_at": "2026-11-18T02:25:45Z"
   },
   "tax_lien": {
-   "entries": 70513,
-   "generated_at": "2026-11-18T03:17:40Z"
+   "entries": 73389,
+   "generated_at": "2026-11-18T12:06:53Z"
   },
   "tax_lien_johnston_static": {
    "entries": 8,
@@ -73,7 +73,7 @@
    "generated_at": "2026-11-16T21:00:28Z"
   }
  },
- "listings": 326211,
+ "listings": 325215,
  "uncovered": {
   "by_scraper_source": {
    "city_websites.charlotte_open_data": 4585,
@@ -92,7 +92,7 @@
    "counties_nc.gastonia_code_enforcement": 1087,
    "counties_nc.lincoln_vacant": 13232,
    "counties_nc.nc_county_pdf_delinquent_tax": 3200,
-   "counties_nc.polk_tax": 2618,
+   "counties_nc.polk_tax": 1622,
    "counties_nc.transylvania_vacant": 10883,
    "counties_sc.charleston_delinquent_tax": 1757,
    "counties_sc.charleston_energov_history": 2378,
@@ -125,7 +125,7 @@
    "NC:lincoln": 15105,
    "NC:mcdowell": 2948,
    "NC:mecklenburg": 8680,
-   "NC:polk": 3048,
+   "NC:polk": 2052,
    "NC:transylvania": 11368,
    "NC:wake": 3869,
    "SC:charleston": 9703,
