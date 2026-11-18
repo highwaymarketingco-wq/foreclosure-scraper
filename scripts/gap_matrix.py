@@ -2390,6 +2390,36 @@ def _nc_heir_estate_parcels_credit() -> set[tuple[str, str]]:
     return out
 
 
+#: 'assessed_value''s own Spec carries NO producers tuple at all for SC (only a NC statewide
+#: entry) -- confirmed 2026-11-18, gap_matrix built-not-verified/sourced-not-built sweep. That
+#: makes `out["assessed_value"]` unconditionally `set()` for every SC county regardless of what
+#: real code exists (built_in_code()'s own `if files else set()` branch, line ~2531), the SAME
+#: bug class as the heir_estate/marriage_license cases above, just with zero producers to grep
+#: instead of a wrong-direction blanket match. scripts/backfill_orangeburg_assessed_value.py (see
+#: its own module docstring, commit e891e88c) is a real, live-verified, wired mechanism for
+#: Orangeburg SC specifically: qpaybill_delinquent_roll.py's own staged detail pass already
+#: parses `"Total Assessed:"` into the canonical Listing.assessed_value field, and that commit's
+#: own county-scoped sibling (reusing the SAME production parse_detail()/sweep_county()
+#: functions, matched by qpaybill's own account-number identification_no) applies it against
+#: Orangeburg's 3,470 real board rows. A plain producers-tuple entry is not used here because the
+#: real reader (qpaybill_delinquent_roll.py's detail pass) ALSO backs ~19-26 other qPayBill
+#: counties for OTHER columns entirely unrelated to assessed_value (its own DETAIL_MAX budget is
+#: spent globally, ranked by tier/balance -- see that backfill script's own docstring) -- a
+#: blanket producers-tuple grep over that file would over-credit every one of them for THIS
+#: column too, the identical wrong-direction bug the heir_estate helpers above exist to avoid.
+#: Scoped to Orangeburg alone, the one county this script's own county-scoped sibling actually
+#: targets today; a future county needs its own sibling script (same shape) before it earns a
+#: literal here, never added by analogy alone.
+_ORANGEBURG_ASSESSED_VALUE_CREDIT = frozenset({("SC", "Orangeburg")})
+
+
+def _orangeburg_assessed_value_credit() -> set[tuple[str, str]]:
+    """Precise (state, county) credit for 'assessed_value' from scripts/backfill_orangeburg_
+    assessed_value.py (see this constant's own docstring above for why a literal, not a blanket
+    producers-tuple grep)."""
+    return set(_ORANGEBURG_ASSESSED_VALUE_CREDIT)
+
+
 #: Same sweep, 'lien_priority' column. Its only producer, rod/enrich.py, carries ZERO literal
 #: county-name text of its own: its VENDORS dict is built entirely at import time from four OTHER
 #: modules' own constants (rod/cchs.py's CCHS_COUNTIES, rod/aumentum.py's AUMENTUM_COUNTIES,
@@ -2573,6 +2603,10 @@ def built_in_code() -> dict[str, set[tuple[str, str]]]:
         other_files = [PKG / f for f in heir_spec.producers if f not in drop]
         base = counties_named_in([f for f in other_files if f.exists()], pats) if other_files else set()
         out["heir_estate"] = base | _sc_heir_estate_parcel_cache_credit() | _nc_heir_estate_parcels_credit()
+    # assessed_value: SC has NO producers tuple at all on this Spec (see
+    # _ORANGEBURG_ASSESSED_VALUE_CREDIT's own docstring) -- nothing to drop, just add the one
+    # real, precise county this column's real SC mechanism covers today.
+    out["assessed_value"] = out.get("assessed_value", set()) | _orangeburg_assessed_value_credit()
     # marriage_license: same refinement for enrichment_county_lien_sweep.py/rod/county_sweeps.py
     # (see _COUNTY_LIEN_SWEEP_REL's own docstring) -- drop that pair's blanket name-match
     # contribution (24 counties, almost all from the unrelated "lien" job) and replace it with the
