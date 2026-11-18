@@ -29,11 +29,27 @@
 # tonight: no `|| break` anywhere (see feedback_selflooping_wrapper_or_break_
 # fragility_2026-11-11 -- a single BoardLockBusy must not kill the loop), and
 # every path is absolute so a cron environment's bare PATH can't break it.
+#
+# HEALTH CHECK ADDED 2026-11-18: "alive" only ever answered "is a process
+# running", never "is it actually succeeding". Found live: a board resharding
+# on 2026-11-16 left board.manifest.json stale (45 real parts on disk, 6
+# recorded), so every wrapper that touches the board hit the SAME
+# BoardIntegrityError on every single invocation -- exhaust its bound (a few
+# thousand seconds), supervisor sees it as "exited", relaunches a fresh bound,
+# repeat. ~10,000 identical failures over 2 days, completely invisible,
+# because "alive" was true the entire time (something was always running,
+# it just never once succeeded). check_stuck() below tails each wrapper's own
+# log and counts recent known-error signatures; past a threshold it writes a
+# single-line, timestamped, greppable alert to logs/SUPERVISOR_ALERTS.log
+# instead of silently continuing. Deliberately alert-only, not a kill switch:
+# this is about catching the NEXT one inside minutes instead of days, not
+# about guessing when it's safe to stop a wrapper automatically.
 set -u
 ROOT=/home/opc/foreclosure-scraper
 cd "$ROOT" || exit 1
 PY="$ROOT/.venv/bin/python3.12"
 LOG="$ROOT/logs/supervisor.log"
+ALERTLOG="$ROOT/logs/SUPERVISOR_ALERTS.log"
 mkdir -p "$ROOT/logs"
 
 alive() {  # alive "<match-pattern>" -> exit 0 if a real process matches, 1 if not
@@ -48,25 +64,48 @@ relaunch() {  # relaunch "<name>" "<shell command to launch, already self-loopin
   disown
 }
 
+check_stuck() {  # check_stuck "<name>" "<log file>" -> appends an alert if the
+                 # tail looks like a repeated-failure loop, never blocks/stops anything
+  local name="$1" logfile="$2" hits
+  [ -f "$logfile" ] || return 0
+  hits=$(tail -n 40 "$logfile" 2>/dev/null | grep -cE 'BoardIntegrityError|Traceback \(most recent call last\)')
+  if [ "${hits:-0}" -ge 8 ]; then
+    # Only write one alert per hour per wrapper -- don't spam the alert log
+    # itself into the same kind of noise this is meant to fix.
+    local marker="$ROOT/logs/.alerted_${name}"
+    local now; now=$(date +%s)
+    local last=0
+    [ -f "$marker" ] && last=$(cat "$marker" 2>/dev/null || echo 0)
+    if [ $((now - last)) -ge 3600 ]; then
+      echo "$(date -u +%FT%TZ) STUCK $name: ${hits}/40 recent log lines show BoardIntegrityError/Traceback -- check $logfile" >> "$ALERTLOG"
+      echo "$now" > "$marker"
+    fi
+  fi
+}
+
 if ! alive "backfill_gis_attrs_boardwide.py"; then
   relaunch gis_attrs_boardwide \
     "cd '$ROOT' && for i in \$(seq 1 150); do $PY scripts/backfill_gis_attrs_boardwide.py --allow-large --max-rows 3000 >> logs/gis_attrs_backfill_continuous.log 2>&1; sleep 15; done"
 fi
+check_stuck gis_attrs_boardwide "$ROOT/logs/gis_attrs_backfill_continuous.log"
 
 if ! alive "backfill_mecklenburg_gis_attrs.py"; then
   relaunch meck_gis_attrs \
     "cd '$ROOT' && for i in \$(seq 1 300); do BOARD_PATCH_ALLOW_LARGE=1 $PY scripts/backfill_mecklenburg_gis_attrs.py --allow-large --max-rows 3000 >> logs/backfill_meck_gis_attrs_continuous.log 2>&1; sleep 15; done"
 fi
+check_stuck meck_gis_attrs "$ROOT/logs/backfill_meck_gis_attrs_continuous.log"
 
 if ! alive "backfill_mecklenburg_code_enforcement.py"; then
   relaunch meck_code_enforcement \
     "cd '$ROOT' && for i in \$(seq 1 300); do BOARD_PATCH_ALLOW_LARGE=1 BOARD_APPEND_ALLOW_LARGE=1 $PY scripts/backfill_mecklenburg_code_enforcement.py --batch-size 300 --max-batches 1 >> logs/backfill_meck_codeenf_continuous.log 2>&1; sleep 15; done"
 fi
+check_stuck meck_code_enforcement "$ROOT/logs/backfill_meck_codeenf_continuous.log"
 
 if ! alive "backfill_mecklenburg_tax.py"; then
   relaunch meck_tax \
     "cd '$ROOT' && for i in \$(seq 1 300); do BOARD_PATCH_ALLOW_LARGE=1 BOARD_APPEND_ALLOW_LARGE=1 $PY scripts/backfill_mecklenburg_tax.py --rounds 3 >> logs/backfill_meck_tax_continuous.log 2>&1; sleep 15; done"
 fi
+check_stuck meck_tax "$ROOT/logs/backfill_meck_tax_continuous.log"
 
 if ! alive "run_comps_sweep.sh"; then
   relaunch comps_sweep "bash '$ROOT/scripts/run_comps_sweep.sh'"
@@ -76,6 +115,7 @@ if ! alive "backfill_deed_chain_v2.py"; then
   relaunch deed_chain_v2 \
     "cd '$ROOT' && for i in \$(seq 1 20); do $PY scripts/backfill_deed_chain_v2.py --allow-large >> logs/manual_deed_chain_v2_run.log 2>&1; sleep 20; done"
 fi
+check_stuck deed_chain_v2 "$ROOT/logs/manual_deed_chain_v2_run.log"
 
 if ! alive "verification_sweep.py --signal tax_lien"; then
   relaunch tax_lien \
