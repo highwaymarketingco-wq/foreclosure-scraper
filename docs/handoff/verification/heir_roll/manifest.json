@@ -1,53 +1,56 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 4660,
+  "confirmed": 4716,
   "refuted": 11,
-  "rows": 4740,
-  "stale": 23,
-  "unconfirmed": 46,
+  "rows": 4798,
+  "stale": 24,
+  "unconfirmed": 47,
   "wall": 0
  },
- "generated_at": "2026-11-18T13:41:36Z",
+ "generated_at": "2026-11-18T14:45:08Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-18T13:41:36Z",
-  "county": "Berkeley",
+  "at": "2026-11-18T14:45:08Z",
+  "county": null,
   "host": "SMB-LTSEO05",
-  "max_rows": 2000,
+  "max_rows": 80,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "gis.berkeleycountysc.gov": 351
+    "chesterfieldsc.wthgis.com": 119
    }
   },
   "result": {
    "budget_stop": 1,
-   "checked": 350,
-   "confirmed": 350
+   "checked": 58,
+   "confirmed": 56,
+   "stale": 1,
+   "unconfirmed": 1
   },
-  "seconds": 701,
+  "seconds": 242,
   "selection": {
-   "applies": 716,
-   "due_new": 551,
-   "not_due_ttl": 165
+   "applies": 718,
+   "due_new": 718
   },
-  "source": null,
+  "source": [
+   "counties_sc.sc_wthgis_heir_estate"
+  ],
   "tier": null
  },
- "rows": 4740,
+ "rows": 4798,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4525006,
+   "bytes": 4575971,
    "file": "000.json",
-   "rows": 4740,
-   "sha256": "b3a38a79a1ce4c8a092efebcb7dc41c9a80fac5ccc51ae5e5cdcd8f1476cba68"
+   "rows": 4798,
+   "sha256": "e71d1df06cd3af86cfcc288dd1266c78e6b6785fbd331f608dc4d6ebe4b50cdc"
   }
  ],
  "signal": "heir_roll",
