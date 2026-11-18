@@ -1,5 +1,5 @@
 {
- "board_rows": 622248,
+ "board_rows": 622634,
  "by_category": {
   "uncovered": 301147,
   "wall": 22520
@@ -41,8 +41,8 @@
    "generated_at": "2026-11-18T10:46:08Z"
   },
   "heir_roll": {
-   "entries": 5610,
-   "generated_at": "2026-11-18T21:37:59Z"
+   "entries": 5860,
+   "generated_at": "2026-11-18T23:30:27Z"
   },
   "jail_booking": {
    "entries": 227,
@@ -61,8 +61,8 @@
    "generated_at": "2026-11-18T02:25:45Z"
   },
   "tax_lien": {
-   "entries": 75689,
-   "generated_at": "2026-11-18T22:29:20Z"
+   "entries": 75809,
+   "generated_at": "2026-11-18T23:18:19Z"
   },
   "tax_lien_johnston_static": {
    "entries": 8,
