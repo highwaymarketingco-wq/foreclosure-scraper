@@ -206,7 +206,25 @@ def test_counties_filter_rejects_unknown_county():
 
 
 def test_default_registry_includes_all_round19_counties():
-    assert set(m._WTHGIS_COUNTIES) == {"Chesterfield", "Dillon", "McCormick", "Marion"}
+    assert {"Chesterfield", "Dillon", "McCormick", "Marion"} <= set(m._WTHGIS_COUNTIES)
+
+
+def test_default_registry_includes_round32_marlboro():
+    assert set(m._WTHGIS_COUNTIES) == {"Chesterfield", "Dillon", "McCormick", "Marion", "Marlboro"}
+    cfg = m._WTHGIS_COUNTIES["Marlboro"]
+    assert cfg["dsid"] == 2558
+    assert cfg["base"] == "https://marlborosc.wthgis.com/tgis/"
+    # Marlboro's own schema (live-verified 2026-11-18): no Owner Name2, address is
+    # Physical&nbsp;Address not the default Property&nbsp;Address1, mailing city/state
+    # ride combined in Mailing&nbsp;Address3, and value/acreage use this county's own
+    # plain-English labels -- same override shape Marion's entry already uses.
+    assert cfg["fields"]["owner2"] is None
+    assert cfg["fields"]["address"] == "Physical&nbsp;Address"
+    assert cfg["fields"]["mailing_city"] == "Mailing&nbsp;Address3"
+    assert cfg["fields"]["mailing_state"] is None
+    assert cfg["fields"]["market_value"] == "Total&nbsp;Market&nbsp;Appraisal"
+    assert cfg["fields"]["tax_value"] is None
+    assert cfg["fields"]["acreage"] == "Total&nbsp;Acreage"
 
 
 class _FakeResponse:
