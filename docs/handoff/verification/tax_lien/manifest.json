@@ -1,162 +1,161 @@
 {
  "buckets": 16,
  "counts": {
-  "confirmed": 37890,
+  "confirmed": 37922,
   "refuted": 988,
-  "rows": 69306,
-  "stale": 13382,
+  "rows": 69906,
+  "stale": 13950,
   "unconfirmed": 17046,
   "wall": 0
  },
- "generated_at": "2026-11-18T02:58:12Z",
+ "generated_at": "2026-11-18T03:03:49Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-18T02:58:10Z",
-  "county": "Guilford",
+  "at": "2026-11-18T03:03:47Z",
+  "county": "Beaufort",
   "host": "SMB-LTSEO05",
   "max_rows": 600,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "bcpwa.ncptscloud.com": 148
+    "bcpwa.ncptscloud.com": 40
    }
   },
   "result": {
-   "budget_stop": 1,
-   "checked": 139,
-   "confirmed": 35,
-   "stale": 1,
-   "unconfirmed": 103
+   "checked": 600,
+   "confirmed": 32,
+   "stale": 568
   },
-  "seconds": 303,
+  "seconds": 231,
   "selection": {
-   "applies": 4423,
-   "due_new": 3378,
-   "due_retry": 872,
-   "due_ttl": 116,
-   "not_due_ttl": 57
+   "applies": 3443,
+   "due_new": 3336,
+   "due_retry": 18,
+   "due_ttl": 2,
+   "not_due_ttl": 87,
+   "same_property_queued": 6
   },
   "source": null,
   "tier": null
  },
- "rows": 69306,
+ "rows": 69906,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 5958552,
+   "bytes": 6088487,
    "file": "000.json",
-   "rows": 4244,
-   "sha256": "bf0472cda27333e97677c0ec970b971efd008af6c51c54579cfbffc16a5d9aa6"
+   "rows": 4282,
+   "sha256": "d491d21721ad21bdd1eaf5a6526a043c9b84de042f1b3f5c4b9de59b666ee4fc"
   },
   {
    "bucket": 1,
-   "bytes": 5997309,
+   "bytes": 6113305,
    "file": "001.json",
-   "rows": 4236,
-   "sha256": "710a8d0ae5721d574e9821c691449daa48d741147d9dfe9b995fe169e1df618d"
+   "rows": 4269,
+   "sha256": "ca83a29bea6ba19b1a867bea52a2286bc6b3be95fb191b147ee578dcafb0e92e"
   },
   {
    "bucket": 2,
-   "bytes": 6074982,
+   "bytes": 6243007,
    "file": "002.json",
-   "rows": 4357,
-   "sha256": "13a41a9b5757c0a9a7e4b45e833e63431ef93611083279468686cf7dba0e5210"
+   "rows": 4406,
+   "sha256": "7402e2536c68f7b3d62def26f826c20aed8df0492ec6a9c38fc8e734922211a7"
   },
   {
    "bucket": 3,
-   "bytes": 6076306,
+   "bytes": 6212544,
    "file": "003.json",
-   "rows": 4325,
-   "sha256": "829e111a9f35150432de65ff0e5da2e5544eb31f57a9d9a8ae2804ff50dfdccf"
+   "rows": 4363,
+   "sha256": "7bc75a3b8f69c039f776eb6dbfc99935991eb4d2aab79d0ebcdee75109d8732a"
   },
   {
    "bucket": 4,
-   "bytes": 6069305,
+   "bytes": 6225652,
    "file": "004.json",
-   "rows": 4300,
-   "sha256": "17bd1432ec0f34de518ca8cb2c90d58d45396643dc4a46f27403cc9d5223eecd"
+   "rows": 4344,
+   "sha256": "32ddb1779f48b46db91f43d6e5dd5a2ba03949aedc432f515a53efc73a443b33"
   },
   {
    "bucket": 5,
-   "bytes": 6206208,
+   "bytes": 6323748,
    "file": "005.json",
-   "rows": 4406,
-   "sha256": "97f8c66aa9aacc88607b045511c43e92ae969cb8a21a0ed9e704601c1a50a87c"
+   "rows": 4440,
+   "sha256": "33b502bcc5b7f4dff3ef55a7951b240b3de5e660f6a78e15fc45aaf8443a0b4c"
   },
   {
    "bucket": 6,
-   "bytes": 5985287,
+   "bytes": 6120026,
    "file": "006.json",
-   "rows": 4253,
-   "sha256": "7e0ef9142cbe475359b59533038ca964ff90e11470f6242c76fc4ad113693ef0"
+   "rows": 4290,
+   "sha256": "8aeb7799771244b75476f46e3568b0bcca0a0a9bc72bbf7a94f8f8f13717140d"
   },
   {
    "bucket": 7,
-   "bytes": 6158672,
+   "bytes": 6303625,
    "file": "007.json",
-   "rows": 4366,
-   "sha256": "374ebe49d2206d5a2e97738d30a20a1d21debc029fc744672f42274935663a8c"
+   "rows": 4407,
+   "sha256": "10c5e6fd6ef6935df8deee9589cded8e16168132a09864cba212dc90b4dba83c"
   },
   {
    "bucket": 8,
-   "bytes": 6240964,
+   "bytes": 6387580,
    "file": "008.json",
-   "rows": 4416,
-   "sha256": "8ef3fcaf0a031189b0a4edef6cc25d38375e8dba1a996ff9bb34868fba5a7b33"
+   "rows": 4458,
+   "sha256": "70b17b3e6dfb19717ba36077b712c5e31bf96a4fbff2190865b0e8e6ba00e13b"
   },
   {
    "bucket": 9,
-   "bytes": 6115128,
+   "bytes": 6258060,
    "file": "009.json",
-   "rows": 4348,
-   "sha256": "6a33550233b351c548a963d12a9faa1f115584e9c116ba88ef3b026fc808e46b"
+   "rows": 4389,
+   "sha256": "a0350febe88bc8ec0f6c23f18a6954904860e5d784c6c518d78d6f089523e9ce"
   },
   {
    "bucket": 10,
-   "bytes": 5932835,
+   "bytes": 6047139,
    "file": "010.json",
-   "rows": 4231,
-   "sha256": "eeb79455bd7f0c50478c686be6dff57d667d351e67ec525b76c9d5db4c7a577c"
+   "rows": 4263,
+   "sha256": "195fbaf8f812a43b87bee8e00eb613497cabee2df5b2194c05a6f9e5d92e1d72"
   },
   {
    "bucket": 11,
-   "bytes": 6027655,
+   "bytes": 6165502,
    "file": "011.json",
-   "rows": 4306,
-   "sha256": "0560c69dca6be4d1399cd9594c3dd6e4721f70bad1ca5b2e2c507ceb6e4744d6"
+   "rows": 4345,
+   "sha256": "78e0b107a426e1955a5462538c8941e84798e94f9bcaf637b55e8ba0df8de00e"
   },
   {
    "bucket": 12,
-   "bytes": 6152199,
+   "bytes": 6261437,
    "file": "012.json",
-   "rows": 4378,
-   "sha256": "ce4af9a8f0e180158934f4f99eb38a2023ca75e3aafa337d17ff86cd9533b863"
+   "rows": 4408,
+   "sha256": "2bc7f93611cea5d25f4b78c72b60ee6135b3944e953421bfd04ceb5e42e66fee"
   },
   {
    "bucket": 13,
-   "bytes": 6158648,
+   "bytes": 6284061,
    "file": "013.json",
-   "rows": 4368,
-   "sha256": "b0ee2db0a3e33648414b703d1a0d43f0f040386bf43f32661f41b962a9cbf86c"
+   "rows": 4403,
+   "sha256": "02a7ad6f70baca1565ab9ca6fa42a4b897706d13a247240e31ee6d88620ad498"
   },
   {
    "bucket": 14,
-   "bytes": 6144963,
+   "bytes": 6268176,
    "file": "014.json",
-   "rows": 4374,
-   "sha256": "d01e26eb5cde8de753aea5301b6578682d64fd28db3b70ab215f0e2fd3c59d1b"
+   "rows": 4409,
+   "sha256": "69de8cdc067ff1afccd53b2440b67815c36325e02f152965e74754593affdf23"
   },
   {
    "bucket": 15,
-   "bytes": 6248351,
+   "bytes": 6362648,
    "file": "015.json",
-   "rows": 4398,
-   "sha256": "76c52d832bae762ea528054e88864e7e32ddc323074f859bbb0aef7841fbc4d6"
+   "rows": 4430,
+   "sha256": "cc92509936ef0caf0ad6366a7ab6adb6ae35aabde8aff44284f5ab5304b1912b"
   }
  ],
  "signal": "tax_lien",
