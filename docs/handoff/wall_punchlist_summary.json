@@ -1,8 +1,8 @@
 {
- "board_rows": 619830,
+ "board_rows": 622248,
  "by_category": {
   "uncovered": 305272,
-  "wall": 78029
+  "wall": 20939
  },
  "format_version": 1,
  "kind": "wall_punchlist_summary",
@@ -41,8 +41,8 @@
    "generated_at": "2026-10-17T14:28:27Z"
   },
   "heir_roll": {
-   "entries": 703,
-   "generated_at": "2026-11-16T20:07:24Z"
+   "entries": 1050,
+   "generated_at": "2026-11-18T02:25:45Z"
   },
   "jail_booking": {
    "entries": 227,
@@ -58,11 +58,11 @@
   },
   "probate_heir": {
    "entries": 131,
-   "generated_at": "2026-11-16T21:50:13Z"
+   "generated_at": "2026-11-18T02:25:45Z"
   },
   "tax_lien": {
-   "entries": 69080,
-   "generated_at": "2026-11-17T16:49:54Z"
+   "entries": 70513,
+   "generated_at": "2026-11-18T03:17:40Z"
   },
   "tax_lien_johnston_static": {
    "entries": 8,
@@ -73,7 +73,7 @@
    "generated_at": "2026-11-16T21:00:28Z"
   }
  },
- "listings": 383301,
+ "listings": 326211,
  "uncovered": {
   "by_scraper_source": {
    "city_websites.charlotte_open_data": 4585,
@@ -144,7 +144,6 @@
    "counties_generic.arcgis_distress.spartanburg_city_tax_sale": 23,
    "counties_generic.arcgis_distress.spartanburg_infill_eligible": 1,
    "counties_generic.arcgis_distress.spartanburg_property_cleanup": 22,
-   "counties_generic.liensnc": 51753,
    "counties_nc.nc_heir_estate_parcels": 14,
    "counties_sc.anderson_master_in_equity": 1,
    "counties_sc.cherokee_delinquent_tax": 118,
@@ -177,7 +176,6 @@
    "law_firms.brock_scott": 4,
    "law_firms.hutchens": 4,
    "law_firms.mcmichael_taylor_gray": 1,
-   "liensnc": 5337,
    "national.distressed": 12,
    "national.foreclosure_dot_com": 18,
    "national.homeharvest": 1,
@@ -198,11 +196,10 @@
   "by_signal": {
    "court_wall": 7313,
    "divorce": 4904,
-   "lien_registry_wall": 65812
+   "lien_registry_wall": 8722
   },
   "by_wall_path": {
    "divorce_sc_wall": 4904,
-   "liensnc_login": 57090,
    "nc_est": 3058,
    "nc_sp": 168,
    "sc_lien_registries": 8722,
@@ -210,25 +207,25 @@
    "sc_publicindex": 3969
   },
   "by_wall_state": {
-   "not_yet_labelled": 76373,
+   "not_yet_labelled": 19283,
    "recorded": 1656
   },
   "top_counties": {
-   "NC:": 3836,
-   "NC:brunswick": 3659,
-   "NC:buncombe": 1532,
-   "NC:durham": 2095,
-   "NC:forsyth": 1601,
-   "NC:guilford": 1813,
-   "NC:harnett": 1630,
-   "NC:johnston": 1925,
-   "NC:mecklenburg": 5874,
-   "NC:union": 1469,
-   "NC:wake": 6723,
+   "NC:buncombe": 256,
+   "NC:cabarrus": 299,
+   "NC:guilford": 309,
+   "NC:johnston": 263,
+   "SC:anderson": 1425,
+   "SC:beaufort": 1217,
    "SC:charleston": 3282,
+   "SC:cherokee": 1066,
+   "SC:greenville": 726,
    "SC:horry": 1672,
+   "SC:laurens": 1070,
+   "SC:oconee": 1056,
    "SC:pickens": 1452,
-   "SC:spartanburg": 3648
+   "SC:spartanburg": 3648,
+   "SC:union": 432
   }
  }
 }
