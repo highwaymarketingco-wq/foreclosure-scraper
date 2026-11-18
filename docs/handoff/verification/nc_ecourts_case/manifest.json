@@ -1,61 +1,67 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 7479,
-  "refuted": 13,
-  "rows": 7916,
-  "stale": 380,
-  "unconfirmed": 44,
+  "confirmed": 7544,
+  "refuted": 18,
+  "rows": 8038,
+  "stale": 412,
+  "unconfirmed": 64,
   "wall": 0
  },
- "generated_at": "2026-11-18T13:59:19Z",
+ "generated_at": "2026-11-18T15:33:15Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-18T13:59:19Z",
-  "county": "Guilford",
+  "at": "2026-11-18T15:33:14Z",
+  "county": null,
   "host": "SMB-LTSEO05",
-  "max_rows": 1000,
+  "max_rows": 2000,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "portal-nc.tylertech.cloud": 64
+    "portal-nc.tylertech.cloud": 151
    }
   },
   "result": {
-   "checked": 577,
-   "confirmed": 548,
-   "stale": 29
+   "budget_stop": 1,
+   "checked": 185,
+   "confirmed": 108,
+   "refuted": 8,
+   "stale": 33,
+   "unconfirmed": 36
   },
-  "seconds": 133,
+  "seconds": 301,
   "selection": {
-   "applies": 1077,
-   "due_new": 520,
-   "due_ttl": 57,
-   "not_due_ttl": 500
+   "applies": 25671,
+   "due_new": 18110,
+   "due_retry": 44,
+   "due_ttl": 863,
+   "not_due_retry": 2,
+   "not_due_ttl": 6652,
+   "same_property_queued": 24
   },
   "source": null,
   "tier": null
  },
- "rows": 7916,
+ "rows": 8038,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4895141,
+   "bytes": 4987023,
    "file": "000.json",
-   "rows": 3963,
-   "sha256": "499f08ed68754b256e89752d6919c35d84bc9735680758dddff27cc87348a96f"
+   "rows": 4026,
+   "sha256": "74ca6e4c466dc8cfaebef7d3b210769196af0549f52a0ad772233fe4a54f215e"
   },
   {
    "bucket": 1,
-   "bytes": 4884948,
+   "bytes": 4972300,
    "file": "001.json",
-   "rows": 3953,
-   "sha256": "fd9925c978a7bbd911ae5ed0bcf2155c4cf68ffab883d26432b3b5b8bb907597"
+   "rows": 4012,
+   "sha256": "f6f3706ae3239aa70c118cd1bf39b6658e234dd5626ac4f5308102c3861d5ba3"
   }
  ],
  "signal": "nc_ecourts_case",
