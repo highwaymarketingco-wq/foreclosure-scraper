@@ -1,7 +1,7 @@
 {
  "board_rows": 632559,
  "by_category": {
-  "uncovered": 301262,
+  "uncovered": 301152,
   "wall": 22520
  },
  "format_version": 1,
@@ -41,8 +41,8 @@
    "generated_at": "2026-11-18T10:46:08Z"
   },
   "heir_roll": {
-   "entries": 6860,
-   "generated_at": "2026-11-19T04:02:05Z"
+   "entries": 6985,
+   "generated_at": "2026-11-19T04:45:21Z"
   },
   "jail_booking": {
    "entries": 227,
@@ -61,8 +61,8 @@
    "generated_at": "2026-11-18T02:25:45Z"
   },
   "tax_lien": {
-   "entries": 76730,
-   "generated_at": "2026-11-19T03:50:59Z"
+   "entries": 76959,
+   "generated_at": "2026-11-19T04:59:11Z"
   },
   "tax_lien_johnston_static": {
    "entries": 8,
@@ -73,7 +73,7 @@
    "generated_at": "2026-11-16T21:00:28Z"
   }
  },
- "listings": 323782,
+ "listings": 323672,
  "uncovered": {
   "by_scraper_source": {
    "city_websites.charlotte_open_data": 4585,
@@ -82,11 +82,11 @@
    "counties_generic.arcgis_distress.new_hanover_demolition_permits": 1326,
    "counties_generic.arcgis_distress.spartanburg_infill_eligible": 1062,
    "counties_generic.arcgis_distress.spartanburg_property_cleanup": 2050,
-   "counties_generic.epa_frs.acres": 1539,
-   "counties_generic.epa_frs.sems": 1987,
-   "counties_generic.state_contamination.nc_dam_safety": 7505,
+   "counties_generic.epa_frs.acres": 1538,
+   "counties_generic.epa_frs.sems": 1984,
+   "counties_generic.state_contamination.nc_dam_safety": 7491,
    "counties_generic.state_contamination.nc_inactive_hazardous": 1456,
-   "counties_generic.state_contamination.nc_ust_incidents": 37664,
+   "counties_generic.state_contamination.nc_ust_incidents": 37581,
    "counties_nc.albemarle_observer_tax_lists": 5089,
    "counties_nc.asheville_helene": 698,
    "counties_nc.gaston_vacant": 20410,
