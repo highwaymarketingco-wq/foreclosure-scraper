@@ -91,8 +91,29 @@ load CLOUDFLARE_API_TOKEN  "$SECRETS/cloudflare_api_token.txt"
 load CLOUDFLARE_ACCOUNT_ID "$SECRETS/cloudflare_account_id.txt"
 # NVIDIA NIM (free) — one key, many vision models (each its own ~40 RPM lane).
 load NVIDIA_API_KEY        "$SECRETS/nvidia_api_key.txt"
+# Anthropic (paid top-up, see VISION_INCLUDE_ANTHROPIC below) — launchd/cron give this
+# script a minimal environment, not the user's shell, so .env is never sourced here;
+# every other credential above is loaded explicitly for the same reason (see the
+# Gemini dotenv-silently-dead incident this pattern already exists to avoid).
+load ANTHROPIC_API_KEY     "$SECRETS/anthropic_api_key.txt"
 
 export VISION_PROVIDER=gemini
+# 2026-11-19: added Claude (Anthropic) to the pool as a PAID top-up, not a
+# replacement -- _build_backends() in enrichment_vision.py only adds Anthropic
+# when the free pool is empty UNLESS VISION_INCLUDE_ANTHROPIC=1, in which case
+# it joins the SAME shared queue as every free backend and only picks up
+# listings the free lanes haven't already claimed (it competes for the tail,
+# never duplicates work). The user has a $200/mo Anthropic budget that covers
+# vision usage. VISION_MAX_SPEND_USD is enrichment_vision.py's own built-in
+# running-total $ guard on the Anthropic path ONLY (free backends cost it
+# nothing regardless): $5/day leaves large headroom in $200/mo even run every
+# day, while being enough to meaningfully help on a day like today's, where
+# Gemini's free tier is 503-ing under high demand and the free pool alone
+# would otherwise sit idle waiting out cooldowns. Model stays the default
+# claude-haiku-4-5 ($1/$5 per Mtok in/out) -- already the cost-matched choice
+# for this grading task (see ANTHROPIC_VISION_MODEL's own comment above).
+export VISION_INCLUDE_ANTHROPIC="${VISION_INCLUDE_ANTHROPIC:-1}"
+export VISION_MAX_SPEND_USD="${VISION_MAX_SPEND_USD:-5}"
 # Let the free DAILY QUOTA (and the 4h wall clock below) be the limiter, not an
 # arbitrary count. 1500 was NOT letting quota be the limiter: every recent pass
 # drained its 1500 and exited with unscored_remaining=0 in 5-17 minutes out of a
