@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 8898,
+  "confirmed": 8993,
   "refuted": 11,
-  "rows": 8992,
+  "rows": 9087,
   "stale": 30,
   "unconfirmed": 53,
   "wall": 0
  },
- "generated_at": "2026-11-19T15:25:00Z",
+ "generated_at": "2026-11-19T17:11:39Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-19T15:25:00Z",
+  "at": "2026-11-19T17:11:38Z",
   "county": "Richland",
   "host": "SMB-LTSEO05",
   "max_rows": 2000,
@@ -21,40 +21,39 @@
   "requests": {
    "errors": {},
    "requests": {
-    "services9.arcgis.com": 251
+    "services9.arcgis.com": 191
    }
   },
   "result": {
-   "budget_stop": 1,
-   "checked": 125,
-   "confirmed": 125
+   "checked": 95,
+   "confirmed": 95
   },
-  "seconds": 501,
+  "seconds": 381,
   "selection": {
    "applies": 1445,
-   "due_new": 220,
-   "not_due_ttl": 1225
+   "due_new": 95,
+   "not_due_ttl": 1350
   },
   "source": null,
   "tier": null
  },
- "rows": 8992,
+ "rows": 9087,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4301403,
+   "bytes": 4338807,
    "file": "000.json",
-   "rows": 4519,
-   "sha256": "ef45cdfed47015733dda8ad9c6de1dc52d63bd793a5a2e92808f1f6acd755cc2"
+   "rows": 4558,
+   "sha256": "dbe7dfa68b425bcd14e92ea9a2a70f0fda184b0b5098cf4912f62bdd4eb3a01d"
   },
   {
    "bucket": 1,
-   "bytes": 4261895,
+   "bytes": 4315577,
    "file": "001.json",
-   "rows": 4473,
-   "sha256": "984fbefb7af69b49854dcb0f8ecf0d8dd90691a841a9f04f5f6e51c6b5ef6f8e"
+   "rows": 4529,
+   "sha256": "4f1c7d2e18a267b841b9b371d96e4c2cf72bce111a48a761cbcaa6fa1031d204"
   }
  ],
  "signal": "heir_roll",
