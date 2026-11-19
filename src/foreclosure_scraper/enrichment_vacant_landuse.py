@@ -134,7 +134,7 @@ _GREENWOOD_NULL_IMPROVEMENT_EXCLUDED_PROPTYPES = frozenset({"Commercial", "Multi
 # (scripts/backfill_vacant_lot_counties.py --dry-run --counties "Marlboro,SC") against
 # the real board: of 1,620 eligible rows, 433 would newly stamp vacant_lot and 595 more
 # would newly mark Improved -- not yet applied (see that script's --apply path).
-_VALUE_ONLY_NO_LANDUSE = frozenset({"Sumter", "Williamsburg", "Kershaw", "Chesterfield", "Marlboro"})
+_VALUE_ONLY_NO_LANDUSE = frozenset({"Sumter", "Williamsburg", "Kershaw", "Chesterfield", "Marlboro", "Dillon"})
 
 
 def _has_cache(memo: dict, county: str, state: str | None) -> bool:
