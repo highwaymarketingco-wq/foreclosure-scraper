@@ -844,6 +844,15 @@ PARCEL_LAYERS: dict[str, dict] = {
         # anyway (correct, tested via mocks) rather than reverted silently; a real fix
         # needs either the county's backend to recover or a per-page fallback that retries
         # a failing page with this one field dropped, neither attempted here.
+        # rollback_exposure DECLINED (round 65, 2026-11-19; see docs/gap_matrix/
+        # declined_registry.json). This layer's only land-vs-tax gap is MarketValue_Total vs
+        # TaxValue_Total/CapValue_Total -- SC's universal reassessment CAP (same thing this
+        # comment block already calls "the capped appraisal, not the 4-6% assessed figure"),
+        # not an ag-use/present-use deferral: a live PropType='Farm-Timber' AND MarketValue_
+        # Total>TaxValue_Total query returns ZERO rows countywide, while the identical query
+        # against PropType='Residential' hits on nearly every sampled row. No AgUseValue/
+        # SpecialAssessment field exists anywhere in this layer's 72 fields. Do not re-wire
+        # rollback_exposure off TaxValue_Total/CapValue_Total for this county.
         "state": "SC",
         "page": 250,   # the CAMA join answers 502 (backend timeout) above about 250 rows a page with this field set
         "url": "https://www.greenwoodsc.gov/arcgis/rest/services/Operational_Layers/CAMA/MapServer/9/query",
