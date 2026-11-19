@@ -5563,6 +5563,35 @@ def patch_existing_rows(patches: dict[str, dict], summary: dict,
     docs.mkdir(parents=True, exist_ok=True)
     listings_path = docs / "listings.json"
 
+    # CROSS-MACHINE PATCH EXPORT (2026-11-19, VM<->origin sync gap). A patch is already
+    # identity-keyed (dedupe_key() -> field updates), not tied to any specific board file
+    # state -- exactly the shape that CAN be replayed against a different (e.g. newer, on a
+    # different machine) board snapshot, unlike the gzipped board files themselves (binary,
+    # not git-mergeable; see project_vm_checkout_264_behind_2026-11-19.md for why that path was
+    # tried and abandoned). When PATCH_EXPORT_DIR is set, every call's raw `patches` dict (pre
+    # any mutation, pre the unsafe-identity strip below -- the replaying side re-derives that
+    # guard independently) is also dropped as a small standalone JSON file there, so a DIFFERENT
+    # machine with a reliable git relationship to origin (today: the Mac side) can later replay
+    # it via this exact same function against its own current board and push normally. This is
+    # a pure side-channel: it writes to a directory that has nothing to do with the board files
+    # this function otherwise touches, so a failure here must never block or alter the real
+    # patch below -- caught and logged, never raised.
+    _export_dir = os.environ.get("PATCH_EXPORT_DIR")
+    if _export_dir:
+        try:
+            _edir = Path(_export_dir)
+            _edir.mkdir(parents=True, exist_ok=True)
+            _efile = _edir / f"{int(time.time())}_{uuid.uuid4().hex[:8]}.json"
+            _efile.write_text(json.dumps({
+                "exported_at": datetime.utcnow().isoformat() + "Z",
+                "host": os.uname().nodename if hasattr(os, "uname") else "unknown",
+                "docs_dir": str(docs_dir),
+                "summary": summary,
+                "patches": patches,
+            }, ensure_ascii=False, default=str), encoding="utf-8")
+        except Exception as exc:  # noqa: BLE001 - never let export failure block a real patch
+            log.error("patch_export.failed", error=str(exc))
+
     require_board_lock(docs)
     _check_not_changed_since_load(listings_path)
 
