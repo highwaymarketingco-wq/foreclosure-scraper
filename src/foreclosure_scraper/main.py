@@ -3632,6 +3632,21 @@ async def run_enrich_tail(st: TailState) -> dict:
     except Exception:
         log.error("yancey_rollback.failed", traceback=traceback.format_exc())
 
+    # Hertford NC rollback_exposure: the county's own live GIS parcels layer
+    # (gis.hertfordcounty.org TaxParcels, found via its ArcGIS-Online-hosted Tax Parcel Viewer
+    # app) carries a literal TOTAL_DEFERRED_VALUE field. Orientation is the OPPOSITE of
+    # Durham's: TOTAL_PROP_VALUE here is already the reduced/taxable value, not full market
+    # value -- see that module's own docstring. Join key is the board's 13-digit REID, not the
+    # bare PIN. Round 66 gap_matrix sweep (2026-11-19). Gate off with
+    # FORECLOSURE_HERTFORD_ROLLBACK=0.
+    try:
+        from .enrichment_hertford_rollback_exposure import enrich_hertford_rollback_exposure
+        s = await _await_capped(enrich_hertford_rollback_exposure(enriched), "hertford_rollback")
+        if s and s.get("matched"):
+            enrichment_stats["hertford_rollback"] = s
+    except Exception:
+        log.error("hertford_rollback.failed", traceback=traceback.format_exc())
+
     # Iredell NC per-parcel tax search (classic ITS.NET TaxBill.aspx, same vendor tax_lien_itsnet.py
     # already drives for Iredell/Chowan tax-lien verification): multi-year unpaid-bill history.
     # Must run BEFORE enrich_tax_owed, same reason as nash_mydt/gaston_mydt above. Gate off with

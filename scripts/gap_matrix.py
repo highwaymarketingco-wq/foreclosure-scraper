@@ -1064,6 +1064,17 @@ SPECS: dict[str, Spec] = {
                                                               # live-verified join/yield (11 real matches of 2,657
                                                               # eligible board rows).
                                                               "enrichment_durham_rollback_exposure.py",
+                                                              # Hertford NC, round 66 (2026-11-19): the county's
+                                                              # own live GIS parcels layer (gis.hertfordcounty.org
+                                                              # TaxParcels) carries a literal TOTAL_DEFERRED_VALUE
+                                                              # field, same vendor-template field names as
+                                                              # Durham's but the opposite TOTAL_PROP_VALUE
+                                                              # orientation (already reduced here, not full
+                                                              # market value) -- see that module's own docstring
+                                                              # for the live-verified join (13-digit REID, not
+                                                              # bare PIN) and yield (46 real matches of 448
+                                                              # eligible board rows).
+                                                              "enrichment_hertford_rollback_exposure.py",
                                                               # 2026-11-16 rollback_exposure sweep: these two were
                                                               # missing entirely, which is WHY 6 of the 9 qPayBill
                                                               # counties the ROLLBACK-TAX Description-text detector
