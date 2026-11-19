@@ -126,12 +126,12 @@ MARLBORO_MAP = {
     "acreage": "Total&nbsp;Acreage",
     "sale_price": "Sale&nbsp;Price",
     "sale_date": "_sale_date_iso",  # pre-normalized key _write_cache() adds to its own copy
+    "improvement_value": "Building&nbsp;Market&nbsp;Appraisal",
     # no tax_value / living_sqft / land_use field exists on this county's template
-    # at all (live-checked -- Building/Land/Total Market Appraisal are the only
-    # value fields published; "0" on Total Number Buldings alongside a 0 Building
-    # Market Appraisal would be a vacant-lot signal for a LATER round, same shape
-    # as Williamsburg/Sumter, but that is a separate gap_matrix column, out of
-    # scope here).
+    # at all (live-checked). Total&nbsp;Number&nbsp;Buldings (building COUNT; the
+    # live page really does spell it "Buldings", not a comment typo) is fetched
+    # in _parse_detail() below for corroboration only -- parcel_cache._COLS has no
+    # building-count column, same as every other county on this platform.
 }
 _DEED_BOOK, _DEED_PAGE = "Deed&nbsp;Book", "Deed&nbsp;Page"
 _SALE_DATE, _SALE_PRICE = "Sale&nbsp;Date", "Sale&nbsp;Price"
@@ -192,6 +192,7 @@ def _parse_detail(txt: str) -> Optional[dict]:
     for f in ("Mailing&nbsp;Address1", "Mailing&nbsp;Address2", "Mailing&nbsp;Address3",
               "Mailing&nbsp;ZipCode", "Physical&nbsp;Address",
               "Total&nbsp;Market&nbsp;Appraisal", "Total&nbsp;Acreage",
+              "Building&nbsp;Market&nbsp;Appraisal", "Total&nbsp;Number&nbsp;Buldings",
               _DEED_BOOK, _DEED_PAGE, _SALE_DATE, _SALE_PRICE, _LEGAL1, _LEGAL2):
         rec[f] = _field(txt, f)
     return rec

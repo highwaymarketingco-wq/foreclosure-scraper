@@ -120,7 +120,21 @@ _GREENWOOD_NULL_IMPROVEMENT_EXCLUDED_PROPTYPES = frozenset({"Commercial", "Multi
 # positive on all 1,016 -- the identical "zero improvement, real market value" shape as
 # Williamsburg (2,194/3,348 at the same ratio, ~65%) and Sumter, not a new pattern guessed
 # for this county.
-_VALUE_ONLY_NO_LANDUSE = frozenset({"Sumter", "Williamsburg", "Kershaw", "Chesterfield"})
+# 2026-11-19 (round 43): Marlboro SC, same WTH "tgis" platform family as Chesterfield/
+# Williamsburg above (marlborosc.wthgis.com, scripts/backfill_marlboro_wthgis_deed_ref.py).
+# That script's MARLBORO_MAP maps improvement_value -> Building&nbsp;Market&nbsp;Appraisal,
+# no land_use field (none exists on this county's getftr.aspx template -- live-checked,
+# same th-label sweep used to build MARLBORO_MAP). data/parcel_cache/marlboro.sqlite
+# checked directly: every cached row carries a non-null improvement_value, 866 of 2,054
+# are exactly 0 while market_value/acreage is present -- the identical "zero improvement,
+# real market value" shape as Chesterfield/Williamsburg/Sumter, not a new pattern guessed
+# for this county. Total&nbsp;Number&nbsp;Buldings (a building-count field, fetched for
+# corroboration only -- no parcel_cache column exists for it) was 0 on the same sample
+# live-checked, in lockstep with the 0 Building Market Appraisal reading. Live dry run
+# (scripts/backfill_vacant_lot_counties.py --dry-run --counties "Marlboro,SC") against
+# the real board: of 1,620 eligible rows, 433 would newly stamp vacant_lot and 595 more
+# would newly mark Improved -- not yet applied (see that script's --apply path).
+_VALUE_ONLY_NO_LANDUSE = frozenset({"Sumter", "Williamsburg", "Kershaw", "Chesterfield", "Marlboro"})
 
 
 def _has_cache(memo: dict, county: str, state: str | None) -> bool:
