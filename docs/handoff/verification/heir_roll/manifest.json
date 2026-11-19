@@ -1,59 +1,60 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 8993,
+  "confirmed": 9100,
   "refuted": 11,
-  "rows": 9087,
+  "rows": 9195,
   "stale": 30,
-  "unconfirmed": 53,
+  "unconfirmed": 54,
   "wall": 0
  },
- "generated_at": "2026-11-19T17:11:39Z",
+ "generated_at": "2026-11-19T17:47:14Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-19T17:11:38Z",
-  "county": "Richland",
+  "at": "2026-11-19T17:47:14Z",
+  "county": "Lexington",
   "host": "SMB-LTSEO05",
   "max_rows": 2000,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "services9.arcgis.com": 191
+    "maps.lex-co.com": 218
    }
   },
   "result": {
-   "checked": 95,
-   "confirmed": 95
+   "budget_stop": 1,
+   "checked": 108,
+   "confirmed": 107,
+   "unconfirmed": 1
   },
-  "seconds": 381,
+  "seconds": 505,
   "selection": {
-   "applies": 1445,
-   "due_new": 95,
-   "not_due_ttl": 1350
+   "applies": 1265,
+   "due_new": 1265
   },
   "source": null,
   "tier": null
  },
- "rows": 9087,
+ "rows": 9195,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4338807,
+   "bytes": 4388398,
    "file": "000.json",
-   "rows": 4558,
-   "sha256": "dbe7dfa68b425bcd14e92ea9a2a70f0fda184b0b5098cf4912f62bdd4eb3a01d"
+   "rows": 4609,
+   "sha256": "76b9ff997247c1b53d512e3e76511b81506b9f92a64fe87c3915d7911f4470a9"
   },
   {
    "bucket": 1,
-   "bytes": 4315577,
+   "bytes": 4370909,
    "file": "001.json",
-   "rows": 4529,
-   "sha256": "4f1c7d2e18a267b841b9b371d96e4c2cf72bce111a48a761cbcaa6fa1031d204"
+   "rows": 4586,
+   "sha256": "25b02801bccc607f7fa7d7ff746d52ee7cadcbdbd5e8b1a4dfeb61f98f000136"
   }
  ],
  "signal": "heir_roll",
