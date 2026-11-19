@@ -89,6 +89,12 @@ DEFAULT_TARGETS: tuple[tuple[str, str], ...] = (
     # scripts/ingest_williamsburg_wthgis_parcels.py from the WTH tgis viewer, not the
     # generic ArcGIS downloader (parcel_cache.py's Williamsburg entry + _WTH_SOURCED).
     ("Williamsburg", "SC"),
+    # Kershaw, Chesterfield, Marlboro SC: also on _VALUE_ONLY_NO_LANDUSE, applied via
+    # explicit --counties runs (this tuple previously omitted them -- keep every
+    # _VALUE_ONLY_NO_LANDUSE county listed here so a default run covers the full set).
+    ("Kershaw", "SC"),
+    ("Chesterfield", "SC"),
+    ("Marlboro", "SC"),
 )
 
 
