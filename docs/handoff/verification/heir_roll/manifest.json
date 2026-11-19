@@ -1,53 +1,53 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 7132,
+  "confirmed": 7282,
   "refuted": 11,
-  "rows": 7226,
+  "rows": 7376,
   "stale": 30,
   "unconfirmed": 53,
   "wall": 0
  },
- "generated_at": "2026-11-19T06:10:19Z",
+ "generated_at": "2026-11-19T06:35:18Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-19T06:10:19Z",
-  "county": "Colleton",
+  "at": "2026-11-19T06:35:18Z",
+  "county": "Hertford",
   "host": "SMB-LTSEO05",
   "max_rows": 2000,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "services1.arcgis.com": 233
+    "services.nconemap.gov": 150
    }
   },
   "result": {
-   "checked": 116,
-   "confirmed": 116
+   "budget_stop": 1,
+   "checked": 150,
+   "confirmed": 150
   },
-  "seconds": 465,
+  "seconds": 502,
   "selection": {
-   "applies": 2577,
-   "due_new": 116,
-   "not_due_retry": 19,
-   "not_due_ttl": 2442
+   "applies": 422,
+   "due_new": 416,
+   "not_due_ttl": 6
   },
   "source": null,
   "tier": null
  },
- "rows": 7226,
+ "rows": 7376,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 6868797,
+   "bytes": 7013180,
    "file": "000.json",
-   "rows": 7226,
-   "sha256": "4faade1d38c9874a4166fed900993e758d2046591e36aad37ba3d0e77df94fa5"
+   "rows": 7376,
+   "sha256": "d30106505de9b03590aac52dfed1e6b0044765acaddf974c282896133db7474d"
   }
  ],
  "signal": "heir_roll",
