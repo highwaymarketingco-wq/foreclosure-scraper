@@ -109,7 +109,18 @@ _GREENWOOD_NULL_IMPROVEMENT_EXCLUDED_PROPTYPES = frozenset({"Commercial", "Multi
 # no building type carries taxTotalBl == 0 while the market-value field (`market_value` /
 # Kershaw's M_Value) stays positive -- 17,681 rows at exactly that "zero improvement, real
 # market value" shape vs. 25,187 improved (taxTotalBl > 0), out of ~42,968 populated rows.
-_VALUE_ONLY_NO_LANDUSE = frozenset({"Sumter", "Williamsburg", "Kershaw"})
+#
+# 2026-11-18 (round 42): Chesterfield SC, same shape, same WTH "tgis" platform family as
+# Williamsburg above (chesterfieldsc.wthgis.com, scripts/ingest_chesterfield_wthgis.py).
+# That script's CHESTERFIELD_MAP maps improvement_value -> MarketValueBuildingsValue but
+# no land_use field (none exists on this county's getftr.aspx template -- confirmed live,
+# same th-label sweep used to build CHESTERFIELD_MAP). data/parcel_cache/chesterfield.sqlite
+# (already populated by that script, 1,016 parcels) checked directly tonight: 1,016/1,016
+# rows carry a non-null improvement_value, 653 of those are exactly 0 while market_value is
+# positive on all 1,016 -- the identical "zero improvement, real market value" shape as
+# Williamsburg (2,194/3,348 at the same ratio, ~65%) and Sumter, not a new pattern guessed
+# for this county.
+_VALUE_ONLY_NO_LANDUSE = frozenset({"Sumter", "Williamsburg", "Kershaw", "Chesterfield"})
 
 
 def _has_cache(memo: dict, county: str, state: str | None) -> bool:
