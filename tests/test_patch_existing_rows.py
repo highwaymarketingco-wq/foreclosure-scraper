@@ -26,6 +26,11 @@ Covers, in order:
   4. contracts: board lock enforcement, the manifest verifies after a patch, the patch-only
      size ceiling and its override, independence from the load/append ceilings
   5. edge cases: empty patches dict, patching onto a board that does not exist yet, zero matches
+  6. cross-machine patch export (2026-11-19, VM<->origin sync gap): PATCH_EXPORT_DIR, when set,
+     drops the raw patches dict as a standalone JSON file -- a side channel so a DIFFERENT
+     machine can later replay it via this same function against its own board, without ever
+     git-merging the binary board files themselves. Off by default; never blocks the real patch
+     even if the export write itself fails.
 """
 from __future__ import annotations
 
@@ -441,3 +446,79 @@ def test_all_patches_unmatched_writes_nothing(tmp_path):
     assert stats["written"] is False
     assert not (docs.parent / "backups").exists() or not list(
         (docs.parent / "backups").glob("listings_*.json"))
+
+
+# ===========================================================================
+# 6. cross-machine patch export
+# ===========================================================================
+
+def test_export_dir_unset_writes_no_export_and_behaves_exactly_as_before(tmp_path, monkeypatch):
+    monkeypatch.delenv("PATCH_EXPORT_DIR", raising=False)
+    docs = tmp_path / "docs"
+    seed = _seed(docs, n=3)
+    stats = wa.patch_existing_rows({seed[0].dedupe_key(): {"parcel_id": "P1"}},
+                                   {"notes": "t"}, docs_dir=docs)
+    assert stats["applied"] == 1
+    assert not list(tmp_path.glob("**/*export*"))
+
+
+def test_export_dir_set_writes_patches_and_still_applies_the_real_patch(tmp_path, monkeypatch):
+    docs = tmp_path / "docs"
+    seed = _seed(docs, n=3)
+    export_dir = tmp_path / "patch_export"
+    monkeypatch.setenv("PATCH_EXPORT_DIR", str(export_dir))
+
+    target = seed[1]
+    patches = {target.dedupe_key(): {"parcel_id": "P2", "raw": {"foo": "bar"}}}
+    stats = wa.patch_existing_rows(patches, {"notes": "export test"}, docs_dir=docs)
+
+    assert stats["applied"] == 1
+    rows = wa.load_board(docs)
+    r = next(li for li in rows if li.street_address == target.street_address)
+    assert r.parcel_id == "P2"
+
+    exported = list(export_dir.glob("*.json"))
+    assert len(exported) == 1
+    payload = json.loads(exported[0].read_text())
+    assert payload["patches"] == patches
+    assert payload["summary"] == {"notes": "export test"}
+    assert payload["docs_dir"] == str(docs)
+    assert "exported_at" in payload
+
+
+def test_export_dir_unwritable_still_applies_the_real_patch(tmp_path, monkeypatch):
+    """A broken export path (e.g. points at a file, not a directory) must never block the
+    actual board patch -- the side channel degrades silently, the real work does not."""
+    docs = tmp_path / "docs"
+    seed = _seed(docs, n=3)
+    blocked = tmp_path / "not_a_directory"
+    blocked.write_text("i am a file, not a dir")
+    monkeypatch.setenv("PATCH_EXPORT_DIR", str(blocked))
+
+    target = seed[0]
+    stats = wa.patch_existing_rows({target.dedupe_key(): {"parcel_id": "P3"}},
+                                   {"notes": "t"}, docs_dir=docs)
+    assert stats["applied"] == 1
+    rows = wa.load_board(docs)
+    r = next(li for li in rows if li.street_address == target.street_address)
+    assert r.parcel_id == "P3"
+
+
+def test_export_captures_patches_stripped_of_nothing_even_unsafe_url_keys(tmp_path, monkeypatch):
+    """The export captures the CALLER's raw patches dict, before the unsafe-identity (url:)
+    strip -- the replaying side independently re-derives that same guard on its own call, so
+    exporting pre-strip is simplest and loses nothing."""
+    docs = tmp_path / "docs"
+    _seed(docs, n=2)
+    export_dir = tmp_path / "patch_export"
+    monkeypatch.setenv("PATCH_EXPORT_DIR", str(export_dir))
+
+    patches = {"url:https://example.test/shared-root": {"parcel_id": "SHOULD_NOT_APPLY"}}
+    stats = wa.patch_existing_rows(patches, {"notes": "t"}, docs_dir=docs)
+    assert stats["unsafe_identity_skipped"] == ["url:https://example.test/shared-root"]
+    assert stats["written"] is False
+
+    exported = list(export_dir.glob("*.json"))
+    assert len(exported) == 1
+    payload = json.loads(exported[0].read_text())
+    assert payload["patches"] == patches
