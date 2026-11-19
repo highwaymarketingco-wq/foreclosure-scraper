@@ -1226,14 +1226,24 @@ PARCEL_LAYERS["Georgetown"] = {
 #: https://dillonsc.wthgis.com/ (HTTP 200, same vendor/protocol as Union's unionsc.wthgis.com
 #: and the existing Williamsburg/Chesterfield WTH ingests elsewhere in this project). This is
 #: NOT an ArcGIS FeatureServer -- it is WTH's own getftr.aspx?D=<dsid>&F=<n> feature-index
-#: protocol, so it cannot become a PARCEL_LAYERS entry as-is; it would need a bespoke ingest
-#: script, the Williamsburg/Union precedent, not attempted this round (out of scope: the ask
-#: was an ArcGIS-shaped entry). CAUTION for whoever picks this up: probing dillonsc.wthgis.com
-#: with dsid=984 (Union's own parcels dsid on unionsc.wthgis.com) returned UNION's own CAMA
-#: data ("\SC\Union\45087parcels.tml") back through DILLON's endpoint -- the dsid keyspace
-#: reads as shared/global across WTH's hosted tenants, not tenant-scoped, so Dillon's actual
-#: parcels dsid is still unknown and must not be assumed to be 984. A real, live, promising
-#: lead; genuinely not built yet.
+#: protocol, so it cannot become a PARCEL_LAYERS entry as-is.
+#: RESOLVED round 54 (2026-11-19): built as scripts/backfill_dillon_wthgis_vacant_lot.py.
+#: Dillon's own parcels dsid is 1042 -- NOT 984 (see the now-corrected caution below) -- read
+#: straight off dillonsc.wthgis.com's own root-page "Parcel Tools Menu" JS (the SAME dsid
+#: already live in production since round 19 for sc_wthgis_heir_estate.py's owner-name sweep,
+#: cross-checked again this round via a direct getftr.aspx field dump: a FULL MarketValue*/
+#: TaxValue* family incl. MarketValueBuildingsValue, the exact improvement-value field
+#: enrichment_vacant_landuse.py's existing fallback needs, no land_use field, same structural
+#: shape as Williamsburg/Chesterfield/Sumter/Barnwell). Live full-county run: 993/1,536 board
+#: rows matched (64.6%), 993/993 detail-fetched, 318 read the zero-improvement/real-market-
+#: value vacant signature. Cache written (data/parcel_cache/dillon.sqlite, gitignored, rebuild
+#: via the script); the actual board fill + vacant_lot stamp happens on the NEXT regular
+#: enrich_gis_attrs()/enrichment_vacant_landuse.py pass, same as every other WTH cache here.
+#: (Former caution, now superseded: probing dillonsc.wthgis.com with dsid=984 -- Union's own
+#: dsid, see below -- returned UNION's own CAMA data back through DILLON's endpoint, proving
+#: the dsid keyspace is shared/global across WTH tenants, not tenant-scoped. Dillon's real
+#: dsid was never 984; it is 1042, confirmed above by reading DILLON's own page, never
+#: assumed from Union's number.)
 #:
 #: UNION (the SC half -- this belongs in SC_DUAL_LAYERS below, keyed state="SC", NOT here,
 #: whenever/if it is ever added): re-confirmed, not re-investigated from scratch. A dedicated
@@ -1245,8 +1255,30 @@ PARCEL_LAYERS["Georgetown"] = {
 #: per-parcel detail incl. Class Code/Acres/Year Built, but HTML-only, curl_cffi
 #: impersonate=chrome required, plain curl/WebFetch = 403) and the SAME WTH tgis family as
 #: Dillon above (unionsc.wthgis.com, dsid 984 = Parcels/CAMA-ID, dsid 992 = ParcelJoin's
-#: ~18-19k sequential ParcelID keyspace). Same conclusion as Dillon: a real lead, needs a
-#: bespoke non-ArcGIS ingest adapter, not a this-round build.
+#: ~18-19k sequential ParcelID keyspace).
+#: NARROWED round 54 (2026-11-19), genuine dead end for THIS platform (not "not built yet"):
+#: unionsc.wthgis.com's client (root page + both shared tgisServer2.js/tgisProc2.js files)
+#: carries NO Parcel Tools Menu / BasicParcels dsid anywhere -- loadTgis() wires only a Crime
+#: Mapper overlay, and addStdMenuItems() (the shared platform function) is generic nav/zoom/
+#: print tools only, no parcels item at all; confirmed no per-county custom JS file exists
+#: either (scripts/unionCustom*.js variants all 404). custom.aspx itself works on this host
+#: (confirms missing-dsid vs. a dead endpoint: DSID=0/omitted -> clean "<err>Error: missing
+#: dsid</err>"). dsid=984 and dsid=992 -- round 53's own found values -- were LIVE RE-TESTED
+#: this round directly against unionsc.wthgis.com itself (not Dillon's host, avoiding the
+#: exact cross-tenant trap above): both respond 200 and both genuinely belong to Union (file
+#: title literally "\SC\Union\45087parcels.tml" / "\SC\Union\ParcelJoin.tml"), so they are
+#: real and tenant-correct -- but getftr.aspx on EITHER returns only ONE bare field (984:
+#: "CAMA ID" -> a TMS string; 992: "ParcelID" -> the same TMS string) with NO owner, address,
+#: value, improvement, or land-use data of any kind -- a thin geometry/label JOIN table, not
+#: an attribute database. Consistent with this: CustomSearchRequest&SearchType=Name&
+#: SearchCriteria=SMITH on either dsid returns zero hits (there is no owner-name field to
+#: search). Union's WTH deployment, unlike Dillon/Chesterfield/Marlboro/McCormick/Marion, was
+#: apparently never provisioned with the richer "BasicParcels" dataset at all -- a narrower,
+#: more final negative than round 53's own "same conclusion as Dillon; needs a bespoke
+#: adapter" (Dillon's lead panned out in full this round; Union's superficially similar one
+#: does not, for a different and now-confirmed reason). Not chased further: Beacon/qPublic
+#: (Schneider Corp, from the enumeration doc above) remains the one real, unexplored lead for
+#: Union's actual CAMA attributes, and is a curl_cffi/impersonate project, not a WTH one.
 
 #: RICHLAND + KERSHAW SC, added 2026-11-06 (gap_matrix heir_estate/vacant_lot breadth check).
 #:
