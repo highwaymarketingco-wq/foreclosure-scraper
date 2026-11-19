@@ -1046,6 +1046,11 @@ SPECS: dict[str, Spec] = {
                                                               "enrichment_brunswick_rollback_exposure.py",
                                                               "enrichment_duplin_rollback_exposure.py",
                                                               "enrichment_johnston_rollback_exposure.py",
+                                                              # Pender NC, round 63 (2026-11-19): the county's own
+                                                              # live GIS parcels layer (iasWorld-linked) carries a
+                                                              # literal DEFERRED_VALUE field -- see that module's
+                                                              # own docstring for the live-verified join/yield.
+                                                              "enrichment_pender_rollback_exposure.py",
                                                               # 2026-11-16 rollback_exposure sweep: these two were
                                                               # missing entirely, which is WHY 6 of the 9 qPayBill
                                                               # counties the ROLLBACK-TAX Description-text detector
