@@ -3618,6 +3618,20 @@ async def run_enrich_tail(st: TailState) -> dict:
     except Exception:
         log.error("durham_rollback.failed", traceback=traceback.format_exc())
 
+    # Yancey NC rollback_exposure: parcels are published by the regional High Country COG
+    # (services1.arcgis.com/vj28eVZMB2OMIUh5 YanceyCountyBaseData), not the county's own GIS;
+    # its own Parcels_20250501 layer carries a literal AG_LAND_VA field (present-use ag/forestry
+    # land-value deferral), no derivation needed beyond one subtraction against the layer's own
+    # CURRENT_LA. Round 65 gap_matrix sweep (2026-11-19). Gate off with
+    # FORECLOSURE_YANCEY_ROLLBACK=0.
+    try:
+        from .enrichment_yancey_rollback_exposure import enrich_yancey_rollback_exposure
+        s = await _await_capped(enrich_yancey_rollback_exposure(enriched), "yancey_rollback")
+        if s and s.get("matched"):
+            enrichment_stats["yancey_rollback"] = s
+    except Exception:
+        log.error("yancey_rollback.failed", traceback=traceback.format_exc())
+
     # Iredell NC per-parcel tax search (classic ITS.NET TaxBill.aspx, same vendor tax_lien_itsnet.py
     # already drives for Iredell/Chowan tax-lien verification): multi-year unpaid-bill history.
     # Must run BEFORE enrich_tax_owed, same reason as nash_mydt/gaston_mydt above. Gate off with
