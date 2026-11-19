@@ -1,7 +1,7 @@
 {
- "board_rows": 622634,
+ "board_rows": 631324,
  "by_category": {
-  "uncovered": 301147,
+  "uncovered": 301148,
   "wall": 22520
  },
  "format_version": 1,
@@ -41,8 +41,8 @@
    "generated_at": "2026-11-18T10:46:08Z"
   },
   "heir_roll": {
-   "entries": 5860,
-   "generated_at": "2026-11-18T23:30:27Z"
+   "entries": 5985,
+   "generated_at": "2026-11-19T00:16:23Z"
   },
   "jail_booking": {
    "entries": 227,
@@ -61,8 +61,8 @@
    "generated_at": "2026-11-18T02:25:45Z"
   },
   "tax_lien": {
-   "entries": 75809,
-   "generated_at": "2026-11-18T23:18:19Z"
+   "entries": 75928,
+   "generated_at": "2026-11-18T23:59:45Z"
   },
   "tax_lien_johnston_static": {
    "entries": 8,
@@ -73,7 +73,7 @@
    "generated_at": "2026-11-16T21:00:28Z"
   }
  },
- "listings": 323667,
+ "listings": 323668,
  "uncovered": {
   "by_scraper_source": {
    "city_websites.charlotte_open_data": 4585,
