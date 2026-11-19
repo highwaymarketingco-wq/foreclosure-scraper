@@ -1,19 +1,19 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 7475,
+  "confirmed": 7548,
   "refuted": 11,
-  "rows": 7569,
+  "rows": 7642,
   "stale": 30,
   "unconfirmed": 53,
   "wall": 0
  },
- "generated_at": "2026-11-19T07:13:51Z",
+ "generated_at": "2026-11-19T07:33:52Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-19T07:13:51Z",
+  "at": "2026-11-19T07:33:51Z",
   "county": "Hertford",
   "host": "SMB-LTSEO05",
   "max_rows": 2000,
@@ -21,33 +21,32 @@
   "requests": {
    "errors": {},
    "requests": {
-    "services.nconemap.gov": 193
+    "services.nconemap.gov": 73
    }
   },
   "result": {
-   "budget_stop": 1,
-   "checked": 193,
-   "confirmed": 193
+   "checked": 73,
+   "confirmed": 73
   },
-  "seconds": 514,
+  "seconds": 189,
   "selection": {
    "applies": 422,
-   "due_new": 266,
-   "not_due_ttl": 156
+   "due_new": 73,
+   "not_due_ttl": 349
   },
   "source": null,
   "tier": null
  },
- "rows": 7569,
+ "rows": 7642,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 7196059,
+   "bytes": 7267717,
    "file": "000.json",
-   "rows": 7569,
-   "sha256": "c8339b8b6e1bd02ef2e846e3e0ab961eb9cb16e1d1922986adcf6753ee5d9289"
+   "rows": 7642,
+   "sha256": "62349291b430fd886606114dc67c21623462912348e5fefba2c4654ef04e326e"
   }
  ],
  "signal": "heir_roll",
