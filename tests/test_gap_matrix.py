@@ -1069,12 +1069,17 @@ def test_nc_heir_estate_parcels_credit_reads_county_gis_keys_not_text():
     2026-11-16: the NC Hoke fix (commit 41da6190, this same session) added a real, dedicated
     `COUNTY_GIS["NC:Hoke"]` entry (its own live-GIS layer, not a stale statewide-mirror timeout) --
     20 real entries is now 21, a legitimate growth of the same registry this test already reads
-    directly, not a regression."""
+    directly, not a regression.
+
+    2026-11-18/19: the NC Lenoir fix (commit 0a29a724, same session) added another real, dedicated
+    `COUNTY_GIS["NC:Lenoir"]` entry (its own live-GIS layer, 1,215 real hits) -- 21 is now 22, same
+    kind of legitimate growth, not a regression."""
     assert gm.counties_named_in([gm.PKG / gm._NC_HEIR_ESTATE_PARCELS_REL]) == {("NC", "Greene")}
     credit = gm._nc_heir_estate_parcels_credit()
     assert ("NC", "Cleveland") in credit and ("SC", "York") in credit
     assert ("NC", "Hoke") in credit
-    assert len(credit) == 21
+    assert ("NC", "Lenoir") in credit
+    assert len(credit) == 22
 
 
 def test_built_in_code_adds_nc_heir_estate_parcels_credit():
@@ -1376,13 +1381,19 @@ def test_check_layer_genuinely_unbuilt_county_still_reads_sourced_not_built():
     """Regression guard for the fix above: a county with no real hit at all (and no code credit
     either) must still read the ordinary layer 'check' sourced-not-built, and must never spawn a
     layer 'verify' row (its own guard: c["pos"] == 0 skips it) -- the rename only touches layer
-    'verify' output, never layer 'check', and never fires without a real hit to justify it."""
+    'verify' output, never layer 'check', and never fires without a real hit to justify it.
+
+    2026-11-19: was state="SC", county="Cherokee" -- that cell got a real declined_registry.json
+    entry on 2026-11-18 (a genuine heir_estate dead end, unrelated to this test), so the fixture
+    now reads "declined" instead of the ordinary "sourced-not-built" this test exists to guard.
+    Swapped to a nonsense county name that can never collide with a real declined_registry.json
+    entry, rather than re-picking a real county that could go stale the same way again later."""
     cube = gm.Cube(today=TODAY)
-    cube.add(row(state="SC", county="Cherokee", listing_type="tax_lien", owner_name="SMITH ANN",
+    cube.add(row(state="SC", county="Zyzzyx", listing_type="tax_lien", owner_name="SMITH ANN",
                  raw={"entity_type": "individual"}))
-    matrix = {("SC", "Cherokee"): dict(MATRIX_REC, state="SC", county="cherokee")}
+    matrix = {("SC", "Zyzzyx"): dict(MATRIX_REC, state="SC", county="zyzzyx")}
     roll = gm.roll_up(cube, matrix, {})
-    cell = roll["cells"][("SC", "Cherokee", "heir_estate")]
+    cell = roll["cells"][("SC", "Zyzzyx", "heir_estate")]
     assert cell["ran"] is False and cell["built"] == "no"
     assert cell["class"] == "sourced-not-built"
     assert not any(g["column"] == "heir_estate" and g["layer"] == "verify" for g in roll["gaps"])
