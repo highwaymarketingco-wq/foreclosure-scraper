@@ -1,52 +1,52 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 7548,
+  "confirmed": 7648,
   "refuted": 11,
-  "rows": 7642,
+  "rows": 7742,
   "stale": 30,
   "unconfirmed": 53,
   "wall": 0
  },
- "generated_at": "2026-11-19T07:33:52Z",
+ "generated_at": "2026-11-19T07:45:14Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-19T07:33:51Z",
-  "county": "Hertford",
+  "at": "2026-11-19T07:45:14Z",
+  "county": "Richland",
   "host": "SMB-LTSEO05",
   "max_rows": 2000,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "services.nconemap.gov": 73
+    "services9.arcgis.com": 201
    }
   },
   "result": {
-   "checked": 73,
-   "confirmed": 73
+   "budget_stop": 1,
+   "checked": 100,
+   "confirmed": 100
   },
-  "seconds": 189,
+  "seconds": 401,
   "selection": {
-   "applies": 422,
-   "due_new": 73,
-   "not_due_ttl": 349
+   "applies": 1445,
+   "due_new": 1445
   },
   "source": null,
   "tier": null
  },
- "rows": 7642,
+ "rows": 7742,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 7267717,
+   "bytes": 7363740,
    "file": "000.json",
-   "rows": 7642,
-   "sha256": "62349291b430fd886606114dc67c21623462912348e5fefba2c4654ef04e326e"
+   "rows": 7742,
+   "sha256": "7e589e07e856fdbfdeeed62e336fdd1ee237988617154755b1357af2fe092cb0"
   }
  ],
  "signal": "heir_roll",
