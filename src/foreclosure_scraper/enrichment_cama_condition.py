@@ -135,15 +135,22 @@ CAMA_SOURCES: dict[tuple[str, str], dict[str, Any]] = {
     },
     ("SC", "Spartanburg"): {
         # Full CAMA layer: BuildingGrade + ConditionFactor + CDUC + YearBuilt + LivingArea.
-        # Verified live 2026-08-19: 99 fields, rich CAMA data. 9k+ listings benefit.
+        # Originally wired 2026-08-19 against GISParcelNumber (99 fields, rich CAMA data) --
+        # live-reverified round 69 (2026-11-19): GISParcelNumber is a DIFFERENT per-building
+        # geometry id, not the board's parcel_id namespace; 0/600 real leads matched it.
+        # The board's parcel_id ('7-09-01-023.00') is this layer's MAPNUMBER verbatim --
+        # confirmed on 5/5 sampled leads, each an exact string hit with CardNumber=1 and a
+        # populated ConditionFactor (164,417 of 183,465 total rows are CardNumber=1, all with
+        # ConditionFactor set). MAPNUMBER's dashes/decimal are load-bearing (pin_raw=True --
+        # digit-stripping it collides different parcels), so this entry does NOT digit-strip.
         "url": "https://maps.spartanburgcounty.org/server/rest/services/"
                "GIS/CAMA_Parcels/FeatureServer/0",
-        "pin_field": "GISParcelNumber",
+        "pin_field": "MAPNUMBER",
         "condition_field": "ConditionFactor",
         "grade_field": "BuildingGrade",
         "year_field": "YearBuilt",
         "join": "pin",
-        "pin_pad15": False,
+        "pin_raw": True,
     },
     ("NC", "Gaston"): {
         # Gaston CAMA: YEARBLT + SQFT (no Condition/Grade, year only).
@@ -168,13 +175,18 @@ _PIN_BATCH = 100
 # ---- Condition normalization -----------------------------------------------------
 #
 # Every county spells condition differently — single-letter codes (Buncombe:
-# P/F/U/N/G/R), full words (Carteret: Poor/Very Poor/Unsound/Fair/Average/...).
+# P/F/U/N/G/R), full words (Carteret: Poor/Very Poor/Unsound/Fair/Average/...),
+# two-letter codes (Spartanburg's ConditionFactor: live-pulled distinct values
+# round 69 are AG/AV/DL/EX/FA/FR/GD/GV/PR/VP -- "PR" is Poor, confirmed by its
+# match to the FR/GD/VG/VP two-letter abbreviation pattern; AG/GV have no
+# confident mapping and are deliberately left to the unknown-code fallback
+# below rather than guessed into either tier).
 # Map both to a canonical label + a distressed flag. The distressed set mirrors
 # enrichment_owner_mailing._POOR_CONDITION so the two condition lanes agree.
 
 _CANON = {
     # code / word (upper)        -> (canonical label, distressed?)
-    "P": ("poor", True), "POOR": ("poor", True),
+    "P": ("poor", True), "POOR": ("poor", True), "PR": ("poor", True),
     "VP": ("very_poor", True), "VERY POOR": ("very_poor", True),
     "U": ("unsound", True), "UN": ("unsound", True), "UNSOUND": ("unsound", True),
     "UNSAFE": ("unsound", True),
@@ -205,7 +217,7 @@ def _normalize_condition(raw_val: Any) -> tuple[str | None, bool]:
     return key.lower(), False
 
 
-def _pin_key(parcel_id: str | None, pad15: bool, units: bool = False) -> str | None:
+def _pin_key(parcel_id: str | None, pad15: bool, units: bool = False, raw: bool = False) -> str | None:
     """Build the county's stored PIN from a lead's parcel_id.
 
     Digits only. When the layer stores 15-digit PIN15 (short 10-digit pin +
@@ -214,9 +226,17 @@ def _pin_key(parcel_id: str | None, pad15: bool, units: bool = False) -> str | N
     ('9627023924C0102'; Buncombe), so a lead keyed by a unit's pinnum looks up by it. Stripping
     its letter gave '96270239240102', a key the layer does not hold (and one two units of a building
     ('C0102', 'D0102') would share).
+    `raw` (found round 69, Spartanburg): the layer's join field is a FORMATTED string map number
+    ('7-09-01-023.00', MAPNUMBER) where the dashes/decimal are load-bearing, not punctuation to
+    strip -- digit-stripping it ('7090102300') builds a key the layer never holds, since MAPNUMBER
+    is stored and compared as that exact dashed/dotted string. Use the lead's parcel_id as-is
+    (trimmed, upper-cased) instead of stripping to digits.
     """
     if not parcel_id:
         return None
+    if raw:
+        key = str(parcel_id).strip().upper()
+        return key or None
     if units:
         parts = condo_units.unit_parts(parcel_id)
         if parts:
@@ -229,9 +249,12 @@ def _pin_key(parcel_id: str | None, pad15: bool, units: bool = False) -> str | N
     return digits
 
 
-def _stored_key(pin: Any, units: bool = False) -> str:
+def _stored_key(pin: Any, units: bool = False, raw: bool = False) -> str:
     """The lookup key of a PIN value the layer returned, built the way _pin_key builds a lead's:
-    digits only, except a condominium unit's pinnum (`units`), which keeps its letters."""
+    digits only, except a condominium unit's pinnum (`units`, keeps its letters) or a formatted
+    map-number join (`raw`, keeps the value exactly as stored -- see _pin_key's `raw` note)."""
+    if raw:
+        return str(pin).strip().upper() if pin is not None else ""
     if units:
         parts = condo_units.unit_parts(pin)
         if parts:
@@ -299,7 +322,7 @@ async def _fetch_by_pins(
             pin = attrs.get(pin_field)
             if pin is None:
                 continue
-            key = _stored_key(pin, bool(cfg.get("pin_units")))
+            key = _stored_key(pin, bool(cfg.get("pin_units")), bool(cfg.get("pin_raw")))
             # Prefer the record that actually has a building condition/grade over
             # a bare parcel row (a PIN can have >1 building card).
             rec = {
@@ -476,7 +499,7 @@ async def enrich_cama_condition(listings: list[Listing], concurrency: int = 6) -
         pin_map: dict[str, list[Listing]] = {}
         no_pin: list[Listing] = []
         for li in leads:
-            pk = _pin_key(li.parcel_id, pad15, bool(cfg.get("pin_units")))
+            pk = _pin_key(li.parcel_id, pad15, bool(cfg.get("pin_units")), bool(cfg.get("pin_raw")))
             if pk:
                 pin_map.setdefault(pk, []).append(li)
             elif li.street_address:
