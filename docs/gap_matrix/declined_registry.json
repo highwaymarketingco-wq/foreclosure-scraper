@@ -6417,6 +6417,22 @@
       "reason": "Round 62 (2026-11-19): this county's only other recorded GIS presence (a Schneider qPublic assessor viewer, login-required) was already declined for condemned/vacancy/vacant/code_enforcement on this same basis; vacant_lot itself had not yet been formally declined, so this round tried the WTH tgis route that worked for Dillon/Chesterfield/Marlboro/McCormick/Williamsburg instead of re-confirming the qPublic wall. allendalesc.wthgis.com answers live (HTTP 200) -- the only one of 6 untried SC WTH subdomains probed this round that did (abbevillesc/bambergsc/edgefieldsc/fairfieldsc/leescsc/cherokeescsc.wthgis.com all connection-refused). But its root page (title \"Allendale, SC Police Dept Map\") wires tgisClientInit(\"Allendale_SC\") with only a commented-out Crime Mapper overlay and a commented-out dsid=1211 \"Live Alerts\" layer -- no Parcel Tools Menu, no BasicParcels dsid anywhere in the client, the exact same signature already confirmed dead for Union SC (see parcel_cache.py's own note). This tenant was provisioned for law-enforcement incident mapping, never for tax/CAMA parcels -- a genuine negative, not an unbuilt source.",
       "confirmed_date": "2026-11-19",
       "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Fairfield",
+      "column": "vacant_lot",
+      "reason": "Round 63 found (round 64 independently re-verified live, 2026-11-19) that the shared services9.arcgis.com Fairfield_Kershaw_Richland_Map_WFL1/FeatureServer carries a dedicated layer 8 (\"Fairfield_Parcels\", 18,173 rows) alongside its siblings layer 6 (Richland_Parcels, already wired in parcel_cache.py's PARCEL_LAYERS) and layer 7 (Kershaw_Parcels, same) -- but Fairfield's own layer is a registered, empty shell: L_Value, M_Value, Ownership, Zoning and Land_Use are ALL 100% null (0 of 18,173 rows have a value in any of the five, re-confirmed live via five separate returnCountOnly queries this round). vacant_lot's current gap_matrix next_action points at a different, as-yet-unconfirmed source (beacon.schneidercorp.com, Schneider qPublic, login-required per the county's other already-declined columns) -- this entry closes off the ArcGIS alternative specifically so a future round does not re-spend time wiring layer 8 expecting Richland/Kershaw's own real data shape. Land_Use null also forecloses this layer for heir_estate's Ownership-text route (that column is independently declined for parcel_cache's missing 'owner' field, which this corroborates rather than contradicts) and for rollback_exposure/assessed_value/tax_aging_surfaced's L_Value/M_Value route (those columns are independently declined/sourced to fairfieldsctax.com already).",
+      "confirmed_date": "2026-11-19",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Perquimans",
+      "column": "multi_year_delinquent_tax",
+      "reason": "Round 63 flagged perqcotax.com (the county's own tax search, already read by verification/verifiers/tax_lien_perquimans.py for the tax_lien SIGNAL) as reachable and GET-based but set the build aside rather than declining it, noting it 'only gives a lump current-total breakdown by tax TYPE not by YEAR.' Round 64 live-confirmed this is structural, not a missed endpoint: fetched the site's own root form (one single GET /search, no account-history or by-year link anywhere in the markup) and a live /search?for=Smith result page -- every account block is exactly the shape tax_lien_perquimans.py's own parse_accounts() already extracts: ONE running 'Taxes Due $<total>' figure per account, broken into a fixed payment-TYPE vector (PTax/PDMV/HTax/HDMV/HMFee/WTax/WDMV/WMFee/HDept/CDFee/PDFee/CPerry/Gates -- county vs. two cities' property tax vs. vehicle tax vs. fees), never into separate tax-YEAR rows or amounts. There is no second page, account-detail view, or query parameter beyond the one /search?for= form this site exposes. multi_year_delinquent_tax needs a per-year breakdown this vendor's UI simply does not surface at any URL; two_year_delinquent/tax_aging_surfaced face the identical gap for the same reason.",
+      "confirmed_date": "2026-11-19",
+      "confidence": "high"
     }
   ]
 }
