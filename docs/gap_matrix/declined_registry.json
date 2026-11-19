@@ -6353,6 +6353,70 @@
       "reason": "This is the parcel_cache-sourced heir_estate signal (raw.heir_estate: a parcel owner-of-record retitled \"<NAME> HEIRS\"/\"ESTATE OF <NAME>\"), gated on parcel_cache carrying an \"owner\" field for this county -- it does not today, and sc_heir_estate_parcel_cache.py's _candidate_counties() auto-tracks every SC county parcel_cache DOES carry, with no hardcoded list, so the real fix is parcel_cache.PARCEL_LAYERS, not this module. Investigated three times independently, same answer each time: (1) 2026-11-10 audit live-checked a uniform statewide \"Parcels - SC - <County>\" ArcGIS Online catalog (org \"GDITAdmin\") that looked like an easy add for all 13 then-missing counties -- every item now 403s \"Subscription is canceled, the item is not accessible\"; (2) 2026-11-16 gap_matrix sweep live-reprobed this county's OWN GIS host specifically (not the dead GDITAdmin catalog) and got Cloudflare's \"Just a moment...\" JS bot-check, HTTP 403, on a plain unauthenticated GET; (3) sc_wthgis_heir_estate.py's round-19/32 accounting of the same 12-cell punch list again names this county among the \"7 ... confirmed real Cloudflare/WAF walls on qpublic.schneidercorp.com or beacon.schneidercorp.com -- a genuine capability gap, not attempted here or anywhere.\" Live-reconfirmed a fourth time tonight (2026-11-18, round 33): a plain curl_cffi-style GET (real Chrome UA, no browser automation) to beacon.schneidercorp.com/Application.aspx?AppID=1061&LayerID=21289&PageTypeID=2&PageID=9397 returns HTTP 403 with the same Cloudflare challenge page (title \"Just a moment...\", challenges.cloudflare.com CSP); the bare platform root (beacon.schneidercorp.com/) 403s identically with no county-specific path at all, confirming this is a domain/infrastructure-level WAF applied uniformly to every tenant county on this Schneider Corp product, not a county-specific or stale finding. Needs real browser automation (Cloudflare challenge-solving) or a county-specific non-Schneider GIS host that does not exist today -- both out of scope for a backfill/reader-add. Not the same cell as this county's other qPublic-adjacent declines (code_enforcement/vacancy/vacant/condemned etc, where any), which cover different columns.",
       "confirmed_date": "2026-11-18",
       "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Wilkes",
+      "column": "multi_year_delinquent_tax",
+      "reason": "Round 62 (2026-11-19): www.webgis/parcelinfo.wilkescounty.net runs the SAME iasWorld \"commonsearch.aspx?mode=realprop\" / Datalets/Datalet.aspx shape enrichment_rowan_multiyear_tax.py already drives for tax.rowancountync.gov. Live-verified the search half works: POSTing a real Wilkes board parcel_id (a short plain-digit id, e.g. \"1101918\") returns a genuine exact match (\"Displaying 1 - 1 of 1\", a real selectSearchRow row with sIndex/idx) -- confirming id-shape coverage exists for at least a subset of Wilkes rows (345/930 board rows carry any parcel_id at all; several of those are GIS-PIN-shaped and were separately confirmed NOT to match this portal, e.g. \"3887-82-9325\"/\"3857760750\" both returned zero results). But the Datalet detail page for that exact matched row, fetched with no mode= param (the only request that returns 200 rather than a generic IIS/ASP.NET 500), carries this county's complete tab list via its own `mode=` references: address, advanced, alt_id, asmt_main, commercial_summary, dweldat_charac, land_summary, link, oby_det, profileall, realprop, sales, sales_summary, sketch, value_history. No tax-bill/payment-shaped mode exists at all -- `tax_bills_int` (Rowan's own working mode name) 500s on this exact matched row, as do `parcel`/`summary`/`taxbill` guesses. This county's public iasWorld instance is configured Assessor/CAMA-only; tax collection/delinquency is evidently a separate system not exposed here. A genuine per-deployment configuration difference from Rowan's tenant, not a code bug -- confirmed on the live site, not guessed.",
+      "confirmed_date": "2026-11-19",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Wilkes",
+      "column": "two_year_delinquent",
+      "reason": "Round 62 (2026-11-19): www.webgis/parcelinfo.wilkescounty.net runs the SAME iasWorld \"commonsearch.aspx?mode=realprop\" / Datalets/Datalet.aspx shape enrichment_rowan_multiyear_tax.py already drives for tax.rowancountync.gov. Live-verified the search half works: POSTing a real Wilkes board parcel_id (a short plain-digit id, e.g. \"1101918\") returns a genuine exact match (\"Displaying 1 - 1 of 1\", a real selectSearchRow row with sIndex/idx) -- confirming id-shape coverage exists for at least a subset of Wilkes rows (345/930 board rows carry any parcel_id at all; several of those are GIS-PIN-shaped and were separately confirmed NOT to match this portal, e.g. \"3887-82-9325\"/\"3857760750\" both returned zero results). But the Datalet detail page for that exact matched row, fetched with no mode= param (the only request that returns 200 rather than a generic IIS/ASP.NET 500), carries this county's complete tab list via its own `mode=` references: address, advanced, alt_id, asmt_main, commercial_summary, dweldat_charac, land_summary, link, oby_det, profileall, realprop, sales, sales_summary, sketch, value_history. No tax-bill/payment-shaped mode exists at all -- `tax_bills_int` (Rowan's own working mode name) 500s on this exact matched row, as do `parcel`/`summary`/`taxbill` guesses. This county's public iasWorld instance is configured Assessor/CAMA-only; tax collection/delinquency is evidently a separate system not exposed here. A genuine per-deployment configuration difference from Rowan's tenant, not a code bug -- confirmed on the live site, not guessed.",
+      "confirmed_date": "2026-11-19",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Wilkes",
+      "column": "tax_aging_surfaced",
+      "reason": "Round 62 (2026-11-19): www.webgis/parcelinfo.wilkescounty.net runs the SAME iasWorld \"commonsearch.aspx?mode=realprop\" / Datalets/Datalet.aspx shape enrichment_rowan_multiyear_tax.py already drives for tax.rowancountync.gov. Live-verified the search half works: POSTing a real Wilkes board parcel_id (a short plain-digit id, e.g. \"1101918\") returns a genuine exact match (\"Displaying 1 - 1 of 1\", a real selectSearchRow row with sIndex/idx) -- confirming id-shape coverage exists for at least a subset of Wilkes rows (345/930 board rows carry any parcel_id at all; several of those are GIS-PIN-shaped and were separately confirmed NOT to match this portal, e.g. \"3887-82-9325\"/\"3857760750\" both returned zero results). But the Datalet detail page for that exact matched row, fetched with no mode= param (the only request that returns 200 rather than a generic IIS/ASP.NET 500), carries this county's complete tab list via its own `mode=` references: address, advanced, alt_id, asmt_main, commercial_summary, dweldat_charac, land_summary, link, oby_det, profileall, realprop, sales, sales_summary, sketch, value_history. No tax-bill/payment-shaped mode exists at all -- `tax_bills_int` (Rowan's own working mode name) 500s on this exact matched row, as do `parcel`/`summary`/`taxbill` guesses. This county's public iasWorld instance is configured Assessor/CAMA-only; tax collection/delinquency is evidently a separate system not exposed here. A genuine per-deployment configuration difference from Rowan's tenant, not a code bug -- confirmed on the live site, not guessed.",
+      "confirmed_date": "2026-11-19",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Franklin",
+      "column": "multi_year_delinquent_tax",
+      "reason": "Round 62 (2026-11-19): www.franklincountytax.us runs the SAME iasWorld \"commonsearch.aspx?mode=realprop\" shape as tax.rowancountync.gov (enrichment_rowan_multiyear_tax.py), live-confirmed reachable (HTTP 200, real __VIEWSTATE/__EVENTVALIDATION hidden fields). But every sampled Franklin board parcel_id (10/543 parcel_id-bearing rows checked) is GIS-PIN-shaped (\"1873-40-1402\", \"2831-72-7238\", ...), unlike Rowan's own short alnum PARID (\"804 062\"). Live-tested both of 2 sampled PINs, each in its dashed-as-is form AND with every non-alphanumeric character stripped (4 POSTs total): all 4 returned zero results from the real search form. No bridging transform between the board's GIS PIN and this portal's own parcel numbering was found, and none is guessed -- the same \"wrong id shape, not a portal fault\" outcome enrichment_rowan_multiyear_tax.py's own MATCH METHOD note already anticipated for a board row sourced from a different id scheme entirely.",
+      "confirmed_date": "2026-11-19",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Franklin",
+      "column": "two_year_delinquent",
+      "reason": "Round 62 (2026-11-19): www.franklincountytax.us runs the SAME iasWorld \"commonsearch.aspx?mode=realprop\" shape as tax.rowancountync.gov (enrichment_rowan_multiyear_tax.py), live-confirmed reachable (HTTP 200, real __VIEWSTATE/__EVENTVALIDATION hidden fields). But every sampled Franklin board parcel_id (10/543 parcel_id-bearing rows checked) is GIS-PIN-shaped (\"1873-40-1402\", \"2831-72-7238\", ...), unlike Rowan's own short alnum PARID (\"804 062\"). Live-tested both of 2 sampled PINs, each in its dashed-as-is form AND with every non-alphanumeric character stripped (4 POSTs total): all 4 returned zero results from the real search form. No bridging transform between the board's GIS PIN and this portal's own parcel numbering was found, and none is guessed -- the same \"wrong id shape, not a portal fault\" outcome enrichment_rowan_multiyear_tax.py's own MATCH METHOD note already anticipated for a board row sourced from a different id scheme entirely.",
+      "confirmed_date": "2026-11-19",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Franklin",
+      "column": "tax_aging_surfaced",
+      "reason": "Round 62 (2026-11-19): www.franklincountytax.us runs the SAME iasWorld \"commonsearch.aspx?mode=realprop\" shape as tax.rowancountync.gov (enrichment_rowan_multiyear_tax.py), live-confirmed reachable (HTTP 200, real __VIEWSTATE/__EVENTVALIDATION hidden fields). But every sampled Franklin board parcel_id (10/543 parcel_id-bearing rows checked) is GIS-PIN-shaped (\"1873-40-1402\", \"2831-72-7238\", ...), unlike Rowan's own short alnum PARID (\"804 062\"). Live-tested both of 2 sampled PINs, each in its dashed-as-is form AND with every non-alphanumeric character stripped (4 POSTs total): all 4 returned zero results from the real search form. No bridging transform between the board's GIS PIN and this portal's own parcel numbering was found, and none is guessed -- the same \"wrong id shape, not a portal fault\" outcome enrichment_rowan_multiyear_tax.py's own MATCH METHOD note already anticipated for a board row sourced from a different id scheme entirely.",
+      "confirmed_date": "2026-11-19",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Franklin",
+      "column": "rollback_exposure",
+      "reason": "Round 62 (2026-11-19): www.franklincountytax.us runs the SAME iasWorld \"commonsearch.aspx?mode=realprop\" shape as tax.rowancountync.gov (enrichment_rowan_multiyear_tax.py), live-confirmed reachable (HTTP 200, real __VIEWSTATE/__EVENTVALIDATION hidden fields). But every sampled Franklin board parcel_id (10/543 parcel_id-bearing rows checked) is GIS-PIN-shaped (\"1873-40-1402\", \"2831-72-7238\", ...), unlike Rowan's own short alnum PARID (\"804 062\"). Live-tested both of 2 sampled PINs, each in its dashed-as-is form AND with every non-alphanumeric character stripped (4 POSTs total): all 4 returned zero results from the real search form. No bridging transform between the board's GIS PIN and this portal's own parcel numbering was found, and none is guessed -- the same \"wrong id shape, not a portal fault\" outcome enrichment_rowan_multiyear_tax.py's own MATCH METHOD note already anticipated for a board row sourced from a different id scheme entirely.",
+      "confirmed_date": "2026-11-19",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Allendale",
+      "column": "vacant_lot",
+      "reason": "Round 62 (2026-11-19): this county's only other recorded GIS presence (a Schneider qPublic assessor viewer, login-required) was already declined for condemned/vacancy/vacant/code_enforcement on this same basis; vacant_lot itself had not yet been formally declined, so this round tried the WTH tgis route that worked for Dillon/Chesterfield/Marlboro/McCormick/Williamsburg instead of re-confirming the qPublic wall. allendalesc.wthgis.com answers live (HTTP 200) -- the only one of 6 untried SC WTH subdomains probed this round that did (abbevillesc/bambergsc/edgefieldsc/fairfieldsc/leescsc/cherokeescsc.wthgis.com all connection-refused). But its root page (title \"Allendale, SC Police Dept Map\") wires tgisClientInit(\"Allendale_SC\") with only a commented-out Crime Mapper overlay and a commented-out dsid=1211 \"Live Alerts\" layer -- no Parcel Tools Menu, no BasicParcels dsid anywhere in the client, the exact same signature already confirmed dead for Union SC (see parcel_cache.py's own note). This tenant was provisioned for law-enforcement incident mapping, never for tax/CAMA parcels -- a genuine negative, not an unbuilt source.",
+      "confirmed_date": "2026-11-19",
+      "confidence": "high"
     }
   ]
 }

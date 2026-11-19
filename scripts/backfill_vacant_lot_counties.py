@@ -95,6 +95,19 @@ DEFAULT_TARGETS: tuple[tuple[str, str], ...] = (
     ("Kershaw", "SC"),
     ("Chesterfield", "SC"),
     ("Marlboro", "SC"),
+    # Dillon, McCormick SC: round 62 (2026-11-19) sync check -- both are on
+    # enrichment_vacant_landuse._VALUE_ONLY_NO_LANDUSE (Dillon added round 54,
+    # McCormick round 58, each via its own dedicated WTH tgis backfill script --
+    # scripts/backfill_dillon_wthgis_vacant_lot.py / backfill_mccormick_wthgis_vacant_lot.py)
+    # but this tuple was never updated when either landed, so a DEFAULT-run (no
+    # --counties) of this script silently skipped them. Re-run with --counties
+    # Dillon,SC McCormick,SC confirmed 0 new patches today (both already fully
+    # swept by their own one-off scripts: 1,278 candidates scanned, 2 stamped, both
+    # dropped as dedupe_key collisions) -- this is forward-looking hygiene, not a
+    # rows-landed fix, so a future cache refresh for either county is actually
+    # picked up by a plain default run instead of silently dropped again.
+    ("Dillon", "SC"),
+    ("McCormick", "SC"),
 )
 
 

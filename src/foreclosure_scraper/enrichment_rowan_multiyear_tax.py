@@ -3,6 +3,25 @@ tax.rowancountync.gov -- feeds both raw['multi_year_delinquent_tax'] and
 raw['two_year_delinquent'], the two shared contracts gap_matrix.py's own checked_columns()/
 positive_columns() already read.
 
+SIBLINGS TRIED AND DECLINED (round 62, 2026-11-19) -- before writing a new sibling module for
+    another gap_matrix "sourced-not-built" county on this same iasWorld/"commonsearch.aspx"
+    shape, check docs/gap_matrix/declined_registry.json first:
+    Wilkes NC (parcelinfo.wilkescounty.net): the SAME /search/commonsearch.aspx?mode=realprop
+        form live-matches real Wilkes board parcel_ids (confirmed: "Displaying 1 - 1 of 1" for
+        a real short plain-digit id) -- but the Datalet detail page for that exact matched row
+        exposes only {address, advanced, alt_id, asmt_main, commercial_summary, dweldat_charac,
+        land_summary, link, oby_det, profileall, realprop, sales, sales_summary, sketch,
+        value_history} tabs (every `mode=` value live-scraped off that one page); NO tax-bill/
+        payment mode exists at all (this module's own `tax_bills_int` 500s there, as do
+        "parcel"/"summary"/"taxbill"). This county's public iasWorld instance is
+        Assessor/CAMA-only -- tax COLLECTION is evidently hosted elsewhere, not on this portal.
+    Franklin NC (www.franklincountytax.us): same commonsearch.aspx shape, reachable live -- but
+        every sampled Franklin board parcel_id is GIS-PIN-shaped ("1873-40-1402"), and searching
+        that exact string, its undashed form, and the same pair for a second sampled parcel all
+        returned zero results (same "wrong id shape, not a portal fault" outcome this module's
+        own MATCH METHOD note already anticipated). No bridging transform found; not guessed.
+    Both entries, with the live evidence above, are in declined_registry.json.
+
 WHY THIS EXISTS. gap_matrix lists both columns as Rowan "sourced-not-built" (~4,594 applicable
     rows each, source "tax/property card: tax.rowancountync.gov"). Rowan's own board source,
     scrapers/counties_nc/rowan_delinquent_tax.py, reads the county's published "Delinquent
