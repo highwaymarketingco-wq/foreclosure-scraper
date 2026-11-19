@@ -1075,6 +1075,17 @@ SPECS: dict[str, Spec] = {
                                                               # bare PIN) and yield (46 real matches of 448
                                                               # eligible board rows).
                                                               "enrichment_hertford_rollback_exposure.py",
+                                                              # Round 66 (2026-11-19) also checked Martin and
+                                                              # Northampton NC (both no-source-known) for the same
+                                                              # shortcut and found genuine dead ends, not missed
+                                                              # sources -- both live-confirmed, see
+                                                              # declined_registry.json: Martin's own GIS server
+                                                              # (gis.martincountyncgov.com, 4 services checked) only
+                                                              # carries a single CURRENT_TOTAL_VALUE field, no
+                                                              # land/building split; Northampton's AGD-vendor layer
+                                                              # only carries Tax_Value (a second candidate host,
+                                                              # geodecisions.com, refused every connection attempt
+                                                              # and was NOT checked -- re-verify if it comes back).
                                                               # 2026-11-16 rollback_exposure sweep: these two were
                                                               # missing entirely, which is WHY 6 of the 9 qPayBill
                                                               # counties the ROLLBACK-TAX Description-text detector
