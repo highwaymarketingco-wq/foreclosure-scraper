@@ -1,19 +1,19 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 6141,
+  "confirmed": 6266,
   "refuted": 11,
-  "rows": 6235,
+  "rows": 6360,
   "stale": 30,
   "unconfirmed": 53,
   "wall": 0
  },
- "generated_at": "2026-11-19T01:30:40Z",
+ "generated_at": "2026-11-19T01:59:05Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-19T01:30:40Z",
+  "at": "2026-11-19T01:59:05Z",
   "county": "Colleton",
   "host": "SMB-LTSEO05",
   "max_rows": 2000,
@@ -27,29 +27,28 @@
   "result": {
    "budget_stop": 1,
    "checked": 125,
-   "confirmed": 124,
-   "unconfirmed": 1
+   "confirmed": 125
   },
   "seconds": 501,
   "selection": {
    "applies": 2577,
-   "due_new": 1116,
-   "not_due_retry": 18,
-   "not_due_ttl": 1443
+   "due_new": 991,
+   "not_due_retry": 19,
+   "not_due_ttl": 1567
   },
   "source": null,
   "tier": null
  },
- "rows": 6235,
+ "rows": 6360,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 5930817,
+   "bytes": 6048730,
    "file": "000.json",
-   "rows": 6235,
-   "sha256": "14e6d493a805e6cf15ce196b27baf46e7d01d2f14cb9c0e85e92e2cecfcda598"
+   "rows": 6360,
+   "sha256": "ee27c342f4997ac858a2dd98a2ec0a5b3e22665cb9fa00fb6021a80cd7550af8"
   }
  ],
  "signal": "heir_roll",
