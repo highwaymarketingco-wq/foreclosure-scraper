@@ -3594,6 +3594,17 @@ async def run_enrich_tail(st: TailState) -> dict:
     except Exception:
         log.error("pender_mydt.failed", traceback=traceback.format_exc())
 
+    # Pender NC rollback_exposure: the county's own live GIS parcels layer (iasWorld-linked,
+    # gis.pendercountync.gov) carries a literal DEFERRED_VALUE field, no derivation needed.
+    # Round 63 gap_matrix sweep (2026-11-19). Gate off with FORECLOSURE_PENDER_ROLLBACK=0.
+    try:
+        from .enrichment_pender_rollback_exposure import enrich_pender_rollback_exposure
+        s = await _await_capped(enrich_pender_rollback_exposure(enriched), "pender_rollback")
+        if s and s.get("matched"):
+            enrichment_stats["pender_rollback"] = s
+    except Exception:
+        log.error("pender_rollback.failed", traceback=traceback.format_exc())
+
     # Iredell NC per-parcel tax search (classic ITS.NET TaxBill.aspx, same vendor tax_lien_itsnet.py
     # already drives for Iredell/Chowan tax-lien verification): multi-year unpaid-bill history.
     # Must run BEFORE enrich_tax_owed, same reason as nash_mydt/gaston_mydt above. Gate off with
