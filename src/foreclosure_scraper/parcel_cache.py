@@ -409,6 +409,25 @@ PARCEL_LAYERS: dict[str, dict] = {
     # empty. PIN matches board parcel_id format exactly (dashed with a
     # trailing ".00", e.g. "0068J-0H-012.00"), verified live. No market/
     # assessed value field on this layer (owner+mailing+situs+sale only).
+    #
+    # vacant_lot gap check 2026-11-19 (round 53, Georgetown/Jasper/Lancaster/Clarendon/
+    # Dillon/Union breadth attempt): land_use and improvement_value are 100% NULL in
+    # lancaster.sqlite because neither key is mapped above -- confirmed this is not a
+    # missed mapping. Live field list (.../FeatureServer/0?f=json) has exactly ONE
+    # unmapped field, CLASS (string, length 9), confirmed 100% non-null (56,535/56,535)
+    # but a MESS: distinct sample values are " " (blank/whitespace), "0", "01", "1",
+    # "129", "140", "2020", "216"... -- inconsistent digit-length codes with no
+    # CodedValueDomain on the service (domain: null) and no published legend found.
+    # No market/assessed/building-value field of ANY kind exists on this layer (same
+    # confirmed-absent as the docstring above already says) -- so even mapping CLASS as
+    # land_use would pass enrichment_vacant_landuse.py's bare-digit gate for most rows
+    # but then dead-end at `imprv = rec.get("improvement_value")` being permanently None
+    # (no field to source it from), which the gate correctly refuses to guess past. This
+    # is the same structural dead end as Georgetown/Jasper below, not a quick fix.
+    # SEPARATE OPEN ITEM, not chased further this round: live returnCountOnly on this
+    # layer today reports 56,535 parcels vs 79,291 rows in the current cache (refreshed
+    # 2026-11-15) -- a ~29% drop. Could be a live-service blip or a real roll change;
+    # worth a second live count before the next scheduled refresh overwrites the cache.
     "Lancaster": {
         "state": "SC",
         "url": "https://services3.arcgis.com/rJcpRneDUBgTeCT3/arcgis/rest/services/LC_Parcels/FeatureServer/0/query",
@@ -974,6 +993,19 @@ PARCEL_LAYERS: dict[str, dict] = {
         # (20,258 rows) is therefore now STALE and this source can no longer be refreshed
         # or field-checked for land_use until the item's sharing changes back or a
         # replacement source is found.
+        #
+        # RE-VERIFIED 2026-11-19 (round 53): still HTTP 499 "Token Required" (GWM_0003) on
+        # both the layer metadata (?f=json) and a /query call -- unchanged since 2026-11-16,
+        # not a transient blip. jasper.sqlite is still on the OLD (pre-2026-10-07+) schema,
+        # missing the improvement_value/year_built/bedrooms/bathrooms/stories/rollback_tax
+        # columns later entries carry (confirmed: 11 columns vs Georgetown/Lancaster's 17) --
+        # expected, since overwrite-in-place means a county's table shape freezes at
+        # whatever refresh_parcel_cache.py last successfully wrote, and this one hasn't run
+        # since the wall went up. No replacement Jasper County source found this round
+        # (not actively searched for one -- out of scope; see the block after PARCEL_LAYERS
+        # closes below for the counties that WERE searched this round). Hard-blocked at the
+        # source, not a mapping bug: nothing to fix here without the token wall lifting or a
+        # different host being found.
         "state": "SC",
         "url": "https://services6.arcgis.com/UXJOITFCLbn0Ibm0/arcgis/rest/services/Jasper_County_Parcels/FeatureServer/2/query",
         "id_fields": ["TaxPIN"],
@@ -1135,6 +1167,32 @@ PARCEL_LAYERS["Orangeburg"] = {
 #: rows (e.g. a right-of-way sliver) carry TMS with ParcelID null, never the reverse.
 #: SaleDate/SalePrice are ArcGIS epoch-ms/raw numeric, handled by this module's existing
 #: generic _iso_date/sale_amount normalization -- no county-specific parsing needed.
+#:
+#: vacant_lot gap check 2026-11-19 (round 53): land_use/improvement_value are 100% NULL in
+#: georgetown.sqlite because neither key is mapped below. Live-checked whether that's a
+#: missed mapping (.../MapServer/2?f=json): there IS one real unmapped field, LandUseCode
+#: (string, length 50) -- 99.1% filled (47,433/47,896, confirmed via returnCountOnly) with
+#: genuine county-specific codes (sampled distinct values: "Q100", "N000", "N100", "N804",
+#: "Q000", "Q202", "N453"...). But it is a bare alphanumeric CODE, not descriptive text, so
+#: _is_vacant_land_use()'s VACANT/VAC wordlist regex can never match it, and it also is NOT
+#: all-digit (leading Q/N letter), so it does not pass enrichment_vacant_landuse.py's
+#: bare-numeric-DOR-code gate either -- and even if it did, that gate's fallback needs a
+#: mapped improvement_value to read, and this layer has NO market/assessed/building-value
+#: field of any kind (full 31-field list checked; only TotalLandArea and SalePrice touch
+#: money/size at all). The service's own field metadata shows domain: null (no
+#: CodedValueDomain), so there is no live-fetchable legend for what Q/N + 3-digit-suffix
+#: means, and this project's established rule (see Horry's bare-DOR-code note above) is to
+#: NOT guess a code's meaning without a ground-truth check (e.g. Sumter's satellite-imagery
+#: sample) -- which this layer's schema cannot even support here, since it carries no
+#: structural field (sqft/year_built/bedrooms) to cross-check a guessed "000 = vacant"
+#: reading against either. Mapping LandUseCode as-is would be a silent no-op (zero
+#: enrichment_vacant_landuse.py stamps, confirmed by walking the function's own logic
+#: against these values); a real fix needs either a verified SC DOR use-code legend with
+#: live ground-truth sampling, or a different Georgetown source with a dollar value field --
+#: neither is a this-round-sized task. NOT a mapping bug; structurally blocked as currently
+#: sourced. (Jasper and Lancaster above hit the same two-pattern wall from different angles
+#: -- see their own 2026-11-19 notes. Clarendon/Dillon/Union SC source-discovery notes for
+#: this same round are directly below, after this entry.)
 PARCEL_LAYERS["Georgetown"] = {
     "state": "SC",
     "url": ("https://gis1.georgetowncountysc.org/portal/rest/services/GCGIS_Energov/"
@@ -1146,6 +1204,49 @@ PARCEL_LAYERS["Georgetown"] = {
             "owner_mailing": ["BillingAddress", "BillingAddress2", "City", "State", "ZipCode"],
             "acreage": "TotalLandArea", "sale_price": "SalePrice", "sale_date": "SaleDate"},
 }
+
+#: CLARENDON / DILLON / UNION SC -- vacant_lot breadth round 53 (2026-11-19), source
+#: discovery for the 3 SC counties with NO parcel_cache file at all (vs. Georgetown/Jasper/
+#: Lancaster just above, which have one but hit the land_use/improvement_value wall noted
+#: on each). None of the three got a working PARCEL_LAYERS entry this round:
+#:
+#: CLARENDON: no county-run GIS findable. www.clarendoncountysc.gov has no GIS/map link
+#: anywhere in its homepage nav or /sitemap/ (both fetched live). AGOL search
+#: (title:Parcels AND Clarendon, and "Clarendon County" SC broad) returns exactly one
+#: county-specific hit: GDIT's "Parcels - SC - Clarendon County", smpesri.scdot.org/arcgis/
+#: rest/services/GISMapping/SC_Parcels/MapServer/13 -- the SAME statewide product already
+#: in net_new_source_register.md 4.2 as token-walled; re-confirmed live today at every
+#: level (service root, layer 13 root, and a layer-13 /query all answer HTTP 499 "Token
+#: Required"), so the per-sublayer wall is as real as the parent-service one already on
+#: record. No alternative found. DEAD for now.
+#:
+#: DILLON: same statewide-GDIT sublayer (MapServer/16), same live 499 wall, no county AGOL
+#: org/username hit either. BUT the county's own site (dilloncountysc.org ->
+#: /departments/gis.php) links a live, NOT token-walled WTH tgis viewer:
+#: https://dillonsc.wthgis.com/ (HTTP 200, same vendor/protocol as Union's unionsc.wthgis.com
+#: and the existing Williamsburg/Chesterfield WTH ingests elsewhere in this project). This is
+#: NOT an ArcGIS FeatureServer -- it is WTH's own getftr.aspx?D=<dsid>&F=<n> feature-index
+#: protocol, so it cannot become a PARCEL_LAYERS entry as-is; it would need a bespoke ingest
+#: script, the Williamsburg/Union precedent, not attempted this round (out of scope: the ask
+#: was an ArcGIS-shaped entry). CAUTION for whoever picks this up: probing dillonsc.wthgis.com
+#: with dsid=984 (Union's own parcels dsid on unionsc.wthgis.com) returned UNION's own CAMA
+#: data ("\SC\Union\45087parcels.tml") back through DILLON's endpoint -- the dsid keyspace
+#: reads as shared/global across WTH's hosted tenants, not tenant-scoped, so Dillon's actual
+#: parcels dsid is still unknown and must not be assumed to be 984. A real, live, promising
+#: lead; genuinely not built yet.
+#:
+#: UNION (the SC half -- this belongs in SC_DUAL_LAYERS below, keyed state="SC", NOT here,
+#: whenever/if it is ever added): re-confirmed, not re-investigated from scratch. A dedicated
+#: 2-sweep enumeration already ran for Union (docs/enumeration_r3/r3_Union.md) and concluded
+#: "no server, no org, no useful statewide host... no hosted FeatureServer, no DCAT/open-data
+#: catalog anywhere in this county" -- re-checked today: no new AGOL hit changes that, and the
+#: same statewide GDIT product is the same 499 wall as Clarendon/Dillon above. That doc's own
+#: real leads are both non-ArcGIS: Beacon/qPublic (Schneider Corp; owner-name + sales-by-date +
+#: per-parcel detail incl. Class Code/Acres/Year Built, but HTML-only, curl_cffi
+#: impersonate=chrome required, plain curl/WebFetch = 403) and the SAME WTH tgis family as
+#: Dillon above (unionsc.wthgis.com, dsid 984 = Parcels/CAMA-ID, dsid 992 = ParcelJoin's
+#: ~18-19k sequential ParcelID keyspace). Same conclusion as Dillon: a real lead, needs a
+#: bespoke non-ArcGIS ingest adapter, not a this-round build.
 
 #: RICHLAND + KERSHAW SC, added 2026-11-06 (gap_matrix heir_estate/vacant_lot breadth check).
 #:
