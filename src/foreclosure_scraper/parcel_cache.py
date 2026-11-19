@@ -1280,6 +1280,24 @@ PARCEL_LAYERS["Georgetown"] = {
 #: (Schneider Corp, from the enumeration doc above) remains the one real, unexplored lead for
 #: Union's actual CAMA attributes, and is a curl_cffi/impersonate project, not a WTH one.
 
+#: ALLENDALE SC -- vacant_lot round 62 (2026-11-19), NEW county checked on the WTH tgis
+#: platform (gap_matrix's sourced-not-built list still named this county's ONLY recorded
+#: source as the qPublic-login viewer already declined for condemned/vacancy/vacant/
+#: code_enforcement -- vacant_lot itself was never formally declined, so this round tried
+#: the SAME WTH-tgis route that worked for Dillon/Chesterfield/Marlboro/McCormick instead of
+#: re-confirming the qPublic wall). allendalesc.wthgis.com answers live (HTTP 200, unlike
+#: every other untried-SC-county subdomain probed the same round: abbeville/bamberg/
+#: edgefield/fairfield/lee/cherokee all connection-refused) -- but it is NOT a parcels/CAMA
+#: deployment at all: its root page (title "Allendale, SC Police Dept Map") wires
+#: tgisClientInit("Allendale_SC", ...) with a commented-out Crime Mapper overlay
+#: (addMenuItem("...","Crime Mapper App",...) and a commented-out dsid=1211 "Live Alerts"
+#: layer) and addStdMenuItems() (the shared platform's generic nav/zoom/print tools) --
+#: exactly Union's already-documented dead-end signature just above (no Parcel Tools Menu,
+#: no BasicParcels dsid anywhere in the client), confirming this county's WTH tenant was
+#: provisioned for law-enforcement incident mapping, never for tax/CAMA parcels. See
+#: docs/gap_matrix/declined_registry.json (SC/Allendale/vacant_lot) for the registry entry
+#: this backs.
+
 #: RICHLAND + KERSHAW SC, added 2026-11-06 (gap_matrix heir_estate/vacant_lot breadth check).
 #:
 #: NOT the county's own GIS (richlandmaps.com is confirmed -- again, live -- a custom PHP/
