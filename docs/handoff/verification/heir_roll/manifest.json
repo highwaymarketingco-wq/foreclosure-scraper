@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 9337,
+  "confirmed": 9460,
   "refuted": 11,
-  "rows": 9433,
+  "rows": 9556,
   "stale": 30,
   "unconfirmed": 55,
   "wall": 0
  },
- "generated_at": "2026-11-19T19:27:53Z",
+ "generated_at": "2026-11-19T21:18:39Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-19T19:27:53Z",
+  "at": "2026-11-19T21:18:39Z",
   "county": "Lexington",
   "host": "SMB-LTSEO05",
   "max_rows": 2000,
@@ -29,33 +29,33 @@
    "checked": 123,
    "confirmed": 123
   },
-  "seconds": 502,
+  "seconds": 503,
   "selection": {
    "applies": 1265,
-   "due_new": 1042,
+   "due_new": 919,
    "not_due_retry": 2,
-   "not_due_ttl": 221
+   "not_due_ttl": 344
   },
   "source": null,
   "tier": null
  },
- "rows": 9433,
+ "rows": 9556,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4505384,
+   "bytes": 4573225,
    "file": "000.json",
-   "rows": 4731,
-   "sha256": "fe42fc6ab671753724c248c5016cd424a016f36883c13080bf9c9be168438326"
+   "rows": 4802,
+   "sha256": "3007057af03df960593a3b69a6cf4cc77373df2c0442947894a446407e553eb1"
   },
   {
    "bucket": 1,
-   "bytes": 4482425,
+   "bytes": 4532001,
    "file": "001.json",
-   "rows": 4702,
-   "sha256": "31b2099769edb82fb947bc384d565a70715db6ecff05f34a3851d94ca99766e2"
+   "rows": 4754,
+   "sha256": "fc083fd73f8c891b974c01c5ee19427f8716a53aa28d956d868b599bbc9837d0"
   }
  ],
  "signal": "heir_roll",
