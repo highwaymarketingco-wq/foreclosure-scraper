@@ -134,7 +134,29 @@ _GREENWOOD_NULL_IMPROVEMENT_EXCLUDED_PROPTYPES = frozenset({"Commercial", "Multi
 # (scripts/backfill_vacant_lot_counties.py --dry-run --counties "Marlboro,SC") against
 # the real board: of 1,620 eligible rows, 433 would newly stamp vacant_lot and 595 more
 # would newly mark Improved -- not yet applied (see that script's --apply path).
-_VALUE_ONLY_NO_LANDUSE = frozenset({"Sumter", "Williamsburg", "Kershaw", "Chesterfield", "Marlboro", "Dillon"})
+#
+# 2026-11-19 (round 58): McCormick SC, same WTH "tgis" platform family as Dillon above
+# (mccormicksc.wthgis.com, scripts/backfill_mccormick_wthgis_vacant_lot.py). Schema
+# field-for-field IDENTICAL to Dillon's (live-diffed), so the same mapping applies:
+# improvement_value -> MarketValueBuildingsValue, market_value -> MarketValueTotalValue,
+# no land_use field on this county's template (confirmed live, same full-field dump used
+# for every sibling WTH county above). data/parcel_cache/mccormick.sqlite (311 records,
+# built this round from a surname-crawl match against 416 of 527 McCormick board rows that
+# carry a parcel_id) checked directly: 311/311 rows carry a non-null improvement_value, 167
+# of those are exactly 0 while market_value is present -- the identical "zero improvement,
+# real market value" shape as every other county in this set. Marion SC (same round's other
+# WTH candidate, DSID=1064, schema CONFIRMED DIFFERENT -- Land&nbsp;Value/Building&nbsp;Value
+# split, no MarketValueTotalValue at all) was investigated but NOT added here: only 7 of 287
+# Marion board rows carry any parcel_id at all (live-measured), and all 7 already came from
+# the one producer (sc_wthgis_heir_estate.py) that populates them, so a dedicated cache
+# adapter has a hard 7-row ceiling with no crawl-discoverable upside -- a real yield floor,
+# not a platform wall, same "not worth it at this ceiling" judgment this project already
+# applied to Beaufort's 1.4% parcel_id coverage (see backfill_vacant_lot_counties.py's own
+# docstring). Not attempted; a future round could revisit if Marion's own parcel_id coverage
+# ever improves from elsewhere.
+_VALUE_ONLY_NO_LANDUSE = frozenset({
+    "Sumter", "Williamsburg", "Kershaw", "Chesterfield", "Marlboro", "Dillon", "McCormick",
+})
 
 
 def _has_cache(memo: dict, county: str, state: str | None) -> bool:
