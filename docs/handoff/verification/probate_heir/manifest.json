@@ -8,9 +8,9 @@
   "unconfirmed": 36,
   "wall": 0
  },
- "generated_at": "2026-11-18T02:25:45Z",
+ "generated_at": "2026-11-20T02:00:25Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
- "host": "SMB-LTSEO05",
+ "host": "mac-single-parcel-recheck",
  "kind": "verification_ledger_manifest",
  "last_run": {
   "at": "2026-11-18T02:25:45Z",
@@ -36,10 +36,10 @@
  "shards": [
   {
    "bucket": 0,
-   "bytes": 183183,
+   "bytes": 183329,
    "file": "000.json",
    "rows": 131,
-   "sha256": "baf4e99144065addf631e051843a2edd7d1a08f818e0ad02ee1a67b04d478293"
+   "sha256": "dfd6e3b38e3c6633fe68c010afea6e6c7dce710303b14236f70354ac462a2c0b"
   }
  ],
  "signal": "probate_heir",
