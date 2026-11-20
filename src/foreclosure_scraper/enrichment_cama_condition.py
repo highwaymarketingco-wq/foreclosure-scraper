@@ -154,6 +154,22 @@ CAMA_SOURCES: dict[tuple[str, str], dict[str, Any]] = {
     },
     ("NC", "Gaston"): {
         # Gaston CAMA: YEARBLT + SQFT (no Condition/Grade, year only).
+        # 2026-11-19 (round 70) FIX: was pin_pad15=True (0/600 live match, per
+        # round 69's finding -- "oldPIN, AKPAR -- none resolved"). Root cause,
+        # found via a live /query?f=json metadata call (never guessed): PIN is
+        # stored DASHED ('3546-54-0134'), the SAME shape as the board's own
+        # Gaston parcel_id ('3584-60-1097') -- the generic _pin_key() digit-
+        # strips by default (pin_pad15 only changes padding AFTER that strip),
+        # so every lookup key became '3546540134', which the layer's PIN field
+        # never stores and so never matches. This is the exact same bug class
+        # round 69 found and fixed for SC:Spartanburg's MAPNUMBER (dashes are
+        # load-bearing, not punctuation to strip). Live-verified: a 17-PIN raw
+        # (unstripped) batch against this UNCHANGED layer matched 17/17
+        # (100%). oldPIN (digits-only, '3546540134') is also live on this
+        # layer and would join the board's minority of digit-only Gaston
+        # parcel_ids, but this one entry can only carry one pin_field/join
+        # mode -- see backfill_gaston_cama_condition.py for the real,
+        # board-wide dashed-vs-digit split and the resulting match rate.
         "url": "https://gis.gastoncountync.gov/publicgis/rest/services/"
                "PublicGIS/Parcels/FeatureServer/11",
         "pin_field": "PIN",
@@ -161,7 +177,7 @@ CAMA_SOURCES: dict[tuple[str, str], dict[str, Any]] = {
         "grade_field": None,
         "year_field": "YEARBLT",
         "join": "pin",
-        "pin_pad15": True,
+        "pin_raw": True,
     },
 }
 
