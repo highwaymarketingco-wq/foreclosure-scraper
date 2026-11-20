@@ -2053,6 +2053,10 @@ RAW_KEEP = {
     "crime": "*",                     # FBI UCR / per-zip crime stats
     "fema_repetitive_loss": "*",      # NFIP multiple-loss properties (much stronger than flood zone alone)
     "code_enforcement": "*",          # City open code violations (Charlotte 311 etc.)
+    # Registered BEFORE spartanburg_energov_selfservice.py's first real run, per this
+    # dict's own standing lesson (see bankruptcy_tax_combo above) about a new raw key
+    # landing silently dropped at publish otherwise.
+    "permit_activity": "*",           # permit issue/final/expire dates + stalled-renovation flag
     "sc_tax_delinquent": "*",         # SC delinquent tax / pre-tax-sale tag
     "building_permits": "*",          # recent permits = positive, stale open = negative
     "bid4assets": "*",                # auction-site raw payload

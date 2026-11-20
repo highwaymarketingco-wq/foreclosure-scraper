@@ -13,6 +13,15 @@ WHY NOT the county's dedicated "Condemned_Properties" service:
     (EnerGov spatial collections are generic Point/Line/Polygon buckets, and
     CAMA.PermitType is null across the dataset — both dead ends for this signal.)
 
+    SCOPE OF THAT DEAD END: the EnerGov note above is about GIS SPATIAL exposure
+    of EnerGov data (a point/line/polygon ArcGIS layer) — a different access
+    surface from spartanburg_energov_selfservice.py's Tyler EnerGov SELF-SERVICE
+    REST search API (apps/selfservice/api/energov/search/search), which was found
+    later (2026-11-19) and is NOT ruled out by this reasoning. That sibling module
+    pulls Code Case records for this same condemned/code_enforcement signal (plus
+    Permit records for a separate stalled-renovation signal) once its backend —
+    confirmed down as of 2026-11-19 — is healthy; see its own docstring.
+
 WHAT WE USE INSTEAD (compliant, live, net-new):
     The county CAMA_Parcels FeatureServer carries a per-structure condition code.
     ConditionFactor='DL' / CDUC='DELAPITATED' is the assessor's own dilapidated /
