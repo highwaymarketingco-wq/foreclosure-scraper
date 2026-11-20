@@ -23,6 +23,13 @@ TAX = [_li("26CV000871-220", "336 Example Cir", "Cleveland", "2026-10-06"),
        _li("26CV000871-220", "319 Example Cir", "Cleveland", "2026-10-06"),
        _li("26CV000001-220", "1 A St", "Cleveland"), _li("26CV000002-220", "2 A St", "Cleveland"),
        _li("26CV000003-220", "3 A St", "Cleveland")]
+# No case_number of its own (the firm's catalog carries parcel ids, not court cases), matching
+# the real terry_howe_flc.py Listing shape: some rows have a numbered street_address, some are
+# "Off <street>" locator parcels with none -- the same split this file's own applies() already
+# handles for every other firm via address-only matching.
+FLC = [_li(None, "817 Saxon Ave", "Spartanburg", None), _li(None, "123 Elm St", "Chester", None),
+       _li(None, "Off Dodd St", "Spartanburg", None), _li(None, "2 Elm St", "Chester", None),
+       _li(None, "4 Elm St", "Chester", None), _li(None, "6 Elm St", "Chester", None)]
 
 
 @pytest.fixture(autouse=True)
@@ -35,10 +42,14 @@ def _lists(monkeypatch):
     async def kania():
         return TAX
 
+    async def flc():
+        return FLC
+
     async def broken():
         raise TimeoutError("no answer")
 
-    monkeypatch.setattr(F, "PROVIDERS", {"hutchens_NC": nc, "kania": kania, "shapiro": broken})
+    monkeypatch.setattr(F, "PROVIDERS",
+                         {"hutchens_NC": nc, "kania": kania, "shapiro": broken, "terry_howe_flc": flc})
     yield
     F.reset_caches()
 
@@ -115,3 +126,39 @@ def test_unreadable_list_is_transient():
 def test_row_with_no_case_matches_by_address_in_the_county():
     r = _run(_row(case_number=None, street_address="12 Sample Street"))
     assert r.verdict == "confirmed" and r.evidence["match_basis"] == "address"
+
+
+def test_terry_howe_flc_row_with_numbered_address_matches_by_address():
+    row = _row(source="counties_sc.terry_howe_flc", county="Spartanburg", case_number=None,
+               street_address="817 Saxon Ave", sale_date=None)
+    assert F.applies(row)
+    r = _run(row)
+    assert r.verdict == "confirmed" and r.evidence["match_basis"] == "address"
+    assert F.governs_for(r.to_dict()) == ("tax_sale", "upset_bid")
+
+
+def test_terry_howe_flc_locator_only_row_is_out_of_scope():
+    # "Off Dodd St" carries no house number and no case number -- the same scope limit every
+    # other firm's address-only matching already has, not a new gap this entry introduces.
+    row = _row(source="counties_sc.terry_howe_flc", county="Spartanburg", case_number=None,
+               street_address="Off Dodd St", sale_date=None)
+    assert not F.applies(row)
+
+
+def test_terry_howe_flc_ignores_a_foreign_case_number_and_matches_by_address():
+    # Live-confirmed 2026-11-20: some real Spartanburg terry_howe_flc board rows carry a
+    # "trulia-<id>_ZPID" case_number from cross-source enrichment, never the firm's own (an FLC
+    # auction has no court case). Matching that against the firm's case-less catalog must not
+    # block the address fallback that would otherwise find the row.
+    row = _row(source="counties_sc.terry_howe_flc", county="Spartanburg",
+               case_number="trulia-11805212_ZPID", street_address="817 Saxon Ave", sale_date=None)
+    assert F.applies(row)
+    r = _run(row)
+    assert r.verdict == "confirmed" and r.evidence["match_basis"] == "address"
+
+
+def test_terry_howe_flc_row_for_a_different_county_is_unconfirmed():
+    row = _row(source="counties_sc.terry_howe_flc", county="Laurens", case_number=None,
+               street_address="817 Saxon Ave", sale_date=None)
+    r = _run(row)
+    assert r.verdict == "unconfirmed" and r.evidence["reason"] == "not_listed_no_date"
