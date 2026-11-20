@@ -1,60 +1,60 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 10256,
+  "confirmed": 10595,
   "refuted": 11,
-  "rows": 10352,
+  "rows": 10691,
   "stale": 30,
   "unconfirmed": 55,
   "wall": 0
  },
- "generated_at": "2026-11-20T01:02:44Z",
+ "generated_at": "2026-11-20T01:32:05Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-20T01:02:44Z",
-  "county": "Lexington",
+  "at": "2026-11-20T01:32:05Z",
+  "county": "Berkeley",
   "host": "SMB-LTSEO05",
   "max_rows": 2000,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "maps.lex-co.com": 102
+    "gis.berkeleycountysc.gov": 340
    }
   },
   "result": {
-   "checked": 50,
-   "confirmed": 50
+   "budget_stop": 1,
+   "checked": 339,
+   "confirmed": 339
   },
-  "seconds": 204,
+  "seconds": 701,
   "selection": {
-   "applies": 1265,
-   "due_new": 50,
-   "not_due_retry": 2,
-   "not_due_ttl": 1213
+   "applies": 1693,
+   "due_new": 1178,
+   "not_due_ttl": 515
   },
   "source": null,
   "tier": null
  },
- "rows": 10352,
+ "rows": 10691,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4970614,
+   "bytes": 5135073,
    "file": "000.json",
-   "rows": 5219,
-   "sha256": "5520e1c79394c458adebd93a733193c322f65530e06becd8e16842ee5af9c0c6"
+   "rows": 5392,
+   "sha256": "df887ffe1904983de5b8b9044788acfcc464f80a6d0c2147476a91ded14f1e96"
   },
   {
    "bucket": 1,
-   "bytes": 4894436,
+   "bytes": 5051927,
    "file": "001.json",
-   "rows": 5133,
-   "sha256": "0b4e2764d212557562c2dda2cc0e0a5318f42802afeecdabf1267279e43fd774"
+   "rows": 5299,
+   "sha256": "ed79e0761b5bcbc513f826eafa853e430627bcf0d2b6a5300a13c19e6b1a869a"
   }
  ],
  "signal": "heir_roll",
