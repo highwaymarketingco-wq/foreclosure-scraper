@@ -31,7 +31,7 @@ from typing import Iterable
 
 import structlog
 
-from .identity import suspicious_owner_name
+from .identity import rod_chain_conveyance_owner, suspicious_owner_name
 from .models import Listing
 
 log = structlog.get_logger()
@@ -72,12 +72,22 @@ def _owner_candidates(li: Listing) -> list[tuple[str | None, str | None]]:
     (raw['owner_mailing']['source']). li.owner_name and skip_trace.owner_name share that same
     tag: on a row liensnc_handoff.py originated, BOTH fields were set from that filing's own
     unvalidated owner_text parse, so either one can carry that same provenance. li.defendant
-    (the court filing's own party name) carries none."""
+    (the court filing's own party name) carries none.
+
+    identity.rod_chain_conveyance_owner() goes FIRST, ahead of li.owner_name itself: unlike
+    every other candidate here (all read off a county roll or tax-record snapshot that can go
+    stale after a real sale -- see _owner()'s docstring), it is a specific recorded deed,
+    independently tied to THIS row's own parcel, naming whoever the county register's OWN index
+    says holds title today. Its provenance tag is 'rod_chain_conveyance', never a
+    _LIEN_FILING_SOURCES value, so an entity-suffixed grantee from this source is never wrongly
+    caught by the entity_from_lien_filing rule the way a lien filing's own unvalidated parse is."""
     raw = li.raw or {}
     st = raw.get("skip_trace") or {}
     om = raw.get("owner_mailing")
     lien_source = om.get("source") if isinstance(om, dict) else None
+    conveyance = rod_chain_conveyance_owner(li)
     return [
+        (conveyance.get("name") if conveyance else None, "rod_chain_conveyance"),
         (li.owner_name, lien_source),
         (st.get("owner_name"), lien_source),
         (li.defendant, None),
@@ -92,19 +102,25 @@ def _owner(li: Listing) -> str | None:
     candidate, or to the generic "Property Owner" default (via _first_name(None)) when every
     candidate is empty or flagged. Reliability order:
 
-    1. li.owner_name — the board's primary, actively-maintained owner field.
+    1. identity.rod_chain_conveyance_owner() — a register deed PROVEN (not merely name-matched)
+       to be THIS parcel's, naming whoever the county's own index says the prior owner (li.
+       owner_name's own source, further down this chain) already conveyed it to. None on the
+       overwhelming majority of rows (rod_chain is off by default and covers a small slice of
+       NC counties) -- this is the one candidate that can be MORE current than li.owner_name
+       itself, see 2026-11-20 below.
+    2. li.owner_name — the board's primary, actively-maintained owner field.
        identity.py's resolve_owner()/owner_verdict() keep it bound to the
        county's CURRENT record of THIS parcel (classifying every contradicting
        claim as bound/unbound/foreign/historical before trusting it) and
        correct it in place when the county disagrees.
-    2. raw['skip_trace']['owner_name'] — written by enrichment_skip_trace.py's
+    3. raw['skip_trace']['owner_name'] — written by enrichment_skip_trace.py's
        TaxRecordsOnlyProvider, which (2026-11-19) now itself prefers
        li.owner_name over the unvalidated owner_mailing/gis claim, and is
        re-run (not frozen forever) on a row PROVABLY carrying a name
        identity.py has since rejected (see that module's
        _skip_trace_owner_is_stale()). Used only when li.owner_name itself is
        empty or flagged.
-    3. li.defendant — the court filing's defendant name; last resort.
+    4. li.defendant — the court filing's defendant name; last resort.
 
     2026-11-19 verification (20 rows sampled from 3,264 contactable rows where
     li.owner_name and skip_trace.owner_name disagreed, 18 live-confirmed against county
@@ -113,6 +129,18 @@ def _owner(li: Listing) -> str | None:
     a lienholder/government/job-title name read as the owner, the different "party-role
     confusion" defect suspicious_owner_name() exists to catch. Before the first fix, _owner()
     read skip_trace.owner_name first and never looked at li.owner_name at all.
+
+    2026-11-20 follow-up on that 22% ("too small a slice, and with no reliable flag to key off
+    at this call site" per the fix's own commit message): live-checked again this session
+    against 24,154 real rows whose owner_name reads as a builder/developer entity -- this
+    board's deed_chain has no usable grantor/grantee signal for that population at all (0 of
+    4,268 rows with any deed_chain have the entity as a transfer's grantor paired with a
+    different grantee), so there is genuinely nothing safe to key off there; identity.py's
+    module docstring has the measurement. raw['rod_chain']['conveyed_out_since'] (a different,
+    narrower enrichment, off by default) DOES carry a real signal, but only when independently
+    tied to this exact parcel -- identity.rod_chain_conveyance_owner()/_conveyance_confirmed()
+    is that check, and candidate 1 above is its result. Everything that fails it (today, nearly
+    every row) falls straight through to li.owner_name exactly as before.
     """
     for name, source in _owner_candidates(li):
         if name and not suspicious_owner_name(name, source=source):

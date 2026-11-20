@@ -833,6 +833,96 @@ def owner_identity_uncertain(row: Any) -> Optional[dict]:
     return suspicious_owner_name(_get(row, "owner_name"), source=source)
 
 
+# ---------------------------------------------------------------------------
+# STALE OWNER AFTER A REAL TRANSFER. The residual gap f5eeab0d/f8aa709c (2026-11-19) scoped out
+# by name: a verification sample found 22% of li.owner_name/skip_trace.owner_name mismatches had
+# skip_trace more correct -- concentrated in builder-new-construction and heir/estate parcels
+# where li.owner_name (read off a county tax-roll snapshot) was never refreshed after a real,
+# recorded conveyance. "too small a slice, and with no reliable flag to key off at this call
+# site" (f5eeab0d's own commit message) -- which is still true for the GENERAL case: this board
+# does not carry a deed chain with usable grantor/grantee data for that population
+# (enrichment_deed_chain's own measured coverage -- assessor_card 6.9%, rod_docs 0.4% -- live-
+# checked 2026-11-20 against the 24,154 rows whose owner_name reads as a builder/developer
+# entity: 4,268 have ANY deed_chain, and across every one of them exactly 0 have the entity as a
+# transfer's grantor paired with a DIFFERENT grantee. There is no signal there to key off.)
+#
+# raw['rod_chain']['conveyed_out_since'] (enrichment_rod_chain.py, a register name-index search,
+# off by default and only wired for a subset of NC counties) is the one place a genuine signal
+# DOES exist -- but it is found by the owner's NAME, not by parcel (that module's own docstring:
+# "a chain is found by the OWNER'S NAME, so its newest deed can be that owner's deed for another
+# parcel"; a 2026-10-09 sample of 30 found 14 right, 10 another parcel's deed, 6 missing a later
+# deed). Live-checked 2026-11-20 against the 109 real rows currently carrying
+# binding.reason=="owner_conveyed_since_last_deed": the risk is not hypothetical. A builder who
+# buys a dozen lots in one bulk deed and sells them off one at a time is the worst case --
+# RiverWILD Homes LLC's one retrieved conveyance ("MEADOW CREST Lot 4") cannot be the current
+# owner of all three separate board rows on East Clydes Point Way that cite the same bulk chain,
+# and Byers Construction & Development LLC's retrieved conveyance (3.21 AC) turned out to be a
+# DIFFERENT, larger tract than the 0.314 AC parcel this row's own county_deed_ref binds it to.
+# Only 5 of the 109 (Clark Joshua Keith -> Blueridge Processing Corp; a life-estate/remainderman
+# pair; two heir deeds; JAG Development Company -> Colony Custom Builders LLC, the one live
+# builder/developer example) could be independently tied to THIS row's own parcel rather than a
+# namesake's or a different lot in the same bulk purchase. rod_chain_conveyance_owner() below is
+# that narrow confirmation, used as outreach.py's new FIRST candidate; everything that fails it
+# (the overwhelming majority -- rod_chain itself covers well under 1% of the board, since
+# FORECLOSURE_ROD_CHAIN defaults off) falls straight through to the existing li.owner_name ->
+# skip_trace.owner_name -> li.defendant chain, unchanged.
+# ---------------------------------------------------------------------------
+
+#: a parcel_id this short could coincidentally appear inside an unrelated description's digits
+_CONVEYANCE_MIN_PARCEL_DIGITS = 8
+
+
+def _conveyance_confirmed(row: Any, entry: dict) -> Optional[str]:
+    """Independent, row-specific proof that `entry` (one of raw['rod_chain']['conveyed_out_since'])
+    is THIS row's own parcel's deed, not a namesake's or a different lot in the same bulk
+    purchase -- the one thing a name-matched chain cannot promise on its own (see the module note
+    above). Either tie is read off data this row already carries; nothing is fetched.
+      'book_page'   entry's own book/page is the SAME instrument the county's current parcel
+                    record cites (lawyer_lane.county_deed_ref/same_book_page) -- the strongest
+                    tie there is, independent of either side having a date.
+      'parcel_id'   this row's own parcel_id (digits only, >= _CONVEYANCE_MIN_PARCEL_DIGITS of
+                    them, to rule out a short coincidental match) appears in entry's own recorded
+                    description -- a register index often embeds the parcel/lot number in the
+                    text (e.g. "Parcel: 5468-30-1427-00 LOT 17 POLLOCKSVILLE TOWNSHIP").
+    None when neither ties out."""
+    from .lawyer_lane import county_deed_ref, same_book_page
+    cdr = county_deed_ref(row)
+    if same_book_page(entry.get("book"), entry.get("page"), cdr.get("book"), cdr.get("page")):
+        return "book_page"
+    pid = re.sub(r"[^0-9]", "", str(_get(row, "parcel_id") or ""))
+    if len(pid) >= _CONVEYANCE_MIN_PARCEL_DIGITS:
+        desc_digits = re.sub(r"[^0-9]", "", str(entry.get("description") or ""))
+        if pid in desc_digits:
+            return "parcel_id"
+    return None
+
+
+def rod_chain_conveyance_owner(row: Any) -> Optional[dict]:
+    """The grantee of a register deed PROVEN -- not merely name-matched -- to be THIS row's own
+    parcel, conveyed away from the name raw['rod_chain'] searched for: the stale-owner-after-a-
+    real-transfer gap described in the module note above. None whenever there is nothing to
+    confirm against (no rod_chain, no status "ok", no conveyed_out_since) or no candidate
+    conveyance ties to this parcel specifically (_conveyance_confirmed()) -- fails safe rather
+    than trusting a name-only chain. Checks conveyances in the order enrichment_rod_chain.py
+    already gives them (newest first) and returns the first confirmed one, i.e. the most recent
+    proven conveyance. Else {'name': the grantee(s), 'tie', 'recorded', 'book', 'page'}."""
+    rc = _raw(row).get("rod_chain")
+    if not isinstance(rc, dict) or rc.get("status") != "ok":
+        return None
+    for entry in rc.get("conveyed_out_since") or []:
+        if not isinstance(entry, dict):
+            continue
+        tie = _conveyance_confirmed(row, entry)
+        if not tie:
+            continue
+        grantees = [str(g).strip() for g in (entry.get("grantees") or []) if str(g or "").strip()]
+        if not grantees:
+            continue
+        return {"name": "; ".join(grantees), "tie": tie, "recorded": entry.get("recorded"),
+                "book": entry.get("book"), "page": entry.get("page")}
+    return None
+
+
 def resolve_owners(listings: Iterable[Any]) -> dict:
     """resolve_owner() over a board, in place. Counts only; never raises on an odd row."""
     stats: Counter = Counter()
@@ -860,6 +950,6 @@ def run_identity_pass(listings: list) -> dict:
 __all__ = [
     "collapse_twins", "duplicate_groups", "fused_record", "ident_key", "owner_identity_uncertain",
     "owner_verdict", "partition", "record_key", "resolve_owner", "resolve_owners",
-    "run_identity_pass", "situs_tag", "suspicious_owner_name", "unfuse",
-    "unfuse_rows",
+    "rod_chain_conveyance_owner", "run_identity_pass", "situs_tag", "suspicious_owner_name",
+    "unfuse", "unfuse_rows",
 ]
