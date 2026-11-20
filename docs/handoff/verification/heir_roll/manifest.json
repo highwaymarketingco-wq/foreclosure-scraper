@@ -1,59 +1,61 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 13577,
+  "confirmed": 13648,
   "refuted": 11,
-  "rows": 13734,
-  "stale": 30,
-  "unconfirmed": 116,
+  "rows": 13807,
+  "stale": 31,
+  "unconfirmed": 117,
   "wall": 0
  },
- "generated_at": "2026-11-20T11:08:27Z",
+ "generated_at": "2026-11-20T13:50:53Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-20T11:08:27Z",
-  "county": "Barnwell",
+  "at": "2026-11-20T13:50:52Z",
+  "county": "Aiken",
   "host": "SMB-LTSEO05",
-  "max_rows": 2000,
+  "max_rows": 1000,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "services8.arcgis.com": 887
+    "gis.cityofaikensc.gov": 221
    }
   },
   "result": {
-   "checked": 295,
-   "confirmed": 295
+   "budget_stop": 1,
+   "checked": 73,
+   "confirmed": 71,
+   "stale": 1,
+   "unconfirmed": 1
   },
-  "seconds": 1775,
+  "seconds": 441,
   "selection": {
-   "applies": 1295,
-   "due_new": 295,
-   "not_due_ttl": 1000
+   "applies": 838,
+   "due_new": 838
   },
   "source": null,
   "tier": null
  },
- "rows": 13734,
+ "rows": 13807,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 6593514,
+   "bytes": 6630653,
    "file": "000.json",
-   "rows": 6927,
-   "sha256": "af96769d8209590220a050acaae53dee108e4f66933b4f73afa9e03aaf6f0a52"
+   "rows": 6966,
+   "sha256": "2753525691170f27f9e43b432d0a28858ecedb34924bd6f50126fdb29d79434a"
   },
   {
    "bucket": 1,
-   "bytes": 6488224,
+   "bytes": 6520524,
    "file": "001.json",
-   "rows": 6807,
-   "sha256": "8c3fdcf2b976fee9bfb2440657ee8dc42f7bef3a3d04f47a7aef8132ac95db34"
+   "rows": 6841,
+   "sha256": "821c331aaab1c283e345f1989ff15213949948b03debba2baf54d9ec449255b0"
   }
  ],
  "signal": "heir_roll",
