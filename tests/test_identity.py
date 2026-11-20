@@ -430,3 +430,90 @@ def test_owner_identity_uncertain_reads_the_rows_own_owner_mailing_source():
 
     no_mailing = _li(owner="SMITH JOHN")
     assert idn.owner_identity_uncertain(no_mailing) is None
+
+
+# ---------------------------------------------------------------------------
+# rod_chain_conveyance_owner(): the residual 22% gap f5eeab0d/f8aa709c scoped out by name (a
+# builder/developer entity or old grantor stuck as li.owner_name after a real, recorded sale).
+# Live-checked 2026-11-20 against the real board: raw['rod_chain']['conveyed_out_since'] is
+# found by NAME, not by parcel, so it can be a namesake's deed or a different lot in the same
+# bulk builder purchase -- these tests mirror the real shapes found, both the ones narrow enough
+# to confirm and the ones that must stay unconfirmed.
+# ---------------------------------------------------------------------------
+
+def test_rod_chain_conveyance_owner_confirms_by_book_page_against_county_deed_ref():
+    # the real McDowell NC example: the chain's OWN last_deed book/page does not match the
+    # county's current parcel record, but a LATER conveyed_out_since deed's book/page does --
+    # proof the county's own index already has this exact instrument as the parcel's own.
+    row = _li(owner="CLARK JOSHUA KEITH", parcel="172000341984",
+              raw={"rod_chain": {"status": "ok", "conveyed_out_since": [
+                       {"recorded": "2025-03-11", "book": "1494", "page": "797",
+                        "grantors": ["CLARK JOSHUA KEITH"], "grantees": ["BLUERIDGE PROCESSING CORP."]}]},
+                   "county_deed_ref": {"book": "1494", "page": "797"}})
+    v = idn.rod_chain_conveyance_owner(row)
+    assert v == {"name": "BLUERIDGE PROCESSING CORP.", "tie": "book_page",
+                 "recorded": "2025-03-11", "book": "1494", "page": "797"}
+
+
+def test_rod_chain_conveyance_owner_confirms_by_the_rows_own_parcel_id_embedded_in_the_description():
+    # the real Jones County NC example: no date and no county_deed_ref book/page match, but the
+    # conveyed-out deed's OWN recorded description embeds this row's exact parcel id.
+    row = _li(owner="JAG DEVELOPMENT COMPANY", parcel="546830142700",
+              raw={"rod_chain": {"status": "ok", "conveyed_out_since": [
+                       {"recorded": "2026-01-14", "book": "446", "page": "555",
+                        "description": "Parcel: 5468-30-1427-00 LOT 17 POLLOCKSVILLE TOWNSHIP",
+                        "grantors": ["JAG DEVELOPMENT COMPANY"],
+                        "grantees": ["COLONY CUSTOM BUILDERS LLC"]}]},
+                   "county_deed_ref": {"book": "312", "page": "659"}})  # the stale bulk-buy deed
+    v = idn.rod_chain_conveyance_owner(row)
+    assert v["name"] == "COLONY CUSTOM BUILDERS LLC"
+    assert v["tie"] == "parcel_id"
+
+
+def test_rod_chain_conveyance_owner_declines_a_namesakes_or_a_different_lots_deed():
+    # the real Jackson County NC example (Byers Construction & Development LLC, 611 Osprey
+    # Mountain Way): county_deed_ref matches the chain's LAST deed (this parcel IS theirs), but
+    # the only conveyed_out_since deed is a bigger, differently-numbered tract (0.314 AC parcel
+    # vs a 3.21 AC conveyance) with no parcel id embedded in its description -- neither tie
+    # holds, so this must NOT be read as proof Byers sold THIS parcel.
+    row = _li(owner="BYERS CONSTRUCTION & DEVELOPMENT LLC", parcel="7640464099",
+              raw={"rod_chain": {"status": "ok", "conveyed_out_since": [
+                       {"recorded": "2024-06-04", "book": "2378", "page": "1236",
+                        "description": "WEBSTER 3.21 AC",
+                        "grantors": ["BYERS CONSTRUCTION & DEVELOPMENT, LLC"],
+                        "grantees": ["ELLIS, RANDALL S.", "ELLIS, TERRI S."]}]},
+                   "county_deed_ref": {"book": "2335", "page": "638"}})
+    assert idn.rod_chain_conveyance_owner(row) is None
+
+
+def test_rod_chain_conveyance_owner_declines_a_bulk_builder_purchases_other_lot():
+    # the real RiverWILD Homes LLC example: a builder bought dozens of lots in one deed and the
+    # only retrieved conveyance is a DIFFERENT, unrelated lot in a different subdivision -- must
+    # not be handed back as if it were this row's own buyer.
+    row = _li(owner="RiverWILD Homes, LLC", parcel=None,
+              raw={"rod_chain": {"status": "ok", "conveyed_out_since": [
+                       {"recorded": "2024-03-07", "book": "6628", "page": "313",
+                        "description": "Subdivision: MEADOW CREST Lot: 4 PB 98/22 PB 98/435",
+                        "grantors": ["RIVERWILD HOMES, LLC"],
+                        "grantees": ["COTTINGHAM GEORGE DAVIS IV", "COTTINGHAM JESSICA HOFF"]}]}})
+    assert idn.rod_chain_conveyance_owner(row) is None
+
+
+def test_rod_chain_conveyance_owner_declines_without_rod_chain_or_a_bad_status():
+    assert idn.rod_chain_conveyance_owner(_li(owner="SMITH JOHN", parcel="1234567890")) is None
+    walled = _li(owner="SMITH JOHN", parcel="1234567890",
+                 raw={"rod_chain": {"status": "walled", "conveyed_out_since": [
+                          {"book": "1", "page": "2", "grantees": ["DOE JANE"]}]},
+                      "county_deed_ref": {"book": "1", "page": "2"}})
+    assert idn.rod_chain_conveyance_owner(walled) is None
+
+
+def test_rod_chain_conveyance_owner_ignores_a_short_parcel_id_as_a_coincidental_match():
+    # a short parcel id could appear inside an unrelated description's digits by chance;
+    # _CONVEYANCE_MIN_PARCEL_DIGITS guards against treating that as proof.
+    row = _li(owner="SMITH JOHN", parcel="12",
+              raw={"rod_chain": {"status": "ok", "conveyed_out_since": [
+                       {"recorded": "2025-01-01", "book": "9", "page": "9",
+                        "description": "LOT 12 SOME SUBDIVISION",
+                        "grantors": ["SMITH JOHN"], "grantees": ["DOE JANE"]}]}})
+    assert idn.rod_chain_conveyance_owner(row) is None

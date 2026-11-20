@@ -234,6 +234,54 @@ def test_owner_does_not_skip_an_entity_name_sourced_from_the_county_roll():
     assert O._owner(li) == "ACME HOLDINGS LLC"
 
 
+# ---------------------------------------------------------------------------
+# 2026-11-20 follow-up: the residual 22% gap f5eeab0d/f8aa709c scoped out by name (li.owner_name
+# itself stale after a real sale -- a builder/developer entity or old grantor). A deed proven to
+# this row's own parcel (identity.rod_chain_conveyance_owner()) now outranks even li.owner_name.
+# ---------------------------------------------------------------------------
+
+def test_owner_prefers_a_confirmed_rod_chain_conveyance_over_the_stale_board_owner_name():
+    # the real JAG Development Company example: li.owner_name is a bulk-tract developer who
+    # already conveyed THIS exact parcel away, proven by the row's own parcel id turning up
+    # inside the conveyance's recorded description.
+    li = _li(skip=None, owner_name="JAG DEVELOPMENT COMPANY", defendant="SOMEONE ELSE",
+              parcel_id="546830142700")
+    li.raw["rod_chain"] = {"status": "ok", "conveyed_out_since": [
+        {"recorded": "2026-01-14", "book": "446", "page": "555",
+         "description": "Parcel: 5468-30-1427-00 LOT 17 POLLOCKSVILLE TOWNSHIP",
+         "grantors": ["JAG DEVELOPMENT COMPANY"], "grantees": ["COLONY CUSTOM BUILDERS LLC"]}]}
+    assert O._owner(li) == "COLONY CUSTOM BUILDERS LLC"
+
+
+def test_owner_falls_back_to_board_owner_name_when_the_conveyance_cannot_be_confirmed():
+    # the real Byers Construction & Development LLC example: a conveyed_out_since deed exists,
+    # but neither tie (book/page, embedded parcel id) ties it to THIS parcel -- li.owner_name
+    # must be kept, not swapped for a namesake's or a different lot's buyer.
+    li = _li(skip={"owner_name": "Brenten Byers"}, owner_name="BYERS CONSTRUCTION & DEVELOPMENT LLC",
+              parcel_id="7640464099")
+    li.raw["rod_chain"] = {"status": "ok", "conveyed_out_since": [
+        {"recorded": "2024-06-04", "book": "2378", "page": "1236", "description": "WEBSTER 3.21 AC",
+         "grantors": ["BYERS CONSTRUCTION & DEVELOPMENT, LLC"],
+         "grantees": ["ELLIS, RANDALL S.", "ELLIS, TERRI S."]}]}
+    li.raw["county_deed_ref"] = {"book": "2335", "page": "638"}
+    assert O._owner(li) == "BYERS CONSTRUCTION & DEVELOPMENT LLC"
+
+
+def test_generate_outreach_uses_a_confirmed_rod_chain_conveyance_end_to_end(tmp_path, monkeypatch):
+    _tmp_paths(tmp_path, monkeypatch)
+    li = _li(skip={"owner_name": "WRONG STALE SKIPTRACE NAME",
+                   "owner_mailing_address": "999 Far Rd, Charlotte NC"},
+              owner_name="JAG DEVELOPMENT COMPANY", parcel_id="546830142700")
+    li.raw["rod_chain"] = {"status": "ok", "conveyed_out_since": [
+        {"recorded": "2026-01-14", "book": "446", "page": "555",
+         "description": "Parcel: 5468-30-1427-00 LOT 17 POLLOCKSVILLE TOWNSHIP",
+         "grantors": ["JAG DEVELOPMENT COMPANY"], "grantees": ["COLONY CUSTOM BUILDERS LLC"]}]}
+    O.generate_outreach([li])
+    o = li.raw["outreach"]
+    assert o["owner"] == "COLONY CUSTOM BUILDERS LLC"
+    assert "JAG" not in o["letter"]
+
+
 def test_owner_identity_uncertain_flag_is_stamped_on_raw_end_to_end(tmp_path, monkeypatch):
     _tmp_paths(tmp_path, monkeypatch)
     li = _li(skip={"owner_name": "Procurement Manager",
