@@ -19,11 +19,33 @@ the scraper's own parser; one list per firm per sweep process, cached):
     law_firms.rogers_townsend       the firm's SC listings PDF
     law_firms.kania                 the tax-foreclosure listings JSON (also national.nc_upset_bids
                                     rows whose source_url is that page)
+    counties_sc.terry_howe_flc      Terry Howe & Associates' free unauthenticated WordPress REST
+                                    catalog (terryhowe.com/wp-json/wp/v2/auctions), the SC
+                                    Forfeited Land Commission auctioneer for Chester, Fairfield,
+                                    Laurens and Spartanburg today -- the producer's own `.fetch()`,
+                                    re-used directly, no new parsing code. Added round 78
+                                    (2026-11-20): a genuine "verifier narrower than producer" gap
+                                    -- the module is live, wired in main.py's DATELESS_OK_SOURCES,
+                                    and gap_matrix.py's own fresh run that day carried Chester (28
+                                    rows) and Fairfield (7) as `built-not-verified` before this
+                                    entry existed, with nothing in this file or elsewhere ever
+                                    having recognized the source. Live-checked 2026-11-20: of its
+                                    54 current board rows, 30 carry a usable house-numbered street
+                                    address (e.g. "817 Saxon Ave") this file's existing address
+                                    match already handles with zero new matching code; the other
+                                    24 are "Off <street>" locator parcels or bundle rows with
+                                    neither a case number nor a numbered address and correctly
+                                    stay out of `applies()`'s scope, same as every other firm here.
 NOT read (walls, recorded in docs/walls_register.json): Brock & Scott (answers 'Forbidden' to a
 plain client; its scraper falls back to a stealth browser), Zacchaeus (stealth browser only), the
 ncnotices.com / scpublicnotices.com notice bodies (cards nc_notice_body, sc_notice_body), and the
 special-proceeding file itself in NC eCourts (card nc_sp: hearing, sale, report of sale, upset
-bids). Aggregators (foreclosure.com, Zillow, Realtor) are not a primary source.
+bids). Aggregators (foreclosure.com, Zillow, Realtor) are not a primary source. counties_sc.sc_flc
+(the statewide SC FLC doc scraper, Anderson's own producer) is NOT added here even though it is
+the same claim shape: its `.fetch()` is a multi-page OCR run against a shared, quota-limited OCR
+pool (600s timeout) and re-running it from inside a verification sweep risks starving that pool
+for the production scrape -- a bigger, riskier lift than reusing a single free JSON endpoint,
+not this round's fix.
 
 MATCHING. By the court case number (letters and digits only), else, for a row with no case number,
 by a house-numbered address that core.address_relation calls a match, in the same county.
@@ -75,7 +97,16 @@ FIRMS: dict[str, tuple[str, str]] = {
     "law_firms.bell_carrington": ("bell_carrington", "foreclosure"),
     "law_firms.rogers_townsend": ("rogers_townsend", "foreclosure"),
     "law_firms.kania": ("kania", "tax"),
+    "counties_sc.terry_howe_flc": ("terry_howe_flc", "tax"),
 }
+
+#: firm keys whose OWN catalog never carries a case/docket number (an FLC auction has no court
+#: case) -- a row's board-level case_number for one of these is cross-source enrichment noise
+#: (e.g. a dedupe fingerprint like "trulia-11805212_ZPID", live-confirmed on real Spartanburg
+#: counties_sc.terry_howe_flc board rows 2026-11-20), never this firm's own identifier, so find()
+#: below must not let it block its address fallback the way a REAL non-matching case number
+#: correctly would for every other firm here.
+NO_CASE_FIRMS = frozenset({"terry_howe_flc"})
 _NAME = __name__.rsplit(".", 1)[-1]
 
 #: list key -> async () -> list of Listing (the firm's current list); tests replace entries
@@ -102,6 +133,15 @@ async def _scraper_list(module: str, cls: str) -> list:
     return list(await getattr(m, cls)().fetch())
 
 
+async def _terry_howe_flc() -> list:
+    """The same free WordPress REST catalog counties_sc.terry_howe_flc.TerryHoweFLC already
+    fetches for production -- one call returns every SC county's current FLC auction, not a
+    per-firm page the way the law_firms.* providers above are, so this lives in counties_sc, not
+    law_firms (_scraper_list's import path is hardcoded to the latter)."""
+    from ...scrapers.counties_sc.terry_howe_flc import TerryHoweFLC
+    return list(await TerryHoweFLC().fetch())
+
+
 def _default_providers() -> dict:
     return {
         "hutchens_NC": lambda: _hutchens("NC"),
@@ -110,6 +150,7 @@ def _default_providers() -> dict:
         "bell_carrington": lambda: _scraper_list("bell_carrington", "BellCarrington"),
         "rogers_townsend": lambda: _scraper_list("rogers_townsend", "RogersTownsend"),
         "kania": lambda: _scraper_list("kania", "KaniaLawFirm"),
+        "terry_howe_flc": _terry_howe_flc,
     }
 
 
@@ -187,8 +228,14 @@ async def current_list(key: str) -> list:
 def find(row: Any, listings: list) -> tuple[Optional[Any], str]:
     """The firm's listing of the row's sale. One case can list several parcels (a tax
     foreclosure of a person's lots, one row each): the listing of the case whose address is the
-    row's own wins, then one with no conflicting address, then the first."""
-    c = ncase(_get(row, "case_number"))
+    row's own wins, then one with no conflicting address, then the first.
+
+    A row whose firm is in NO_CASE_FIRMS always goes straight to the address path below: its
+    board-level case_number (when it has one at all) is enrichment noise from a different
+    source, never this firm's own docket -- matching it against a catalog that has no case
+    numbers of its own would only ever miss, masking a real address match."""
+    f = firm_of(row)
+    c = "" if f and f[0] in NO_CASE_FIRMS else ncase(_get(row, "case_number"))
     if c:
         same = [li for li in listings if ncase(_get(li, "case_number")) == c]
         if not same:
