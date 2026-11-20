@@ -1,19 +1,19 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 1857,
+  "confirmed": 2076,
   "refuted": 97,
-  "rows": 2005,
+  "rows": 2225,
   "stale": 20,
-  "unconfirmed": 31,
+  "unconfirmed": 32,
   "wall": 0
  },
- "generated_at": "2026-11-20T13:18:24Z",
+ "generated_at": "2026-11-20T13:26:31Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-20T13:18:24Z",
+  "at": "2026-11-20T13:26:31Z",
   "county": "York",
   "host": "SMB-LTSEO05",
   "max_rows": 3000,
@@ -21,33 +21,34 @@
   "requests": {
    "errors": {},
    "requests": {
-    "services1.arcgis.com": 221
+    "services1.arcgis.com": 220
    }
   },
   "result": {
    "budget_stop": 1,
-   "checked": 221,
-   "confirmed": 221
+   "checked": 220,
+   "confirmed": 219,
+   "unconfirmed": 1
   },
   "seconds": 441,
   "selection": {
    "applies": 78965,
-   "due_new": 78293,
-   "not_due_ttl": 672
+   "due_new": 78072,
+   "not_due_ttl": 893
   },
   "source": null,
   "tier": null
  },
- "rows": 2005,
+ "rows": 2225,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 1991044,
+   "bytes": 2180692,
    "file": "000.json",
-   "rows": 2005,
-   "sha256": "eec1bc72773f55c8996cb879d9008ad35e3bf351d53e65bd7ef9bf3327487bd2"
+   "rows": 2225,
+   "sha256": "26ab65b999dc85f7e2954dd8b3f78cf6f2773131c4b1bbbac98b7a77b56502ed"
   }
  ],
  "signal": "elderly_disabled",
