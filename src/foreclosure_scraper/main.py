@@ -788,6 +788,12 @@ DATELESS_OK_SOURCES = {
     "counties_sc.sc_heir_estate_parcel_cache",   # SC heir/estate owner-of-record, parcel_cache-read (dateless)
     "counties_sc.spartanburg_vacant",            # Spartanburg City vacant registry (absentee+vacant, dateless)
     "counties_sc.spartanburg_condemned",         # Spartanburg condemned/dilapidated CAMA-condition signal (dateless)
+    # Tyler EnerGov self-service Code Case + Permit records -- a code case / permit
+    # posture is a standing condition, never a scheduled event. Backend confirmed
+    # down (HTTP 500) as of 2026-11-19 -- see the module's own docstring; this entry
+    # keeps the source from being whitelist-starved the moment it starts returning
+    # real rows, instead of needing a second code change once Tyler's tenant heals.
+    "counties_sc.spartanburg_energov_selfservice",
     "counties_nc.asheville_str_permits",         # Asheville lapsed STR/homestay permits (motivated landlord, dateless)
     "counties_nc.lincoln_code_violations",       # Lincoln County open code-enforcement violations (address-keyed, dateless)
     # Prefix match (main._active_only startswith-checks "base.") -- every
