@@ -1,60 +1,62 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 11580,
+  "confirmed": 12374,
   "refuted": 11,
-  "rows": 11680,
+  "rows": 12512,
   "stale": 30,
-  "unconfirmed": 59,
+  "unconfirmed": 97,
   "wall": 0
  },
- "generated_at": "2026-11-20T03:14:33Z",
+ "generated_at": "2026-11-20T04:47:03Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-20T03:14:33Z",
+  "at": "2026-11-20T04:47:03Z",
   "county": "Georgetown",
   "host": "SMB-LTSEO05",
-  "max_rows": 200,
+  "max_rows": 1100,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "gis1.georgetowncountysc.org": 452
+    "gis1.georgetowncountysc.org": 2498
    }
   },
   "result": {
    "budget_stop": 1,
-   "checked": 150,
-   "confirmed": 146,
-   "unconfirmed": 4
+   "checked": 832,
+   "confirmed": 794,
+   "unconfirmed": 38
   },
-  "seconds": 904,
+  "seconds": 5002,
   "selection": {
    "applies": 1159,
-   "due_new": 1159
+   "due_new": 1009,
+   "not_due_retry": 4,
+   "not_due_ttl": 146
   },
   "source": null,
   "tier": null
  },
- "rows": 11680,
+ "rows": 12512,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 5597388,
+   "bytes": 6005991,
    "file": "000.json",
-   "rows": 5875,
-   "sha256": "21cc836bc778b4795d1c938b9244b2edddce0b7f2f275cc177ab0b3365d69f8e"
+   "rows": 6297,
+   "sha256": "37742c379f1b0e1d6ca64583b272fe2bbec55b83f8f2e93f1385c8a84c48cc47"
   },
   {
    "bucket": 1,
-   "bytes": 5536547,
+   "bytes": 5934004,
    "file": "001.json",
-   "rows": 5805,
-   "sha256": "d47239a24ea6be3ddddb831290895415bca52e9bdac6f133838c451e5fbe2e1d"
+   "rows": 6215,
+   "sha256": "56b17d0dafcbff68a68f88011748f4464ebab4a18d6f79a4a181f76e918eef70"
   }
  ],
  "signal": "heir_roll",
