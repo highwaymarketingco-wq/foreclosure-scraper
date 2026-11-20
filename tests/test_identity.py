@@ -419,6 +419,65 @@ def test_suspicious_owner_name_does_not_flag_a_person_sourced_from_a_lien_filing
     assert idn.suspicious_owner_name("SMITH JOHN", source="liensnc_filing") is None
 
 
+def test_suspicious_owner_name_flags_a_decedent_estate_or_heir_group():
+    # 2026-11-20 find: classify_entity_type() already buckets these as 'estate', but
+    # suspicious_owner_name() never checked that bucket, so outreach.py's _first_name()
+    # positionally misread the leading phrase as a name ("ESTATE OF HERSHEL MOORE" -> "Of").
+    v = idn.suspicious_owner_name("ESTATE OF HERSHEL MOORE")
+    assert v == {"reason": "estate", "name": "ESTATE OF HERSHEL MOORE"}
+    assert idn.suspicious_owner_name("The Estate Of William J. Mcbride")["reason"] == "estate"
+    assert idn.suspicious_owner_name(
+        "Any Heirs-At-Law, Or Devisees Of Rhonda L. Lewis, Deceased,")["reason"] == "estate"
+    assert idn.suspicious_owner_name("SMITH JOHN HEIRS")["reason"] == "estate"
+    # unconditional, unlike entity_from_lien_filing -- a county-roll source does not save it,
+    # because the defect here is "no living person at a knowable position", not provenance.
+    assert idn.suspicious_owner_name("ESTATE OF HERSHEL MOORE", source="county_gis")["reason"] \
+        == "estate"
+
+
+def test_suspicious_owner_name_does_not_flag_an_llc_whose_business_name_says_real_estate():
+    # live board find: classify_entity_type() checks its ESTATE/HEIRS markers BEFORE is_entity(),
+    # so an LLC/Inc-suffixed "...Real Estate..." business name also reads back 'estate' -- but
+    # it is an unambiguous, well-identified entity, not a decedent's estate. Flagging it here
+    # made the real board row WORSE (it fell through to an unrelated garbage li.defendant value
+    # instead of using this perfectly good LLC name), so the entity-suffixed case must stay
+    # unflagged regardless of source.
+    assert idn.suspicious_owner_name("RAY AND SALLIE EDWARDS REAL ESTATE LLC") is None
+    assert idn.suspicious_owner_name("BAKER AND BAKER REAL ESTATE DEVELOPERS LLC") is None
+    assert idn.suspicious_owner_name("The Conservancy Real Estate Group, LLC") is None
+    assert idn.suspicious_owner_name("RODGER C JARRELL REAL ESTATE & MORTGAGES INC") is None
+
+
+def test_suspicious_owner_name_does_not_flag_a_life_estate_or_an_ordinary_trust():
+    # "LIFE ESTATE" is a living person's interest, not a decedent's estate (classify_entity_type's
+    # own exception); a bare TRUST is handled by the existing entity_from_lien_filing rule only,
+    # never unconditionally like 'estate' -- a family trust from the county roll is an ordinary
+    # current owner, not a party-role defect.
+    assert idn.suspicious_owner_name("SMITH JOHN LIFE ESTATE") is None
+    assert idn.suspicious_owner_name("SMITH FAMILY TRUST") is None
+    assert idn.suspicious_owner_name("SMITH FAMILY TRUST", source="county_gis") is None
+
+
+def test_suspicious_owner_name_flags_a_handle_like_bare_lowercase_token():
+    # 2026-11-20 find: li.defendant sometimes carries a squashed contractor handle or email
+    # local-part instead of a court party name -- a shape no real producer here writes a name
+    # in (a county roll is all-caps, a court filing is Title Case).
+    v = idn.suspicious_owner_name("chcenturycom")
+    assert v == {"reason": "handle_like", "name": "chcenturycom"}
+    assert idn.suspicious_owner_name("reesebuiltnc")["reason"] == "handle_like"
+    assert idn.suspicious_owner_name("victorybuildersllc")["reason"] == "handle_like"
+    # source-independent, same as 'government'/'estate' -- this is about shape, not provenance
+    assert idn.suspicious_owner_name("izzis", source="county_gis")["reason"] == "handle_like"
+
+
+def test_suspicious_owner_name_does_not_flag_an_ordinary_lowercase_or_short_name():
+    # a real, ordinary name is never flagged just for being short or lower-case on its own --
+    # the rule is anchored on the WHOLE string being one run-together 5+ letter lowercase word.
+    assert idn.suspicious_owner_name("Smith, John A") is None     # mixed case, multi-word
+    assert idn.suspicious_owner_name("izzi") is None              # under the 5-letter floor
+    assert idn.suspicious_owner_name("smith john") is None        # has a space
+
+
 def test_owner_identity_uncertain_reads_the_rows_own_owner_mailing_source():
     flagged = _li(owner="ACME HOLDINGS LLC",
                   raw={"owner_mailing": {"owner": "ACME HOLDINGS LLC", "source": "liensnc_filing"}})

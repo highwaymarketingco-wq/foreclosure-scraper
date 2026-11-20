@@ -235,6 +235,43 @@ def test_owner_does_not_skip_an_entity_name_sourced_from_the_county_roll():
 
 
 # ---------------------------------------------------------------------------
+# 2026-11-20 find: a decedent's ESTATE or an HEIR group named collectively is not one living
+# person at a position _first_name() can find ("ESTATE OF HERSHEL MOORE" -> "Of", SC's lis
+# pendens "Any Heirs-At-Law Or Devisees Of X, Deceased" -> "Any") -- a letter/email/SMS greeting
+# the heirs of a dead person as "Dear Any,"/"Dear Of,". identity.suspicious_owner_name() now
+# flags the 'estate' shape the same unconditional way it flags 'government', so _owner() falls
+# through exactly as it already does for those.
+# ---------------------------------------------------------------------------
+
+def test_owner_skips_a_decedent_estate_and_falls_back_to_defendant():
+    li = _li(skip=None, owner_name="ESTATE OF HERSHEL MOORE", defendant="REAL HOMEOWNER")
+    assert O._owner(li) == "REAL HOMEOWNER"
+
+
+def test_owner_skips_an_heir_group_boilerplate_from_skip_trace_and_falls_back_to_defendant():
+    li = _li(skip={"owner_name": "Any Heirs-At-Law, Or Devisees Of Rhonda L. Lewis, Deceased,"},
+              owner_name=None, defendant="REAL HOMEOWNER")
+    assert O._owner(li) == "REAL HOMEOWNER"
+
+
+def test_owner_returns_none_when_estate_is_the_only_candidate_everywhere():
+    li = _li(skip={"owner_name": "ESTATE OF HERSHEL MOORE"}, owner_name="HERSHEL MOORE HEIRS",
+              defendant="SMITH JOHN HEIRS")
+    assert O._owner(li) is None
+    # and the message generators fall back to the generic greeting rather than "Dear Of,"
+    assert O._first_name(O._owner(li)) == "Property Owner"
+
+
+def test_owner_skips_a_handle_like_defendant_and_falls_back_to_property_owner():
+    # 2026-11-20 find: li.defendant (the last-resort candidate) sometimes carries a squashed
+    # contractor handle or email local-part instead of a real court party name -- it must never
+    # be handed out as a greeting name just because every earlier candidate was empty.
+    li = _li(skip=None, owner_name=None, defendant="chcenturycom")
+    assert O._owner(li) is None
+    assert O._first_name(O._owner(li)) == "Property Owner"
+
+
+# ---------------------------------------------------------------------------
 # 2026-11-20 follow-up: the residual 22% gap f5eeab0d/f8aa709c scoped out by name (li.owner_name
 # itself stale after a real sale -- a builder/developer entity or old grantor). A deed proven to
 # this row's own parcel (identity.rod_chain_conveyance_owner()) now outranks even li.owner_name.
