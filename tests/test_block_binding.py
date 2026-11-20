@@ -82,6 +82,36 @@ def test_other_person_is_roll_aware():
     assert bb.block_verdict(stale, "skip_trace", st)[0] != "other_person"
 
 
+def test_bop_check_and_incarceration_check_are_derived_not_person():
+    """2026-11-19 (block-binding d-other-person follow-up): bop_check / incarceration_check are
+    enrichment_bop_federal.py / enrichment_incarceration.py's own answered-NO-MATCH pacing stamps
+    -- {checked_at, name, source, result} where `name` is the owner string AT QUERY TIME, kept
+    only so the next run can tell "already asked about this lead's current owner" from "owner
+    changed, ask again" (_stamp_of). It is not a claim about who owns the row today the way
+    bop_federal/incarceration's own matched_name is. Live board sample (2026-11-19): rows whose
+    owner_name has since become an entity -- a church, a city, the state DOT -- still carried a
+    bop_check/incarceration_check stamp naming a real person checked under a now-superseded
+    owner, and every one of them was flagged other_person even though nothing was copied from
+    another row. These two must stay DERIVED_BLOCKS (never `checked()`, never judged) exactly
+    like block_binding's existing tax_county_check / link_check negative stamps, and exactly like
+    scripts/audit_checks/cube.py's NegativeWrapperDated already treats them."""
+    assert bb.block_kind("bop_check") == "derived"
+    assert bb.block_kind("incarceration_check") == "derived"
+    stamp = {"checked_at": "2026-10-23T16:16:12+00:00", "name": "TEXACO LAWNDALE",
+             "source": "BOP inmate locator", "result": "no_match"}
+    assert bb.checked("bop_check", stamp) is False
+    # the exact live shape: current owner is now an entity the stamp's queried name never named
+    li = _li(owner="FIRST METHODIST CHUR", raw={"bop_check": stamp})
+    assert bb.block_verdict(li, "bop_check", stamp)[0] != "other_person"
+    names = [n for n, _v, _fp, _named in bb.row_verdicts(li)]
+    assert "bop_check" not in names          # never reaches a verdict at all: not `checked()`
+    inc_stamp = {"checked_at": "2026-11-12T17:53:31+00:00", "name": "MICHAEL HUGGINS",
+                 "source": "NC DAC offender search", "result": "no_match"}
+    li2 = _li(owner="City of Gastonia", raw={"incarceration_check": inc_stamp})
+    assert bb.block_verdict(li2, "incarceration_check", inc_stamp)[0] != "other_person"
+    assert "bop_check" not in bb.PERSON_NAME_FIELDS and "incarceration_check" not in bb.PERSON_NAME_FIELDS
+
+
 # ------------------------------------------------------------------ the scrub
 
 def test_scrub_removes_a_copied_mailing_where_the_owner_differs():

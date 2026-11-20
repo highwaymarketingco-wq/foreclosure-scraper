@@ -74,8 +74,10 @@ FAMILIES: dict[str, frozenset] = {
                              "divorce", "probate", "sc_probate_notice", "sc_probate_net",
                              "mcdowell_probate", "heir_estate", "heir_candidates", "lis_pendens_resolution",
                              "townnews_legal", "ncnotices", "court_bid", "documents"}),
-    "person-match": frozenset({"jail_booking", "jail_booking_new", "incarceration", "incarceration_check",
-                               "bop_check", "bop_federal", "obituary", "sc_state_tax_lien",
+    # bop_check / incarceration_check deliberately absent (2026-11-19): block_binding.DERIVED_BLOCKS
+    # now, so they are never `checked()` and never reach this family -- see that module's comment.
+    "person-match": frozenset({"jail_booking", "jail_booking_new", "incarceration",
+                               "bop_federal", "obituary", "sc_state_tax_lien",
                                "marriage_license", "resolved_from_name"}),
     "code-site": frozenset({"code_enforcement", "charlotte_code_enforcement", "lincoln_code", "vacancy",
                             "vacant", "septic", "state_contamination", "sc_ust_registry", "epa_frs",
