@@ -1,59 +1,60 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 11434,
+  "confirmed": 11580,
   "refuted": 11,
-  "rows": 11530,
+  "rows": 11680,
   "stale": 30,
-  "unconfirmed": 55,
+  "unconfirmed": 59,
   "wall": 0
  },
- "generated_at": "2026-11-20T02:14:14Z",
+ "generated_at": "2026-11-20T03:14:33Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-20T02:14:14Z",
-  "county": "Berkeley",
+  "at": "2026-11-20T03:14:33Z",
+  "county": "Georgetown",
   "host": "SMB-LTSEO05",
-  "max_rows": 2000,
+  "max_rows": 200,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "gis.berkeleycountysc.gov": 141
+    "gis1.georgetowncountysc.org": 452
    }
   },
   "result": {
-   "checked": 140,
-   "confirmed": 140
+   "budget_stop": 1,
+   "checked": 150,
+   "confirmed": 146,
+   "unconfirmed": 4
   },
-  "seconds": 283,
+  "seconds": 904,
   "selection": {
-   "applies": 1693,
-   "due_new": 140,
-   "not_due_ttl": 1553
+   "applies": 1159,
+   "due_new": 1159
   },
   "source": null,
   "tier": null
  },
- "rows": 11530,
+ "rows": 11680,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 5522189,
+   "bytes": 5597388,
    "file": "000.json",
-   "rows": 5798,
-   "sha256": "97d12fde18dfce2f90f6b59b88141d7b7b17c201ef51af909bc465d1bcd1a22e"
+   "rows": 5875,
+   "sha256": "21cc836bc778b4795d1c938b9244b2edddce0b7f2f275cc177ab0b3365d69f8e"
   },
   {
    "bucket": 1,
-   "bytes": 5465038,
+   "bytes": 5536547,
    "file": "001.json",
-   "rows": 5732,
-   "sha256": "fa93912829a7db6bd01a73b2791fec0efe50636e64af0cb56988f013daa8c837"
+   "rows": 5805,
+   "sha256": "d47239a24ea6be3ddddb831290895415bca52e9bdac6f133838c451e5fbe2e1d"
   }
  ],
  "signal": "heir_roll",
