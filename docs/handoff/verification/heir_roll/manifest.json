@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 9460,
+  "confirmed": 9684,
   "refuted": 11,
-  "rows": 9556,
+  "rows": 9780,
   "stale": 30,
   "unconfirmed": 55,
   "wall": 0
  },
- "generated_at": "2026-11-19T21:18:39Z",
+ "generated_at": "2026-11-20T00:12:13Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-19T21:18:39Z",
+  "at": "2026-11-20T00:12:13Z",
   "county": "Lexington",
   "host": "SMB-LTSEO05",
   "max_rows": 2000,
@@ -21,41 +21,41 @@
   "requests": {
    "errors": {},
    "requests": {
-    "maps.lex-co.com": 248
+    "maps.lex-co.com": 450
    }
   },
   "result": {
    "budget_stop": 1,
-   "checked": 123,
-   "confirmed": 123
+   "checked": 224,
+   "confirmed": 224
   },
-  "seconds": 503,
+  "seconds": 900,
   "selection": {
    "applies": 1265,
-   "due_new": 919,
+   "due_new": 796,
    "not_due_retry": 2,
-   "not_due_ttl": 344
+   "not_due_ttl": 467
   },
   "source": null,
   "tier": null
  },
- "rows": 9556,
+ "rows": 9780,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4573225,
+   "bytes": 4673604,
    "file": "000.json",
-   "rows": 4802,
-   "sha256": "3007057af03df960593a3b69a6cf4cc77373df2c0442947894a446407e553eb1"
+   "rows": 4907,
+   "sha256": "0f1fe91b388f1161c376315da93a7e6a30f0f714213a3e985eb0305c82661366"
   },
   {
    "bucket": 1,
-   "bytes": 4532001,
+   "bytes": 4645839,
    "file": "001.json",
-   "rows": 4754,
-   "sha256": "fc083fd73f8c891b974c01c5ee19427f8716a53aa28d956d868b599bbc9837d0"
+   "rows": 4873,
+   "sha256": "fb2ef2a94bfb68375b3ee1ed15a9f51f394cd9e91b22481f7d503e3d9f6313ec"
   }
  ],
  "signal": "heir_roll",
