@@ -1,7 +1,7 @@
 {
  "board_rows": 632819,
  "by_category": {
-  "uncovered": 300991,
+  "uncovered": 165215,
   "wall": 22520
  },
  "format_version": 1,
@@ -13,8 +13,8 @@
    "generated_at": "2026-10-17T14:28:27Z"
   },
   "code_enforcement": {
-   "entries": 196,
-   "generated_at": "2026-10-17T14:28:27Z"
+   "entries": 398,
+   "generated_at": "2026-11-20T05:57:07Z"
   },
   "comps": {
    "entries": 240,
@@ -29,8 +29,8 @@
    "generated_at": "2026-10-17T14:28:27Z"
   },
   "elderly_disabled": {
-   "entries": 219,
-   "generated_at": "2026-10-17T14:28:27Z"
+   "entries": 1563,
+   "generated_at": "2026-11-20T06:46:50Z"
   },
   "foreclosure_rod": {
    "entries": 106,
@@ -41,8 +41,8 @@
    "generated_at": "2026-11-18T10:46:08Z"
   },
   "heir_roll": {
-   "entries": 9556,
-   "generated_at": "2026-11-19T21:18:39Z"
+   "entries": 13734,
+   "generated_at": "2026-11-20T11:08:27Z"
   },
   "jail_booking": {
    "entries": 227,
@@ -58,11 +58,11 @@
   },
   "probate_heir": {
    "entries": 131,
-   "generated_at": "2026-11-18T02:25:45Z"
+   "generated_at": "2026-11-20T02:00:25Z"
   },
   "tax_lien": {
-   "entries": 79167,
-   "generated_at": "2026-11-19T20:40:03Z"
+   "entries": 81208,
+   "generated_at": "2026-11-20T09:18:59Z"
   },
   "tax_lien_johnston_static": {
    "entries": 8,
@@ -73,42 +73,42 @@
    "generated_at": "2026-11-16T21:00:28Z"
   }
  },
- "listings": 323511,
+ "listings": 187735,
  "uncovered": {
   "by_scraper_source": {
    "city_websites.charlotte_open_data": 4585,
    "counties_generic.arcgis_distress.burke_storm_damage": 413,
    "counties_generic.arcgis_distress.greensboro_code_housing": 603,
    "counties_generic.arcgis_distress.new_hanover_demolition_permits": 1326,
+   "counties_generic.arcgis_distress.raleigh_structure_fires": 381,
+   "counties_generic.arcgis_distress.rocky_mount_blight_survey_2025": 384,
    "counties_generic.arcgis_distress.spartanburg_infill_eligible": 1062,
    "counties_generic.arcgis_distress.spartanburg_property_cleanup": 2050,
-   "counties_generic.epa_frs.acres": 1538,
+   "counties_generic.epa_frs.acres": 1535,
    "counties_generic.epa_frs.sems": 1984,
    "counties_generic.state_contamination.nc_dam_safety": 7491,
-   "counties_generic.state_contamination.nc_inactive_hazardous": 1456,
-   "counties_generic.state_contamination.nc_ust_incidents": 37581,
+   "counties_generic.state_contamination.nc_inactive_hazardous": 1455,
+   "counties_generic.state_contamination.nc_ust_incidents": 37565,
    "counties_nc.albemarle_observer_tax_lists": 5089,
    "counties_nc.asheville_helene": 692,
-   "counties_nc.gaston_vacant": 20410,
-   "counties_nc.gastonia_code_enforcement": 1087,
+   "counties_nc.gaston_vacant": 20220,
    "counties_nc.lincoln_vacant": 13232,
+   "counties_nc.mcdowell_probate": 378,
    "counties_nc.nc_county_pdf_delinquent_tax": 3200,
    "counties_nc.polk_tax": 1622,
    "counties_nc.transylvania_vacant": 10883,
    "counties_sc.charleston_delinquent_tax": 1757,
-   "counties_sc.charleston_energov_history": 2378,
+   "counties_sc.charleston_energov_history": 2323,
    "counties_sc.charleston_tax_sale_xlsx": 2393,
-   "counties_sc.lexington_homestead": 28099,
+   "counties_sc.georgetown_civicengage": 353,
    "counties_sc.sc_probate_notices.yourpickenscounty": 442,
    "counties_sc.sc_public_index": 2517,
    "counties_sc.sc_public_notices": 411,
    "counties_sc.sc_ust_registry": 15581,
-   "counties_sc.spartanburg_condemned": 913,
-   "counties_sc.spartanburg_homestead": 27344,
+   "counties_sc.spartanburg_condemned": 912,
    "counties_sc.spartanburg_vacant": 4220,
-   "counties_sc.york_homestead": 78953,
    "courtlistener.recap": 730,
-   "national.distressed": 4692,
+   "national.distressed": 4689,
    "national.hud_reac_inspection": 809,
    "national.jail_bookings": 2417,
    "national.landandfarm": 448,
@@ -119,20 +119,20 @@
   },
   "top_counties": {
    "NC:cumberland": 2181,
+   "NC:durham": 2003,
    "NC:forsyth": 2406,
-   "NC:gaston": 23408,
+   "NC:gaston": 22107,
    "NC:guilford": 4621,
-   "NC:lincoln": 15095,
+   "NC:lincoln": 15093,
    "NC:mcdowell": 2944,
    "NC:mecklenburg": 8680,
    "NC:polk": 2052,
    "NC:transylvania": 11368,
    "NC:wake": 3869,
-   "SC:charleston": 9582,
-   "SC:lexington": 28912,
+   "SC:charleston": 9527,
+   "SC:greenville": 1935,
    "SC:pickens": 2214,
-   "SC:spartanburg": 37873,
-   "SC:york": 79877
+   "SC:spartanburg": 10528
   }
  },
  "wall": {
