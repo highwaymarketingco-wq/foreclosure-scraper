@@ -167,6 +167,44 @@ COUNTY_GIS: dict[str, dict] = {
         "owner": ["Name1"], "care_of": "Name2",
         "mail": ["Addr1", "City", "State", "Zip"],
         "mail_state": "State", "situs": ["PhysStrAdd"], "parcel": "NCPIN"},
+    # 2026-11-19 (round 70): Carteret had NO entry here at all -- this is the
+    # SAME parcel MapServer layer enrichment_cama_condition.py's CAMA_SOURCES
+    # already reads (Condition/Grade/Y_BLT_HOUSE, PIN15, live 95.3% match,
+    # round 69) and enrichment_recorded_comps.py's RECORDED_COMP_CONFIG
+    # already configures (SALE_PRICE/SaleDate/HtdSqFt, added 2026-08-19) --
+    # but recorded_comps.enrich() only reads THIS dict's `url`
+    # (`COUNTY_GIS.get(f"{state}:{county}", {}).get("url")`), and with no
+    # "NC:Carteret" key that was always None, so every Carteret lead was
+    # skipped before any network call (round 69 finding, confirmed live
+    # round 70: adding just the url unblocks recorded_comps; the owner/mail/
+    # situs/parcel/out_fields below are this module's own, separate benefit).
+    # Live-verified round 70 (2026-11-19), 600-PIN15 batch against the
+    # UNCHANGED layer: 594/600 (99.0%) PIN15 match; of matched, OWNER
+    # populated 594/594 (100%), MAIL_ADDRESS1 592/594 (99.7%), MAIL_STATE
+    # 581/594 (97.8%), PropertyAddress situs 502/594 (84.5%). FullMailingAddress
+    # is a dead field on this layer (0/594 populated) -- use the MAIL_ADDRESS1/
+    # 2 + MAIL_CITY + MAIL_STATE + MAIL_ZI5 components instead. BEDROOMS/
+    # BATHROOMS match this module's generic _extract_specs patterns (bare
+    # "bedrooms"/"bathrooms") and backfill Listing.bedrooms/bathrooms where
+    # missing; HtdSqFt/TOT_SQ_FT/Y_BLT_HOUSE do NOT match any existing
+    # _extract_specs pattern (htdsqft/tot_sq_ft/y_blt_house are not shaped
+    # like the patterns' alternatives) so they are deliberately left out of
+    # out_fields here -- year_built is already filled for this county by
+    # enrich_cama_condition's own dedicated Y_BLT_HOUSE read, and a TOTAL
+    # value field (Total_EMV) exists on the layer but matches none of
+    # _VALUE_PRIORITY's patterns verbatim, so value is correctly left to
+    # _resolve_one's existing NC-OneMap value-supplement fallback rather than
+    # risked here (LAND_VALUE alone, with no matching improvement field,
+    # would make _extract_value's land+improvement fallback return the LAND
+    # value as if it were the total -- not touching that shared fallback in
+    # this county-scoped change).
+    "NC:Carteret": {"url": "https://arcgisweb.carteretcountync.gov/arcgis/rest/services/"
+                          "Layers/Parceldata/MapServer/0",
+        "owner": ["OWNER", "OWNER2"],
+        "mail": ["MAIL_ADDRESS1", "MAIL_ADDRESS2", "MAIL_CITY", "MAIL_STATE", "MAIL_ZI5"],
+        "mail_state": "MAIL_STATE", "situs": ["PropertyAddress"], "parcel": "PIN15",
+        "out_fields": "PIN15,OWNER,OWNER2,MAIL_ADDRESS1,MAIL_ADDRESS2,MAIL_CITY,MAIL_STATE,"
+                       "MAIL_ZI5,PropertyAddress,BEDROOMS,BATHROOMS"},
     # --- SC ---
     # 2026-08-03 REPOINT: the old AGOL layer (services9…/Parcel_and_CAMA_Feb_1_2021)
     # is a 29,402-row MUNICIPAL extract — it can only answer ~16% of the 8,919
