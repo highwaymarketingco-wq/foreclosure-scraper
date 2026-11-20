@@ -1,54 +1,56 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 2076,
+  "confirmed": 2290,
   "refuted": 97,
-  "rows": 2225,
-  "stale": 20,
+  "rows": 2446,
+  "stale": 27,
   "unconfirmed": 32,
   "wall": 0
  },
- "generated_at": "2026-11-20T13:26:31Z",
+ "generated_at": "2026-11-20T13:34:39Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-20T13:26:31Z",
-  "county": "York",
+  "at": "2026-11-20T13:34:39Z",
+  "county": "Spartanburg",
   "host": "SMB-LTSEO05",
   "max_rows": 3000,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "services1.arcgis.com": 220
+    "maps.spartanburgcounty.org": 221
    }
   },
   "result": {
    "budget_stop": 1,
-   "checked": 220,
-   "confirmed": 219,
-   "unconfirmed": 1
+   "checked": 221,
+   "confirmed": 214,
+   "stale": 7
   },
   "seconds": 441,
   "selection": {
-   "applies": 78965,
-   "due_new": 78072,
-   "not_due_ttl": 893
+   "applies": 29420,
+   "due_new": 28044,
+   "not_due_retry": 4,
+   "not_due_ttl": 1372,
+   "same_property_queued": 224
   },
   "source": null,
   "tier": null
  },
- "rows": 2225,
+ "rows": 2446,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 2180692,
+   "bytes": 2384518,
    "file": "000.json",
-   "rows": 2225,
-   "sha256": "26ab65b999dc85f7e2954dd8b3f78cf6f2773131c4b1bbbac98b7a77b56502ed"
+   "rows": 2446,
+   "sha256": "b378392b3792448a2225378548a2d7402c91bc5cdbfc819b164408696ffb7158"
   }
  ],
  "signal": "elderly_disabled",
