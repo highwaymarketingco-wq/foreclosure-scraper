@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 10595,
+  "confirmed": 10945,
   "refuted": 11,
-  "rows": 10691,
+  "rows": 11041,
   "stale": 30,
   "unconfirmed": 55,
   "wall": 0
  },
- "generated_at": "2026-11-20T01:32:05Z",
+ "generated_at": "2026-11-20T01:47:27Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-20T01:32:05Z",
+  "at": "2026-11-20T01:47:27Z",
   "county": "Berkeley",
   "host": "SMB-LTSEO05",
   "max_rows": 2000,
@@ -21,40 +21,40 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.berkeleycountysc.gov": 340
+    "gis.berkeleycountysc.gov": 351
    }
   },
   "result": {
    "budget_stop": 1,
-   "checked": 339,
-   "confirmed": 339
+   "checked": 350,
+   "confirmed": 350
   },
-  "seconds": 701,
+  "seconds": 702,
   "selection": {
    "applies": 1693,
-   "due_new": 1178,
-   "not_due_ttl": 515
+   "due_new": 839,
+   "not_due_ttl": 854
   },
   "source": null,
   "tier": null
  },
- "rows": 10691,
+ "rows": 11041,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 5135073,
+   "bytes": 5297972,
    "file": "000.json",
-   "rows": 5392,
-   "sha256": "df887ffe1904983de5b8b9044788acfcc464f80a6d0c2147476a91ded14f1e96"
+   "rows": 5564,
+   "sha256": "6411605e8015b63e943dda44731466ddd6baaf48f30b2ad68316af141fc356c6"
   },
   {
    "bucket": 1,
-   "bytes": 5051927,
+   "bytes": 5220431,
    "file": "001.json",
-   "rows": 5299,
-   "sha256": "ed79e0761b5bcbc513f826eafa853e430627bcf0d2b6a5300a13c19e6b1a869a"
+   "rows": 5477,
+   "sha256": "b38847d78424b1aed9c2f39d3bc4c612d0ec607fb6b460d8b9fab37af41197e8"
   }
  ],
  "signal": "heir_roll",
