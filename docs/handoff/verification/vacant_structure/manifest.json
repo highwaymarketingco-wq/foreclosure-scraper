@@ -1,60 +1,51 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 425,
+  "confirmed": 435,
   "refuted": 2,
-  "rows": 450,
+  "rows": 460,
   "stale": 4,
   "unconfirmed": 19,
   "wall": 0
  },
- "generated_at": "2026-11-16T21:00:28Z",
+ "generated_at": "2026-11-20T12:28:00Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-16T21:00:28Z",
-  "county": null,
+  "at": "2026-11-20T12:28:00Z",
+  "county": "Gaston",
   "host": "SMB-LTSEO05",
-  "max_rows": 400,
+  "max_rows": 20,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "gis.charlottenc.gov": 1,
-    "maps.spartanburgcounty.org": 1,
-    "rockhillgis.cityofrockhill.com": 3,
-    "services.arcgis.com": 6,
-    "www.greenwoodsc.gov": 221
+    "devsvcs.gastonianc.gov": 53
    }
   },
   "result": {
-   "checked": 400,
-   "confirmed": 397,
-   "refuted": 1,
-   "stale": 2
+   "checked": 10,
+   "confirmed": 10
   },
-  "seconds": 441,
+  "seconds": 126,
   "selection": {
-   "applies": 1723,
-   "due_new": 1673,
-   "due_retry": 3,
-   "due_ttl": 3,
-   "due_version": 44
+   "applies": 10,
+   "due_new": 10
   },
   "source": null,
   "tier": null
  },
- "rows": 450,
+ "rows": 460,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 435294,
+   "bytes": 453424,
    "file": "000.json",
-   "rows": 450,
-   "sha256": "81533c1225b5f083b96ee7a404083db384123602bf7532469a56f97975d68696"
+   "rows": 460,
+   "sha256": "f9da6e4cda8bb4927eae9cf11432194ef8adf188696abb2c846eb3decb8c64f9"
   }
  ],
  "signal": "vacant_structure",
