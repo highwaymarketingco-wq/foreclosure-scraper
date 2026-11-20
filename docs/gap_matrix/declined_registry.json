@@ -6457,6 +6457,22 @@
       "reason": "Round 66 checked Northampton's own GIS for the same literal-deferred-field shortcut that worked for Pender/Durham/Macon/Haywood/Davidson/Yancey/Hertford. The county has no GIS of its own and is not served by a regional council-of-governments GIS either (checked both before concluding this, per this registry's own standing instruction) -- its parcel data is published by a private GIS vendor (AGD Maps, agdmaps.com) via an ArcGIS-Online-hosted webmap (item bdcfedc12b494e038bfcfd47518b1ca8, found through the county's public webapp.agdmaps.com/nc/northampton/ viewer), whose Parcels layer sits on a separate vendor-shared org (services3.arcgis.com/nJbIFHiSnaX0z0hS NorthamptonService/FeatureServer/8). Live-read all 25 of this layer's fields: PARCELNBR, Owner, Acreage, Deed_Reference, Sale_Price and exactly ONE value field, Tax_Value -- no land/building split, no present-use/deferred/ag-use field of any kind. A second candidate host for this county (parcelviewer.geodecisions.com, Northampton/Public/MapServer, whose public legend lists a distinct 'Parcels' layer) refused every connection attempt (TCP connect timeout, not a CAPTCHA/login/403 -- confirmed from two independent network paths) and could not be read at all; if it ever comes back up it has NOT been checked and this entry should be re-verified against it before being trusted further. multi_year_delinquent_tax/two_year_delinquent/tax_aging_surfaced are independently sourced against www.northamptonnctax.com (a separate tax-bill portal, not this GIS vendor) and are not touched by this finding.",
       "confirmed_date": "2026-11-19",
       "confidence": "medium"
+    },
+    {
+      "state": "SC",
+      "county": "Georgetown",
+      "column": "vacant_lot",
+      "reason": "Round 53 (same day, earlier) and this round both live-checked the county's own registered GCGIS_Energov layer (gis1.georgetowncountysc.org/portal/rest/services/GCGIS_Energov/MapServer/2 -- the SAME layer the existing Georgetown/lt_elderly_disabled declined entry already names) for a usable land_use field: all 32 fields read live. LandUseCode (esriFieldTypeString) is the only land-use-shaped field and carries domain: null -- no CodedValueDomain, no published legend anywhere findable, so its string values cannot be read without guessing. Zone (esriFieldTypeString) is a zoning/density designation (sampled live: R-6, R-1 AC, R-3/4 AC, MR-10, OC, PA, MD, RVC, plus municipal-overlay values like 'TOWN OF ANDREWS'/'TOWN OF PAWLEYS ISLAND') -- what a parcel is ZONED for, not whether it is currently vacant; a zoned-residential parcel is routinely already improved, so mapping Zone as land_use would silently misclassify. No building/improvement-value field of any kind exists on this layer (only TotalLandArea touches size; SalePrice/SaleDate are the only money fields) to use as the Horry/Barnwell-style improvement_value==0 fallback either. This project's own standing rule (see the Horry/Lancaster/Barnwell bare-DOR-code notes in parcel_cache.py) is to never guess a legend-less code's meaning -- structurally blocked as currently sourced, not a quick parcel_cache mapping add.",
+      "confirmed_date": "2026-11-19",
+      "confidence": "high"
+    },
+    {
+      "state": "NC",
+      "county": "Carteret",
+      "column": "atty_tax_verified_confirmed",
+      "reason": "gap_matrix's own suggested source (a tax-roll reader for tax/property card: www.bttaxpayerportal.com) is already confirmed dead for this exact purpose: enrichment_bt_parcel_info.py's own module docstring (live-verified 2026-10-16, Warren County, a real board owner) found this 14-county vendor family (Carteret included) is a CAMA/assessment system only -- owner, deed, legal description, current value -- with NO tax-payment or delinquency data anywhere on the search results, the Parcel Information panel, or the Property Record Card PDF, and names atty_tax_verified_confirmed by name among the columns this same mis-attribution hit. A sibling column on this exact county (tax_aging_surfaced) already carries a declined entry citing the identical finding; this entry closes the matching atty_tax_verified_confirmed cell, which the registry had not yet covered.",
+      "confirmed_date": "2026-11-19",
+      "confidence": "high"
     }
   ]
 }

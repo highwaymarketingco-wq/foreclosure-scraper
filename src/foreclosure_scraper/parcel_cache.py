@@ -1202,6 +1202,13 @@ PARCEL_LAYERS["Orangeburg"] = {
 #: sourced. (Jasper and Lancaster above hit the same two-pattern wall from different angles
 #: -- see their own 2026-11-19 notes. Clarendon/Dillon/Union SC source-discovery notes for
 #: this same round are directly below, after this entry.)
+#: ROUND 71 (2026-11-19, same day): independently re-fetched this layer's full 32-field list
+#: live and corroborated the above byte-for-byte (LandUseCode domain: null, no legend; the
+#: unmapped Zone field sampled live is a zoning/density code -- R-6, R-1 AC, MR-10, "TOWN OF
+#: ANDREWS", etc. -- not a land-use/vacancy flag; no building/improvement-value field exists
+#: to fall back on). Formally closed via docs/gap_matrix/declined_registry.json
+#: (SC/Georgetown/vacant_lot, confirmed_date 2026-11-19) so gap_matrix.py stops re-flagging
+#: this cell as an open "sourced-not-built" opportunity. Re-verify live before reopening.
 PARCEL_LAYERS["Georgetown"] = {
     "state": "SC",
     "url": ("https://gis1.georgetowncountysc.org/portal/rest/services/GCGIS_Energov/"
