@@ -102,6 +102,26 @@ DERIVED_BLOCKS = frozenset({
     # identity.py's party-role-confusion safety net (2026-11-19 verification follow-up):
     # stamped by outreach.py's generate_outreach(), audit-only, never read for identity work
     "owner_identity_uncertain",
+    # enrichment_bop_federal.py / enrichment_incarceration.py's own answered-NO-MATCH pacing
+    # stamps (2026-11-19, block-binding d-other-person follow-up): {checked_at, name, source,
+    # result}. `name` is the OWNER STRING AT QUERY TIME, kept only so _stamp_of() can tell "this
+    # lead's current owner was already asked" from "the owner changed, ask again" -- it is never
+    # read as a claim about who the row's CURRENT owner is (bop_federal/incarceration carry that
+    # claim, in their OWN matched_name, and already have their own stale-match invalidation:
+    # _owner_still_supports_match). Were still in PERSON_BLOCKS with a PERSON_NAME_FIELDS entry,
+    # so a lead whose owner_name was later corrected (a sale, an entity correction, a parcel_cache
+    # fix) got its OLD, now-unrelated queried name compared against the NEW owner and flagged
+    # other_person -- not cross-row contamination, just this row's own pacing bookkeeping
+    # outliving the owner it was taken against. scripts/audit_checks/cube.py's own
+    # NegativeWrapperDated already treats these two (plus marriage_license, divorce) as dated
+    # negative/screen wrappers, not person records -- this was the one place still disagreeing.
+    # Measured live on the 11/19 board: 230,764 bop_check / 366,080 incarceration_check rows,
+    # 17,313 / 12,407 flagged other_person purely on this mismatch (the d-other-person check's
+    # two biggest writers by far). Moving them here (never `checked()`, so block_verdict never
+    # runs on them) also stops scrub_unbound_blocks from deleting the stamp itself every run it
+    # disagrees -- that delete was actively undoing the "rotate past checked leads instead of
+    # re-asking the same names forever" pacing these two enrichers exist to provide.
+    "bop_check", "incarceration_check",
 })
 
 #: person blocks: they describe the OWNER (a person or entity), so the same block on two parcels
@@ -109,7 +129,7 @@ DERIVED_BLOCKS = frozenset({
 PERSON_BLOCKS = frozenset({
     "owner_mailing", "owner_phone", "owner_email", "skip_trace", "sos_agent", "owner_cluster",
     "builder_distress", "liensnc_related", "divorce", "jail_booking", "jail_booking_new",
-    "incarceration", "incarceration_check", "bop_check", "bop_federal", "obituary", "probate",
+    "incarceration", "bop_federal", "obituary", "probate",
     "sc_probate_notice", "sc_probate_net", "greenville_probate", "mcdowell_probate", "heir_estate", "heir_candidates",
     "bankruptcy", "courtlistener", "courtlistener_adversary", "bankruptcy_stay",
     "bankruptcy_tax_combo", "sc_state_tax_lien", "resolved_from_name", "rod", "marriage_license",
@@ -121,8 +141,8 @@ PERSON_BLOCKS = frozenset({
 PERSON_NAME_FIELDS: dict[str, tuple[str, ...]] = {
     "jail_booking": ("matched_name", "inmate_name"),
     "incarceration": ("matched_name",),
-    "incarceration_check": ("name",),
-    "bop_check": ("name",),
+    # bop_check / incarceration_check deliberately absent: DERIVED_BLOCKS now (see its comment) --
+    # their "name" is the query, not a claim about the row's current person.
     "skip_trace": ("owner_name",),
     "obituary": ("decedent",),
     "probate": ("decedent",),
