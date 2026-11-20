@@ -34,6 +34,15 @@ Cost & rate-limit control:
   - max_per_run (default 100): caps API calls per workflow execution
   - Prioritizes by sale_date proximity (closer to sale = higher priority
     since outreach time is short)
+
+Re-run policy (2026-11-19): a row is normally skip-traced exactly once -- raw['skip_trace']
+present means "done". TaxRecordsOnlyProvider's owner_name now prefers li.owner_name (identity.py-
+validated) over the unvalidated owner_mailing/gis claim it used to read first, and a row whose
+stored skip_trace.owner_name is PROVABLY the exact name identity.py has since rejected
+(raw['owner_conflict']['loser']) is the one, narrow exception to "done" -- see
+_skip_trace_owner_is_stale(). This is self-healing (one re-run fixes it, see that function's
+docstring for why it cannot recur on its own), so no separate backfill script is needed: the
+next ordinary enrichment run picks up every row still carrying this exact signature.
 """
 from __future__ import annotations
 
@@ -102,8 +111,20 @@ class TaxRecordsOnlyProvider:
             or gis.get("mailing_address")
             or gis.get("Owner_Mailing_Address")
         )
+        # 2026-11-19 (verification follow-up): li.owner_name is now the FIRST choice, not the
+        # last. identity.py's resolve_owner()/owner_verdict() keep it bound to the county's
+        # CURRENT record of this parcel and correct it in place when the county disagrees --
+        # om/gis below carry no such check, they're whatever the source wrote. Writing the
+        # unvalidated om/gis claim here whenever li.owner_name already exists is exactly how a
+        # stale/rejected name got written into raw['skip_trace']['owner_name'] and then frozen
+        # by the "never re-run" eligibility gate below (see _skip_trace_owner_is_stale()): a
+        # verification pass found 67% of mismatched rows carried raw['owner_conflict'], and
+        # 96.3% of those had skip_trace.owner_name exactly equal to the conflict's rejected
+        # ("loser") name -- i.e. this provider had copied the very claim identity.py rejected.
+        # li.defendant stays the last resort (court filing name, no county binding at all).
         owner = (
-            om.get("owner")
+            li.owner_name
+            or om.get("owner")
             or gis.get("owner")
             or gis.get("Owner")
             or li.defendant
@@ -329,6 +350,37 @@ def _resolve_provider() -> SkipTraceProvider:
     return NoopProvider()
 
 
+def _skip_trace_owner_is_stale(li: Listing) -> bool:
+    """True when this row's raw['skip_trace']['owner_name'] is PROVABLY the exact name
+    identity.py's resolve_owner() rejected for this row (raw['owner_conflict']['loser']) --
+    not merely "a conflict was flagged here at some point". Bounded and self-healing by
+    construction, so the eligibility gate below can safely re-run these rows every pass
+    without unbounded re-querying:
+
+      * raw['owner_conflict'] is never cleared once set (identity.py's own historical-record
+        convention -- see unfused/merged_records), so gating on its mere PRESENCE would mean
+        re-running every such row forever, including ones the provider already fixed.
+      * Gating on an EXACT match against the recorded loser is self-correcting instead: once
+        re-run with the owner-precedence fix above (li.owner_name first), the fresh
+        skip_trace.owner_name becomes li.owner_name itself. For an 'roll' decision that is the
+        NEW, county-corrected value -- never equal to the OLD value that lost (loser), by
+        owner_verdict()'s own definition of disagreement. For a 'row'/'undecided' decision
+        li.owner_name was never the loser (loser is the OTHER contradicting claim) -- so this
+        is already False before any re-run. Either way, one re-run clears the condition; it
+        does not recur without a fresh, independent conflict.
+    """
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    st = raw.get("skip_trace")
+    conflict = raw.get("owner_conflict")
+    if not isinstance(st, dict) or not isinstance(conflict, dict):
+        return False
+    st_owner = str(st.get("owner_name") or "").strip()
+    loser = str(conflict.get("loser") or "").strip()
+    if not st_owner or not loser:
+        return False
+    return st_owner.casefold() == loser.casefold()
+
+
 def _priority(li: Listing) -> tuple:
     """Sort key: lower priority value = run first. Closer-to-sale
     listings get traced first so the limited budget hits the most
@@ -396,10 +448,18 @@ async def enrich_with_skip_trace(
 
     # Filter eligible: must have street_address; prioritize ones with
     # a defendant name (paid lookups need both).
+    # 2026-11-19: "never re-run once skip-traced" used to be absolute, which is how a row's
+    # skip_trace.owner_name could go stale forever even after identity.py corrected the real
+    # owner_name -- see _skip_trace_owner_is_stale()'s docstring for why the exact-match gate
+    # below is both targeted (only rows PROVABLY carrying the rejected name) and bounded (the
+    # owner-precedence fix above makes this self-heal in one re-run, not recur).
     eligible = [
         li for li in listings
         if li.street_address
-        and not (li.raw or {}).get("skip_trace")  # don't re-run
+        and (
+            not (li.raw or {}).get("skip_trace")       # never traced -- the original case
+            or _skip_trace_owner_is_stale(li)           # traced, but provably carries a name
+        )                                                # identity.py has since rejected
     ]
     eligible.sort(key=_priority)
     targets = eligible[:max_per_run]

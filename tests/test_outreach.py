@@ -193,3 +193,74 @@ def test_skip_trace_and_owner_phone_both_contribute_when_both_are_present(tmp_pa
     li.raw["dnc_scrub"] = [{"phone": "8645551212", "dnc_status": "clear"}]
     O.generate_outreach([li])
     assert li.raw["outreach"]["phones"] == ["9195553434", "(864) 555-1212"]
+
+
+# ---------------------------------------------------------------------------
+# 2026-11-19 verification follow-up: PARTY-ROLE CONFUSION safety net. A verification sample
+# found 3/18 rows where NEITHER li.owner_name NOR skip_trace.owner_name was the real owner -- a
+# lienholder, government body, or (one real example) a literal job title ("Procurement
+# Manager") read off a liensnc filing. _owner() now skips any candidate
+# identity.suspicious_owner_name() flags, falling through to the next one (or the generic
+# "Property Owner" default) instead of guessing.
+# ---------------------------------------------------------------------------
+
+def test_owner_skips_a_government_entity_and_falls_back_to_defendant():
+    li = _li(skip=None, owner_name="CLEVELAND COUNTY", defendant="REAL HOMEOWNER")
+    assert O._owner(li) == "REAL HOMEOWNER"
+
+
+def test_owner_skips_a_job_title_from_skip_trace_and_falls_back_to_defendant():
+    li = _li(skip={"owner_name": "Procurement Manager"}, owner_name=None,
+              defendant="REAL HOMEOWNER")
+    assert O._owner(li) == "REAL HOMEOWNER"
+
+
+def test_owner_returns_none_when_every_candidate_is_suspicious():
+    li = _li(skip={"owner_name": "Procurement Manager"}, owner_name="CLEVELAND COUNTY",
+              defendant="CITY OF ROCK HILL")
+    assert O._owner(li) is None
+
+
+def test_owner_skips_an_entity_name_sourced_from_a_lien_filing():
+    li = _li(skip=None, owner_name="ACME HOLDINGS LLC", defendant="REAL HOMEOWNER")
+    li.raw["owner_mailing"] = {"owner": "ACME HOLDINGS LLC", "source": "liensnc_filing"}
+    assert O._owner(li) == "REAL HOMEOWNER"
+
+
+def test_owner_does_not_skip_an_entity_name_sourced_from_the_county_roll():
+    # same entity-shaped name, but sourced from an actual tax roll -- an ordinary LLC owner
+    li = _li(skip=None, owner_name="ACME HOLDINGS LLC", defendant="SOMEONE ELSE")
+    li.raw["owner_mailing"] = {"owner": "ACME HOLDINGS LLC", "source": "county_gis"}
+    assert O._owner(li) == "ACME HOLDINGS LLC"
+
+
+def test_owner_identity_uncertain_flag_is_stamped_on_raw_end_to_end(tmp_path, monkeypatch):
+    _tmp_paths(tmp_path, monkeypatch)
+    li = _li(skip={"owner_name": "Procurement Manager",
+                   "owner_mailing_address": "999 Far Rd, Charlotte NC"},
+              owner_name=None, defendant="REAL HOMEOWNER")
+    O.generate_outreach([li])
+    assert li.raw["owner_identity_uncertain"] is True
+    # but the row is still contactable and still uses the safe fallback name
+    assert li.raw["outreach"]["owner"] == "REAL HOMEOWNER"
+
+
+def test_owner_identity_uncertain_flag_absent_for_an_ordinary_lead(tmp_path, monkeypatch):
+    _tmp_paths(tmp_path, monkeypatch)
+    li = _li(skip={"owner_name": "SMITH JOHN",
+                   "owner_mailing_address": "999 Far Rd, Charlotte NC"})
+    O.generate_outreach([li])
+    assert "owner_identity_uncertain" not in li.raw
+
+
+def test_generate_outreach_excludes_a_lead_whose_every_owner_candidate_is_suspicious(tmp_path, monkeypatch):
+    """A row with NO safe name anywhere must not be auto-generated outreach at all -- the
+    existing contactable gate already enforces this once _owner() returns None."""
+    _tmp_paths(tmp_path, monkeypatch)
+    li = _li(skip={"owner_name": "Procurement Manager",
+                   "owner_mailing_address": "999 Far Rd, Charlotte NC"},
+              owner_name="CLEVELAND COUNTY", defendant="CITY OF ROCK HILL")
+    stats = O.generate_outreach([li])
+    assert stats["contactable"] == 0
+    assert "outreach" not in li.raw
+    assert li.raw["owner_identity_uncertain"] is True  # still flagged for audit, even though excluded

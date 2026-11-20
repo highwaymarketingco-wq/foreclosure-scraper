@@ -2197,6 +2197,7 @@ RAW_KEEP = {
     "twins_collapsed": "*",           # how many duplicate rows of the property were merged into this one
     "unfused": "*",                   # the row was re-keyed to its own source record {from_parcel, to_parcel, ...}
     "owner_conflict": "*",            # the county roll contradicted the owner: {decision, reason, block, loser}
+    "owner_identity_uncertain": "*",  # outreach.py's party-role-confusion safety-net flag (True), audit-only
     "corroboration": "*",             # court-confirmed vs single-source-aggregator flag {court_confirmed, tier, sources, label}
     "competition": "*",               # publication-reach/competition tag {level, reason, widely_published, sources}
     "signal_stack": "*",              # list-stacking: {count, signals[]} distinct distress signals per property

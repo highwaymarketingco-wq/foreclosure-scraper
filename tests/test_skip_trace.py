@@ -188,3 +188,105 @@ def test_priority_imminent_first():
     items.sort(key=_priority)
     assert items[0] is imminent
     assert items[-1] is no_date  # least urgent
+
+
+# ---------------------------------------------------------------------------
+# 2026-11-19 verification follow-up: TaxRecordsOnlyProvider used to write owner_name straight
+# from raw['owner_mailing']/raw['gis'] with no identity-binding check -- li.owner_name, which
+# identity.py keeps bound to the county's CURRENT record, was consulted LAST, not first. A
+# verification pass found 67% of mismatched rows carried raw['owner_conflict'], 96.3% of those
+# with skip_trace.owner_name exactly equal to the conflict's rejected ("loser") name: this
+# provider had copied the very claim identity.py rejected. Fixed to prefer li.owner_name.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_tax_records_prefers_li_owner_name_over_gis_claim():
+    provider = TaxRecordsOnlyProvider()
+    li = _li(
+        street_address="123 Main St",
+        owner_name="RIGHT BOARD OWNER",
+        raw={"gis": {"owner": "WRONG GIS CLAIM", "owner_mailing_address": "999 Elsewhere Ln"}},
+    )
+    out = await provider.lookup(li)
+    assert out["owner_name"] == "RIGHT BOARD OWNER"
+
+
+@pytest.mark.asyncio
+async def test_tax_records_falls_back_to_gis_owner_when_board_owner_name_missing():
+    provider = TaxRecordsOnlyProvider()
+    li = _li(
+        street_address="123 Main St",
+        raw={"gis": {"owner": "GIS OWNER", "owner_mailing_address": "999 Elsewhere Ln"}},
+    )
+    out = await provider.lookup(li)
+    assert out["owner_name"] == "GIS OWNER"
+
+
+# ---------------------------------------------------------------------------
+# The eligibility gate's new, narrow re-run exception: a row whose skip_trace.owner_name is
+# PROVABLY the exact name identity.py rejected (raw['owner_conflict']['loser']) is eligible
+# again; everything else stays "never re-run". See _skip_trace_owner_is_stale()'s docstring in
+# enrichment_skip_trace.py for why this is bounded (self-heals in one re-run, does not recur).
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_skip_trace_is_rerun_when_it_provably_carries_the_rejected_owner_name(monkeypatch):
+    monkeypatch.setenv("SKIP_TRACE_PROVIDER", "tax_records_only")
+    li = _li(
+        street_address="1 Main St",
+        owner_name="NEW CORRECTED OWNER",   # identity.py already fixed this
+        raw={
+            "gis": {"owner": "NEW CORRECTED OWNER", "owner_mailing_address": "999 Diff"},
+            "skip_trace": {"provider": "tax_records_only", "owner_name": "OLD REJECTED OWNER"},
+            "owner_conflict": {"decision": "roll", "reason": "bound_record", "block": "gis",
+                               "loser": "OLD REJECTED OWNER"},
+        },
+    )
+    stats = await enrich_with_skip_trace([li])
+    assert stats["attempted"] == 1  # re-run, not skipped as "already done"
+    assert li.raw["skip_trace"]["owner_name"] == "NEW CORRECTED OWNER"  # self-healed
+
+
+@pytest.mark.asyncio
+async def test_skip_trace_is_not_rerun_when_owner_conflict_loser_does_not_match_stored_value(monkeypatch):
+    """owner_conflict present is not the gate by itself -- only an EXACT match against the
+    specific name this row's own skip_trace recorded. A conflict about a different name (or a
+    row that was never skip-traced with that name) must not force a re-run."""
+    monkeypatch.setenv("SKIP_TRACE_PROVIDER", "tax_records_only")
+    li = _li(
+        street_address="1 Main St",
+        owner_name="CURRENT OWNER",
+        raw={
+            "gis": {"owner": "CURRENT OWNER", "owner_mailing_address": "999 Diff"},
+            "skip_trace": {"provider": "tax_records_only", "owner_name": "CURRENT OWNER"},
+            "owner_conflict": {"decision": "row", "reason": "unbound_record", "block": "gis",
+                               "loser": "SOME OTHER REJECTED NAME"},
+        },
+    )
+    stats = await enrich_with_skip_trace([li])
+    assert stats["attempted"] == 0  # already-correct skip_trace left alone
+
+
+@pytest.mark.asyncio
+async def test_skip_trace_is_not_rerun_for_an_ordinary_owner_conflict_free_row(monkeypatch):
+    """The common case: already skip-traced, no owner_conflict at all -- untouched."""
+    monkeypatch.setenv("SKIP_TRACE_PROVIDER", "tax_records_only")
+    li = _li(
+        street_address="1 Main St",
+        raw={"skip_trace": {"provider": "tax_records_only", "owner_name": "SMITH JOHN"}},
+    )
+    stats = await enrich_with_skip_trace([li])
+    assert stats["attempted"] == 0
+
+
+def test_stale_helper_self_heals_after_one_rerun():
+    """Direct check of the bounded-reprocessing claim: once the row's stored skip_trace.owner_name
+    becomes the NEW (non-rejected) value, the staleness condition clears on its own."""
+    from foreclosure_scraper.enrichment_skip_trace import _skip_trace_owner_is_stale
+    li = _li(raw={
+        "skip_trace": {"owner_name": "OLD REJECTED OWNER"},
+        "owner_conflict": {"loser": "OLD REJECTED OWNER"},
+    })
+    assert _skip_trace_owner_is_stale(li) is True
+    li.raw["skip_trace"]["owner_name"] = "NEW CORRECTED OWNER"  # simulate the re-run landing
+    assert _skip_trace_owner_is_stale(li) is False
