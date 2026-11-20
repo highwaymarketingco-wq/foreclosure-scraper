@@ -88,6 +88,54 @@ def test_name_search():
 
 
 # ---------------------------------------------------------------------------
+# 2026-11-19: a verification pass live-checked 20 of the 3,264 contactable rows where the
+# board's top-level owner_name (identity.py-validated against the county's CURRENT record of
+# THIS parcel) disagreed with raw['skip_trace']['owner_name'] (written once by
+# enrichment_skip_trace.py with no such binding check, and never re-run afterward). Of the 18
+# reached live: owner_name was correct 11/18 (61%), skip_trace 4/18 (22%, concentrated in
+# builder-new-construction and heir/estate parcels -- too small a slice, and with no reliable
+# flag to key off at this call site, to carve out as its own rule), neither 3/18. _owner() used
+# to read skip_trace.owner_name FIRST and never consult li.owner_name at all, so every
+# letter/SMS/email used the less-reliable, unvalidated name whenever the two disagreed. Fixed
+# to prefer li.owner_name, falling back to skip_trace then defendant.
+# ---------------------------------------------------------------------------
+
+def test_owner_prefers_board_owner_name_over_stale_skip_trace():
+    li = _li(skip={"owner_name": "WRONG STALE SKIPTRACE NAME"}, owner_name="RIGHT BOARD NAME")
+    assert O._owner(li) == "RIGHT BOARD NAME"
+
+
+def test_owner_falls_back_to_skip_trace_when_board_owner_name_missing():
+    li = _li(skip={"owner_name": "SKIP TRACE NAME"}, owner_name=None)
+    assert O._owner(li) == "SKIP TRACE NAME"
+
+
+def test_owner_falls_back_to_defendant_when_owner_name_and_skip_trace_both_missing():
+    li = _li(skip=None, owner_name=None, defendant="COURT DEFENDANT")
+    assert O._owner(li) == "COURT DEFENDANT"
+
+
+def test_owner_returns_none_when_nothing_available():
+    li = _li(skip=None, owner_name=None, defendant=None)
+    assert O._owner(li) is None
+
+
+def test_generate_outreach_uses_board_owner_name_not_stale_skip_trace_end_to_end(tmp_path, monkeypatch):
+    """Same fix, exercised through the real pipeline: the letter/SMS/email text and the
+    raw['outreach']['owner'] field actually sent to the operator must reflect li.owner_name,
+    not a disagreeing nested skip_trace copy."""
+    _tmp_paths(tmp_path, monkeypatch)
+    li = _li(skip={"owner_name": "WRONG STALE NAME", "owner_mailing_address": "999 Far Rd, Charlotte NC"},
+             owner_name="RIGHT BOARD NAME")
+    O.generate_outreach([li])
+    o = li.raw["outreach"]
+    assert o["owner"] == "RIGHT BOARD NAME"
+    assert "WRONG" not in o["letter"]
+    assert "WRONG" not in o["sms"]
+    assert "WRONG" not in o["email"]
+
+
+# ---------------------------------------------------------------------------
 # 2026-10-16: skip_trace.phone_numbers is a PAID-provider-only field -- never populated in
 # this free-only project (0 of 353,609 real board rows). The real, free phone pipeline
 # (voter_phone, county_phone, surface_contacts, liensnc, free_phones, sc_voter_xref) lands at

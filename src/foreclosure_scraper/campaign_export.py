@@ -125,7 +125,7 @@ def _export_sms(
         if not phones:
             continue
 
-        owner = st.get("owner_name") or li.defendant or li.owner_name or ""
+        owner = _owner(li) or ""
         for phone in phones:
             rows.append({
                 "phone": phone,
@@ -153,8 +153,7 @@ def _export_email(
     rows = []
     for li in listings:
         raw = li.raw or {}
-        st = raw.get("skip_trace") or {}
-        owner = st.get("owner_name") or li.defendant or li.owner_name or ""
+        owner = _owner(li) or ""
         if not owner:
             continue
 
@@ -197,7 +196,7 @@ def _export_mail(
     for li in listings:
         raw = li.raw or {}
         st = raw.get("skip_trace") or {}
-        owner = st.get("owner_name") or li.defendant or li.owner_name or ""
+        owner = _owner(li) or ""
         mailing = st.get("owner_mailing_address") or ""
         if not owner or not mailing:
             continue

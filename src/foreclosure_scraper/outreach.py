@@ -66,8 +66,31 @@ def save_crm(crm: dict) -> None:
 # ---- helpers ---------------------------------------------------------------
 
 def _owner(li: Listing) -> str | None:
+    """Best available owner name for outreach, in reliability order:
+
+    1. li.owner_name — the board's primary, actively-maintained owner field.
+       identity.py's resolve_owner()/owner_verdict() keep it bound to the
+       county's CURRENT record of THIS parcel (classifying every contradicting
+       claim as bound/unbound/foreign/historical before trusting it) and
+       correct it in place when the county disagrees.
+    2. raw['skip_trace']['owner_name'] — written once by
+       enrichment_skip_trace.py's TaxRecordsOnlyProvider straight from
+       raw['owner_mailing']/raw['gis'] with NO such binding check, and never
+       re-run once a row has been skip-traced (see that module's eligibility
+       gate), so it can go stale even after identity.py corrects li.owner_name.
+       Used only when li.owner_name itself is empty.
+    3. li.defendant — the court filing's defendant name; last resort.
+
+    2026-11-19 verification (20 rows sampled from 3,264 contactable rows where
+    these two disagreed, 18 live-confirmed against county sources): li.owner_name
+    was right 11/18 (61%), skip_trace.owner_name 4/18 (22%, concentrated in
+    builder-owned new-construction and heir/estate parcels), neither 3/18. Before
+    this fix, _owner() read skip_trace.owner_name first and never looked at
+    li.owner_name at all, so every letter/SMS/email used the less-reliable,
+    unvalidated name whenever the two disagreed.
+    """
     st = (li.raw or {}).get("skip_trace") or {}
-    return st.get("owner_name") or li.defendant or None
+    return li.owner_name or st.get("owner_name") or li.defendant or None
 
 
 def _dnc_clear_phones(raw: dict) -> list[str]:
