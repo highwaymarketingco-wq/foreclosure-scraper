@@ -1,54 +1,51 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 515,
+  "confirmed": 570,
   "refuted": 59,
-  "rows": 664,
+  "rows": 719,
   "stale": 90,
   "unconfirmed": 0,
   "wall": 0
  },
- "generated_at": "2026-11-20T12:59:29Z",
+ "generated_at": "2026-11-20T13:02:03Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-20T12:59:29Z",
-  "county": "Spartanburg",
+  "at": "2026-11-20T13:02:03Z",
+  "county": "Charleston",
   "host": "SMB-LTSEO05",
-  "max_rows": 500,
+  "max_rows": 100,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "maps.spartanburgcounty.org": 211
+    "gisccapps.charlestoncounty.org": 55
    }
   },
   "result": {
-   "budget_stop": 1,
-   "checked": 211,
-   "confirmed": 186,
-   "stale": 25
+   "checked": 55,
+   "confirmed": 55
   },
-  "seconds": 421,
+  "seconds": 108,
   "selection": {
-   "applies": 714,
-   "due_new": 563,
-   "not_due_ttl": 151
+   "applies": 55,
+   "due_new": 55
   },
   "source": null,
   "tier": null
  },
- "rows": 664,
+ "rows": 719,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 738255,
+   "bytes": 790805,
    "file": "000.json",
-   "rows": 664,
-   "sha256": "27dc5cdd595117571f65dac009565b3f7168e9cbaf3f72159fd700e858c4d0a9"
+   "rows": 719,
+   "sha256": "8749853d6e157efdd6f53eb848cb9cace30e32492b43da540147f57cb92a43ba"
   }
  ],
  "signal": "code_enforcement",
