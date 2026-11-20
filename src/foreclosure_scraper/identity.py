@@ -69,6 +69,27 @@ staleness problem (the roll-vs-row check above already covers that), a party-rol
 cheap rule can fully solve. suspicious_owner_name() below is a narrow, high-confidence net for
 the shapes that sample actually showed, meant to fail SAFE (flag and fall back) rather than
 guess; outreach.py's _owner() is the consumer.
+
+A fifth shape, same family, found 2026-11-20: a decedent's ESTATE or an HEIR group named
+collectively ("ESTATE OF HERSHEL MOORE", "Any Heirs-At-Law Or Devisees Of X, Deceased") is not a
+party-role confusion in the sense above -- the string IS about the right property -- but it
+names no single living person at a position outreach.py's _first_name() can find: that function
+only knows "LAST FIRST" (county roll) and "First Last" (court filing), so a leading non-name
+phrase like "Estate Of"/"Any Heirs-At-Law Or Devisees Of" reads back as "Of"/"Any", not a name.
+Addressing a letter to the decedent by name would be equally wrong (they are dead); the safe
+answer is the one every other reason here already gives: no identifiable living addressee, fail
+through. Caught via classify_entity_type()'s existing 'estate' bucket (name_normalize.py's
+_ESTATE_MARKERS) below, never a new pattern of its own.
+
+A sixth shape, same 2026-11-20 pass: a value that never should have reached an owner-name field
+at all. li.defendant in particular (candidate 4, the last resort) sometimes carries a bare,
+all-lowercase, run-together word -- "chcenturycom", "reesebuiltnc", "victorybuildersllc" -- that
+reads as a squashed contractor handle or email local-part from some other field, not a court
+party name (16,854 board rows, mostly counties_generic.liensnc; which upstream field actually
+leaks here is a separate, unresolved data-pipeline question, out of scope for this safety net).
+No real producer here ever writes a name in that shape -- a county roll is all-caps, a court
+filing is Title Case -- so suspicious_owner_name()'s own 'handle_like' rule below flags it purely
+on shape, the same fail-safe-and-fall-through answer as every reason above.
 """
 from __future__ import annotations
 
@@ -780,6 +801,19 @@ _JOB_TITLE_RE = re.compile(
     r"REPRESENTATIVE|SECRETARY|EXAMINER|INSPECTOR|AUDITOR|COMPTROLLER|SPECIALIST|ANALYST)$"
 )
 
+#: 2026-11-20 find, on the raw (pre-normalize) string: this codebase's own real name shapes are
+#: ALWAYS multi-word -- a county roll's all-caps "LAST FIRST[ MIDDLE]" or a court filing's
+#: Title-Case "First Last" -- never one run-together all-lowercase word. A single bare lowercase
+#: token 5+ letters long is not a name any producer here is TRYING to write; live-sampled against
+#: the real board it is a squashed contractor/builder handle or an email local-part leaking into
+#: li.defendant from an unrelated field ("chcenturycom", "reesebuiltnc", "victorybuildersllc",
+#: "toddanddea") -- 16,854 rows, 15,108 of them counties_generic.liensnc alone, none of it this
+#: fix's business to track down and root-cause per producer (that is a separate data-pipeline
+#: bug), but _owner()'s own 4th-choice fallback must not hand it out as a greeting name either
+#: way. Anchored on the whole string, so it never touches a real multi-word name that merely
+#: contains a lowercase run somewhere.
+_HANDLE_LIKE_RE = re.compile(r"^[a-z]{5,}$")
+
 #: raw['owner_mailing']['source'] values that name a LIEN FILING's own unvalidated free-text
 #: parse, not a county tax roll -- liensnc_handoff.py's parse_owner() reads a filing's
 #: "owner_text" line with no identity check at all (see enrichment_skip_trace.py's
@@ -804,16 +838,57 @@ def suspicious_owner_name(name: Any, *, source: Optional[str] = None) -> Optiona
     roll block). Else {"reason", "name"}:
       'government'               classify_entity_type() reads a county/city/state/authority/
                                   district name.
+      'estate'                   classify_entity_type() reads 'estate' (name_normalize.py's
+                                  _ESTATE_MARKERS: ESTATE/HEIRS/HEIR/DECEASED/DECD, "LIFE ESTATE"
+                                  excepted) -- a decedent's estate or an heir group named
+                                  collectively, never one living person at a knowable position in
+                                  the string. 2026-11-20 find: outreach.py's own _first_name()
+                                  only knows two shapes, county-roll "LAST FIRST" and court
+                                  "First Last", and has no notion of a leading non-name phrase --
+                                  so "ESTATE OF HERSHEL MOORE" positionally reads back "Of", "The
+                                  Estate Of William J. Mcbride" reads back "The", and SC's lis
+                                  pendens boilerplate "Any Heirs-At-Law Or Devisees Of X,
+                                  Deceased" reads back "Any": a letter/email/SMS greeting the
+                                  heirs of a dead person as "Dear Any,"/"Dear Of,". Extracting the
+                                  decedent's own first name instead would not fix this either --
+                                  Hershel Moore is dead; a letter cannot be addressed to him. The
+                                  safe answer is the same one 'government'/'job_title' already
+                                  give: treat the string as having no identifiable living
+                                  addressee at all and let the caller fail through to the next
+                                  candidate, or to the generic "Property Owner" default.
+                                  Live-measured against the real board: 513 of 33,102
+                                  estate-classified li.owner_name rows hit this (an "Of"/"The"/
+                                  initial-token greeting), spanning both states. Guarded with
+                                  `not is_entity(name)`: classify_entity_type() checks its
+                                  ESTATE/HEIRS/HEIR/DECEASED/DECD markers BEFORE is_entity(), so
+                                  an LLC/Inc-suffixed "...Real Estate..." business name (a real,
+                                  unambiguous entity, e.g. "RAY AND SALLIE EDWARDS REAL ESTATE
+                                  LLC") also reads back 'estate' -- live-caught by this fix's own
+                                  verification sweep BEFORE the guard was added: that exact row's
+                                  li.defendant was an unrelated garbage value, so flagging its
+                                  perfectly good LLC name here fell through to something WORSE,
+                                  not safer. Without the corporate suffix (e.g. a sole
+                                  proprietorship's "RODGER C JARRELL REAL ESTATE") is_entity()
+                                  cannot tell, so that residual slice still flags -- failing
+                                  through to the next candidate or "Property Owner" is the same
+                                  safe default every other reason here already falls back to.
       'entity_from_lien_filing'  an LLC/Inc/Trust/Corp-suffixed name whose own source is a lien
                                   filing's free-text parse, not a county tax roll.
       'job_title'                the whole string is job-title-shaped, not a name.
+      'handle_like'              the whole string is one run-together, all-lowercase word (5+
+                                  letters, no space) -- not a shape any producer here writes a
+                                  real name in; see _HANDLE_LIKE_RE's own comment.
     """
     if not name_tokens(name):
         return None
-    from .name_normalize import classify_entity_type, normalize_name
+    if _HANDLE_LIKE_RE.match(str(name).strip()):
+        return {"reason": "handle_like", "name": str(name)}
+    from .name_normalize import classify_entity_type, is_entity, normalize_name
     kind = classify_entity_type(name)
     if kind == "government":
         return {"reason": "government", "name": str(name)}
+    if kind == "estate" and not is_entity(name):
+        return {"reason": "estate", "name": str(name)}
     if kind in ("entity", "trust") and source in _LIEN_FILING_SOURCES:
         return {"reason": "entity_from_lien_filing", "name": str(name)}
     if _JOB_TITLE_RE.match(normalize_name(name)):
