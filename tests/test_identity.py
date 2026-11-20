@@ -366,3 +366,67 @@ def test_board_selfcheck_counts_duplicates_by_property():
     rows = [_to_dict(li) for li in _board()]
     entry = {e["name"]: e for e in sc.invariants(rows)}["no duplicate identifiable properties"]
     assert entry["count"] == 1 and entry["multi_address_keys"] == 1
+
+
+# ---------------------------------------------------------------------------
+# 2026-11-19 verification follow-up: PARTY-ROLE CONFUSION. A third verification sample (18
+# live-checked rows where li.owner_name and skip_trace.owner_name disagreed) found 3/18 where
+# NEITHER was the real owner -- a lienholder, government body, builder-of-record, or (one real
+# example) a literal job title ("Procurement Manager") read off a liensnc filing's free-text
+# owner field. suspicious_owner_name() is the narrow, fail-safe net for the shapes that sample
+# actually showed; it is a DIFFERENT defect from owner_verdict()/resolve_owner() above.
+# ---------------------------------------------------------------------------
+
+def test_suspicious_owner_name_flags_a_government_entity():
+    v = idn.suspicious_owner_name("CLEVELAND COUNTY")
+    assert v == {"reason": "government", "name": "CLEVELAND COUNTY"}
+    assert idn.suspicious_owner_name("CITY OF ROCK HILL")["reason"] == "government"
+    assert idn.suspicious_owner_name("SPARTANBURG COUNTY HOUSING AUTHORITY")["reason"] == "government"
+
+
+def test_suspicious_owner_name_flags_the_literal_job_title_sample():
+    # the real 2026-11-19 verification example: a liensnc filing's owner_text parsed as a title
+    assert idn.suspicious_owner_name("Procurement Manager")["reason"] == "job_title"
+    assert idn.suspicious_owner_name("Tax Collector")["reason"] == "job_title"
+
+
+def test_suspicious_owner_name_does_not_flag_an_ordinary_person():
+    assert idn.suspicious_owner_name("SMITH JOHN") is None
+    assert idn.suspicious_owner_name("Smith, John A") is None
+    assert idn.suspicious_owner_name(None) is None
+    assert idn.suspicious_owner_name("") is None
+
+
+def test_suspicious_owner_name_flags_an_entity_sourced_from_a_lien_filings_own_parse():
+    # liensnc_handoff.py's parse_owner() reads a filing's free-text owner_text with no
+    # identity check -- an entity-suffixed hit FROM THAT SOURCE is suspect.
+    v = idn.suspicious_owner_name("ACME HOLDINGS LLC", source="liensnc_filing")
+    assert v == {"reason": "entity_from_lien_filing", "name": "ACME HOLDINGS LLC"}
+    assert idn.suspicious_owner_name("DOE JANE TRUST", source="liensnc")["reason"] == \
+        "entity_from_lien_filing"
+
+
+def test_suspicious_owner_name_does_not_flag_an_entity_sourced_from_the_county_roll():
+    # the SAME entity-suffixed name is a perfectly ordinary owner when it came from an actual
+    # county tax-roll block instead of a lien filing's unvalidated free-text parse.
+    assert idn.suspicious_owner_name("ACME HOLDINGS LLC", source="county_gis") is None
+    assert idn.suspicious_owner_name("ACME HOLDINGS LLC") is None       # no source at all
+
+
+def test_suspicious_owner_name_does_not_flag_a_person_sourced_from_a_lien_filing():
+    # the lien-filing-source rule is scoped to ENTITY-shaped names, not every name that source
+    # ever touches -- an ordinary person's name from liensnc must not be flagged.
+    assert idn.suspicious_owner_name("SMITH JOHN", source="liensnc_filing") is None
+
+
+def test_owner_identity_uncertain_reads_the_rows_own_owner_mailing_source():
+    flagged = _li(owner="ACME HOLDINGS LLC",
+                  raw={"owner_mailing": {"owner": "ACME HOLDINGS LLC", "source": "liensnc_filing"}})
+    assert idn.owner_identity_uncertain(flagged)["reason"] == "entity_from_lien_filing"
+
+    clean = _li(owner="ACME HOLDINGS LLC",
+               raw={"owner_mailing": {"owner": "ACME HOLDINGS LLC", "source": "county_gis"}})
+    assert idn.owner_identity_uncertain(clean) is None
+
+    no_mailing = _li(owner="SMITH JOHN")
+    assert idn.owner_identity_uncertain(no_mailing) is None

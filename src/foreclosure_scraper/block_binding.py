@@ -99,6 +99,9 @@ DERIVED_BLOCKS = frozenset({
     "parcel_id_alias", "withdrawn_case_type_other", "resolver_conflict_undone",
     # identity.py's provenance (audit 2026-10-09, identity): written by the identity pass
     "merged_records", "twins_collapsed", "unfused", "owner_conflict",
+    # identity.py's party-role-confusion safety net (2026-11-19 verification follow-up):
+    # stamped by outreach.py's generate_outreach(), audit-only, never read for identity work
+    "owner_identity_uncertain",
 })
 
 #: person blocks: they describe the OWNER (a person or entity), so the same block on two parcels

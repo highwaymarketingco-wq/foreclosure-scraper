@@ -59,6 +59,16 @@ OneMap's parcel layer queried by the row's own parcel id; Spartanburg's CAMA lay
     travels with Listing.merge's raw deep-merge and is not proof the owner value is the refreshed
     one: a HUD facility name carried a parcel-cache stamp).
 resolve_owner() applies that rule and stamps raw['owner_conflict'] on every contradicted row.
+
+PARTY-ROLE CONFUSION. A fourth, different defect: the string offered as the owner is not a
+person's (or a legitimate owning entity's) name at all -- a lienholder, a government body, a
+builder-of-record, or (confirmed on the live board) a literal job title ("Procurement Manager")
+read off a lien filing's free-text owner field. 2026-11-19 verification: of 18 live-checked rows
+where li.owner_name and raw['skip_trace']['owner_name'] disagreed, 3 had NEITHER right -- not a
+staleness problem (the roll-vs-row check above already covers that), a party-role problem no
+cheap rule can fully solve. suspicious_owner_name() below is a narrow, high-confidence net for
+the shapes that sample actually showed, meant to fail SAFE (flag and fall back) rather than
+guess; outreach.py's _owner() is the consumer.
 """
 from __future__ import annotations
 
@@ -758,6 +768,71 @@ def resolve_owner(row: Any) -> Optional[str]:
     return v["decision"]
 
 
+#: shapes that identify a PARTY ROLE, not a person -- a conservative, whole-string match (1-3
+#: words ending in one of these nouns) so an ordinary long name that happens to contain one of
+#: these words elsewhere is never caught, and a genuine rare surname ("Clerk", "Collector") is
+#: caught only when it is the ENTIRE offered name, which the verification sample's real examples
+#: ("Procurement Manager") always were. False positives here just lose the personalized name
+#: (outreach.py falls back to the next candidate, or the generic default) -- the safe direction.
+_JOB_TITLE_RE = re.compile(
+    r"^(?:[A-Z]+\s+){0,2}(?:MANAGER|DIRECTOR|SUPERVISOR|OFFICER|ADMINISTRATOR|COORDINATOR|"
+    r"CLERK|COLLECTOR|TREASURER|ASSESSOR|RECORDER|REGISTER|ATTORNEY|PARALEGAL|AGENT|"
+    r"REPRESENTATIVE|SECRETARY|EXAMINER|INSPECTOR|AUDITOR|COMPTROLLER|SPECIALIST|ANALYST)$"
+)
+
+#: raw['owner_mailing']['source'] values that name a LIEN FILING's own unvalidated free-text
+#: parse, not a county tax roll -- liensnc_handoff.py's parse_owner() reads a filing's
+#: "owner_text" line with no identity check at all (see enrichment_skip_trace.py's
+#: TaxRecordsOnlyProvider, which copies this straight into raw['skip_trace']['owner_name'] too),
+#: so an entity-suffixed hit sourced from here is as likely to be the filing agent's or a
+#: contractor's registered name as the actual property owner. An LLC/trust owner sourced from
+#: an actual county roll block is NOT flagged by this -- only this specific unvalidated source.
+_LIEN_FILING_SOURCES = frozenset({"liensnc_filing", "liensnc"})
+
+
+def suspicious_owner_name(name: Any, *, source: Optional[str] = None) -> Optional[dict]:
+    """Safety net for the PARTY-ROLE CONFUSION defect in the module docstring above -- a
+    different bug class from owner_verdict()/resolve_owner(): those settle "the county roll
+    disagrees with a name that IS a person's"; this catches "the string offered as an owner is
+    not a person's name at all". Deliberately cheap and non-exhaustive (real identity
+    resolution is out of scope); callers must fail SAFE on a hit, never guess.
+
+    `source` is the candidate's own provenance tag when it has one (raw['owner_mailing']
+    ['source']) -- needed only for the entity_from_lien_filing rule below.
+
+    None when `name` reads as an ordinary person (or an entity sourced from an actual county
+    roll block). Else {"reason", "name"}:
+      'government'               classify_entity_type() reads a county/city/state/authority/
+                                  district name.
+      'entity_from_lien_filing'  an LLC/Inc/Trust/Corp-suffixed name whose own source is a lien
+                                  filing's free-text parse, not a county tax roll.
+      'job_title'                the whole string is job-title-shaped, not a name.
+    """
+    if not name_tokens(name):
+        return None
+    from .name_normalize import classify_entity_type, normalize_name
+    kind = classify_entity_type(name)
+    if kind == "government":
+        return {"reason": "government", "name": str(name)}
+    if kind in ("entity", "trust") and source in _LIEN_FILING_SOURCES:
+        return {"reason": "entity_from_lien_filing", "name": str(name)}
+    if _JOB_TITLE_RE.match(normalize_name(name)):
+        return {"reason": "job_title", "name": str(name)}
+    return None
+
+
+def owner_identity_uncertain(row: Any) -> Optional[dict]:
+    """suspicious_owner_name() applied to THIS row's own li.owner_name, using
+    raw['owner_mailing']['source'] as the provenance tag. A convenience for callers that only
+    care about the row's primary owner field; outreach.py's _owner() instead runs the same
+    check per-candidate across every owner source it considers (li.owner_name,
+    skip_trace.owner_name, li.defendant), since which field is actually about to be used
+    determines what should be checked."""
+    om = _raw(row).get("owner_mailing")
+    source = om.get("source") if isinstance(om, dict) else None
+    return suspicious_owner_name(_get(row, "owner_name"), source=source)
+
+
 def resolve_owners(listings: Iterable[Any]) -> dict:
     """resolve_owner() over a board, in place. Counts only; never raises on an odd row."""
     stats: Counter = Counter()
@@ -783,7 +858,8 @@ def run_identity_pass(listings: list) -> dict:
 
 
 __all__ = [
-    "collapse_twins", "duplicate_groups", "fused_record", "ident_key", "owner_verdict", "partition",
-    "record_key", "resolve_owner", "resolve_owners", "run_identity_pass", "situs_tag", "unfuse",
+    "collapse_twins", "duplicate_groups", "fused_record", "ident_key", "owner_identity_uncertain",
+    "owner_verdict", "partition", "record_key", "resolve_owner", "resolve_owners",
+    "run_identity_pass", "situs_tag", "suspicious_owner_name", "unfuse",
     "unfuse_rows",
 ]

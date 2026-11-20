@@ -31,6 +31,7 @@ from typing import Iterable
 
 import structlog
 
+from .identity import suspicious_owner_name
 from .models import Listing
 
 log = structlog.get_logger()
@@ -65,32 +66,67 @@ def save_crm(crm: dict) -> None:
 
 # ---- helpers ---------------------------------------------------------------
 
+def _owner_candidates(li: Listing) -> list[tuple[str | None, str | None]]:
+    """Every owner-name source _owner() will consider, in its reliability order, each paired
+    with the provenance tag suspicious_owner_name() needs for the entity_from_lien_filing rule
+    (raw['owner_mailing']['source']). li.owner_name and skip_trace.owner_name share that same
+    tag: on a row liensnc_handoff.py originated, BOTH fields were set from that filing's own
+    unvalidated owner_text parse, so either one can carry that same provenance. li.defendant
+    (the court filing's own party name) carries none."""
+    raw = li.raw or {}
+    st = raw.get("skip_trace") or {}
+    om = raw.get("owner_mailing")
+    lien_source = om.get("source") if isinstance(om, dict) else None
+    return [
+        (li.owner_name, lien_source),
+        (st.get("owner_name"), lien_source),
+        (li.defendant, None),
+    ]
+
+
 def _owner(li: Listing) -> str | None:
-    """Best available owner name for outreach, in reliability order:
+    """Best available owner name for outreach: the first candidate, in reliability order, that
+    does NOT read as a non-owner party (suspicious_owner_name() -- a lienholder, government
+    body, or job title; see identity.py's module docstring, "PARTY-ROLE CONFUSION"). A flagged
+    candidate is skipped, never returned -- this fails safe by falling through to the next
+    candidate, or to the generic "Property Owner" default (via _first_name(None)) when every
+    candidate is empty or flagged. Reliability order:
 
     1. li.owner_name — the board's primary, actively-maintained owner field.
        identity.py's resolve_owner()/owner_verdict() keep it bound to the
        county's CURRENT record of THIS parcel (classifying every contradicting
        claim as bound/unbound/foreign/historical before trusting it) and
        correct it in place when the county disagrees.
-    2. raw['skip_trace']['owner_name'] — written once by
-       enrichment_skip_trace.py's TaxRecordsOnlyProvider straight from
-       raw['owner_mailing']/raw['gis'] with NO such binding check, and never
-       re-run once a row has been skip-traced (see that module's eligibility
-       gate), so it can go stale even after identity.py corrects li.owner_name.
-       Used only when li.owner_name itself is empty.
+    2. raw['skip_trace']['owner_name'] — written by enrichment_skip_trace.py's
+       TaxRecordsOnlyProvider, which (2026-11-19) now itself prefers
+       li.owner_name over the unvalidated owner_mailing/gis claim, and is
+       re-run (not frozen forever) on a row PROVABLY carrying a name
+       identity.py has since rejected (see that module's
+       _skip_trace_owner_is_stale()). Used only when li.owner_name itself is
+       empty or flagged.
     3. li.defendant — the court filing's defendant name; last resort.
 
     2026-11-19 verification (20 rows sampled from 3,264 contactable rows where
-    these two disagreed, 18 live-confirmed against county sources): li.owner_name
-    was right 11/18 (61%), skip_trace.owner_name 4/18 (22%, concentrated in
-    builder-owned new-construction and heir/estate parcels), neither 3/18. Before
-    this fix, _owner() read skip_trace.owner_name first and never looked at
-    li.owner_name at all, so every letter/SMS/email used the less-reliable,
-    unvalidated name whenever the two disagreed.
+    li.owner_name and skip_trace.owner_name disagreed, 18 live-confirmed against county
+    sources): li.owner_name was right 11/18 (61%), skip_trace.owner_name 4/18 (22%,
+    concentrated in builder-owned new-construction and heir/estate parcels), NEITHER 3/18 --
+    a lienholder/government/job-title name read as the owner, the different "party-role
+    confusion" defect suspicious_owner_name() exists to catch. Before the first fix, _owner()
+    read skip_trace.owner_name first and never looked at li.owner_name at all.
     """
-    st = (li.raw or {}).get("skip_trace") or {}
-    return li.owner_name or st.get("owner_name") or li.defendant or None
+    for name, source in _owner_candidates(li):
+        if name and not suspicious_owner_name(name, source=source):
+            return name
+    return None
+
+
+def _owner_identity_uncertain(li: Listing) -> bool:
+    """True when at least one of this listing's owner candidates was suspicious enough that
+    _owner() had to skip past it. Purely an audit signal -- stamped onto
+    raw['owner_identity_uncertain'] by generate_outreach() so a flagged row is visible/reviewable
+    later; _owner() itself already fails safe on its own and never consults this flag."""
+    return any(name and suspicious_owner_name(name, source=source)
+               for name, source in _owner_candidates(li))
 
 
 def _dnc_clear_phones(raw: dict) -> list[str]:
@@ -210,6 +246,8 @@ def generate_outreach(listings: list[Listing]) -> dict:
     for li in listings:
         if not isinstance(li.raw, dict):
             li.raw = {}
+        if _owner_identity_uncertain(li):
+            li.raw["owner_identity_uncertain"] = True
         contact = _contact(li)
         # Contactable = we have at least an owner name + (mailing addr or phone).
         contactable = bool(contact["owner"]) and bool(
