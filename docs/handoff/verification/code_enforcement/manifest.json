@@ -1,53 +1,56 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 280,
-  "refuted": 57,
-  "rows": 398,
-  "stale": 61,
+  "confirmed": 329,
+  "refuted": 59,
+  "rows": 453,
+  "stale": 65,
   "unconfirmed": 0,
   "wall": 0
  },
- "generated_at": "2026-11-20T05:57:07Z",
+ "generated_at": "2026-11-20T12:51:03Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-20T05:57:07Z",
-  "county": "Spartanburg",
+  "at": "2026-11-20T12:51:03Z",
+  "county": "Gaston",
   "host": "SMB-LTSEO05",
-  "max_rows": 900,
+  "max_rows": 500,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "maps.spartanburgcounty.org": 151
+    "devsvcs.gastonianc.gov": 207
    }
   },
   "result": {
    "budget_stop": 1,
-   "checked": 151,
-   "confirmed": 111,
-   "stale": 40
+   "checked": 55,
+   "confirmed": 49,
+   "refuted": 2,
+   "stale": 4
   },
-  "seconds": 301,
+  "seconds": 438,
   "selection": {
-   "applies": 714,
-   "due_new": 714
+   "applies": 1516,
+   "due_new": 1465,
+   "not_due_ttl": 51,
+   "same_property_queued": 1
   },
   "source": null,
   "tier": null
  },
- "rows": 398,
+ "rows": 453,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 478016,
+   "bytes": 564910,
    "file": "000.json",
-   "rows": 398,
-   "sha256": "202b62e5c917a097627c9898c1e0b7a801a59431438093169be8456fe971b070"
+   "rows": 453,
+   "sha256": "16a91585da4e1b19563912b4042c44925ad050eba6672a55427e6a224517cb0e"
   }
  ],
  "signal": "code_enforcement",
