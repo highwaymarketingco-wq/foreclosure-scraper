@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 13282,
+  "confirmed": 13577,
   "refuted": 11,
-  "rows": 13439,
+  "rows": 13734,
   "stale": 30,
   "unconfirmed": 116,
   "wall": 0
  },
- "generated_at": "2026-11-20T10:11:22Z",
+ "generated_at": "2026-11-20T11:08:27Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-20T10:11:22Z",
+  "at": "2026-11-20T11:08:27Z",
   "county": "Barnwell",
   "host": "SMB-LTSEO05",
   "max_rows": 2000,
@@ -21,40 +21,39 @@
   "requests": {
    "errors": {},
    "requests": {
-    "services8.arcgis.com": 1202
+    "services8.arcgis.com": 887
    }
   },
   "result": {
-   "budget_stop": 1,
-   "checked": 400,
-   "confirmed": 400
+   "checked": 295,
+   "confirmed": 295
   },
-  "seconds": 2406,
+  "seconds": 1775,
   "selection": {
    "applies": 1295,
-   "due_new": 695,
-   "not_due_ttl": 600
+   "due_new": 295,
+   "not_due_ttl": 1000
   },
   "source": null,
   "tier": null
  },
- "rows": 13439,
+ "rows": 13734,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 6444254,
+   "bytes": 6593514,
    "file": "000.json",
-   "rows": 6766,
-   "sha256": "d1e5877576091176b79b71041840cb7248cf02dd166063e36d642b8f594f77c2"
+   "rows": 6927,
+   "sha256": "af96769d8209590220a050acaae53dee108e4f66933b4f73afa9e03aaf6f0a52"
   },
   {
    "bucket": 1,
-   "bytes": 6364249,
+   "bytes": 6488224,
    "file": "001.json",
-   "rows": 6673,
-   "sha256": "5b7189a456f9f61900be5a8f1ae19c0fed8c5d68179f67c9d1bb706f51e2f345"
+   "rows": 6807,
+   "sha256": "8c3fdcf2b976fee9bfb2440657ee8dc42f7bef3a3d04f47a7aef8132ac95db34"
   }
  ],
  "signal": "heir_roll",
