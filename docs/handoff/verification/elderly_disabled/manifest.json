@@ -1,57 +1,53 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 4431,
+  "confirmed": 5030,
   "refuted": 97,
-  "rows": 4616,
+  "rows": 5215,
   "stale": 55,
   "unconfirmed": 33,
   "wall": 0
  },
- "generated_at": "2026-11-21T21:07:55Z",
+ "generated_at": "2026-11-21T21:29:09Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-21T21:07:55Z",
-  "county": "Spartanburg",
+  "at": "2026-11-21T21:29:09Z",
+  "county": "Lexington",
   "host": "SMB-LTSEO05",
   "max_rows": 2000,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "maps.spartanburgcounty.org": 601
+    "maps.lex-co.com": 599
    }
   },
   "result": {
    "budget_stop": 1,
-   "checked": 601,
-   "confirmed": 586,
-   "stale": 14,
-   "unconfirmed": 1
+   "checked": 599,
+   "confirmed": 599
   },
-  "seconds": 1202,
+  "seconds": 1201,
   "selection": {
-   "applies": 29420,
-   "due_new": 27328,
-   "not_due_retry": 4,
-   "not_due_ttl": 2088,
-   "same_property_queued": 156
+   "applies": 28099,
+   "due_new": 26979,
+   "not_due_ttl": 1120
   },
   "source": null,
   "tier": null
  },
- "rows": 4616,
+ "rows": 5215,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4344749,
+   "bytes": 4887246,
    "file": "000.json",
-   "rows": 4616,
-   "sha256": "adc2667cff2c1d7b0fd31b51c3cad9ce8ddce1593330fe8b10deeadd3aea2d73"
+   "rows": 5215,
+   "sha256": "638bfa27ba8f98b18c0abedcbaa2078c36ac931b092ef33a853105282adeb736"
   }
  ],
  "signal": "elderly_disabled",
