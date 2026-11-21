@@ -676,10 +676,26 @@ def _parse_card(html: str, county: str) -> CardResult | None:
     #              Fairfield's text match as a confirmed miss, not a confirmed non-vacant --
     #              a real fix here needs either a Fairfield/SC-DOR code table or reading the
     #              building-detail absence, neither built.
-    # Spartanburg/Oconee/Pickens/Union not yet checked. Each needs its own live fact-label
-    # dump (same method as above) before assuming either way -- do not extend the Clarendon
-    # label names to another county without checking.
-    lu = _pick(facts, ("land use",))
+    # FOUND 2026-11-21 (same sweep, continued). Spartanburg/Oconee/Pickens/Union live fact-
+    # label dumps (1 real board parcel each) -- EVERY one of these 4 DOES carry a land-use-
+    # equivalent field, confirmed live, but NONE of them calls it "land use":
+    #   Spartanburg "property usage" -> "Non-Qualified Regular Residential Improved (6RGR)"
+    #   Oconee      "class"          -> "101 Residential 1 Family"
+    #   Union       "record type"    -> "Residential" (also has a separate, more opaque
+    #               "class code (note: not zoning info)" -> "RN-Residential" -- "record type"
+    #               preferred as the plainer text; not yet known which (if either) actually
+    #               reads "Vacant" on a real vacant Union parcel)
+    #   Pickens     "property type"/"account type" -> "Commercial" -- the one live sample
+    #               happened to be a commercial retail parcel (Haven of Rest Ministries), not
+    #               residential, so this confirms the label exists and extracts, NOT that a
+    #               residential Pickens card uses the same label/wording.
+    # Same caveat as Clarendon/Fairfield applies to all four: extraction is proven (real text
+    # comes back), but the POSITIVE vacant-detection path is UNCONFIRMED -- 0 of these 4
+    # samples were vacant, so _is_vacant_land_use has never actually fired True on any of
+    # them. Do not report any county in this list as "vacant detection working" without a
+    # real vacant sample.
+    lu = _pick(facts, ("land use", "property usage", "record type", "class",
+                       "property type", "account type"))
     if lu:
         res.land_use = lu.strip()
     res.acres = _float(_pick(facts, ("acres/lot", "acres")))
