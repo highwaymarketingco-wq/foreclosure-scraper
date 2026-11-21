@@ -1,5 +1,5 @@
 {
- "board_rows": 632819,
+ "board_rows": 633730,
  "by_category": {
   "uncovered": 165215,
   "wall": 22520
@@ -13,8 +13,8 @@
    "generated_at": "2026-10-17T14:28:27Z"
   },
   "code_enforcement": {
-   "entries": 719,
-   "generated_at": "2026-11-20T13:02:03Z"
+   "entries": 1071,
+   "generated_at": "2026-11-20T16:30:39Z"
   },
   "comps": {
    "entries": 240,
@@ -29,8 +29,8 @@
    "generated_at": "2026-10-17T14:28:27Z"
   },
   "elderly_disabled": {
-   "entries": 2666,
-   "generated_at": "2026-11-20T13:42:46Z"
+   "entries": 4616,
+   "generated_at": "2026-11-21T21:07:55Z"
   },
   "foreclosure_rod": {
    "entries": 106,
@@ -61,8 +61,8 @@
    "generated_at": "2026-11-20T02:00:25Z"
   },
   "tax_lien": {
-   "entries": 81606,
-   "generated_at": "2026-11-20T14:59:49Z"
+   "entries": 82978,
+   "generated_at": "2026-11-21T19:08:14Z"
   },
   "tax_lien_johnston_static": {
    "entries": 8,
