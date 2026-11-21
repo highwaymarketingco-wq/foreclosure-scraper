@@ -3,47 +3,53 @@
  "counts": {
   "confirmed": 40851,
   "refuted": 988,
-  "rows": 82955,
+  "rows": 82958,
   "stale": 23622,
-  "unconfirmed": 17494,
+  "unconfirmed": 17497,
   "wall": 0
  },
- "generated_at": "2026-11-21T17:33:18Z",
+ "generated_at": "2026-11-21T17:42:51Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-21T17:33:15Z",
-  "county": "Johnston",
+  "at": "2026-11-21T17:42:48Z",
+  "county": "Yadkin",
   "host": "SMB-LTSEO05",
   "max_rows": 3,
   "recheck_only": false,
   "requests": {
-   "errors": {},
-   "requests": {}
+   "errors": {
+    "www.bttaxpayerportal.com": 2
+   },
+   "requests": {
+    "www.bttaxpayerportal.com": 2
+   }
   },
   "result": {
    "checked": 3,
+   "deferred": 3,
+   "rechecked_after_deferral": 3,
    "unconfirmed": 3
   },
-  "seconds": 3,
+  "seconds": 125,
   "selection": {
-   "applies": 178,
-   "due_new": 178
+   "applies": 1100,
+   "due_new": 1100
   },
   "source": null,
   "tier": null
  },
- "rows": 82955,
+ "rows": 82958,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 7134460,
+   "bytes": 7135411,
    "file": "000.json",
-   "rows": 5095,
-   "sha256": "43c8b0801d9a5e92998a56c6321d08eb02e4c78bf3ef8bb03d5d7b910239c5e5"
+   "rows": 5096,
+   "sha256": "640eaf0f3add5e21cdb4c4356d91d044cdd80aa3bad81a36bddac1b6bf007436"
   },
   {
    "bucket": 1,
@@ -124,10 +130,10 @@
   },
   {
    "bucket": 12,
-   "bytes": 7314949,
+   "bytes": 7315900,
    "file": "012.json",
-   "rows": 5236,
-   "sha256": "a32db22c31ad7166313a984602523c32ba88496c29868faf56f1467c0b867027"
+   "rows": 5237,
+   "sha256": "b1ceea5d1ac4fd3515b8d25d90142150a996f5c99b00a1c2aa6d464892a57872"
   },
   {
    "bucket": 13,
@@ -138,10 +144,10 @@
   },
   {
    "bucket": 14,
-   "bytes": 7336597,
+   "bytes": 7337542,
    "file": "014.json",
-   "rows": 5268,
-   "sha256": "c5520b4fe5892a82013ab93d60e6e3a4d63bd15616e12892aa793b2652723569"
+   "rows": 5269,
+   "sha256": "21c423fa85d21d84c6003cc9828fac71c1d8abfaa014e0615b8ceb20848d220f"
   },
   {
    "bucket": 15,
