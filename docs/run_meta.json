@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-11-21T21:34:01.702471Z",
+  "run_time": "2026-11-21T22:08:13.611291Z",
   "total": 633730,
   "by_source": {
     "national.auction_bank_reo": 3,
@@ -998,7 +998,7 @@
     }
   },
   "health_as_of": "2026-10-16T20:24:46.640274Z",
-  "health_age_hours": 865.15,
+  "health_age_hours": 865.72,
   "health_stale": true,
   "source_last_success": {
     "city_websites.charlotte_open_data": "2026-10-16T20:24:46.640274Z",
