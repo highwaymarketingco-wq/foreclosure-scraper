@@ -188,6 +188,29 @@ does not have to pay Chesterfield's own ~600-hit cost (and produce nothing but
 already-landed duplicates) every time; omitting it sweeps every enabled county, the
 only mode that existed before this round.
 
+2026-11-20 added Williamsburg, closing gap_matrix's own heir_estate "built-not-verified"
+cell for this county (est_rows_affected=183 -- that number predates this addition, from
+whatever smaller signal previously carried the raw.heir_estate shape, and undercounts the
+real yield badly). DSID=56 found the same bare-subdomain-root-GET way as Dillon/McCormick
+(`addMenuItem(...,"fetchOverlay('tgis/custom.aspx?DSID=56&...')")`). LIVE-VERIFIED tonight,
+same two tokens: ESTATE=60 raw hits, HEIR=1,069 raw hits (by far the largest single-county
+HEIR yield on this platform -- every other county's real signal came through ESTATE, not
+HEIR). A 25-point sample (all 10 ESTATE hits + 15 random HEIR hits) through the SAME
+unmodified classifiers: 14/15 HEIR hits real (93.3%, in line with Chesterfield's bar), 1/15
+a genuine no-match (owner text had no death word despite surfacing on a HEIR search --
+the index does a substring match on more than just the owner field, apparently); ESTATE was
+noisy as expected (6/10 "Real Estate ... LLC" businesses, correctly _excluded_row, 3/10 real
+decedent hits, 1/10 a life_estate -- the identical "Real Estate" business-name noise shape
+Chesterfield/Dillon/McCormick/Marion each hit on this same token). 0/25 misclassified either
+direction. Schema live-diffed against a real getftr.aspx detail page (FeatureID 709):
+Owner&nbsp;Name/Name2, Mailing&nbsp;Address1/2/City/State/ZipCode, Map&nbsp;Number -- matches
+_DEFAULT_FIELDS exactly, no override needed (confirms the module's own earlier "Chesterfield's/
+Williamsburg's ... camelCase scheme" aside above was correct). Net: HEIR alone should land on
+the order of ~950-1,000 real new estate_lead rows once this producer next runs against
+Williamsburg (1,069 raw hits x ~93% precision), the single largest addition this platform has
+produced for any one county -- not yet run; this change only registers the county, it does not
+itself execute a board-writing pass.
+
 Politeness: same as the sibling ingest script -- a small county-run legacy ASP.NET
 box, not a CDN. Low concurrency, generous timeout, bounded retries.
 """
@@ -240,6 +263,15 @@ _WTHGIS_COUNTIES: dict[str, dict] = {
             "acreage": None,
         },
     },
+    # 2026-11-20, gap_matrix built-not-verified sweep (heir_estate showed 183 est_rows for
+    # Williamsburg before this county was even registered here -- that estimate predates this
+    # addition and undercounts the real yield; see module docstring for the live numbers).
+    # DSID=56, found the same way as Dillon/McCormick (bare subdomain root GET,
+    # `addMenuItem(...,"fetchOverlay('tgis/custom.aspx?DSID=56&...')")`). Schema
+    # live-diffed against a real getftr.aspx detail page: matches _DEFAULT_FIELDS exactly
+    # (Owner&nbsp;Name/Name2, Mailing&nbsp;Address1/2/City/State/ZipCode, Map&nbsp;Number) --
+    # no override needed.
+    "Williamsburg": {"dsid": 56, "base": "https://williamsburgsc.wthgis.com/tgis/"},
     # round 32 (2026-11-18) -- see module docstring for the live-verification numbers.
     "Marlboro": {
         "dsid": 2558,
