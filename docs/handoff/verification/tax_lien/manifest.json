@@ -3,62 +3,54 @@
  "counts": {
   "confirmed": 40851,
   "refuted": 988,
-  "rows": 82952,
+  "rows": 82955,
   "stale": 23622,
-  "unconfirmed": 17491,
+  "unconfirmed": 17494,
   "wall": 0
  },
- "generated_at": "2026-11-20T18:51:14Z",
+ "generated_at": "2026-11-21T17:33:18Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-20T18:51:10Z",
-  "county": "Mecklenburg",
+  "at": "2026-11-21T17:33:15Z",
+  "county": "Johnston",
   "host": "SMB-LTSEO05",
-  "max_rows": 3000,
+  "max_rows": 3,
   "recheck_only": false,
   "requests": {
    "errors": {},
-   "requests": {
-    "taxbill.co.mecklenburg.nc.us": 638
-   }
+   "requests": {}
   },
   "result": {
-   "budget_stop": 1,
-   "checked": 319,
-   "confirmed": 20,
-   "stale": 296,
+   "checked": 3,
    "unconfirmed": 3
   },
-  "seconds": 1507,
+  "seconds": 3,
   "selection": {
-   "applies": 20904,
-   "due_new": 10874,
-   "due_retry_transient": 3,
-   "not_due_retry": 112,
-   "not_due_ttl": 9915
+   "applies": 178,
+   "due_new": 178
   },
   "source": null,
   "tier": null
  },
- "rows": 82952,
+ "rows": 82955,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 7133611,
+   "bytes": 7134460,
    "file": "000.json",
-   "rows": 5094,
-   "sha256": "b861628853d4873b3c84af07f2f74c0f093277310bc4686a10ba3e4922efbb97"
+   "rows": 5095,
+   "sha256": "43c8b0801d9a5e92998a56c6321d08eb02e4c78bf3ef8bb03d5d7b910239c5e5"
   },
   {
    "bucket": 1,
-   "bytes": 7174109,
+   "bytes": 7174942,
    "file": "001.json",
-   "rows": 5092,
-   "sha256": "0130b241773015120417714e7c9d9eacbc3a2856fe673ab8450bf36357b2b50b"
+   "rows": 5093,
+   "sha256": "781b17ea6558f8fa45d45caf27e541a0577aef0e7dc5c8b5dc296a6ccee8c783"
   },
   {
    "bucket": 2,
@@ -153,10 +145,10 @@
   },
   {
    "bucket": 15,
-   "bytes": 7424269,
+   "bytes": 7425124,
    "file": "015.json",
-   "rows": 5249,
-   "sha256": "4fd5360a6304d8a025e33bd8f455e886bba6c8eeb5add4b8c4a8d6d8c4d8b94d"
+   "rows": 5250,
+   "sha256": "a891c5f70358f5ef5eae29fe94debaebebd9fe525df4f89ffd821e1eec90cbea"
   }
  ],
  "signal": "tax_lien",
