@@ -685,10 +685,9 @@ def _parse_card(html: str, county: str) -> CardResult | None:
     #               "class code (note: not zoning info)" -> "RN-Residential" -- "record type"
     #               preferred as the plainer text; not yet known which (if either) actually
     #               reads "Vacant" on a real vacant Union parcel)
-    #   Pickens     "property type"/"account type" -> "Commercial" -- the one live sample
-    #               happened to be a commercial retail parcel (Haven of Rest Ministries), not
-    #               residential, so this confirms the label exists and extracts, NOT that a
-    #               residential Pickens card uses the same label/wording.
+    #   Pickens     "property type"/"account type" -> confirmed stable across property
+    #               classes on 5 live board parcels: "Commercial" (211 Pendleton St, a retail
+    #               store), "Residential" x3, "Mobile Home" x1 -- not a commercial-only fluke.
     # Same caveat as Clarendon/Fairfield applies to all four: extraction is proven (real text
     # comes back), but the POSITIVE vacant-detection path is UNCONFIRMED -- 0 of these 4
     # samples were vacant, so _is_vacant_land_use has never actually fired True on any of
