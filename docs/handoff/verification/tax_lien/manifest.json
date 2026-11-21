@@ -1,46 +1,42 @@
 {
  "buckets": 16,
  "counts": {
-  "confirmed": 40851,
+  "confirmed": 40856,
   "refuted": 988,
-  "rows": 82958,
+  "rows": 82963,
   "stale": 23622,
   "unconfirmed": 17497,
   "wall": 0
  },
- "generated_at": "2026-11-21T17:42:51Z",
+ "generated_at": "2026-11-21T18:11:55Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-21T17:42:48Z",
-  "county": "Yadkin",
+  "at": "2026-11-21T18:11:53Z",
+  "county": "Sampson",
   "host": "SMB-LTSEO05",
-  "max_rows": 3,
+  "max_rows": 5,
   "recheck_only": false,
   "requests": {
-   "errors": {
-    "www.bttaxpayerportal.com": 2
-   },
+   "errors": {},
    "requests": {
-    "www.bttaxpayerportal.com": 2
+    "sampsonnc.munisselfservice.com": 24
    }
   },
   "result": {
-   "checked": 3,
-   "deferred": 3,
-   "rechecked_after_deferral": 3,
-   "unconfirmed": 3
+   "checked": 5,
+   "confirmed": 5
   },
-  "seconds": 125,
+  "seconds": 51,
   "selection": {
-   "applies": 1100,
-   "due_new": 1100
+   "applies": 20,
+   "due_new": 20
   },
   "source": null,
   "tier": null
  },
- "rows": 82958,
+ "rows": 82963,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
@@ -67,10 +63,10 @@
   },
   {
    "bucket": 3,
-   "bytes": 7280867,
+   "bytes": 7282062,
    "file": "003.json",
-   "rows": 5180,
-   "sha256": "f85ad4b59737ea518e02bfb171f1c3e753cda6463657d7c7b39aa651c4238f43"
+   "rows": 5181,
+   "sha256": "9fd7ffc14416b02d110da0be4c97ba82328a2b7c0a11e7fb67883fd8d4bbc6a8"
   },
   {
    "bucket": 4,
@@ -109,10 +105,10 @@
   },
   {
    "bucket": 9,
-   "bytes": 7348363,
+   "bytes": 7349569,
    "file": "009.json",
-   "rows": 5235,
-   "sha256": "95aedc6bffe190243d63c7b6254db45947a62fc0549c32fe39b23e041c35e1f4"
+   "rows": 5236,
+   "sha256": "8e01b1b49051a8f95fd1cef3bbf806c45c746576c93851dab92e959eadc21ac5"
   },
   {
    "bucket": 10,
@@ -144,17 +140,17 @@
   },
   {
    "bucket": 14,
-   "bytes": 7337542,
+   "bytes": 7338670,
    "file": "014.json",
-   "rows": 5269,
-   "sha256": "21c423fa85d21d84c6003cc9828fac71c1d8abfaa014e0615b8ceb20848d220f"
+   "rows": 5270,
+   "sha256": "8fe208a907557db6e3e5bff320085e533f4f4b05ab4ca36336ff82f639614113"
   },
   {
    "bucket": 15,
-   "bytes": 7425124,
+   "bytes": 7427515,
    "file": "015.json",
-   "rows": 5250,
-   "sha256": "a891c5f70358f5ef5eae29fe94debaebebd9fe525df4f89ffd821e1eec90cbea"
+   "rows": 5252,
+   "sha256": "2d2135a3db3e5cd2e925248646cacdfc2864c33a43d30cbb5f1b9e8b915f3382"
   }
  ],
  "signal": "tax_lien",
