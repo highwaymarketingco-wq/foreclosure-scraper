@@ -647,6 +647,29 @@ def _parse_card(html: str, county: str) -> CardResult | None:
     res.bathrooms = _float(_pick(facts, ("number of full baths", "full bathrooms",
                                          "bathrooms", "full baths")))
     res.market_value = _parse_market_value(soup)
+    # FOUND 2026-11-21 (gap_matrix vacant_lot sourced-not-built sweep). Clarendon ONLY --
+    # this does NOT generalize across counties on this same Schneider platform, confirmed
+    # live, not assumed:
+    #   Clarendon  HAS a plain "land use" row (e.g. "NON-QUALIFIED RESIDENTIAL (NREG)") and
+    #              a plain "acres/lot" row -- live-confirmed on 21 real board parcels (1
+    #              known-working test address + 20 fresh board rows across two passes),
+    #              21/21 extracted cleanly. 0/21 happened to be vacant, so the positive
+    #              detection path (_is_vacant_land_use firing True) is UNCONFIRMED -- only
+    #              the extraction itself and the correct-negative path are proven.
+    #   Lee        does NOT carry an equivalent field at all. Dumped every fact label on a
+    #              real Lee parcel (068-04-00-053-000, the module's own documented test
+    #              case): the closest thing is "Class Code (Note: Not Zoning Info)" --
+    #              SC's 4%/6% owner-occupancy ASSESSMENT RATIO class, explicitly NOT a
+    #              land-use/property-type signal -- so there is nothing here to extract for
+    #              Lee. An earlier version of this comment claimed Lee would pick this up
+    #              "immediately" -- that was wrong, said before testing it; corrected here.
+    # Fairfield/Spartanburg/Oconee/Pickens/Union not yet checked. Each needs its own live
+    # fact-label dump (same method as above) before assuming either way -- do not extend
+    # the Clarendon label names to another county without checking.
+    lu = _pick(facts, ("land use",))
+    if lu:
+        res.land_use = lu.strip()
+    res.acres = _float(_pick(facts, ("acres/lot", "acres")))
     res.sales = _parse_sales(soup)
     return res if res.has_fill() else None
 

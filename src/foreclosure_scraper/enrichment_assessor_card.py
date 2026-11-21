@@ -52,6 +52,7 @@ import threading
 import structlog
 
 from .models import Listing, PropertyKind
+from .enrichment_vacant_landuse import _is_vacant_land_use
 
 log = structlog.get_logger()
 
@@ -240,6 +241,18 @@ def _apply(li: Listing, res, stats: dict) -> None:
         stats["filled_price"] += 1
     if li.market_value is None and res.market_value:
         li.market_value = res.market_value
+    if res.acres and li.acreage is None:
+        li.acreage = res.acres
+    # FOUND 2026-11-21 (gap_matrix vacant_lot sourced-not-built sweep, Clarendon/Lee): the
+    # qPublic card's own "Land Use" row, live-confirmed on 7 real Clarendon parcels. Same
+    # stamping convention enrichment_vacant_landuse.py already uses for parcel_cache-sourced
+    # counties (land_use filled either way, vacant_lot only when it actually reads vacant),
+    # so a row checked through either path reads identically on the board.
+    if res.land_use and not (li.land_use or "").strip():
+        clean = res.land_use.strip()
+        li.land_use = clean.title() if clean.isupper() else clean
+        if _is_vacant_land_use(clean) and not li.raw.get("vacant_lot"):
+            li.raw["vacant_lot"] = {"land_use": clean[:60], "source": "qpublic_card"}
     li.raw["assessor_card"] = prov
 
 
