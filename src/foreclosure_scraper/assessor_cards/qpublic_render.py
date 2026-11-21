@@ -663,9 +663,22 @@ def _parse_card(html: str, county: str) -> CardResult | None:
     #              land-use/property-type signal -- so there is nothing here to extract for
     #              Lee. An earlier version of this comment claimed Lee would pick this up
     #              "immediately" -- that was wrong, said before testing it; corrected here.
-    # Fairfield/Spartanburg/Oconee/Pickens/Union not yet checked. Each needs its own live
-    # fact-label dump (same method as above) before assuming either way -- do not extend
-    # the Clarendon label names to another county without checking.
+    #   Fairfield  carries a plain "land use" row too, BUT as an opaque SC DOR-style code
+    #              ("4LQ (4LQ)", "GX (GX)"), not descriptive text -- _is_vacant_land_use's
+    #              word-boundary text match (VACANT/VAC/...) will never fire on these, so
+    #              extraction works (res.land_use gets filled) but vacant DETECTION silently
+    #              does not, even on a parcel that plainly reads as vacant/ag land from its
+    #              OTHER fields: live-dumped "Off Chester Rd" (53.000 acres, land use "4LQ")
+    #              has NO building_type/year_built/finished_area rows at all, vs. a real
+    #              improved parcel ("410 Davis Cir") which has all four -- the same "no
+    #              structure on the card" signal enrichment_vacant_landuse.py's improvement-
+    #              value fallback already uses, just not read from this card yet. Treat
+    #              Fairfield's text match as a confirmed miss, not a confirmed non-vacant --
+    #              a real fix here needs either a Fairfield/SC-DOR code table or reading the
+    #              building-detail absence, neither built.
+    # Spartanburg/Oconee/Pickens/Union not yet checked. Each needs its own live fact-label
+    # dump (same method as above) before assuming either way -- do not extend the Clarendon
+    # label names to another county without checking.
     lu = _pick(facts, ("land use",))
     if lu:
         res.land_use = lu.strip()
