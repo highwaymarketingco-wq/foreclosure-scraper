@@ -8,31 +8,29 @@
   "unconfirmed": 17497,
   "wall": 0
  },
- "generated_at": "2026-11-21T18:17:17Z",
+ "generated_at": "2026-11-21T19:02:52Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-21T18:17:15Z",
-  "county": "Sampson",
+  "at": "2026-11-21T19:02:49Z",
+  "county": "Person",
   "host": "SMB-LTSEO05",
-  "max_rows": 25,
+  "max_rows": 5,
   "recheck_only": false,
   "requests": {
    "errors": {},
-   "requests": {
-    "sampsonnc.munisselfservice.com": 103
-   }
+   "requests": {}
   },
   "result": {
-   "checked": 15,
-   "confirmed": 15
+   "checked": 5,
+   "unconfirmed": 5
   },
-  "seconds": 210,
+  "seconds": 4,
   "selection": {
-   "applies": 20,
-   "due_new": 15,
-   "not_due_ttl": 5
+   "applies": 853,
+   "due_new": 532,
+   "due_retry": 321
   },
   "source": null,
   "tier": null
@@ -50,10 +48,10 @@
   },
   {
    "bucket": 1,
-   "bytes": 7178531,
+   "bytes": 7178648,
    "file": "001.json",
    "rows": 5096,
-   "sha256": "ad148de8be687e56bf1b6adccb5af5c99dbb21b4431776f13f281eda995f4dde"
+   "sha256": "a5702926525b9cc1bb4ffcb3b815408c6d37271bba2ec74d37dcc19932b95187"
   },
   {
    "bucket": 2,
@@ -64,10 +62,10 @@
   },
   {
    "bucket": 3,
-   "bytes": 7285576,
+   "bytes": 7285693,
    "file": "003.json",
    "rows": 5184,
-   "sha256": "8cfa2a551ccfb09d35e0ddb926311013bd1234f8986ddb226afdb6a3e98248d7"
+   "sha256": "61f63b0f2534af02d686e7504c2c3a34f5eebe67e503708c4e77403ea2d69817"
   },
   {
    "bucket": 4,
@@ -99,10 +97,10 @@
   },
   {
    "bucket": 8,
-   "bytes": 7458071,
+   "bytes": 7458188,
    "file": "008.json",
    "rows": 5303,
-   "sha256": "10830bdc35520e37118432ffde64c974c226fb9e5072e12e39caadc0f0c5fe50"
+   "sha256": "986058876da7043e767bd6b628b8d689ed48eeb204d48162659f3fe549b3a86c"
   },
   {
    "bucket": 9,
@@ -120,10 +118,10 @@
   },
   {
    "bucket": 11,
-   "bytes": 7172767,
+   "bytes": 7172884,
    "file": "011.json",
    "rows": 5127,
-   "sha256": "75da44cd249702441b69774b6a97a34847088e4ca069aba597a8167f2742c4d4"
+   "sha256": "f0774696ff28b1e644ec55ef6a47458be3f744ea28649e1c9a74845569ec9da6"
   },
   {
    "bucket": 12,
@@ -134,10 +132,10 @@
   },
   {
    "bucket": 13,
-   "bytes": 7355794,
+   "bytes": 7355911,
    "file": "013.json",
    "rows": 5240,
-   "sha256": "5d63fcd9c490c5abf3a1498139e0e72ced26959d165f6d1aa880a45ec664e2d8"
+   "sha256": "e64ec6531cf56597ae4ee6b44362149754333dfa5c259d2657200ca42b7e00ee"
   },
   {
    "bucket": 14,
