@@ -629,8 +629,8 @@
         "start": 126500,
         "end": 138000,
         "records": 11500,
-        "bytes": 9633116,
-        "sha256": "2dfed3196c709677af2cd92cb100fe153b6880b9952d725c36c694dff3cd62fd"
+        "bytes": 9633040,
+        "sha256": "5909ef274e3eba10c46fc14b986ab93884953cf7ae0f3d432991744781830c31"
       },
       {
         "name": "listings_part_012.json.gz",
