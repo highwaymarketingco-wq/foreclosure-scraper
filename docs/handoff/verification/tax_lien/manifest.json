@@ -8,39 +8,31 @@
   "unconfirmed": 20568,
   "wall": 0
  },
- "generated_at": "2026-11-22T12:55:12Z",
+ "generated_at": "2026-11-22T13:44:23Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-22T12:55:10Z",
-  "county": "Lee",
+  "at": "2026-11-22T13:44:20Z",
+  "county": "Wake",
   "host": "SMB-LTSEO05",
   "max_rows": 2000,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "leecountync.munisselfservice.com": 398,
-    "leetreasurer.qpaybill.com": 357
+    "services.wake.gov": 1
    }
   },
   "result": {
-   "budget_stop": 1,
-   "checked": 424,
-   "confirmed": 147,
-   "stale": 226,
-   "unconfirmed": 51
+   "checked": 1,
+   "unconfirmed": 1
   },
-  "seconds": 1209,
+  "seconds": 4,
   "selection": {
-   "applies": 3197,
-   "due_new": 1369,
-   "due_retry": 50,
+   "applies": 8,
    "due_ttl": 1,
-   "due_version": 2,
-   "not_due_retry": 32,
-   "not_due_ttl": 1743
+   "not_due_ttl": 7
   },
   "source": null,
   "tier": null
@@ -149,10 +141,10 @@
   },
   {
    "bucket": 14,
-   "bytes": 7785670,
+   "bytes": 7785783,
    "file": "014.json",
    "rows": 5641,
-   "sha256": "4d26faa40089f5260734c4d7546e44616ee050eb8232c666e8442255ed5a51b1"
+   "sha256": "27b9f8872b8daed69818e99315d721235c8a99d9a9bcb70e239da7e2e8734063"
   },
   {
    "bucket": 15,
