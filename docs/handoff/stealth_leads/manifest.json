@@ -1,6 +1,6 @@
 {
  "format": "stealth_leads/2",
- "generated_at": "2026-11-21T13:35:10.540339+00:00",
+ "generated_at": "2026-11-22T13:49:49.989583+00:00",
  "host": "SMB-LTSEO05",
  "sources_run": 49,
  "by_source": [
@@ -36,7 +36,7 @@
   },
   {
    "slug": "counties_nc.nc_ecourts_divorce",
-   "count": 2327,
+   "count": 2348,
    "outcome": "OK"
   },
   {
@@ -46,7 +46,7 @@
   },
   {
    "slug": "counties_nc.nc_ecourts_lis_pendens",
-   "count": 15038,
+   "count": 14993,
    "outcome": "OK"
   },
   {
@@ -66,8 +66,8 @@
   },
   {
    "slug": "counties_nc.union_delinquent_tax",
-   "count": 0,
-   "outcome": "ZERO_RESULT"
+   "count": 325,
+   "outcome": "OK"
   },
   {
    "slug": "counties_sc.chester_delinquent_tax",
@@ -101,17 +101,17 @@
   },
   {
    "slug": "counties_sc.sc_public_index",
-   "count": 860,
+   "count": 892,
    "outcome": "PARTIAL"
   },
   {
    "slug": "counties_sc.sc_public_index_lis_pendens",
-   "count": 227,
+   "count": 216,
    "outcome": "PARTIAL"
   },
   {
    "slug": "counties_sc.sc_public_notices",
-   "count": 3410,
+   "count": 3419,
    "outcome": "OK"
   },
   {
@@ -121,7 +121,7 @@
   },
   {
    "slug": "counties_sc.sc_rod_walled",
-   "count": 310,
+   "count": 386,
    "outcome": "OK"
   },
   {
@@ -161,7 +161,7 @@
   },
   {
    "slug": "national.auction_dot_com",
-   "count": 100,
+   "count": 102,
    "outcome": "OK"
   },
   {
@@ -171,7 +171,7 @@
   },
   {
    "slug": "national.estate_sales",
-   "count": 38,
+   "count": 42,
    "outcome": "OK"
   },
   {
@@ -211,7 +211,7 @@
   },
   {
    "slug": "national.sc_public_index",
-   "count": 77,
+   "count": 74,
    "outcome": "OK"
   },
   {
@@ -221,7 +221,7 @@
   },
   {
    "slug": "national.xome",
-   "count": 40,
+   "count": 41,
    "outcome": "OK"
   },
   {
@@ -231,27 +231,27 @@
   },
   {
    "slug": "national.zillow_foreclosures",
-   "count": 580,
+   "count": 581,
    "outcome": "OK"
   },
   {
    "slug": "newspapers.coastland_times",
-   "count": 2,
+   "count": 3,
    "outcome": "OK"
   },
   {
    "slug": "public_notices.nc_notices_counties",
-   "count": 607,
+   "count": 597,
    "outcome": "OK"
   },
   {
    "slug": "public_notices.ncnotices",
-   "count": 94,
+   "count": 106,
    "outcome": "OK"
   }
  ],
- "lead_count": 27594,
- "shard_count": 33,
+ "lead_count": 28009,
+ "shard_count": 34,
  "shard_max_bytes": 20971520,
  "shards": [
   {
@@ -259,231 +259,238 @@
    "slug": "counties_nc.nc_civicplus_tax_sale",
    "count": 38,
    "bytes": 44182,
-   "sha256": "318c22be119d740c5ab1270dfb176831366c5d08e59a521cf2c86004eb6a6f70"
+   "sha256": "c9452159964dbd9f64ff22612291cec5f3411f61fd49f4bdc4f2f771ecb7211b"
   },
   {
    "file": "counties_nc.nc_county_tax_foreclosure.000.jsonl",
    "slug": "counties_nc.nc_county_tax_foreclosure",
    "count": 88,
    "bytes": 135082,
-   "sha256": "7ea3f9b7a7c4c6888f933567afb99d0b761ef24f71522d16f9dd8c5d7d658ef9"
+   "sha256": "5c183881df065c3cd08eca00f295b143dfde307b31e30d9311990ea72cfda6c5"
   },
   {
    "file": "counties_nc.nc_ecourts_divorce.000.jsonl",
    "slug": "counties_nc.nc_ecourts_divorce",
-   "count": 2327,
-   "bytes": 3545541,
-   "sha256": "0c4297b53b6f22700c44b8088eea591ba418952b9d1810ba4d18c05f612cf3da"
+   "count": 2348,
+   "bytes": 3577497,
+   "sha256": "f8464067549414662fbc79410625941c72ae560c844cd91487893772f1b22e2f"
   },
   {
    "file": "counties_nc.nc_ecourts_lis_pendens.000.jsonl",
    "slug": "counties_nc.nc_ecourts_lis_pendens",
-   "count": 13485,
-   "bytes": 20970411,
-   "sha256": "ffc65a54334ecd77bf62765177ada942e3a11e4e2450043f78cb14afebe88054"
+   "count": 13489,
+   "bytes": 20971051,
+   "sha256": "750d145814c59b4e254605234382ec1df4f618802d48790faaec75c3ee140314"
   },
   {
    "file": "counties_nc.nc_ecourts_lis_pendens.001.jsonl",
    "slug": "counties_nc.nc_ecourts_lis_pendens",
-   "count": 1553,
-   "bytes": 2425471,
-   "sha256": "40f2071c3ad5d2c0ca9e7aa034e524c6576b9a6a3c7bc220de931f80091d6ae8"
+   "count": 1504,
+   "bytes": 2343212,
+   "sha256": "01c2bff47ae7cef51f4fa89519233508a6a1382ccb98085438b3bb835b2fcd06"
   },
   {
    "file": "counties_nc.polk_tax.000.jsonl",
    "slug": "counties_nc.polk_tax",
    "count": 1,
    "bytes": 1121,
-   "sha256": "260b4042b9182b42ed2d455bf4e42ae6bfd549b567e20278fe013d629a15e069"
+   "sha256": "bc42b1df38c0ee90240e303d33ccde5339866bcd16ce0427eceef5753d74e980"
   },
   {
    "file": "counties_nc.rutherford_wildfire_tax.000.jsonl",
    "slug": "counties_nc.rutherford_wildfire_tax",
    "count": 1476,
    "bytes": 3977107,
-   "sha256": "fd83f77a0d3aa0fa7dc5103536de77e72afad6fe8a6ad19c1790f6ccff43c43f"
+   "sha256": "2150bc1052e0b728042710b624ca377808cad84bb28f0642b56ac6c5991663b1"
+  },
+  {
+   "file": "counties_nc.union_delinquent_tax.000.jsonl",
+   "slug": "counties_nc.union_delinquent_tax",
+   "count": 325,
+   "bytes": 570115,
+   "sha256": "70a9f4dda3ab52b4309c949f7d58d7d6b2f5f21ca3f2616767e3aa0443b76925"
   },
   {
    "file": "counties_sc.pickens_master_in_equity.000.jsonl",
    "slug": "counties_sc.pickens_master_in_equity",
    "count": 30,
    "bytes": 39850,
-   "sha256": "993b0b42add4e3a6d6d077d1fcc1bca6db88f744f4ef188ac7d1165ce2f3ef23"
+   "sha256": "ea1937505adab6c1b7121901b9c98cebdbf15ef10e0337435fba41a4eeed86cf"
   },
   {
    "file": "counties_sc.sc_coastal_rosters.000.jsonl",
    "slug": "counties_sc.sc_coastal_rosters",
    "count": 68,
    "bytes": 114888,
-   "sha256": "de3b9a622870461ae9a234a52be6e35b0aeb39b78bb49321add4df94dedd0024"
+   "sha256": "4f730fcfd807ee5fe8082a094f554cad57cf0e6324b335d0c699f8bb6279709e"
   },
   {
    "file": "counties_sc.sc_county_rosters.000.jsonl",
    "slug": "counties_sc.sc_county_rosters",
    "count": 10,
    "bytes": 14326,
-   "sha256": "857224269e2ea7265e6fa562c29e33436d9c7509953a9145648699052b5d5059"
+   "sha256": "e8709873519308b1d3f780d5db047f2c0fa43f850c834e14ff984ebb5165562d"
   },
   {
    "file": "counties_sc.sc_des_brownfields.000.jsonl",
    "slug": "counties_sc.sc_des_brownfields",
    "count": 69,
    "bytes": 170890,
-   "sha256": "51e5fdbcc544609cf61b4052b3c5d1ae2934ba0ce9a216796a3fdd91b7cf85db"
+   "sha256": "175f15209db5c036670e9c548f2d0097b48f61d8abb991272604af06fa757102"
   },
   {
    "file": "counties_sc.sc_public_index.000.jsonl",
    "slug": "counties_sc.sc_public_index",
-   "count": 860,
-   "bytes": 1458195,
-   "sha256": "f037a78686ea84cac91de5c9c0f09015f02d10466798836f9d0c4fd123f4c62d"
+   "count": 892,
+   "bytes": 1514726,
+   "sha256": "a49357651f5d04c8fcdc4e4f47e1286f29301ea3ef3aca98011a356b8514aa43"
   },
   {
    "file": "counties_sc.sc_public_index_lis_pendens.000.jsonl",
    "slug": "counties_sc.sc_public_index_lis_pendens",
-   "count": 227,
-   "bytes": 331129,
-   "sha256": "e443186d09b72e9702fdcfa95ba53a9098d973b2316de17ad5fe0727a36cebf9"
+   "count": 216,
+   "bytes": 315425,
+   "sha256": "2061c830eb663ad513efd2a0b0c854f55af8dd948377c9c736690e327c07f8f0"
   },
   {
    "file": "counties_sc.sc_public_notices.000.jsonl",
    "slug": "counties_sc.sc_public_notices",
-   "count": 3410,
-   "bytes": 6297632,
-   "sha256": "6d0aa7d4cd48d60f72a7809c22369611aec37236cd07b2d5d4733d983b9323dd"
+   "count": 3419,
+   "bytes": 6313829,
+   "sha256": "429d54f1a1b5795fd26ae4ac232b0f75cdfc6901234eef60648c178c45d933b0"
   },
   {
    "file": "counties_sc.sc_rod_walled.000.jsonl",
    "slug": "counties_sc.sc_rod_walled",
-   "count": 310,
-   "bytes": 574246,
-   "sha256": "f3bc385f50b67c66366247036deb192c9bab8f63d97b21fa8456a9db15df3492"
+   "count": 386,
+   "bytes": 737464,
+   "sha256": "f1cf655f25e153ae23baa013f02fda843918be8d1f589aaa036edaadf96ff9ad"
   },
   {
    "file": "counties_sc.sc_state_tax_lien.000.jsonl",
    "slug": "counties_sc.sc_state_tax_lien",
    "count": 345,
    "bytes": 389499,
-   "sha256": "47faebae79d638b0669cb4b30e21d171aa28473b15b84e37800d5b9a8dc317e4"
+   "sha256": "bc6bf522550072634eda9e466f5effc390ef3736e9740048325090d10ec6c9f8"
   },
   {
    "file": "law_firms.brock_scott.000.jsonl",
    "slug": "law_firms.brock_scott",
    "count": 71,
-   "bytes": 94740,
-   "sha256": "7520355a7362ec9db6bcbda34c02d0de86a693c2f8e450c7ed201f78638aec18"
+   "bytes": 94733,
+   "sha256": "4a54e0ef58f09bef545bcdafa1bec8f0f7943bb8e61acd4ca47453c7d75470e5"
   },
   {
    "file": "law_firms.hutchens.000.jsonl",
    "slug": "law_firms.hutchens",
    "count": 75,
    "bytes": 97253,
-   "sha256": "1b9da187b777e3cfa201742c65f688f98838fd5cb36a5e0304c2f1f8c1c249fa"
+   "sha256": "4ccb272716034f7a63b9dfe0807b160b32d3b4fb263e03256b54ae9b38bf72da"
   },
   {
    "file": "law_firms.mcmichael_taylor_gray.000.jsonl",
    "slug": "law_firms.mcmichael_taylor_gray",
    "count": 85,
    "bytes": 102959,
-   "sha256": "c8f56a5a41b973bed937479b36f20fca832401587ca23f96076e595e3d2527eb"
+   "sha256": "1fb62f0f2106948ef07d05683ecd647ceac60aa741f03a0a842d2f62364a052b"
   },
   {
    "file": "law_firms.zacchaeus.000.jsonl",
    "slug": "law_firms.zacchaeus",
    "count": 115,
    "bytes": 185099,
-   "sha256": "cb0f0cca5aab9fb571d2969526b2e71be779ed9435c246b6054178079be4578b"
+   "sha256": "bbe3a5337e0d8f51eb8912e7e967c4645837146e17ba066bece2b0c4234a8a2d"
   },
   {
    "file": "national.auction_dot_com.000.jsonl",
    "slug": "national.auction_dot_com",
-   "count": 100,
-   "bytes": 130061,
-   "sha256": "9ddf3b348270ed3af8b3e5d4b16ed2f6162c15f37fb6fdce12f020c8e90aeabc"
+   "count": 102,
+   "bytes": 132574,
+   "sha256": "4fe5e645d2cc48da0c20afe54860ba8dceee4ed181f36258fef2beaff850f40f"
   },
   {
    "file": "national.estate_sales.000.jsonl",
    "slug": "national.estate_sales",
-   "count": 38,
-   "bytes": 80389,
-   "sha256": "9200b10940685fc6c4605c44dc47e004d0a9b7a781307e60053b15e34f7871c2"
+   "count": 42,
+   "bytes": 88003,
+   "sha256": "6acca2fcec369ace60e71587712b2ba2b73cfb7f366dce9b87911fb07ea48fc6"
   },
   {
    "file": "national.first_citizens_reo.000.jsonl",
    "slug": "national.first_citizens_reo",
    "count": 13,
    "bytes": 15231,
-   "sha256": "dedd7520dd0e9055fa1773bd5301abf71d5504d3d73fd8c87baedceaacf0fdae"
+   "sha256": "724df3798784d9ab7a07eddb44732d53d20455578472deed055bf7d25b2ac1cf"
   },
   {
    "file": "national.landandfarm.000.jsonl",
    "slug": "national.landandfarm",
    "count": 650,
-   "bytes": 1569562,
-   "sha256": "1f63e340f4687f7c4e56e441515b3853c817769211fe86dac2a15502947fca22"
+   "bytes": 1570781,
+   "sha256": "43043b6e8e455e8253ad158f9bdf0c382d9553a6c95b7c29625445fe77f2fbfb"
   },
   {
    "file": "national.landwatch.000.jsonl",
    "slug": "national.landwatch",
    "count": 650,
-   "bytes": 1599965,
-   "sha256": "914e31b9fe9cf60b0f1f44db759ab1ca02474bb16d4c3a92efc80ced0caf6c75"
+   "bytes": 1591097,
+   "sha256": "c33deb4d0b241c15f19bf1a77ba6f70060c62957e9f23e2f4c12c2f2322cb71c"
   },
   {
    "file": "national.sc_public_index.000.jsonl",
    "slug": "national.sc_public_index",
-   "count": 77,
-   "bytes": 102671,
-   "sha256": "3b3615e33cbd404f3d4f016d9620aff407148590eec49c268384cad7696e62bc"
+   "count": 74,
+   "bytes": 98644,
+   "sha256": "4097dc285900138d94df420a3d8afcd77de92aee473accd65a81a800f46e87e7"
   },
   {
    "file": "national.trulia.000.jsonl",
    "slug": "national.trulia",
    "count": 18,
    "bytes": 64629,
-   "sha256": "173a8a42f1f52a47821ad1ffd1ca621837e0ab5162ab098b1d2e11ac1928cb9a"
+   "sha256": "547b0233c5c0ede5381c1d8e9e0a5edc371326a0a029ebf76740c710eb42ba8c"
   },
   {
    "file": "national.xome.000.jsonl",
    "slug": "national.xome",
-   "count": 40,
-   "bytes": 95962,
-   "sha256": "54a7d7aa2796a2c1e13e5bc2952689eee5a25353d68d333a4350a3ec29c19d1e"
+   "count": 41,
+   "bytes": 97146,
+   "sha256": "99776eee10dd8e84d2d24e62957167e27e04d3f099d044ee24ec2163f8e096f1"
   },
   {
    "file": "national.zillow_bulk.000.jsonl",
    "slug": "national.zillow_bulk",
    "count": 82,
-   "bytes": 348128,
-   "sha256": "c9d9d54691ecafe4f9bfe6229ee4e701a9f2fc5e920153f5ea72a553eeb4b9f3"
+   "bytes": 328360,
+   "sha256": "2ba492a347b3efa8370ee25c3067c795ff82e1c962ff6ba6607f01a38dc0a735"
   },
   {
    "file": "national.zillow_foreclosures.000.jsonl",
    "slug": "national.zillow_foreclosures",
-   "count": 580,
-   "bytes": 1970694,
-   "sha256": "caf3ae977920bd23ffb1807acd6760a5d7315b685520650b4c1f08b67d281f6b"
+   "count": 581,
+   "bytes": 1988298,
+   "sha256": "e7650e587d61a226c9fce0091bab2f397f95c6d0599e84ab610f98785bc4841b"
   },
   {
    "file": "newspapers.coastland_times.000.jsonl",
    "slug": "newspapers.coastland_times",
-   "count": 2,
-   "bytes": 10648,
-   "sha256": "a98991033926bc1e1e3ff64ac68f7255291ec8c13dbc3e198ad1c39d26c37740"
+   "count": 3,
+   "bytes": 13502,
+   "sha256": "0ef6c797bb58971708a600aef44c16016eb31f7dac93cae2ecf850a120d07655"
   },
   {
    "file": "public_notices.nc_notices_counties.000.jsonl",
    "slug": "public_notices.nc_notices_counties",
-   "count": 607,
-   "bytes": 1181261,
-   "sha256": "ed7ff0011448a270baf3ab3893fce4ebdad15937cf6d6a32b69ab6f9a2356b71"
+   "count": 597,
+   "bytes": 1162626,
+   "sha256": "9fa16c93065fb0164cd62a3041859023294acc9300f0e3e7f050d70abb1da7d1"
   },
   {
    "file": "public_notices.ncnotices.000.jsonl",
    "slug": "public_notices.ncnotices",
-   "count": 94,
-   "bytes": 174186,
-   "sha256": "80dafc1687a25022e20fe4623149557122911f876dbabab5d51b83c3f5b992d4"
+   "count": 106,
+   "bytes": 194906,
+   "sha256": "cd2ffdb84573c6c8db219d209aa7fc19893d175188d66d1a7d3008aa1487eebe"
   }
  ]
 }
