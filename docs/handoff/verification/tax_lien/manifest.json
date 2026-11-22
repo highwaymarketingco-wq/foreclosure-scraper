@@ -1,56 +1,52 @@
 {
  "buckets": 16,
  "counts": {
-  "confirmed": 42910,
+  "confirmed": 42920,
   "refuted": 1005,
-  "rows": 88996,
+  "rows": 89006,
   "stale": 24514,
   "unconfirmed": 20567,
   "wall": 0
  },
- "generated_at": "2026-11-22T12:02:38Z",
+ "generated_at": "2026-11-22T12:16:20Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-22T12:02:36Z",
-  "county": "Anson",
+  "at": "2026-11-22T12:16:18Z",
+  "county": "York",
   "host": "SMB-LTSEO05",
   "max_rows": 2000,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "www.bttaxpayerportal.com": 570
+    "services1.arcgis.com": 3
    }
   },
   "result": {
-   "budget_stop": 1,
-   "checked": 258,
-   "confirmed": 151,
-   "stale": 8,
-   "unconfirmed": 99
+   "checked": 10,
+   "confirmed": 10
   },
-  "seconds": 1204,
+  "seconds": 13,
   "selection": {
-   "applies": 1926,
-   "due_new": 1813,
-   "due_retry": 29,
-   "not_due_ttl": 84
+   "applies": 853,
+   "due_new": 10,
+   "not_due_ttl": 843
   },
   "source": null,
   "tier": null
  },
- "rows": 88996,
+ "rows": 89006,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 7592366,
+   "bytes": 7593437,
    "file": "000.json",
-   "rows": 5489,
-   "sha256": "44db4a8e8f54fe240eaf603d156c64bce4c986f4e464f91e58d30b26f2e552bb"
+   "rows": 5490,
+   "sha256": "63fcb8fac052bda742dffb05316c00366d2dec8430017f5b4ef26c31f305d9ff"
   },
   {
    "bucket": 1,
@@ -68,10 +64,10 @@
   },
   {
    "bucket": 3,
-   "bytes": 7693427,
+   "bytes": 7695481,
    "file": "003.json",
-   "rows": 5532,
-   "sha256": "03a19d211fccea857fda926d3bcb3e73faa76ae7061a1ef03672f264f70956ce"
+   "rows": 5534,
+   "sha256": "c6c22cfcacd39a4c75e340818854bd8ec2ceeaf588ec128494a599520156b231"
   },
   {
    "bucket": 4,
@@ -96,24 +92,24 @@
   },
   {
    "bucket": 7,
-   "bytes": 7666975,
+   "bytes": 7669029,
    "file": "007.json",
-   "rows": 5521,
-   "sha256": "c08f0de1393dec40a6652a5f79fb4de0c049e8a3bd48d71a8586b00c30fbad2f"
+   "rows": 5523,
+   "sha256": "52ae1a0e373d200ce7152975167aff0e4a699f7be0299206cd07b46ff15434e9"
   },
   {
    "bucket": 8,
-   "bytes": 7926362,
+   "bytes": 7927429,
    "file": "008.json",
-   "rows": 5697,
-   "sha256": "d80a50773152f4f1138d18f9678ce36bd3dd1ee449a9de0ecc21e8dc1ec0fd7e"
+   "rows": 5698,
+   "sha256": "deb1cba6a3c0d72fff5ff031b1bb7edb1041c9b20ca61da8b6c1c39bdce4059e"
   },
   {
    "bucket": 9,
-   "bytes": 7778180,
+   "bytes": 7779206,
    "file": "009.json",
-   "rows": 5606,
-   "sha256": "98431d2016167d1fa801c1872e2024b4740de8bc2304615d4c94378cd44ef313"
+   "rows": 5607,
+   "sha256": "c85e3a9e12e03d523bb0b2dd2b54e03a0102dc6a4f369e0aa608720e0d2d988a"
   },
   {
    "bucket": 10,
@@ -131,10 +127,10 @@
   },
   {
    "bucket": 12,
-   "bytes": 7746777,
+   "bytes": 7748829,
    "file": "012.json",
-   "rows": 5608,
-   "sha256": "19eea15247c5f6cf95e8c25efc89e4cf186f6964c464af6827210f97f0ceabb3"
+   "rows": 5610,
+   "sha256": "6c4925952f44ebf8a4e038f927a4d8e97584e19ee98d4a57932f708c02fd17f8"
   },
   {
    "bucket": 13,
@@ -145,10 +141,10 @@
   },
   {
    "bucket": 14,
-   "bytes": 7754617,
+   "bytes": 7755680,
    "file": "014.json",
-   "rows": 5622,
-   "sha256": "f082c247b1db4a40d1bcce665aadbee4fa2c923c66f192e5589369d15a4bb400"
+   "rows": 5623,
+   "sha256": "d39ffb7a17b3d7ed3808756da5715cd7b7f59fb4b2aac140dd2a322816fa9d2d"
   },
   {
    "bucket": 15,
