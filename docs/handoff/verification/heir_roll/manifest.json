@@ -3,60 +3,60 @@
  "counts": {
   "confirmed": 13918,
   "refuted": 11,
-  "rows": 14078,
+  "rows": 14090,
   "stale": 31,
-  "unconfirmed": 118,
+  "unconfirmed": 130,
   "wall": 0
  },
- "generated_at": "2026-11-21T22:20:32Z",
+ "generated_at": "2026-11-22T00:30:46Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-21T22:20:31Z",
-  "county": "Aiken",
+  "at": "2026-11-22T00:30:46Z",
+  "county": "Dorchester",
   "host": "SMB-LTSEO05",
   "max_rows": 2000,
   "recheck_only": false,
   "requests": {
-   "errors": {},
+   "errors": {
+    "gisportal.dorchestercounty.net": 24
+   },
    "requests": {
-    "gis.cityofaikensc.gov": 596
+    "gisportal.dorchestercounty.net": 25
    }
   },
   "result": {
    "budget_stop": 1,
-   "checked": 198,
-   "confirmed": 197,
-   "unconfirmed": 1
+   "checked": 12,
+   "deferred": 12,
+   "unconfirmed": 12
   },
-  "seconds": 1206,
+  "seconds": 1291,
   "selection": {
-   "applies": 838,
-   "due_new": 692,
-   "not_due_retry": 1,
-   "not_due_ttl": 145
+   "applies": 775,
+   "due_new": 775
   },
   "source": null,
   "tier": null
  },
- "rows": 14078,
+ "rows": 14090,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 6753459,
+   "bytes": 6759577,
    "file": "000.json",
-   "rows": 7096,
-   "sha256": "37faca7a2bc2d24e68c3ccd7faed007589a5ca8a44a5f688a4a58eb61de45ae6"
+   "rows": 7103,
+   "sha256": "20dc96be323a8ab8d69f1bf71e080cbcf8e8ac9a594f44177b943cd6e59706db"
   },
   {
    "bucket": 1,
-   "bytes": 6653350,
+   "bytes": 6657622,
    "file": "001.json",
-   "rows": 6982,
-   "sha256": "fd172dc3f937b5b1750d67f9bcf6cf3503f8cd9fed62aaa9cef6b8b23524a931"
+   "rows": 6987,
+   "sha256": "3a6dc21b70e488152e9039bd7770029e9606880c8c17f22c21265d055bf8846d"
   }
  ],
  "signal": "heir_roll",
