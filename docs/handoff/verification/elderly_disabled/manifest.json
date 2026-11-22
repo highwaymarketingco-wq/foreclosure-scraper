@@ -1,53 +1,55 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 5030,
+  "confirmed": 5630,
   "refuted": 97,
-  "rows": 5215,
+  "rows": 5816,
   "stale": 55,
-  "unconfirmed": 33,
+  "unconfirmed": 34,
   "wall": 0
  },
- "generated_at": "2026-11-21T21:29:09Z",
+ "generated_at": "2026-11-22T00:00:11Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-21T21:29:09Z",
-  "county": "Lexington",
+  "at": "2026-11-22T00:00:11Z",
+  "county": "York",
   "host": "SMB-LTSEO05",
   "max_rows": 2000,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "maps.lex-co.com": 599
+    "services1.arcgis.com": 601
    }
   },
   "result": {
    "budget_stop": 1,
-   "checked": 599,
-   "confirmed": 599
+   "checked": 601,
+   "confirmed": 600,
+   "unconfirmed": 1
   },
-  "seconds": 1201,
+  "seconds": 1202,
   "selection": {
-   "applies": 28099,
-   "due_new": 26979,
-   "not_due_ttl": 1120
+   "applies": 78965,
+   "due_new": 77403,
+   "not_due_retry": 1,
+   "not_due_ttl": 1561
   },
   "source": null,
   "tier": null
  },
- "rows": 5215,
+ "rows": 5816,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4887246,
+   "bytes": 5403378,
    "file": "000.json",
-   "rows": 5215,
-   "sha256": "638bfa27ba8f98b18c0abedcbaa2078c36ac931b092ef33a853105282adeb736"
+   "rows": 5816,
+   "sha256": "b90ac2bfd3ca12ad32bd82cb9ca5d8ec7cf9784a53936e62f87c65aa020a920c"
   }
  ],
  "signal": "elderly_disabled",
