@@ -1,61 +1,60 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 13721,
+  "confirmed": 14108,
   "refuted": 11,
-  "rows": 13880,
-  "stale": 31,
-  "unconfirmed": 117,
+  "rows": 14294,
+  "stale": 32,
+  "unconfirmed": 143,
   "wall": 0
  },
- "generated_at": "2026-11-20T13:59:02Z",
+ "generated_at": "2026-11-22T15:58:00Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-20T13:59:01Z",
-  "county": "Aiken",
+  "at": "2026-11-22T15:58:00Z",
+  "county": "Greenville",
   "host": "SMB-LTSEO05",
-  "max_rows": 1000,
+  "max_rows": 2000,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "gis.cityofaikensc.gov": 221
+    "www.gcgis.org": 193
    }
   },
   "result": {
-   "budget_stop": 1,
-   "checked": 73,
-   "confirmed": 73
+   "checked": 192,
+   "confirmed": 190,
+   "stale": 1,
+   "unconfirmed": 1
   },
-  "seconds": 441,
+  "seconds": 385,
   "selection": {
-   "applies": 838,
-   "due_new": 765,
-   "not_due_retry": 1,
-   "not_due_ttl": 72
+   "applies": 192,
+   "due_new": 192
   },
   "source": null,
   "tier": null
  },
- "rows": 13880,
+ "rows": 14294,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 6665843,
+   "bytes": 6858551,
    "file": "000.json",
-   "rows": 7003,
-   "sha256": "b23e367f0c7a61e0494ef665a8d0dfea872be65e0ae89cb1727b5d53bfc056aa"
+   "rows": 7206,
+   "sha256": "273193ca2eb40014d8e246a3e5ed04a156ac6d53099ac7a09e95bb8413b7c3c6"
   },
   {
    "bucket": 1,
-   "bytes": 6554638,
+   "bytes": 6754993,
    "file": "001.json",
-   "rows": 6877,
-   "sha256": "d3495a735a1dd9ab20e22206fc8612ac8756fa82bb95cc242f550212c8638690"
+   "rows": 7088,
+   "sha256": "e2fc741bf0ee340b3d475f9d9ecb715a41e378d04f36d2f306d49d26f7fe0c3d"
   }
  ],
  "signal": "heir_roll",

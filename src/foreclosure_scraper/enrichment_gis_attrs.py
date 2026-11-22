@@ -791,6 +791,31 @@ async def enrich_gis_attrs(listings: list[Listing], concurrency: int = 8) -> dic
         # centroid, one Pickens parcel on 362). Such a lead is looked up by its parcel id only.
         fallback = _bb.imprecise_point(li, shared_pts)
         if fallback and not (li.parcel_id or "").strip():
+            # FOUND 2026-11-21, live on the VM's Mecklenburg wrapper: this return, like the
+            # pre-2026-11-11 no_live_layer path a few lines above, leaves raw["gis"]["queried"]
+            # unset -- so a row that lands here gets re-selected by backfill_mecklenburg_gis_attrs.py
+            # --max-rows 3000 (and backfill_gis_attrs_boardwide.py's own board-wide cap) EVERY
+            # single future invocation, forever. Confirmed live: 3 consecutive real Mecklenburg
+            # invocations (00:11/00:30/00:34, spanning real board-write activity in between) all
+            # report matched=4530, skipped_fallback_point=2981, parcel_cache_hit=3667 BYTE-
+            # IDENTICAL -- the same ~2,981-row chunk of each 3,000-row batch is dead weight every
+            # cycle, leaving only a few hundred rows of real throughput against Mecklenburg's
+            # 30,000+-row backlog (board-wide the number sharing this exact shape is unmeasured,
+            # but the mechanism is identical everywhere `backfill_gis_attrs_boardwide.py` runs).
+            #
+            # NOT fixed here, deliberately: stamping queried=True would stop the waste but, unlike
+            # the no_live_layer case (NC_GIS/SC_GIS/SC_LAYER are static code, so "no layer" truly
+            # never changes), "no parcel_id yet" is NOT provably permanent -- other enrichers in
+            # this codebase do backfill parcel_id for rows that initially lack it, and a row
+            # stamped done here would never get a second chance even after that happens. Whether
+            # that actually occurs often enough for THESE specific stuck rows to matter is
+            # unverified -- that's the open question, not whether the waste is real (it is,
+            # confirmed above). A safe fix needs either: (a) proof this codebase's parcel_id
+            # backfills essentially never reach rows that are ALSO geocoder-fallback-bound (so
+            # permanent-skip costs ~nothing), or (b) a soft-skip that excludes these rows from the
+            # --max-rows SELECTION cap without marking them permanently done, so fresh rows get a
+            # fair share of each batch while these stay eligible for a future parcel_id-equipped
+            # retry. Do not ship (a) without actually checking the backfill-overlap first.
             stats["skipped_fallback_point"] = stats.get("skipped_fallback_point", 0) + 1
             return
         # Cache hit — reuse a prior run's resolved attrs for this parcel/point; NO network.

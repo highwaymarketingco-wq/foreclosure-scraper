@@ -98,3 +98,6 @@ docs/.write_parts_staging.*/
 # exceeds GitHub 100MB limit, should never be tracked (caught 2026-11-13 on the VM, same
 # risk applies here)
 docs/listings.json.gz
+
+# scratch/working files, never meant to be committed
+tmp/
