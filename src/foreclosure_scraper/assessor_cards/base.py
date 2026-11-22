@@ -81,10 +81,6 @@ class CardResult:
     bedrooms: float | None = None
     bathrooms: float | None = None
     market_value: float | None = None     # card's appraised total
-    land_use: str | None = None           # card's own land-use/property-class text (e.g.
-                                           # "NON-QUALIFIED RESIDENTIAL (NREG)"); feeds
-                                           # Listing.land_use + the vacant_lot facet.
-    acres: float | None = None            # card's own "Acres/Lot" figure.
     sales: list[CardSale] = field(default_factory=list)
 
     def arms_length_sale(self) -> CardSale | None:
@@ -103,4 +99,4 @@ class CardResult:
         return s.price if s else None
 
     def has_fill(self) -> bool:
-        return bool(self.living_sqft or self.sales or self.market_value or self.land_use)
+        return bool(self.living_sqft or self.sales or self.market_value)

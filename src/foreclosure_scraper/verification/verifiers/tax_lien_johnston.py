@@ -136,32 +136,6 @@ SERVICE_PATH = "/service/johnston_county_property_tax"
 #: Johnston's own parcel-number shape, as printed throughout the portal: two digits, an optional
 #: section letter, more digits, an optional one/two letter suffix ("01011006", "01E08015R",
 #: "01011021A"). Used only to sanity-check a row's parcel before spending a browser session on it.
-#:
-#: FOUND 2026-11-21 (gap_matrix atty_tax_verified_confirmed investigation, 0/1890 confirmed):
-#: this verifier was never actually unwired or broken -- it auto-discovers fine and correctly
-#: claims 178 applicable rows -- but it is STARVED. Only 8 of Johnston's 3,554 board rows carry
-#: a parcel_id already in this shape; the other 3,546 hold a 12-digit GIS PIN (e.g.
-#: "169310463592"), which this regex correctly rejects rather than guessing (a live 3-row test
-#: against real board rows confirmed all 3 fail at parcel_of() -- 3 seconds for 3 rows, no
-#: browser ever launched -- before any network call, exactly as designed).
-#:
-#: NO FREE CROSSWALK FOUND. Two obvious candidates were checked live and both are a THIRD,
-#: different identifier, not a reformatting of either the board's PIN or this portal's account
-#: number:
-#:   data/parcel_cache/johnston.sqlite  -- schema has no account-number-shaped column at all
-#:                                         (id/owner/address/value/acreage/land_use/sale only).
-#:   NC OneMap (services.nconemap.gov NC1Map_Parcels)  -- live-queried for real Johnston rows:
-#:                                         parno comes back dashed-numeric ("165600-42-9613",
-#:                                         "165703-00-9554") -- no letter, wrong shape, and not
-#:                                         the same value as either the board PIN or a working
-#:                                         appraisal-card id (e.g. "16-L-03-009-C-", confirmed
-#:                                         live same day against enrichment_bt_appraisal_card.py's
-#:                                         Johnston tenant -- see that module for the appraisal-
-#:                                         card side of this same county).
-#:
-#: So this is not a "run it" fix -- it needs a real crosswalk source (Johnston's own GIS parcel
-#: layer under its own domain, not OneMap, might carry both the PIN and its own account number on
-#: the same feature; not yet checked) before the other 3,546 rows can ever reach this portal.
 _PARCEL_RE = re.compile(r"^\d{2}[A-Z]?\d{4,7}[A-Z]{0,2}$")
 
 _NAME = __name__.rsplit(".", 1)[-1]

@@ -110,6 +110,33 @@ def main() -> int:
 
     print(f"Mecklenburg/NC rows on board: {len(board):,}")
 
+    # FOUND 2026-11-21: 574 of these rows' dedupe_key (parcel:NC:mecklenburg:<parcel_id>) is
+    # shared with >=1 sibling row -- all genuine multi-unit apartment-complex code-enforcement
+    # listings (one tax parcel, many individually-cased units, e.g. 10 different "92xx GLENWATER
+    # DR #NNN" rows all keyed to parcel 04732103). The round-loop's own collision guard below
+    # correctly refuses to patch any of them -- it can't tell which sibling a write is "for" --
+    # but enrich_mecklenburg_tax() doesn't know that and was spending its ENTIRE live-fetch
+    # budget re-fetching these same always-unpatchable rows every single invocation for hours:
+    # 'eligible': 752, 100% collision rate both rounds, 'total applied across all rounds: 0',
+    # confirmed identical across >=3 separate invocations live on the VM. Filtering them out
+    # BEFORE the fetch (not just at the write stage) is what actually frees the budget for the
+    # ~38,000+ other Mecklenburg rows that CAN be patched -- this doesn't touch the collision-
+    # safety guard itself, only what gets selected to spend network budget on.
+    board_f, keys_f, before_f = [], [], []
+    skipped_collision = 0
+    for li, k, b4 in zip(board, keys, before):
+        if k is not None and key_counts.get(k, 0) > 1:
+            skipped_collision += 1
+            continue
+        board_f.append(li)
+        keys_f.append(k)
+        before_f.append(b4)
+    if skipped_collision:
+        print(f"  skipped {skipped_collision:,} rows up front: dedupe_key shared with a "
+              f"sibling row on this board (same guard as the round loop below, applied before "
+              f"spending fetch budget instead of after)")
+    board, keys, before = board_f, keys_f, before_f
+
     # FIX 2026-11-13: used to accumulate all --rounds worth of changes and write ONCE at the
     # very end. Live-observed consequence: a full invocation (3 rounds x 300 real parcels,
     # ~830 real two_year_written hits, the table-index parser bug now fixed) ran its entire

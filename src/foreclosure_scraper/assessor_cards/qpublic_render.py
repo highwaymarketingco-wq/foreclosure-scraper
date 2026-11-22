@@ -647,57 +647,6 @@ def _parse_card(html: str, county: str) -> CardResult | None:
     res.bathrooms = _float(_pick(facts, ("number of full baths", "full bathrooms",
                                          "bathrooms", "full baths")))
     res.market_value = _parse_market_value(soup)
-    # FOUND 2026-11-21 (gap_matrix vacant_lot sourced-not-built sweep). Clarendon ONLY --
-    # this does NOT generalize across counties on this same Schneider platform, confirmed
-    # live, not assumed:
-    #   Clarendon  HAS a plain "land use" row (e.g. "NON-QUALIFIED RESIDENTIAL (NREG)") and
-    #              a plain "acres/lot" row -- live-confirmed on 21 real board parcels (1
-    #              known-working test address + 20 fresh board rows across two passes),
-    #              21/21 extracted cleanly. 0/21 happened to be vacant, so the positive
-    #              detection path (_is_vacant_land_use firing True) is UNCONFIRMED -- only
-    #              the extraction itself and the correct-negative path are proven.
-    #   Lee        does NOT carry an equivalent field at all. Dumped every fact label on a
-    #              real Lee parcel (068-04-00-053-000, the module's own documented test
-    #              case): the closest thing is "Class Code (Note: Not Zoning Info)" --
-    #              SC's 4%/6% owner-occupancy ASSESSMENT RATIO class, explicitly NOT a
-    #              land-use/property-type signal -- so there is nothing here to extract for
-    #              Lee. An earlier version of this comment claimed Lee would pick this up
-    #              "immediately" -- that was wrong, said before testing it; corrected here.
-    #   Fairfield  carries a plain "land use" row too, BUT as an opaque SC DOR-style code
-    #              ("4LQ (4LQ)", "GX (GX)"), not descriptive text -- _is_vacant_land_use's
-    #              word-boundary text match (VACANT/VAC/...) will never fire on these, so
-    #              extraction works (res.land_use gets filled) but vacant DETECTION silently
-    #              does not, even on a parcel that plainly reads as vacant/ag land from its
-    #              OTHER fields: live-dumped "Off Chester Rd" (53.000 acres, land use "4LQ")
-    #              has NO building_type/year_built/finished_area rows at all, vs. a real
-    #              improved parcel ("410 Davis Cir") which has all four -- the same "no
-    #              structure on the card" signal enrichment_vacant_landuse.py's improvement-
-    #              value fallback already uses, just not read from this card yet. Treat
-    #              Fairfield's text match as a confirmed miss, not a confirmed non-vacant --
-    #              a real fix here needs either a Fairfield/SC-DOR code table or reading the
-    #              building-detail absence, neither built.
-    # FOUND 2026-11-21 (same sweep, continued). Spartanburg/Oconee/Pickens/Union live fact-
-    # label dumps (1 real board parcel each) -- EVERY one of these 4 DOES carry a land-use-
-    # equivalent field, confirmed live, but NONE of them calls it "land use":
-    #   Spartanburg "property usage" -> "Non-Qualified Regular Residential Improved (6RGR)"
-    #   Oconee      "class"          -> "101 Residential 1 Family"
-    #   Union       "record type"    -> "Residential" (also has a separate, more opaque
-    #               "class code (note: not zoning info)" -> "RN-Residential" -- "record type"
-    #               preferred as the plainer text; not yet known which (if either) actually
-    #               reads "Vacant" on a real vacant Union parcel)
-    #   Pickens     "property type"/"account type" -> confirmed stable across property
-    #               classes on 5 live board parcels: "Commercial" (211 Pendleton St, a retail
-    #               store), "Residential" x3, "Mobile Home" x1 -- not a commercial-only fluke.
-    # Same caveat as Clarendon/Fairfield applies to all four: extraction is proven (real text
-    # comes back), but the POSITIVE vacant-detection path is UNCONFIRMED -- 0 of these 4
-    # samples were vacant, so _is_vacant_land_use has never actually fired True on any of
-    # them. Do not report any county in this list as "vacant detection working" without a
-    # real vacant sample.
-    lu = _pick(facts, ("land use", "property usage", "record type", "class",
-                       "property type", "account type"))
-    if lu:
-        res.land_use = lu.strip()
-    res.acres = _float(_pick(facts, ("acres/lot", "acres")))
     res.sales = _parse_sales(soup)
     return res if res.has_fill() else None
 

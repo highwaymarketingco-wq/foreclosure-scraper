@@ -332,25 +332,6 @@ PORTALS: dict[str, Portal] = {
     #: full_model=True per the roll scraper's own confirmed config (nc_its_public_tax.ITSPortal
     #: "Person": an empty partial 500s here same as Transylvania/Catawba); address_search=False
     #: for the same untested-field reason as Davidson above
-    #:
-    #: FOUND 2026-11-21 (gap_matrix atty_tax_verified_confirmed sweep, 0/1047 confirmed). Two
-    #: DISTINCT, live-confirmed dead ends, not one:
-    #:   929 of 1,689 Person board rows (55%) carry NO parcel_id at all -> searches() can't
-    #:       build a name_search plan (needs BOTH owner_name AND row_parcel_ids().own) ->
-    #:       deterministic "parcel_unresolvable", confirmed on 5 real rows, ~1s each (no
-    #:       network call at all -- the client-side gate, same shape as tax_lien_johnston's).
-    #:   The other 760 DO carry a parcel_id (mixed shapes: "0938-02-89-5064.000", "A105-32",
-    #:       12-digit "090600203731000") and DO reach a real OwnerName search -- confirmed on
-    #:       15 real rows, ~4s each (genuine network round-trips, not a client gate) -- but
-    #:       every one came back "parcel_not_found", not a portal error. This means the
-    #:       OwnerName search is firing and finding a result page, but _bind()'s conservative
-    #:       own-parcel-only check (see Portal.name_search docstring above) is rejecting every
-    #:       match: the bill it finds does not textually match this row's parcel_id. Not yet
-    #:       determined whether that's a real board/portal ID-format mismatch (most likely,
-    #:       same class of problem as tax_lien_johnston.py's crosswalk gap) or a owner-name
-    #:       formatting mismatch upstream of that. Needs --capture-dir on a real run to see
-    #:       the actual bill parcel number the portal returns for one of these 15, compared
-    #:       against the board's own value, before guessing further.
     "Person": Portal("Person", "https://www.bttaxpayerportal.com/ITSPublicPR", "ParcelNumber",
                      full_model=True, address_search=False, name_search=True),
     #: ADDED 2026-11-17 (gap_matrix round 20, atty_tax_verified_confirmed's own primary target).
