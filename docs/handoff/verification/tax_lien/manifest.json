@@ -1,56 +1,54 @@
 {
  "buckets": 16,
  "counts": {
-  "confirmed": 40861,
+  "confirmed": 40864,
   "refuted": 988,
-  "rows": 83029,
+  "rows": 83032,
   "stale": 23683,
   "unconfirmed": 17497,
   "wall": 0
  },
- "generated_at": "2026-11-22T02:17:07Z",
+ "generated_at": "2026-11-22T02:24:06Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-22T02:17:05Z",
-  "county": "Rowan",
+  "at": "2026-11-22T02:24:03Z",
+  "county": "Wake",
   "host": "SMB-LTSEO05",
   "max_rows": 2000,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "tax.rowancountync.gov": 567
+    "services.nconemap.gov": 4,
+    "services.wake.gov": 8
    }
   },
   "result": {
-   "budget_stop": 1,
-   "checked": 555,
-   "confirmed": 443,
-   "stale": 111,
+   "checked": 8,
+   "confirmed": 7,
    "unconfirmed": 1
   },
-  "seconds": 1204,
+  "seconds": 25,
   "selection": {
-   "applies": 2666,
-   "due_retry": 87,
-   "due_ttl": 2578,
-   "not_due_ttl": 1
+   "applies": 8,
+   "due_new": 3,
+   "due_ttl": 5
   },
   "source": null,
   "tier": null
  },
- "rows": 83029,
+ "rows": 83032,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 7143984,
+   "bytes": 7144094,
    "file": "000.json",
    "rows": 5101,
-   "sha256": "3593910dcaa29d9e997c51cd2fe3cedc0c9d02daba6040c6cbcd0b4209625952"
+   "sha256": "4e7639acd85e08b85c405a8e667867a3da3d39a6e74e248ef9f4e83a24d2bae3"
   },
   {
    "bucket": 1,
@@ -61,10 +59,10 @@
   },
   {
    "bucket": 2,
-   "bytes": 7307224,
+   "bytes": 7307335,
    "file": "002.json",
    "rows": 5232,
-   "sha256": "ea2c5d0d8f7705307c295ea4cd1962908584b606e21d35bc34cdf53fae40093c"
+   "sha256": "eaf057ade16c2e5d63aaae860b4312521843400e584d8bd18034f865043a0a68"
   },
   {
    "bucket": 3,
@@ -75,10 +73,10 @@
   },
   {
    "bucket": 4,
-   "bytes": 7230503,
+   "bytes": 7230613,
    "file": "004.json",
    "rows": 5131,
-   "sha256": "19d13e5561bd463b5d21e1a9a005fdc4bc17f9978758ea0cf4d862af1ed67be6"
+   "sha256": "cea156bc83a3350cb551fc563c6917bbbaf956b57f28dc3b14008add5401eadc"
   },
   {
    "bucket": 5,
@@ -96,10 +94,10 @@
   },
   {
    "bucket": 7,
-   "bytes": 7263497,
+   "bytes": 7265665,
    "file": "007.json",
-   "rows": 5166,
-   "sha256": "2de7cfa3c20ea6a7993c94f615fa617a9cdfb087cbcd62c09afafecd5cde3012"
+   "rows": 5168,
+   "sha256": "e84e800da2c57c0926994a56f21889af94bc5da6f94fa339b224b9be493037ed"
   },
   {
    "bucket": 8,
@@ -117,17 +115,17 @@
   },
   {
    "bucket": 10,
-   "bytes": 7029888,
+   "bytes": 7029998,
    "file": "010.json",
    "rows": 5056,
-   "sha256": "f0f77ba32a9e75b31733d8756b3eacfea410d1a9233d4746b6b3edf4622c7bae"
+   "sha256": "215eac031f8a5695129f0fd93e97aaf3d2a2d7708bf314c70cab51bca7f3e5bf"
   },
   {
    "bucket": 11,
-   "bytes": 7178390,
+   "bytes": 7179506,
    "file": "011.json",
-   "rows": 5129,
-   "sha256": "076dd15c83038bf36e6bbfcfb16074d919bcfcd9944e4481960eb6b673e6984b"
+   "rows": 5130,
+   "sha256": "9ddca92e10b7a93138b6e188091830c23e68baab647b4f59f35db4286c53caea"
   },
   {
    "bucket": 12,
@@ -145,10 +143,10 @@
   },
   {
    "bucket": 14,
-   "bytes": 7350142,
+   "bytes": 7350367,
    "file": "014.json",
    "rows": 5277,
-   "sha256": "b3d09974b8fbf6a16fe566088cedb813d356f1b4ce97d2585394dbac68106198"
+   "sha256": "54bdcd3117aa456d855870cfd51ca18961b0f88b59e22a1e775c3e125fd1979c"
   },
   {
    "bucket": 15,
