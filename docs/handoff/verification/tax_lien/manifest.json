@@ -1,42 +1,40 @@
 {
  "buckets": 16,
  "counts": {
-  "confirmed": 40921,
+  "confirmed": 40922,
   "refuted": 988,
   "rows": 83029,
   "stale": 23622,
-  "unconfirmed": 17498,
+  "unconfirmed": 17497,
   "wall": 0
  },
- "generated_at": "2026-11-21T23:34:18Z",
+ "generated_at": "2026-11-22T00:38:47Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-21T23:34:15Z",
-  "county": "Nash",
+  "at": "2026-11-22T00:38:45Z",
+  "county": "Pender",
   "host": "SMB-LTSEO05",
   "max_rows": 2000,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "nashcountync.munisselfservice.com": 406
+    "mss.pendercountync.gov": 4
    }
   },
   "result": {
-   "checked": 51,
-   "confirmed": 50,
-   "deferred": 1,
-   "rechecked_after_deferral": 1,
-   "unconfirmed": 1
+   "checked": 4,
+   "confirmed": 1,
+   "unconfirmed": 3
   },
-  "seconds": 1225,
+  "seconds": 14,
   "selection": {
-   "applies": 61,
-   "due_new": 51,
-   "not_due_retry": 1,
-   "not_due_ttl": 9
+   "applies": 27,
+   "due_retry": 3,
+   "due_retry_transient": 1,
+   "not_due_ttl": 23
   },
   "source": null,
   "tier": null
@@ -68,10 +66,10 @@
   },
   {
    "bucket": 3,
-   "bytes": 7286952,
+   "bytes": 7287065,
    "file": "003.json",
    "rows": 5185,
-   "sha256": "f3ac6977c8dad4f73eb0baab9eea9d5b4b9f8112b028a02a8067c6919746f61a"
+   "sha256": "4037956fa9835348ea3967076e844a02781d543be74a4ef72b40c5a82740d7bd"
   },
   {
    "bucket": 4,
@@ -89,10 +87,10 @@
   },
   {
    "bucket": 6,
-   "bytes": 7131393,
+   "bytes": 7131506,
    "file": "006.json",
    "rows": 5092,
-   "sha256": "b130232488307a61157e53115fd269a54f135b864d25d45805b4195dba0c0a7e"
+   "sha256": "89408a5911da6618bd22399c07abe9a650bbee7108fb23c8a945bd27a519af5b"
   },
   {
    "bucket": 7,
@@ -103,10 +101,10 @@
   },
   {
    "bucket": 8,
-   "bytes": 7460732,
+   "bytes": 7461355,
    "file": "008.json",
    "rows": 5305,
-   "sha256": "68024734579dc42684a286f2e602f088c43efe3d4c69c1d36d7292fe4022440e"
+   "sha256": "f662437a7bdf1def9c3c56f7769db815033502919babbb2737f33750c91be642"
   },
   {
    "bucket": 9,
