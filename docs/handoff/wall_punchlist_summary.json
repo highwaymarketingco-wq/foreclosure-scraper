@@ -13,8 +13,8 @@
    "generated_at": "2026-10-17T14:28:27Z"
   },
   "code_enforcement": {
-   "entries": 1071,
-   "generated_at": "2026-11-20T16:30:39Z"
+   "entries": 1247,
+   "generated_at": "2026-11-21T21:58:06Z"
   },
   "comps": {
    "entries": 240,
@@ -29,8 +29,8 @@
    "generated_at": "2026-10-17T14:28:27Z"
   },
   "elderly_disabled": {
-   "entries": 4616,
-   "generated_at": "2026-11-21T21:07:55Z"
+   "entries": 5816,
+   "generated_at": "2026-11-22T07:48:22Z"
   },
   "foreclosure_rod": {
    "entries": 106,
@@ -41,8 +41,8 @@
    "generated_at": "2026-11-20T12:42:30Z"
   },
   "heir_roll": {
-   "entries": 13880,
-   "generated_at": "2026-11-20T13:59:02Z"
+   "entries": 14294,
+   "generated_at": "2026-11-22T15:58:00Z"
   },
   "jail_booking": {
    "entries": 227,
@@ -61,8 +61,8 @@
    "generated_at": "2026-11-20T02:00:25Z"
   },
   "tax_lien": {
-   "entries": 82978,
-   "generated_at": "2026-11-21T19:08:14Z"
+   "entries": 90059,
+   "generated_at": "2026-11-22T15:19:17Z"
   },
   "tax_lien_johnston_static": {
    "entries": 8,

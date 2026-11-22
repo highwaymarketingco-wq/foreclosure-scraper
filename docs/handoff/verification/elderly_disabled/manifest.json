@@ -8,35 +8,23 @@
   "unconfirmed": 34,
   "wall": 0
  },
- "generated_at": "2026-11-22T00:00:11Z",
+ "generated_at": "2026-11-22T07:48:22Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-22T00:00:11Z",
-  "county": "York",
+  "at": "2026-11-22T07:48:22Z",
+  "county": "Pickens",
   "host": "SMB-LTSEO05",
   "max_rows": 2000,
   "recheck_only": false,
   "requests": {
    "errors": {},
-   "requests": {
-    "services1.arcgis.com": 601
-   }
+   "requests": {}
   },
-  "result": {
-   "budget_stop": 1,
-   "checked": 601,
-   "confirmed": 600,
-   "unconfirmed": 1
-  },
-  "seconds": 1202,
-  "selection": {
-   "applies": 78965,
-   "due_new": 77403,
-   "not_due_retry": 1,
-   "not_due_ttl": 1561
-  },
+  "result": {},
+  "seconds": 0,
+  "selection": {},
   "source": null,
   "tier": null
  },
