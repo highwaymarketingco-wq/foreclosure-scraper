@@ -1,63 +1,60 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 13918,
+  "confirmed": 14108,
   "refuted": 11,
-  "rows": 14102,
-  "stale": 31,
-  "unconfirmed": 142,
+  "rows": 14294,
+  "stale": 32,
+  "unconfirmed": 143,
   "wall": 0
  },
- "generated_at": "2026-11-22T01:26:26Z",
+ "generated_at": "2026-11-22T15:58:00Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-22T01:26:26Z",
-  "county": "Dorchester",
+  "at": "2026-11-22T15:58:00Z",
+  "county": "Greenville",
   "host": "SMB-LTSEO05",
   "max_rows": 2000,
   "recheck_only": false,
   "requests": {
-   "errors": {
-    "gisportal.dorchestercounty.net": 24
-   },
+   "errors": {},
    "requests": {
-    "gisportal.dorchestercounty.net": 25
+    "www.gcgis.org": 193
    }
   },
   "result": {
-   "budget_stop": 1,
-   "checked": 12,
-   "deferred": 12,
-   "unconfirmed": 12
+   "checked": 192,
+   "confirmed": 190,
+   "stale": 1,
+   "unconfirmed": 1
   },
-  "seconds": 1289,
+  "seconds": 385,
   "selection": {
-   "applies": 775,
-   "due_new": 763,
-   "not_due_retry_transient": 12
+   "applies": 192,
+   "due_new": 192
   },
   "source": null,
   "tier": null
  },
- "rows": 14102,
+ "rows": 14294,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 6766456,
+   "bytes": 6858551,
    "file": "000.json",
-   "rows": 7111,
-   "sha256": "30ed0e9c4ccbb2802a8002c781aab965d373f728c01d45ad716b78e53328a372"
+   "rows": 7206,
+   "sha256": "273193ca2eb40014d8e246a3e5ed04a156ac6d53099ac7a09e95bb8413b7c3c6"
   },
   {
    "bucket": 1,
-   "bytes": 6661137,
+   "bytes": 6754993,
    "file": "001.json",
-   "rows": 6991,
-   "sha256": "39b86e22686b62b0b1eb8f275de46d25b71f1cc7f8086e5a8fb2a35fbe059e21"
+   "rows": 7088,
+   "sha256": "e2fc741bf0ee340b3d475f9d9ecb715a41e378d04f36d2f306d49d26f7fe0c3d"
   }
  ],
  "signal": "heir_roll",
