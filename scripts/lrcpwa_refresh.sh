@@ -46,6 +46,13 @@ if ! board_lock_acquire "$ROOT" "lrcpwa_refresh.sh" 0 "${LRCPWA_MAX_RUNTIME:-360
   exit 0
 fi
 
+# FOUND 2026-11-23: every run since at least 11/16 resolved real parcels (78-80/night
+# address-filled) then lost ALL of it at the final write -- patch_existing_rows()'s own
+# size-proportional-cost ceiling (board now 5.68GB, over the 2300MB default) refuses the
+# write every time, rc=1, nothing committed. Same ceiling family as the vision-cache fix
+# (run_daily_vision.sh); patch_existing_rows is "measurably cheap per row" per its own
+# docstring, unlike load_board() -- safe to override here, already proven safe tonight.
+export BOARD_PATCH_ALLOW_LARGE=1
 job_run "${LRCPWA_TIMEOUT:-3300}" uv run python scripts/lrcpwa_refresh.py
 RC=$JOB_RUN_RC
 if [ "$RC" -ne 0 ]; then
