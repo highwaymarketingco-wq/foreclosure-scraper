@@ -35,6 +35,9 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "src"))
 
+from collections import Counter  # noqa: E402
+
+from foreclosure_scraper.block_binding import FALLBACK_POINT_MIN_ROWS, imprecise_point  # noqa: E402
 from foreclosure_scraper.board_stream import iter_board_rows  # noqa: E402
 from foreclosure_scraper.enrichment_gis_attrs import enrich_gis_attrs  # noqa: E402
 from foreclosure_scraper.models import Listing  # noqa: E402
@@ -67,17 +70,44 @@ def main() -> int:
         if args.allow_large:
             os.environ["BOARD_PATCH_ALLOW_LARGE"] = "1"
 
-    print(f"streaming board for {COUNTY} rows (full raw, county-scoped)...")
+    # FIXED 2026-11-23 (found live, board-wide's sibling backfill_gis_attrs_boardwide.py was
+    # frozen at an identical "N more left" count for 43 hours/112 cycles straight -- the same
+    # enrich_gis_attrs() code this script calls silently skips a fallback-point/geocode-imprecise
+    # row without ever stamping it queried=True, so it stays "never-queried" and gets re-selected
+    # forever unless the CALLER excludes it from selection ahead of time). This script had NO
+    # such pre-filter at all (unlike board-wide's, which had one but an incomplete one) -- every
+    # cycle's "30323 more never-queried rows left", flat for 168+ consecutive cycles, is very
+    # likely the exact same mechanism. Mirrors board-wide's fix: one cheap first pass to find
+    # locally-shared fallback points, then exclude any no-parcel_id row imprecise_point() would
+    # refuse anyway, so it never eats the --max-rows selection budget in the first place.
+    print("pass 1: finding Mecklenburg-shared fallback points (lat,lng only, cheap)...")
+    point_counts: Counter = Counter()
+    for rec in iter_board_rows(docs_dir / "listings.json.gz"):
+        if (rec.get("county") or "").strip() != COUNTY:
+            continue
+        lat, lng = rec.get("latitude"), rec.get("longitude")
+        try:
+            point_counts[(round(float(lat), 5), round(float(lng), 5))] += 1
+        except (TypeError, ValueError):
+            continue
+    shared_points = {p for p, c in point_counts.items() if c >= FALLBACK_POINT_MIN_ROWS}
+    print(f"  {len(shared_points):,} points shared by >={FALLBACK_POINT_MIN_ROWS} rows")
+
+    print(f"pass 2: streaming board for {COUNTY} rows (full raw, county-scoped)...")
     keyed: dict[str, Listing] = {}
     before: dict[str, dict] = {}
     never_queried_count = 0
     already_queried_skipped = 0
+    structurally_unresolvable = 0
     for rec in iter_board_rows(docs_dir / "listings.json.gz"):
         if (rec.get("county") or "").strip() != COUNTY:
             continue
         raw = rec.get("raw") if isinstance(rec.get("raw"), dict) else {}
         never_queried = not (raw.get("gis") or {}).get("queried")
         if args.max_rows and never_queried:
+            if not rec.get("parcel_id") and imprecise_point(rec, shared_points):
+                structurally_unresolvable += 1
+                continue
             if never_queried_count >= args.max_rows:
                 already_queried_skipped += 1
                 continue
@@ -100,7 +130,9 @@ def main() -> int:
 
     print(f"{COUNTY} rows loaded this run: {len(keyed):,}"
           + (f" (capped at {args.max_rows} never-queried, {already_queried_skipped} "
-             f"more never-queried rows left for a future batch)" if args.max_rows else ""))
+             f"more never-queried rows left for a future batch, {structurally_unresolvable:,} "
+             f"skipped -- fallback-point/geocode-imprecise with no parcel_id, enrich_gis_attrs() "
+             f"would just skip them anyway)" if args.max_rows else ""))
     print("running enrich_gis_attrs()...")
 
     async def run():
