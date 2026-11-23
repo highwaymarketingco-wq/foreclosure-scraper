@@ -174,6 +174,14 @@ if [ "${CARRIED:-0}" -gt "${MAX_CARRIED_SOURCES:-4}" ]; then
 fi
 
 echo "==> daily vision $(date)" | tee -a "$LOG"
+# FOUND 2026-11-23: every run for at least 4 days straight (11/19, 11/21-23) exited 2 --
+# patch_vision_gemini.py's own write hit BoardLoadTooLarge (the board passed its patch-size
+# ceiling) and correctly cached the already-computed results instead of losing them
+# (logs/vision_pending_patches.json), but with no override set here, NOTHING ever actually
+# landed on the board -- the cache just grew (3,281 patches, real paid Gemini/Anthropic vision
+# API spend, by the time this was found and manually drained). Same fix already applied to
+# run_comps_sweep.sh/the other board-size-ceiling producers this session.
+export BOARD_PATCH_ALLOW_LARGE=1
 job_run "${VISION_JOB_TIMEOUT:-9000}" uv run python scripts/patch_vision_gemini.py >>"$LOG" 2>&1
 RC=$JOB_RUN_RC
 echo "==> exit=$RC $(date)" | tee -a "$LOG"
