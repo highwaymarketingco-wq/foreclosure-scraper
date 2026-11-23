@@ -221,6 +221,33 @@ def test_a_url_fallback_dedupe_key_is_refused_not_applied_to_every_row_that_shar
     )
 
 
+def test_a_unique_per_record_url_fallback_key_is_patched_not_refused(tmp_path):
+    """Refined 2026-11-23, found live on NC incarceration backfill: a url: fallback key is
+    only unsafe when it matches MORE THAN ONE row. A jail roster's own docket detail page
+    (one per booking, not a shared portal root) is a genuinely unique per-record identity --
+    blanket-refusing every url: key regardless of actual multiplicity was discarding 100% of
+    that lane's real enrichment work, every cycle, forever."""
+    docs = tmp_path / "docs"
+    unique_url = "https://example.test/docket/72098165/12/wendy-michelle-mcdonald/"
+    seed = [_lead(0, parcel_id=None, street_address=None, source_url=unique_url),
+            _lead(1)]  # an unrelated, normally-keyed row sharing the board
+    wa.write_artifact(seed, {"notes": "seed"}, docs_dir=docs)
+    key = seed[0].dedupe_key()
+    assert key == f"url:{unique_url}"
+
+    stats = wa.patch_existing_rows({key: {"raw": {"jail_booking": {"matched_name": "WENDY MCDONALD"}}}},
+                                   {"notes": "t"}, docs_dir=docs)
+    assert stats["unsafe_identity_skipped"] == []
+    assert stats["applied"] == 1
+    assert stats["written"] is True
+
+    rows = wa.load_board(docs)
+    matched = next(li for li in rows if li.source_url == unique_url)
+    assert matched.raw.get("jail_booking") == {"matched_name": "WENDY MCDONALD"}
+    other = next(li for li in rows if li.source_url != unique_url)
+    assert "jail_booking" not in (other.raw or {})
+
+
 def test_no_match_is_reported_not_found_and_touches_nothing(tmp_path):
     docs = tmp_path / "docs"
     _seed(docs, n=3)
@@ -507,15 +534,20 @@ def test_export_dir_unwritable_still_applies_the_real_patch(tmp_path, monkeypatc
 def test_export_captures_patches_stripped_of_nothing_even_unsafe_url_keys(tmp_path, monkeypatch):
     """The export captures the CALLER's raw patches dict, before the unsafe-identity (url:)
     strip -- the replaying side independently re-derives that same guard on its own call, so
-    exporting pre-strip is simplest and loses nothing."""
+    exporting pre-strip is simplest and loses nothing. Uses a url: key that is actually unsafe
+    (shared by two on-board rows, the Guilford pattern) -- a url: key the guard lets through
+    (matching zero or one row) is not a "stripped" case at all, see the dedicated tests above."""
     docs = tmp_path / "docs"
-    _seed(docs, n=2)
+    shared_url = "https://example.test/shared-root"
+    seed = [_lead(0, parcel_id=None, street_address=None, source_url=shared_url),
+            _lead(1, parcel_id=None, street_address=None, source_url=shared_url)]
+    wa.write_artifact(seed, {"notes": "seed"}, docs_dir=docs)
     export_dir = tmp_path / "patch_export"
     monkeypatch.setenv("PATCH_EXPORT_DIR", str(export_dir))
 
-    patches = {"url:https://example.test/shared-root": {"parcel_id": "SHOULD_NOT_APPLY"}}
+    patches = {f"url:{shared_url}": {"parcel_id": "SHOULD_NOT_APPLY"}}
     stats = wa.patch_existing_rows(patches, {"notes": "t"}, docs_dir=docs)
-    assert stats["unsafe_identity_skipped"] == ["url:https://example.test/shared-root"]
+    assert stats["unsafe_identity_skipped"] == [f"url:{shared_url}"]
     assert stats["written"] is False
 
     exported = list(export_dir.glob("*.json"))

@@ -5600,22 +5600,52 @@ def patch_existing_rows(patches: dict[str, dict], summary: dict,
     require_board_lock(docs)
     _check_not_changed_since_load(listings_path)
 
-    # UNSAFE-IDENTITY GUARD (2026-11-06, found live on Guilford NC, scripts/backfill_jail_rosters.py):
+    # UNSAFE-IDENTITY GUARD (2026-11-06, found live on Guilford NC, scripts/backfill_jail_rosters.py;
+    # refined 2026-11-23, found live on NC incarceration backfill -- a url: key is only unsafe when
+    # it actually matches MORE THAN ONE row on this board, not merely for having a "url:" prefix).
     # Listing.dedupe_key() falls back to f"url:{source_url}" when a row has no
-    # parcel_id/street_address/case_number. That fallback is NOT a per-listing identity -- a
-    # generic portal-root source_url can be (and was) shared by thousands of unrelated rows
-    # across many counties, so a patch keyed by it applies to every one of them, not just the
-    # one row the caller actually meant. Drop any such key before it can touch a single row.
-    unsafe_identity_skipped = sorted(k for k in patches if k.startswith("url:"))
-    if unsafe_identity_skipped:
-        patches = {k: v for k, v in patches.items() if not k.startswith("url:")}
+    # parcel_id/street_address/case_number. That fallback is NOT always a per-listing identity -- a
+    # generic portal-root source_url can be (and was, on Guilford) shared by thousands of unrelated
+    # rows, so a patch keyed by it would apply to every one of them, not just the one row the
+    # caller meant. But a url: key is just as often a genuinely unique per-record identity (e.g. a
+    # jail roster's own docket detail page, one per booking) -- blanket-refusing every "url:" key
+    # regardless of actual multiplicity discarded 100% of NC incarceration enrichment's real,
+    # paced-at-1req/sec network work, every single cycle, because every one of its candidate rows
+    # (jail-roster-sourced, not yet parcel-matched) has no identity but its own docket URL. The
+    # real danger is multiplicity, exactly the condition duplicate_key_matches already tracks for
+    # every other key -- so resolve it the same way: one cheap, read-only pre-pass (same lightweight
+    # construct as the main pass below, no mutation, no write), gated to run only when a url: key
+    # is actually present so every other caller pays nothing for this.
+    if not patches:
+        return {"existing": None, "patches": 0, "matched": 0, "applied": 0, "not_found": 0,
+                "duplicate_key_matches": 0, "written": False, "total_after": None,
+                "unsafe_identity_skipped": []}
+
+    _raise_if_board_too_large_to_patch(docs)
+
+    url_keys = [k for k in patches if k.startswith("url:")]
+    unsafe_identity_skipped: list = []
+    if url_keys and _board_file_present(listings_path):
+        url_key_set = set(url_keys)
+        match_counts: collections.Counter = collections.Counter()
+        for rec in _iter_board_records(docs):
+            if not isinstance(rec, dict):
+                continue
+            light = Listing.model_construct(**{k: rec.get(k) for k in _APPEND_SIG_FIELDS})
+            try:
+                key = light.dedupe_key()
+            except Exception:  # noqa: BLE001 - too malformed to key is simply unmatched
+                continue
+            if key in url_key_set:
+                match_counts[key] += 1
+        unsafe_identity_skipped = sorted(k for k in url_keys if match_counts.get(k, 0) > 1)
+        if unsafe_identity_skipped:
+            patches = {k: v for k, v in patches.items() if k not in unsafe_identity_skipped}
 
     if not patches:
         return {"existing": None, "patches": 0, "matched": 0, "applied": 0, "not_found": 0,
                 "duplicate_key_matches": 0, "written": False, "total_after": None,
                 "unsafe_identity_skipped": unsafe_identity_skipped}
-
-    _raise_if_board_too_large_to_patch(docs)
 
     if not _board_file_present(listings_path):
         # Nothing to patch onto. Unlike append_new_rows()'s bootstrap case (a fresh publish is
