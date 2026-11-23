@@ -56,10 +56,13 @@ from __future__ import annotations
 import asyncio
 import os
 import re
+import ssl
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from functools import lru_cache
 from typing import Optional
 
+import certifi
 import httpx
 import structlog
 
@@ -199,6 +202,115 @@ async def _dac_lookup(http: httpx.AsyncClient, last: str, first: str) -> _Lookup
                               "confidence": "name_only_low"},
                        answered=True, candidates=n_results)
     return _Lookup(answered=True, candidates=n_results)
+
+
+# SC TLS CHAIN FIX (2026-11-23, found live: every _scdc_lookup call was failing
+# `ssl.SSLCertVerificationError: unable to get local issuer certificate`, 100% of the
+# time, which enrich_incarceration()'s circuit breaker correctly read as "unanswered" and
+# tripped on after INCARCERATION_MAX_FAILURES (default 8) consecutive misses -- abandoning
+# the rest of every run's SC candidates with zero effect, hence SC's candidate pool never
+# advanced). Root cause, confirmed with openssl s_client + the leaf cert's own Authority
+# Information Access extension: public.doc.state.sc.us serves ONLY its leaf certificate
+# (*.doc.state.sc.us), omitting the "GoDaddy TLS Intermediate CA DV - R1v1" it actually
+# chains to -- a server-side misconfiguration (the intermediate was never bundled into
+# their TLS config), not a WAF/CAPTCHA block (that is a DIFFERENT, already-handled path --
+# see res.blocked/host_blocked above) and not a parsing bug. The chain verifies
+# cryptographically end-to-end (openssl verify: OK) once completed; it just is not yet in
+# certifi's Mozilla-derived root bundle (both certs below are dated 2025-08-28 -- a new
+# GoDaddy root generation, root-program inclusion lags real deployment by design).
+#
+# Fetched directly from the leaf cert's own AIA "CA Issuers" URLs (the same authoritative
+# source a browser's own AIA-chasing would use, not a third-party mirror):
+#   intermediate: http://certificates.godaddy.com/repository/gd_tls_issuing_dv-r1v1.crt
+#   root:         http://certificates.godaddy.com/repository/gd_tls_root-r1.crt
+# Completing the real chain (rather than disabling verification) matters here precisely
+# because this enricher feeds raw['incarceration'] matches straight into distress_score --
+# an unverified connection could have a MITM silently substitute fabricated match data.
+# Scoped to ONLY this module's httpx client (see _ssl_context() below); NC's DAC lookups
+# already verify fine against the stock certifi bundle and are unaffected.
+_GODADDY_TLS_INTERMEDIATE_DV_R1V1 = """-----BEGIN CERTIFICATE-----
+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
+-----END CERTIFICATE-----
+"""
+
+_GODADDY_TLS_ROOT_R1 = """-----BEGIN CERTIFICATE-----
+MIIFWTCCA0GgAwIBAgIRANpi/54mGbElekgJNo7o4/cwDQYJKoZIhvcNAQELBQAw
+RjELMAkGA1UEBhMCVVMxFDASBgNVBAoTC0dvRGFkZHkuY29tMSEwHwYDVQQDExhH
+b0RhZGR5IFRMUyBSb290IENBIC0gUjEwHhcNMjUwODI4MTIwMDAwWhcNNDAwODI0
+MTE1OTU5WjBGMQswCQYDVQQGEwJVUzEUMBIGA1UEChMLR29EYWRkeS5jb20xITAf
+BgNVBAMTGEdvRGFkZHkgVExTIFJvb3QgQ0EgLSBSMTCCAiIwDQYJKoZIhvcNAQEB
+BQADggIPADCCAgoCggIBAMLrcp3XnknkTvY9I1IzsQA8K/vp5TJRiYsCZWMitXxG
+H+yD1+dPuC5nVzu6BLlXWZ8f7E7cs7lGBUeygeb2CsrESx1uFtB8R3JR4UOAMNE/
+KrlYFwHBydF1JhcttMEEkojBqt9If+Ks8Go2Be4rIAj495yFzArAPc8Ax2kyGgqf
+9Sl0S1SUbxkuvNRomsb3uNg+rcSWg4zUVixQijIZm2AIBxNW9gzaghs6dnog6rgq
+wBYKk7WNhZOfATkq/GHU9glnmiiMMeFPK2kqo9YNWk17NzEYmrBp6ELJwMwhuupX
+LifmoOAL2axvkO1ci66WKBxPB5OPgy5WfdhYp7l2Az8d9MDKWCYwPTpRjwf41AgG
+KhrwMjEJ+H/tG+wu7vWH0Bk+Bfl2gBtNyGjvObGJHMgJusPASDbWThBaw4PrA6sK
+TNPaQCYtVCYi6h/JXB39P2ilTixeC9hiEFmPkwplgjf/t/7CvF6XoCRIFkU2vUYN
+5WQ9upLYRTMZIVrHOxHOcxevvbD2jSuIz2ZydWWdwSzoQb8g5/bmhfrXwLPlCAZh
+hx+E5ljM/OLlkaySoi35mGE4MVOfld94J7m11UeY76t43RIGW0HF7fwm556C3thd
+70RZ3KWwSiOBJQGzDMzjY+R53kJnUljPSlSqDemUE1fsG7evOPgrZSXc8rP2WTAx
+AgMBAAGjQjBAMA4GA1UdDwEB/wQEAwIBhjAPBgNVHRMBAf8EBTADAQH/MB0GA1Ud
+DgQWBBTsUhGVcHMZyN7KSEOXSxw1JCJDUDANBgkqhkiG9w0BAQsFAAOCAgEAndbU
+wF1KXURZgNLhfC0UkO0qBS2tHXhqJ2AGVMrOkX2+WFwPZ4jOqDTQoobcOXRBlE6O
+eLSGYquyTEW43gWHVy6+UKP1jnBLhpcaib56F5Wp8Fi3eZpT+3MojZEofMtZg7rG
+Jmn6vf1QLztm66JBb7uh1yVruHZupfT0TXZ8Sbpf8xVVWnq+owgVzTFsfSjWyBps
+5G9e/IWYfl6r9rmAPmPdo8LqxUmJXfjL06RlZ2K7HghBQgefEuBjUkSXFR73SyZH
+f8IR+CRbwjV0hmhn2NWDos1MB9TLKm/C8HQ49acBybtLmsTai+i+RT/N6UB1TNTw
+Ts+eZ42z5Danmw+KDO7JI6m/WrlDOuDkyRmY2TKI8vvEeKHfaBehGHUMEWQZe2d2
+AHFvmAonhB10aXUhjAbUMZs4SCo241iuz28FMoVCC6pa07l8A84IRbUfu9OMRkmm
+Ydmd5Pa4ggfkhtJwFxMbR/3bhsDi8tRwkgS6XNOixXK/azf9TA2RqyOsiiJFjffO
+xS4nnYkLtgzqf7hs+Qe3D5UDWUgJyx8AYiwKJIMDlLz+CO8yYIx+YMsKS8jHvclI
+X5DePkFKKNWCUz5x2wlfPbXUPhTjsKO2m3F6009Gf4bQgBL60rzBOuo1Wp6fSlDE
+b9J1nSdKq7qIj1IJ5icFCDhzV+P1LjVv77My5Rw=
+-----END CERTIFICATE-----
+"""
+
+
+@lru_cache(maxsize=1)
+def _ssl_context() -> ssl.SSLContext:
+    """The default certifi trust store PLUS the two GoDaddy certs above -- see the
+    SC TLS CHAIN FIX comment. Adding extra trusted certs never weakens verification for
+    any OTHER site (NC's DAC lookups are unaffected); it only completes the one chain
+    public.doc.state.sc.us fails to serve in full. Cached: built once per process, not
+    once per lookup."""
+    ctx = ssl.create_default_context(cafile=certifi.where())
+    ctx.load_verify_locations(cadata=_GODADDY_TLS_INTERMEDIATE_DV_R1V1)
+    ctx.load_verify_locations(cadata=_GODADDY_TLS_ROOT_R1)
+    return ctx
 
 
 async def _scdc_lookup(http: httpx.AsyncClient, last: str, first: str) -> _Lookup:
@@ -460,7 +572,8 @@ async def enrich_incarceration(listings: list[Listing], max_queries: Optional[in
     cache: dict[tuple, asyncio.Future] = {}
     max_strikes = int(os.environ.get("INCARCERATION_MAX_FAILURES", "8"))
 
-    async with httpx.AsyncClient(timeout=httpx.Timeout(30.0), follow_redirects=True) as http:
+    async with httpx.AsyncClient(timeout=httpx.Timeout(30.0), follow_redirects=True,
+                                  verify=_ssl_context()) as http:
         async def lookup(state: str, last: str, first: str) -> Optional[_Lookup]:
             async with sem:
                 if state in tripped:
