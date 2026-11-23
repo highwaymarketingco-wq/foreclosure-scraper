@@ -40,10 +40,10 @@ while [ "$i" -lt "$ITERATIONS" ]; do
   ts="$(date -u +%FT%TZ)"
   if [ -z "$c" ]; then
     echo "=== $ts iter=$i sweep (no county filter, board order) ===" >> "$LOG"
-    "$PY" scripts/backfill_comps.py --max-rows "$MAX_ROWS" >> "$LOG" 2>&1
+    BOARD_PATCH_ALLOW_LARGE=1 BOARD_APPEND_ALLOW_LARGE=1 "$PY" scripts/backfill_comps.py --max-rows "$MAX_ROWS" >> "$LOG" 2>&1
   else
     echo "=== $ts iter=$i county=$c ===" >> "$LOG"
-    "$PY" scripts/backfill_comps.py --counties "$c" --max-rows "$MAX_ROWS" >> "$LOG" 2>&1
+    BOARD_PATCH_ALLOW_LARGE=1 BOARD_APPEND_ALLOW_LARGE=1 "$PY" scripts/backfill_comps.py --counties "$c" --max-rows "$MAX_ROWS" >> "$LOG" 2>&1
   fi
   i=$((i + 1))
   sleep 15
