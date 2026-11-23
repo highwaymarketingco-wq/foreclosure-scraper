@@ -47,7 +47,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "src"))
 
-from foreclosure_scraper.block_binding import FALLBACK_POINT_MIN_ROWS  # noqa: E402
+from foreclosure_scraper.block_binding import FALLBACK_POINT_MIN_ROWS, imprecise_point  # noqa: E402
 from foreclosure_scraper.board_stream import iter_board_rows  # noqa: E402
 from foreclosure_scraper.enrichment_gis_attrs import enrich_gis_attrs  # noqa: E402
 from foreclosure_scraper.models import Listing  # noqa: E402
@@ -159,21 +159,28 @@ def main() -> int:
                 # act on them.
                 structurally_unresolvable += 1
                 continue
-            if not rec.get("parcel_id"):
-                try:
-                    pt = (round(float(rec.get("latitude")), 5), round(float(rec.get("longitude")), 5))
-                except (TypeError, ValueError):
-                    pt = None
-                if pt in shared_points:
-                    # No parcel_id and this point is shared by >=FALLBACK_POINT_MIN_ROWS
-                    # rows board-wide -- a fallback/county-seat centroid, not this row's
-                    # own location. enrich_gis_attrs() always refuses to live-query it
-                    # (block_binding.imprecise_point() -> skipped_fallback_point, never
-                    # reaches the 'queried' stamp). Found live 2026-10-23: batches 4-6
-                    # kept landing on a 100K+-row cluster of exactly this shape
-                    # (environmental/registry/filing sources sharing a county centroid).
-                    structurally_unresolvable += 1
-                    continue
+            if not rec.get("parcel_id") and imprecise_point(rec, shared_points):
+                # No parcel_id and block_binding.imprecise_point() says this row's coordinate
+                # isn't its own location -- enrich_gis_attrs() always refuses to live-query it
+                # (-> skipped_fallback_point, never reaches the 'queried' stamp). Found live
+                # 2026-10-23: batches 4-6 kept landing on a 100K+-row cluster of exactly this
+                # shape (environmental/registry/filing sources sharing a county centroid).
+                #
+                # FIXED 2026-11-23 (found live, board-wide frozen at "356661 more left" for 43
+                # hours/112 cycles straight): this used to replicate only ONE of imprecise_point()'s
+                # three conditions -- `pt in shared_points`, a crude global recount at
+                # FALLBACK_POINT_MIN_ROWS -- missing imprecise_point_flag(raw) (an explicit
+                # per-row flag set at geocode time) and is_county_seat_point() (a curated list,
+                # not a live recount). A row caught by either of those TWO slipped past this
+                # pre-filter, got selected into the batch anyway, then got silently skipped
+                # inside enrich_gis_attrs() by the SAME imprecise_point() call this now calls
+                # directly -- re-selected forever, crowding out rows that could make real
+                # progress. Confirmed this is the dominant cause of the board-wide freeze: the
+                # same ~299-row dead-weight slice recurred every single cycle regardless of
+                # max_rows. Calling the identical function used internally, instead of
+                # re-deriving a narrower approximation of it, is what keeps the two in sync.
+                structurally_unresolvable += 1
+                continue
             if never_queried_count >= args.max_rows:
                 already_queried_skipped += 1
                 continue
