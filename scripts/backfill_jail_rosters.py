@@ -473,7 +473,12 @@ async def _amain(args) -> int:
     # timed 2026-11-05 -- 13+ min and still running, memory-bounded but far too slow for a
     # one-county fix), and both real --apply attempts that hit it never reached the write step
     # at all.
-    with board_lock(REPO, owner="backfill_jail_rosters"):
+    #
+    # FOUND 2026-11-23: no wait= here meant an instant BoardLockBusy crash (losing the whole
+    # 792-request fetch) any time backfill_incarceration's own 5-minute relaunch cycle happened
+    # to hold the lock -- 3/3 real --apply attempts lost this way in a row. incarceration's own
+    # acquisition already uses wait=1800, poll=10 for exactly this reason; match it here.
+    with board_lock(REPO, owner="backfill_jail_rosters", wait=1800, poll=10):
         scoped: list[Listing] = []
         scanned = 0
         for rec in iter_board_rows(args.board):
