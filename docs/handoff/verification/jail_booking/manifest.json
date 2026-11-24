@@ -1,59 +1,73 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 137,
+  "confirmed": 140,
   "refuted": 21,
-  "rows": 227,
-  "stale": 19,
-  "unconfirmed": 48,
+  "rows": 237,
+  "stale": 22,
+  "unconfirmed": 52,
   "wall": 0
  },
- "generated_at": "2026-10-17T14:28:27Z",
+ "generated_at": "2026-11-24T02:30:31Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-10-17T14:28:27Z",
+  "at": "2026-11-24T02:30:31Z",
   "county": null,
   "host": "SMB-LTSEO05",
-  "max_rows": 300,
+  "max_rows": 10,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "berkeleycountysc.paystar.io": 10,
-    "cama.harnett.org": 3,
-    "services1.arcgis.com": 31,
-    "spartanburgcountytax.qpaybill.com": 4,
-    "tax.buncombenc.gov": 41,
-    "tax.transylvaniacounty.org": 56,
-    "taxbill.catawbacountync.gov": 555
+    "gis.buncombecounty.org": 28,
+    "gis.charlottenc.gov": 14,
+    "portal-nc.tylertech.cloud": 8,
+    "registerofdeeds.buncombenc.gov": 33,
+    "rockhillgis.cityofrockhill.com": 3,
+    "roster:cc.southernsoftware.com": 1,
+    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "roster:lexingtonsheriffsc.policetocitizen.com": 1,
+    "roster:oconee-so-sc.zuercherportal.com": 1,
+    "roster:union-so-sc.zuercherportal.com": 1,
+    "services.nconemap.gov": 10,
+    "tax.buncombenc.gov": 22,
+    "vt.ncsbe.gov": 63,
+    "webgis2.durhamnc.gov": 3,
+    "www.courtlistener.com": 15,
+    "www.greenwoodsc.gov": 10
    }
   },
   "result": {
-   "budget_stop": 1
+   "checked": 10,
+   "confirmed": 3,
+   "deferred": 1,
+   "rechecked_after_deferral": 1,
+   "stale": 3,
+   "unconfirmed": 4
   },
-  "seconds": 1513,
+  "seconds": 612,
   "selection": {
-   "applies": 462,
-   "due_new": 310,
+   "applies": 907,
+   "due_new": 759,
    "due_retry": 9,
-   "due_ttl": 1,
-   "due_version": 142
+   "due_version": 139
   },
   "source": null,
   "tier": null
  },
- "rows": 227,
+ "rows": 237,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 288955,
+   "bytes": 300433,
    "file": "000.json",
-   "rows": 227,
-   "sha256": "e8a248b808193fa0bd0ca8d1ddc5ee26ce0225dc7774d98089f974dca8455787"
+   "rows": 237,
+   "sha256": "3ead912ed322df119b7113b8a87adbcd12eb821ca49c2526b62df6d954efb1e3"
   }
  ],
  "signal": "jail_booking",

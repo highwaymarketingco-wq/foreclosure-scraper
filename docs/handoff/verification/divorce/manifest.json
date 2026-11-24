@@ -3,55 +3,66 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 198,
+  "rows": 208,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 198
+  "wall": 208
  },
- "generated_at": "2026-10-17T14:28:27Z",
+ "generated_at": "2026-11-24T02:30:31Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-10-17T14:28:27Z",
+  "at": "2026-11-24T02:30:31Z",
   "county": null,
   "host": "SMB-LTSEO05",
-  "max_rows": 300,
+  "max_rows": 10,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "berkeleycountysc.paystar.io": 10,
-    "cama.harnett.org": 3,
-    "services1.arcgis.com": 31,
-    "spartanburgcountytax.qpaybill.com": 4,
-    "tax.buncombenc.gov": 41,
-    "tax.transylvaniacounty.org": 56,
-    "taxbill.catawbacountync.gov": 555
+    "gis.buncombecounty.org": 28,
+    "gis.charlottenc.gov": 14,
+    "portal-nc.tylertech.cloud": 8,
+    "registerofdeeds.buncombenc.gov": 33,
+    "rockhillgis.cityofrockhill.com": 3,
+    "roster:cc.southernsoftware.com": 1,
+    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "roster:lexingtonsheriffsc.policetocitizen.com": 1,
+    "roster:oconee-so-sc.zuercherportal.com": 1,
+    "roster:union-so-sc.zuercherportal.com": 1,
+    "services.nconemap.gov": 10,
+    "tax.buncombenc.gov": 22,
+    "vt.ncsbe.gov": 63,
+    "webgis2.durhamnc.gov": 3,
+    "www.courtlistener.com": 15,
+    "www.greenwoodsc.gov": 10
    }
   },
   "result": {
-   "budget_stop": 1
+   "checked": 10,
+   "wall": 10
   },
-  "seconds": 1513,
+  "seconds": 612,
   "selection": {
-   "applies": 4911,
-   "due_new": 4714,
+   "applies": 4916,
+   "due_new": 4719,
    "not_due_ttl": 197
   },
   "source": null,
   "tier": null
  },
- "rows": 198,
+ "rows": 208,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 169762,
+   "bytes": 178250,
    "file": "000.json",
-   "rows": 198,
-   "sha256": "e7bedfafa65c3033004f7896f1c2d4957f2aaaf60b41bfeb76ffae2cf80cbabe"
+   "rows": 208,
+   "sha256": "d66bc0541dc2be47668c6c709be852bff647426cc528598396aae8bd8fabc480"
   }
  ],
  "signal": "divorce",

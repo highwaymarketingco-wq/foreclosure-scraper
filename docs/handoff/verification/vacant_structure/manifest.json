@@ -1,51 +1,71 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 435,
+  "confirmed": 445,
   "refuted": 2,
-  "rows": 460,
+  "rows": 470,
   "stale": 4,
   "unconfirmed": 19,
   "wall": 0
  },
- "generated_at": "2026-11-20T12:28:00Z",
+ "generated_at": "2026-11-24T02:30:31Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-20T12:28:00Z",
-  "county": "Gaston",
+  "at": "2026-11-24T02:30:31Z",
+  "county": null,
   "host": "SMB-LTSEO05",
-  "max_rows": 20,
+  "max_rows": 10,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 53
+    "gis.buncombecounty.org": 28,
+    "gis.charlottenc.gov": 14,
+    "portal-nc.tylertech.cloud": 8,
+    "registerofdeeds.buncombenc.gov": 33,
+    "rockhillgis.cityofrockhill.com": 3,
+    "roster:cc.southernsoftware.com": 1,
+    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "roster:lexingtonsheriffsc.policetocitizen.com": 1,
+    "roster:oconee-so-sc.zuercherportal.com": 1,
+    "roster:union-so-sc.zuercherportal.com": 1,
+    "services.nconemap.gov": 10,
+    "tax.buncombenc.gov": 22,
+    "vt.ncsbe.gov": 63,
+    "webgis2.durhamnc.gov": 3,
+    "www.courtlistener.com": 15,
+    "www.greenwoodsc.gov": 10
    }
   },
   "result": {
    "checked": 10,
    "confirmed": 10
   },
-  "seconds": 126,
+  "seconds": 612,
   "selection": {
-   "applies": 10,
-   "due_new": 10
+   "applies": 1733,
+   "due_new": 1273,
+   "due_retry": 3,
+   "due_ttl": 3,
+   "due_version": 44,
+   "not_due_ttl": 410
   },
   "source": null,
   "tier": null
  },
- "rows": 460,
+ "rows": 470,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 453424,
+   "bytes": 461548,
    "file": "000.json",
-   "rows": 460,
-   "sha256": "f9da6e4cda8bb4927eae9cf11432194ef8adf188696abb2c846eb3decb8c64f9"
+   "rows": 470,
+   "sha256": "67d510448c80b2be3d84c4ab383837cc112ad28eeb91f34c55a2c711bf3e27c8"
   }
  ],
  "signal": "vacant_structure",

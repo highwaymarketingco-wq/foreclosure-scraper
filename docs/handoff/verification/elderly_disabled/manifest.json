@@ -1,43 +1,72 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 5630,
+  "confirmed": 5636,
   "refuted": 97,
-  "rows": 5816,
+  "rows": 5826,
   "stale": 55,
-  "unconfirmed": 34,
+  "unconfirmed": 38,
   "wall": 0
  },
- "generated_at": "2026-11-22T07:48:22Z",
+ "generated_at": "2026-11-24T02:30:31Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-22T07:48:22Z",
-  "county": "Pickens",
+  "at": "2026-11-24T02:30:31Z",
+  "county": null,
   "host": "SMB-LTSEO05",
-  "max_rows": 2000,
+  "max_rows": 10,
   "recheck_only": false,
   "requests": {
    "errors": {},
-   "requests": {}
+   "requests": {
+    "gis.buncombecounty.org": 28,
+    "gis.charlottenc.gov": 14,
+    "portal-nc.tylertech.cloud": 8,
+    "registerofdeeds.buncombenc.gov": 33,
+    "rockhillgis.cityofrockhill.com": 3,
+    "roster:cc.southernsoftware.com": 1,
+    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "roster:lexingtonsheriffsc.policetocitizen.com": 1,
+    "roster:oconee-so-sc.zuercherportal.com": 1,
+    "roster:union-so-sc.zuercherportal.com": 1,
+    "services.nconemap.gov": 10,
+    "tax.buncombenc.gov": 22,
+    "vt.ncsbe.gov": 63,
+    "webgis2.durhamnc.gov": 3,
+    "www.courtlistener.com": 15,
+    "www.greenwoodsc.gov": 10
+   }
   },
-  "result": {},
-  "seconds": 0,
-  "selection": {},
+  "result": {
+   "checked": 10,
+   "confirmed": 6,
+   "unconfirmed": 4
+  },
+  "seconds": 612,
+  "selection": {
+   "applies": 140892,
+   "due_new": 134133,
+   "due_retry": 4,
+   "due_version": 2,
+   "not_due_retry": 13,
+   "not_due_ttl": 6740
+  },
   "source": null,
   "tier": null
  },
- "rows": 5816,
+ "rows": 5826,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 5403378,
+   "bytes": 5419909,
    "file": "000.json",
-   "rows": 5816,
-   "sha256": "b90ac2bfd3ca12ad32bd82cb9ca5d8ec7cf9784a53936e62f87c65aa020a920c"
+   "rows": 5826,
+   "sha256": "a1859027116253840584efc4751946896a90733f0f1ab9c669bb454ce8e4514a"
   }
  ],
  "signal": "elderly_disabled",

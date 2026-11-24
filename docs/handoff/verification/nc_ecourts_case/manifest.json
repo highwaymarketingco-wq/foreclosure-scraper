@@ -8,39 +8,49 @@
   "unconfirmed": 64,
   "wall": 0
  },
- "generated_at": "2026-11-18T15:33:15Z",
+ "generated_at": "2026-11-24T02:30:32Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-18T15:33:14Z",
+  "at": "2026-11-24T02:30:31Z",
   "county": null,
   "host": "SMB-LTSEO05",
-  "max_rows": 2000,
+  "max_rows": 10,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "portal-nc.tylertech.cloud": 151
+    "gis.buncombecounty.org": 28,
+    "gis.charlottenc.gov": 14,
+    "portal-nc.tylertech.cloud": 8,
+    "registerofdeeds.buncombenc.gov": 33,
+    "rockhillgis.cityofrockhill.com": 3,
+    "roster:cc.southernsoftware.com": 1,
+    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "roster:lexingtonsheriffsc.policetocitizen.com": 1,
+    "roster:oconee-so-sc.zuercherportal.com": 1,
+    "roster:union-so-sc.zuercherportal.com": 1,
+    "services.nconemap.gov": 10,
+    "tax.buncombenc.gov": 22,
+    "vt.ncsbe.gov": 63,
+    "webgis2.durhamnc.gov": 3,
+    "www.courtlistener.com": 15,
+    "www.greenwoodsc.gov": 10
    }
   },
   "result": {
-   "budget_stop": 1,
-   "checked": 185,
-   "confirmed": 108,
-   "refuted": 8,
-   "stale": 33,
-   "unconfirmed": 36
+   "checked": 10,
+   "unconfirmed": 10
   },
-  "seconds": 301,
+  "seconds": 612,
   "selection": {
    "applies": 25671,
-   "due_new": 18110,
-   "due_retry": 44,
-   "due_ttl": 863,
-   "not_due_retry": 2,
-   "not_due_ttl": 6652,
-   "same_property_queued": 24
+   "due_new": 17973,
+   "due_retry": 69,
+   "due_ttl": 803,
+   "not_due_ttl": 6826
   },
   "source": null,
   "tier": null
@@ -51,17 +61,17 @@
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4987023,
+   "bytes": 4987253,
    "file": "000.json",
    "rows": 4026,
-   "sha256": "74ca6e4c466dc8cfaebef7d3b210769196af0549f52a0ad772233fe4a54f215e"
+   "sha256": "f5d5d06a101bfcd5b0364f73746a27168d65ce7eb7008e6222feb8f2f6039bc0"
   },
   {
    "bucket": 1,
-   "bytes": 4972300,
+   "bytes": 4973220,
    "file": "001.json",
    "rows": 4012,
-   "sha256": "f6f3706ae3239aa70c118cd1bf39b6658e234dd5626ac4f5308102c3861d5ba3"
+   "sha256": "4f03e744ac4ff6d368c9d6c160dfeab11f61a3f6a7152115381ab2d060e117cb"
   }
  ],
  "signal": "nc_ecourts_case",

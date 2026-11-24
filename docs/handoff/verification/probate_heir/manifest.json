@@ -1,45 +1,71 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 48,
+  "confirmed": 47,
   "refuted": 1,
-  "rows": 131,
+  "rows": 135,
   "stale": 46,
-  "unconfirmed": 36,
+  "unconfirmed": 41,
   "wall": 0
  },
- "generated_at": "2026-11-20T02:00:25Z",
+ "generated_at": "2026-11-24T02:30:32Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
- "host": "mac-single-parcel-recheck",
+ "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-18T02:25:45Z",
-  "county": "Gaston",
+  "at": "2026-11-24T02:30:32Z",
+  "county": null,
   "host": "SMB-LTSEO05",
-  "max_rows": 1000,
+  "max_rows": 10,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "gis.gastoncountync.gov": 101
+    "gis.buncombecounty.org": 28,
+    "gis.charlottenc.gov": 14,
+    "portal-nc.tylertech.cloud": 8,
+    "registerofdeeds.buncombenc.gov": 33,
+    "rockhillgis.cityofrockhill.com": 3,
+    "roster:cc.southernsoftware.com": 1,
+    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "roster:lexingtonsheriffsc.policetocitizen.com": 1,
+    "roster:oconee-so-sc.zuercherportal.com": 1,
+    "roster:union-so-sc.zuercherportal.com": 1,
+    "services.nconemap.gov": 10,
+    "tax.buncombenc.gov": 22,
+    "vt.ncsbe.gov": 63,
+    "webgis2.durhamnc.gov": 3,
+    "www.courtlistener.com": 15,
+    "www.greenwoodsc.gov": 10
    }
   },
-  "result": {},
-  "seconds": 200,
-  "selection": {},
+  "result": {
+   "checked": 10,
+   "confirmed": 2,
+   "unconfirmed": 8
+  },
+  "seconds": 612,
+  "selection": {
+   "applies": 1052,
+   "due_new": 936,
+   "due_retry": 1,
+   "due_version": 38,
+   "not_due_ttl": 77
+  },
   "source": null,
   "tier": null
  },
- "rows": 131,
+ "rows": 135,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 183329,
+   "bytes": 192374,
    "file": "000.json",
-   "rows": 131,
-   "sha256": "dfd6e3b38e3c6633fe68c010afea6e6c7dce710303b14236f70354ac462a2c0b"
+   "rows": 135,
+   "sha256": "b675e5a0279ecdadec6dab36033dddefba51a5e15b8f97205eecee4ecfbefd80"
   }
  ],
  "signal": "probate_heir",

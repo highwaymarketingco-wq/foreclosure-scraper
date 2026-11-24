@@ -1,60 +1,79 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 14108,
+  "confirmed": 14118,
   "refuted": 11,
-  "rows": 14294,
+  "rows": 14304,
   "stale": 32,
   "unconfirmed": 143,
   "wall": 0
  },
- "generated_at": "2026-11-22T15:58:00Z",
+ "generated_at": "2026-11-24T02:30:31Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-22T15:58:00Z",
-  "county": "Greenville",
+  "at": "2026-11-24T02:30:31Z",
+  "county": null,
   "host": "SMB-LTSEO05",
-  "max_rows": 2000,
+  "max_rows": 10,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "www.gcgis.org": 193
+    "gis.buncombecounty.org": 28,
+    "gis.charlottenc.gov": 14,
+    "portal-nc.tylertech.cloud": 8,
+    "registerofdeeds.buncombenc.gov": 33,
+    "rockhillgis.cityofrockhill.com": 3,
+    "roster:cc.southernsoftware.com": 1,
+    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "roster:lexingtonsheriffsc.policetocitizen.com": 1,
+    "roster:oconee-so-sc.zuercherportal.com": 1,
+    "roster:union-so-sc.zuercherportal.com": 1,
+    "services.nconemap.gov": 10,
+    "tax.buncombenc.gov": 22,
+    "vt.ncsbe.gov": 63,
+    "webgis2.durhamnc.gov": 3,
+    "www.courtlistener.com": 15,
+    "www.greenwoodsc.gov": 10
    }
   },
   "result": {
-   "checked": 192,
-   "confirmed": 190,
-   "stale": 1,
-   "unconfirmed": 1
+   "checked": 10,
+   "confirmed": 10
   },
-  "seconds": 385,
+  "seconds": 612,
   "selection": {
-   "applies": 192,
-   "due_new": 192
+   "applies": 44671,
+   "due_new": 30433,
+   "due_retry": 26,
+   "due_retry_transient": 24,
+   "due_ttl": 432,
+   "not_due_retry": 89,
+   "not_due_ttl": 13667
   },
   "source": null,
   "tier": null
  },
- "rows": 14294,
+ "rows": 14304,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 6858551,
+   "bytes": 6865119,
    "file": "000.json",
-   "rows": 7206,
-   "sha256": "273193ca2eb40014d8e246a3e5ed04a156ac6d53099ac7a09e95bb8413b7c3c6"
+   "rows": 7213,
+   "sha256": "8d01c2695b013fe7bc20f41ac8c5f25c484442ebece14bb0876107dc38a82002"
   },
   {
    "bucket": 1,
-   "bytes": 6754993,
+   "bytes": 6757856,
    "file": "001.json",
-   "rows": 7088,
-   "sha256": "e2fc741bf0ee340b3d475f9d9ecb715a41e378d04f36d2f306d49d26f7fe0c3d"
+   "rows": 7091,
+   "sha256": "ec1fb4a0a0e27dc557a8396af8b34151d72b08a05fa9be4a31ba852b8eff8e6f"
   }
  ],
  "signal": "heir_roll",
