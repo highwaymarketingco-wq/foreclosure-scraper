@@ -594,6 +594,13 @@ async def _select_case_category(page, labels: tuple[str, ...]) -> bool:
 
 async def _search_county(page, county: str, lookback_days: int) -> list[dict]:
     """Run one county search and parse the result hitlist."""
+    # Re-select Estate category before EACH county search. Tyler's Smart Search
+    # form resets the category filter after each submit (Claude 2026-11-24: all
+    # 220 rows were non-estate because category didn't persist across counties).
+    if not await _select_case_category(page, ESTATE_CATEGORY_LABELS):
+        log.debug("nc_ecourts_estates.category_reselect_failed", county=county)
+        # Don't abort — continue with the search, but expect mixed results.
+    
     # Fill the Smart Search criteria input with the county (Advanced Search
     # also exposes a Location filter; the free-text field accepts the county
     # and Tyler scopes the hitlist). Fire input/change so the SPA picks it up.
