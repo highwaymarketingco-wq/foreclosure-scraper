@@ -8,12 +8,12 @@
   "unconfirmed": 147,
   "wall": 0
  },
- "generated_at": "2026-11-24T10:46:18Z",
+ "generated_at": "2026-11-24T10:53:12Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T10:26:16Z",
+  "at": "2026-11-24T10:53:11Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,48 +21,40 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 50,
-    "gisweb.hendersoncountync.gov": 50,
-    "maps.spartanburgcounty.org": 20,
-    "portal-nc.tylertech.cloud": 37,
+    "gis.buncombecounty.org": 54,
+    "gis.rutherfordcountync.gov": 2,
+    "gisweb.hendersoncountync.gov": 49,
+    "maps.spartanburgcounty.org": 1,
+    "portal-nc.tylertech.cloud": 35,
+    "rockhillgis.cityofrockhill.com": 3,
+    "roster:anderson-so-sc.zuercherportal.com": 1,
+    "roster:apps.alamance-nc.com": 1,
     "roster:apps.pittcountync.gov": 1,
-    "roster:cc.southernsoftware.com": 3,
-    "roster:cumberlandsheriffnc.gov": 1,
     "roster:guilfordcountysheriff.policetocitizen.com": 1,
-    "roster:injail.catawbacountync.gov": 1,
-    "roster:laurens-911-sc.zuercherportal.com": 1,
-    "roster:legacyweb.randolphcountync.gov": 1,
     "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "roster:morgantonpdnc.policetocitizen.com": 1,
-    "roster:onlineservices.cabarruscounty.us": 1,
-    "roster:p2c.iredellcountync.gov": 1,
-    "roster:p2c.nhcgov.com": 1,
-    "roster:pasquotank-911-nc.zuercherportal.com": 1,
-    "roster:rowancountync.policetocitizen.com": 1,
-    "roster:tepsweb.cityofgastonia.com": 1,
-    "roster:wakeso.policetocitizen.com": 1,
-    "roster:www2.co.davidson.nc.us": 1,
     "roster:www2.dconc.gov": 1,
+    "services.arcgis.com": 6,
     "services1.arcgis.com": 3,
     "vt.ncsbe.gov": 144,
     "webgis2.durhamnc.gov": 3,
-    "www.courtlistener.com": 64,
+    "www.courtlistener.com": 39,
     "www.southcarolinaprobate.net": 150
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 50
+   "confirmed": 49,
+   "unconfirmed": 1
   },
-  "seconds": 2517,
+  "seconds": 991,
   "selection": {
    "applies": 44671,
-   "due_new": 30073,
+   "due_new": 30023,
    "due_retry": 26,
    "due_retry_transient": 24,
    "due_ttl": 432,
    "not_due_retry": 92,
-   "not_due_ttl": 14024
+   "not_due_ttl": 14074
   },
   "source": null,
   "tier": null
