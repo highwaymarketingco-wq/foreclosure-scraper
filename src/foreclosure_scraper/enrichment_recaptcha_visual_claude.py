@@ -11,15 +11,16 @@ from typing import Optional
 log = structlog.get_logger()
 
 
-async def solve_recaptcha_visual_claude(screenshot_bytes: bytes) -> Optional[str]:
+async def solve_recaptcha_visual_claude(screenshot_bytes: bytes):
     """
-    Solve a visual reCAPTCHA image challenge using Claude API.
+    Solve a visual reCAPTCHA challenge using Claude API.
     
     Args:
-        screenshot_bytes: PNG/JPEG screenshot of the reCAPTCHA image grid
+        screenshot_bytes: PNG/JPEG screenshot of the reCAPTCHA challenge
         
     Returns:
-        Answer string (numbers/letters) or None if failed
+        Dict with "type" and either "answer" (text) or "clicks" (grid coordinates),
+        or None if failed
     """
     # Get Claude API key (same pattern as enrichment_vision.py)
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
@@ -56,16 +57,33 @@ async def solve_recaptcha_visual_claude(screenshot_bytes: bytes) -> Optional[str
     b64_data = base64.b64encode(screenshot_bytes).decode("ascii")
     
     # Claude prompt for reCAPTCHA
-    system_prompt = """You are solving Google reCAPTCHA challenges. The image shows numbers or letters.
+    system_prompt = """You are solving Google reCAPTCHA challenges.
 
-Extract ONLY the actual challenge digits/letters shown. Ignore any UI elements, buttons, or instructions.
+TWO TYPES:
+1. Text/number challenges: Extract the digits/letters shown
+2. Image grid challenges: Identify which grid squares contain the target object
 
-Output format: Return ONLY a JSON object with one key "answer" containing the extracted text with no spaces.
-Example: {"answer": "7392"}
+For IMAGE GRID challenges (e.g., "Select all images with buses"):
+- Analyze each square in the grid
+- Return JSON with "grid_clicks": array of [row, col] coordinates (0-indexed)
+- Example: {"grid_clicks": [[0,1], [2,3]]} means top row 2nd square, 3rd row 4th square
 
-If you see multiple challenge images (grid), focus on the main challenge area only."""
+For TEXT challenges:
+- Return JSON with "answer": the text/numbers shown
+- Example: {"answer": "7392"}
+
+Be precise with grid coordinates. Row 0 is top, Column 0 is left."""
     
-    user_prompt = "What numbers and/or letters are shown in this reCAPTCHA challenge? Return JSON with 'answer' key containing ONLY the digits/letters."
+    user_prompt = """Analyze this reCAPTCHA challenge.
+
+If it's an IMAGE GRID (select all X):
+- Return JSON with "grid_clicks": [[row, col], ...] for squares containing the target
+- Use 0-indexed coordinates
+
+If it's TEXT/NUMBERS:
+- Return JSON with "answer": the text shown
+
+Return ONLY the JSON, no explanation."""
     
     # Build message content (same pattern as enrichment_vision.py)
     content = [
@@ -101,10 +119,22 @@ If you see multiple challenge images (grid), focus on the main challenge area on
         import json
         try:
             parsed = json.loads(raw_text)
+            
+            # Check for grid clicks (image challenge)
+            if "grid_clicks" in parsed:
+                clicks = parsed.get("grid_clicks", [])
+                if clicks:
+                    log.info("recaptcha_claude.grid_solved", clicks=clicks[:10])
+                    return {"type": "grid", "clicks": clicks}
+                else:
+                    log.warning("recaptcha_claude.empty_grid", raw=raw_text[:200])
+                    return None
+            
+            # Check for text answer
             answer = parsed.get("answer", "").strip()
             if answer:
-                log.info("recaptcha_claude.solved", answer=answer[:20])
-                return answer
+                log.info("recaptcha_claude.text_solved", answer=answer[:20])
+                return {"type": "text", "answer": answer}
             else:
                 log.warning("recaptcha_claude.empty_answer", raw=raw_text[:200])
                 return None

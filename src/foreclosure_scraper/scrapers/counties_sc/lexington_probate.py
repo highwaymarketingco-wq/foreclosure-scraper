@@ -119,11 +119,10 @@ async def _find_anchor_frame(page):
 
 
 async def _solve_audio_challenge(page, challenge_frame) -> bool:
-    """Solve reCAPTCHA v2 using Claude vision API (visual challenge).
+    """Solve reCAPTCHA v2 using Claude vision API.
 
-    NEW APPROACH (2026-11-24): Claude vision directly on the visual challenge,
-    no audio button clicking. Audio transcription was broken (got "Shrinky Dink 
-    Dinosaurs" instead of numbers).
+    NEW APPROACH (2026-11-24): Claude vision for BOTH text and image grid challenges.
+    Handles "Select all buses/motorcycles/etc" AND text/number extraction.
     
     Returns True if the reCAPTCHA token is populated after verification.
     """
@@ -138,42 +137,103 @@ async def _solve_audio_challenge(page, challenge_frame) -> bool:
         return False
     
     # Solve with Claude vision
-    answer = await solve_recaptcha_visual_claude(screenshot_bytes)
-    if not answer:
+    result = await solve_recaptcha_visual_claude(screenshot_bytes)
+    if not result:
         log.debug("lexington_probate.claude_vision_failed")
         return False
     
-    log.info("lexington_probate.claude_answer", answer=answer[:20])
-
-    # Type answer
-    try:
-        typed = await challenge_frame.evaluate("""(answer) => {
-            const inp = document.getElementById('audio-response')
-                     || document.querySelector('input[name="audio-response"]')
-                     || document.querySelector('#response');
-            if (!inp) return false;
-            inp.value = answer;
-            inp.dispatchEvent(new Event('input', {bubbles: true}));
-            inp.dispatchEvent(new Event('change', {bubbles: true}));
-            return true;
-        }""", answer)
-        if not typed:
+    challenge_type = result.get("type")
+    
+    # Handle IMAGE GRID challenges (click squares)
+    if challenge_type == "grid":
+        clicks = result.get("clicks", [])
+        log.info("lexington_probate.grid_challenge", clicks=clicks[:10])
+        
+        # Click each grid square
+        for row, col in clicks:
+            try:
+                # reCAPTCHA grid squares are typically in a table
+                # Try multiple selectors
+                clicked = await challenge_frame.evaluate(f"""() => {{
+                    // Try table-based selector
+                    const table = document.querySelector('.rc-imageselect-table');
+                    if (table) {{
+                        const rows = table.querySelectorAll('tr');
+                        if (rows[{row}]) {{
+                            const cells = rows[{row}].querySelectorAll('td');
+                            if (cells[{col}]) {{
+                                cells[{col}].click();
+                                return true;
+                            }}
+                        }}
+                    }}
+                    
+                    // Try tile-based selector (3x3 or 4x4 grid)
+                    const tiles = document.querySelectorAll('.rc-imageselect-tile');
+                    const cols = Math.sqrt(tiles.length);  // 3 for 3x3, 4 for 4x4
+                    const index = {row} * cols + {col};
+                    if (tiles[index]) {{
+                        tiles[index].click();
+                        return true;
+                    }}
+                    
+                    return false;
+                }}""")
+                if clicked:
+                    await asyncio.sleep(0.5)
+            except Exception as exc:
+                log.debug("lexington_probate.grid_click_failed", row=row, col=col, error=str(exc)[:80])
+        
+        await asyncio.sleep(1)
+        
+        # Click verify button
+        try:
+            await challenge_frame.evaluate("""() => {
+                const btn = document.getElementById('recaptcha-verify-button')
+                         || document.querySelector('.rc-button-default');
+                if (btn) btn.click();
+            }""")
+        except Exception:
+            pass
+    
+    # Handle TEXT challenges (type answer)
+    elif challenge_type == "text":
+        answer = result.get("answer", "")
+        log.info("lexington_probate.text_challenge", answer=answer[:20])
+        
+        # Type answer
+        try:
+            typed = await challenge_frame.evaluate("""(answer) => {
+                const inp = document.getElementById('audio-response')
+                         || document.querySelector('input[name="audio-response"]')
+                         || document.querySelector('#response');
+                if (!inp) return false;
+                inp.value = answer;
+                inp.dispatchEvent(new Event('input', {bubbles: true}));
+                inp.dispatchEvent(new Event('change', {bubbles: true}));
+                return true;
+            }""", answer)
+            if not typed:
+                return False
+        except Exception as exc:
+            log.debug("lexington_probate.type_error", error=str(exc)[:80])
             return False
-    except Exception as exc:
-        log.debug("lexington_probate.type_error", error=str(exc)[:80])
+
+        await asyncio.sleep(1.5)
+
+        # Click verify
+        try:
+            await challenge_frame.evaluate("""() => {
+                const btn = document.getElementById('recaptcha-verify-button')
+                         || document.querySelector('.rc-button-default');
+                if (btn) btn.click();
+            }""")
+        except Exception:
+            pass
+    
+    else:
+        log.warning("lexington_probate.unknown_challenge_type", type=challenge_type)
         return False
-
-    await asyncio.sleep(1.5)
-
-    # Click verify
-    try:
-        await challenge_frame.evaluate("""() => {
-            const btn = document.getElementById('recaptcha-verify-button')
-                     || document.querySelector('.rc-button-default');
-            if (btn) btn.click();
-        }""")
-    except Exception:
-        pass
 
     # Check if solved
     await asyncio.sleep(2)
