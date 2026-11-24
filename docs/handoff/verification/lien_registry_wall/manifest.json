@@ -8,12 +8,12 @@
   "unconfirmed": 0,
   "wall": 660
  },
- "generated_at": "2026-11-24T14:29:08Z",
+ "generated_at": "2026-11-24T14:33:15Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T14:03:52Z",
+  "at": "2026-11-24T14:33:15Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -24,27 +24,24 @@
     "gis.buncombecounty.org": 50,
     "gis.charlottenc.gov": 100,
     "gis.transylvaniacounty.org": 50,
-    "portal-nc.tylertech.cloud": 34,
-    "registerofdeeds.buncombenc.gov": 4,
-    "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:oconee-so-sc.zuercherportal.com": 1,
-    "roster:pickens-so-sc.zuercherportal.com": 1,
+    "portal-nc.tylertech.cloud": 35,
+    "registerofdeeds.buncombenc.gov": 87,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
     "roster:union-so-sc.zuercherportal.com": 1,
     "vt.ncsbe.gov": 144,
     "www.courtlistener.com": 2,
-    "www.greenwoodsc.gov": 50,
-    "www.southcarolinaprobate.net": 120
+    "www.greenwoodsc.gov": 50
    }
   },
   "result": {
    "checked": 50,
    "wall": 50
   },
-  "seconds": 1033,
+  "seconds": 982,
   "selection": {
    "applies": 66565,
-   "due_new": 65993,
-   "not_due_ttl": 572,
+   "due_new": 65943,
+   "not_due_ttl": 622,
    "same_property_queued": 1
   },
   "source": null,

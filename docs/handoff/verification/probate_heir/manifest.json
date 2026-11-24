@@ -3,17 +3,17 @@
  "counts": {
   "confirmed": 157,
   "refuted": 2,
-  "rows": 706,
+  "rows": 756,
   "stale": 235,
-  "unconfirmed": 312,
+  "unconfirmed": 362,
   "wall": 0
  },
- "generated_at": "2026-11-24T14:03:53Z",
+ "generated_at": "2026-11-24T14:33:16Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T14:03:53Z",
+  "at": "2026-11-24T14:33:16Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -24,45 +24,40 @@
     "gis.buncombecounty.org": 50,
     "gis.charlottenc.gov": 100,
     "gis.transylvaniacounty.org": 50,
-    "portal-nc.tylertech.cloud": 34,
-    "registerofdeeds.buncombenc.gov": 4,
-    "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:oconee-so-sc.zuercherportal.com": 1,
-    "roster:pickens-so-sc.zuercherportal.com": 1,
+    "portal-nc.tylertech.cloud": 35,
+    "registerofdeeds.buncombenc.gov": 87,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
     "roster:union-so-sc.zuercherportal.com": 1,
     "vt.ncsbe.gov": 144,
     "www.courtlistener.com": 2,
-    "www.greenwoodsc.gov": 50,
-    "www.southcarolinaprobate.net": 120
+    "www.greenwoodsc.gov": 50
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 7,
-   "stale": 33,
-   "unconfirmed": 10
+   "unconfirmed": 50
   },
-  "seconds": 1033,
+  "seconds": 982,
   "selection": {
    "applies": 1052,
-   "due_new": 410,
+   "due_new": 360,
    "due_version": 4,
-   "not_due_retry": 289,
-   "not_due_ttl": 349
+   "not_due_retry": 299,
+   "not_due_ttl": 389
   },
   "source": null,
   "tier": null
  },
- "rows": 706,
+ "rows": 756,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 935958,
+   "bytes": 1010023,
    "file": "000.json",
-   "rows": 706,
-   "sha256": "c4c4fe560e6f3e2361366fe857f1d84ec7f9c847537f979dc2c153f51211dbf7"
+   "rows": 756,
+   "sha256": "5e8261e0f832341f35545a021d578b9491658460cffdce4880051d9faadaa998"
   }
  ],
  "signal": "probate_heir",
