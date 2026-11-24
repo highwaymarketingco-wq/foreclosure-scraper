@@ -1,19 +1,19 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 1244,
+  "confirmed": 1288,
   "refuted": 4,
-  "rows": 1328,
-  "stale": 61,
+  "rows": 1378,
+  "stale": 67,
   "unconfirmed": 19,
   "wall": 0
  },
- "generated_at": "2026-11-24T21:48:35Z",
+ "generated_at": "2026-11-24T22:38:59Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T21:48:35Z",
+  "at": "2026-11-24T22:38:59Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -22,45 +22,44 @@
    "errors": {},
    "requests": {
     "arcgisserver.lincolncountync.gov": 50,
-    "devsvcs.gastonianc.gov": 136,
-    "gis.buncombecounty.org": 50,
+    "devsvcs.gastonianc.gov": 149,
+    "gis.buncombecounty.org": 85,
     "maps.spartanburgcounty.org": 50,
     "portal-nc.tylertech.cloud": 39,
-    "roster:inmatesinjail.yorkcountygov.com": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "vt.ncsbe.gov": 150,
+    "registerofdeeds.buncombenc.gov": 118,
+    "vt.ncsbe.gov": 270,
     "www.courtlistener.com": 2,
-    "www.southcarolinaprobate.net": 150
+    "www.southcarolinaprobate.net": 21
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 43,
-   "stale": 7
+   "confirmed": 44,
+   "stale": 6
   },
-  "seconds": 1300,
+  "seconds": 1339,
   "selection": {
    "applies": 1737,
-   "due_new": 459,
+   "due_new": 409,
    "due_retry": 1,
    "due_ttl": 3,
    "due_version": 4,
    "not_due_retry": 18,
-   "not_due_ttl": 1252
+   "not_due_ttl": 1302
   },
   "source": null,
   "tier": null
  },
- "rows": 1328,
+ "rows": 1378,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 1185707,
+   "bytes": 1226460,
    "file": "000.json",
-   "rows": 1328,
-   "sha256": "5dcb140c170ad4f5c2cf95f16c871697d8451bdf027330e5f2c5ac9dd8efba2f"
+   "rows": 1378,
+   "sha256": "5eb356e5baec6a034580ac2b2dfe77551f5b5b11f6e223a0714fd09715f6bbbd"
   }
  ],
  "signal": "vacant_structure",

@@ -1,19 +1,19 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 6492,
+  "confirmed": 6542,
   "refuted": 99,
-  "rows": 6724,
+  "rows": 6774,
   "stale": 59,
   "unconfirmed": 74,
   "wall": 0
  },
- "generated_at": "2026-11-24T21:48:36Z",
+ "generated_at": "2026-11-24T22:38:59Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T21:48:35Z",
+  "at": "2026-11-24T22:38:59Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -22,44 +22,43 @@
    "errors": {},
    "requests": {
     "arcgisserver.lincolncountync.gov": 50,
-    "devsvcs.gastonianc.gov": 136,
-    "gis.buncombecounty.org": 50,
+    "devsvcs.gastonianc.gov": 149,
+    "gis.buncombecounty.org": 85,
     "maps.spartanburgcounty.org": 50,
     "portal-nc.tylertech.cloud": 39,
-    "roster:inmatesinjail.yorkcountygov.com": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "vt.ncsbe.gov": 150,
+    "registerofdeeds.buncombenc.gov": 118,
+    "vt.ncsbe.gov": 270,
     "www.courtlistener.com": 2,
-    "www.southcarolinaprobate.net": 150
+    "www.southcarolinaprobate.net": 21
    }
   },
   "result": {
    "checked": 50,
    "confirmed": 50
   },
-  "seconds": 1300,
+  "seconds": 1339,
   "selection": {
    "applies": 140892,
-   "due_new": 133246,
+   "due_new": 133196,
    "due_retry": 3,
    "due_version": 1,
    "not_due_retry": 62,
-   "not_due_ttl": 7580,
+   "not_due_ttl": 7630,
    "same_property_queued": 1
   },
   "source": null,
   "tier": null
  },
- "rows": 6724,
+ "rows": 6774,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 6587151,
+   "bytes": 6650201,
    "file": "000.json",
-   "rows": 6724,
-   "sha256": "c9aa635a16ffd87e6c5d720889ef21092245810b80531eb510aed667b8c8be34"
+   "rows": 6774,
+   "sha256": "9030f7d35898dd5a466e367c534aa915801438f469ab79c0f60c25c7119f9a51"
   }
  ],
  "signal": "elderly_disabled",

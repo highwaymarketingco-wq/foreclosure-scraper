@@ -1,19 +1,19 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 1827,
+  "confirmed": 1851,
   "refuted": 176,
-  "rows": 2177,
-  "stale": 171,
-  "unconfirmed": 3,
+  "rows": 2207,
+  "stale": 176,
+  "unconfirmed": 4,
   "wall": 0
  },
- "generated_at": "2026-11-24T22:18:49Z",
+ "generated_at": "2026-11-24T22:38:59Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T21:48:35Z",
+  "at": "2026-11-24T22:38:58Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -22,44 +22,44 @@
    "errors": {},
    "requests": {
     "arcgisserver.lincolncountync.gov": 50,
-    "devsvcs.gastonianc.gov": 136,
-    "gis.buncombecounty.org": 50,
+    "devsvcs.gastonianc.gov": 149,
+    "gis.buncombecounty.org": 85,
     "maps.spartanburgcounty.org": 50,
     "portal-nc.tylertech.cloud": 39,
-    "roster:inmatesinjail.yorkcountygov.com": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "vt.ncsbe.gov": 150,
+    "registerofdeeds.buncombenc.gov": 118,
+    "vt.ncsbe.gov": 270,
     "www.courtlistener.com": 2,
-    "www.southcarolinaprobate.net": 150
+    "www.southcarolinaprobate.net": 21
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 41,
-   "stale": 9
+   "confirmed": 39,
+   "stale": 10,
+   "unconfirmed": 1
   },
-  "seconds": 1300,
+  "seconds": 1339,
   "selection": {
    "applies": 11928,
-   "due_new": 9717,
+   "due_new": 9667,
    "due_ttl": 192,
    "not_due_retry": 3,
-   "not_due_ttl": 2016,
+   "not_due_ttl": 2066,
    "same_property_queued": 1
   },
   "source": null,
   "tier": null
  },
- "rows": 2177,
+ "rows": 2207,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 2432299,
+   "bytes": 2475520,
    "file": "000.json",
-   "rows": 2177,
-   "sha256": "9a32acfb8f72e3e69a75cdd16c5a8ffddf57d99888347f205947a0a34b287323"
+   "rows": 2207,
+   "sha256": "7b829a5167302e278d366dc0c6947882f5622165b4ff49770363de261338cde8"
   }
  ],
  "signal": "code_enforcement",
