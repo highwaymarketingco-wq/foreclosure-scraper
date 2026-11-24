@@ -119,90 +119,30 @@ async def _find_anchor_frame(page):
 
 
 async def _solve_audio_challenge(page, challenge_frame) -> bool:
-    """Switch challenge to audio mode, download MP3, STT via Groq, type answer.
+    """Solve reCAPTCHA v2 using Claude vision API (visual challenge).
 
+    NEW APPROACH (2026-11-24): Claude vision directly on the visual challenge,
+    no audio button clicking. Audio transcription was broken (got "Shrinky Dink 
+    Dinosaurs" instead of numbers).
+    
     Returns True if the reCAPTCHA token is populated after verification.
     """
-    # Click audio button
+    from foreclosure_scraper.enrichment_recaptcha_visual_claude import solve_recaptcha_visual_claude
+    
+    # Take screenshot of the reCAPTCHA challenge
     try:
-        clicked = await challenge_frame.evaluate("""() => {
-            const btn = document.querySelector('#recaptcha-audio-button')
-                      || document.querySelector('.rc-button-audio');
-            if (btn) { btn.click(); return true; }
-            for (const b of document.querySelectorAll('button, a')) {
-                if (b.textContent && b.textContent.toLowerCase().includes('audio')) {
-                    b.click(); return true;
-                }
-            }
-            return false;
-        }""")
-        if not clicked:
-            log.debug("lexington_probate.audio_btn_missing")
-            return False
+        screenshot_bytes = await challenge_frame.screenshot(type="png")
     except Exception as exc:
-        log.debug("lexington_probate.audio_btn_error", error=str(exc)[:80])
+        log.debug("lexington_probate.screenshot_failed", error=str(exc)[:80])
         return False
-
-    # Wait for audio element to load with retries (increased from 4s, 2026-11-24)
-    audio_url: str | None = None
-    for attempt in range(5):
-        await asyncio.sleep(2)
-        try:
-            audio_url = await challenge_frame.evaluate("""() => {
-                const a = document.querySelector('audio source') || document.querySelector('audio');
-                if (a) return a.src || a.getAttribute('src');
-                const l = document.querySelector('.rc-audiochallenge-tdownload-link');
-                if (l) return l.href;
-                return null;
-            }""")
-            if audio_url:
-                break
-        except Exception:
-            pass
-
-    if not audio_url:
-        log.debug("lexington_probate.no_audio_url", attempts=5)
+    
+    # Solve with Claude vision
+    answer = await solve_recaptcha_visual_claude(screenshot_bytes)
+    if not answer:
+        log.debug("lexington_probate.claude_vision_failed")
         return False
-
-    # Download audio
-    try:
-        cookies = await page.context.cookies()
-        cookie_str = "; ".join(f"{c['name']}={c['value']}" for c in cookies)
-        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as c:
-            resp = await c.get(
-                audio_url,
-                headers={
-                    "Referer": "https://www.google.com/recaptcha/api2/",
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                    **({} if not cookie_str else {"Cookie": cookie_str}),
-                },
-            )
-        if resp.status_code != 200:
-            log.debug("lexington_probate.audio_download_failed", status=resp.status_code)
-            return False
-        audio_data = resp.content
-    except Exception as exc:
-        log.debug("lexington_probate.audio_download_error", error=str(exc)[:80])
-        return False
-
-    # Transcribe
-    transcript = await _speech_to_text_groq(audio_data)
-    if not transcript:
-        return False
-
-    # Clean transcript: keep only digits/letters, strip common filler words
-    clean = re.sub(r"[^a-z0-9\s]", "", transcript.strip().lower())
-    filler = {
-        "the", "numbers", "you", "hear", "type", "please", "enter", "below",
-        "or", "and", "digits", "letters", "sequence", "of", "in", "to",
-        "press", "key", "after", "each", "number",
-    }
-    answer = "".join(w for w in clean.split() if w not in filler)
-    if len(answer) > 12:
-        answer = answer[:12]
-    if len(answer) < 2:
-        log.debug("lexington_probate.answer_too_short", raw=transcript[:40])
-        return False
+    
+    log.info("lexington_probate.claude_answer", answer=answer[:20])
 
     # Type answer
     try:
@@ -234,19 +174,23 @@ async def _solve_audio_challenge(page, challenge_frame) -> bool:
     except Exception:
         pass
 
-    await asyncio.sleep(5)
-
-    token = await _get_recaptcha_response(page)
-    if token:
-        log.debug("lexington_probate.captcha_solved", answer=answer)
-        return True
-
-    log.debug("lexington_probate.captcha_not_solved_after_verify")
-    return False
+    # Check if solved
+    await asyncio.sleep(2)
+    try:
+        resp_token = await page.evaluate("""() => {
+            const r = document.getElementById('g-recaptcha-response');
+            return r ? r.value : null;
+        }""")
+        if resp_token and len(resp_token) > 50:
+            return True
+        log.debug("lexington_probate.captcha_not_solved_after_verify")
+        return False
+    except Exception:
+        return False
 
 
 async def _do_captcha_flow(page, max_attempts: int = 8) -> bool:
-    """Full reCAPTCHA V2 flow: checkbox click + audio-challenge fallback.
+    """Full reCAPTCHA V2 flow: checkbox click + visual challenge with Claude.
 
     Returns True when a valid token is in the page.
     """
