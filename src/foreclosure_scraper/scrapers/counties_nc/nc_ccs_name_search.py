@@ -5,7 +5,18 @@ Adapted from enrichment_gaston_rod.py's proven pattern.
 PROBLEM: Broad date-range POST times out (Cloudflare 524 - backend can't handle it)
 SOLUTION: Per-surname search using same 3-step session pattern as Gaston
 
-Counties: Caldwell, Franklin, Hertford, Gates (NOT Cloudflare-blocked)
+Counties: Caldwell, Franklin, Hertford, Gates.
+
+FOUND 2026-11-24 (Hermes, confirmed live by Claude): 3 of the 4
+(caldwellnc/franklinnc/hertfordnc) are now Cloudflare-walled -- a plain GET
+gets HTTP 403, same "Just a moment" posture Gaston's host has (and did NOT
+have as of the 2026-10-13 audit this scraper was originally built against).
+gatesnc is NOT blocked (confirmed live, repeated checks, real 200 + content)
+-- it keeps the original plain-httpx path below. The 3 blocked hosts go
+through _run_stealthy_county(), the same StealthyFetcher Cloudflare-bypass
++ in-page-fetch pattern already proven for enrichment_gaston_rod.py --
+reuses that module's generic _PageSession/_PageResp (page-wrapping, not
+Gaston-specific) rather than duplicating them.
 """
 from __future__ import annotations
 
@@ -19,6 +30,7 @@ import structlog
 
 from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
+from ...enrichment_gaston_rod import _PageSession
 
 log = structlog.get_logger()
 
@@ -29,6 +41,11 @@ _COUNTIES = {
     "Hertford": "hertfordnc",
     "Gates": "gatesnc",
 }
+
+# Confirmed live 2026-11-24 (see module docstring) -- these 3 need the
+# StealthyFetcher Cloudflare bypass; Gates does not and keeps the plain
+# httpx path below.
+_CLOUDFLARE_BLOCKED = {"Caldwell", "Franklin", "Hertford"}
 
 _BASE = "https://{subdomain}.courthousecomputersystems.com"
 _LRINDEX = "/LRSearch/LRIndex?searchTabID=0"
@@ -171,6 +188,82 @@ async def _seed_and_search(
         return []
 
 
+async def _stealthy_seed_and_search(session: _PageSession, base: str, surname: str) -> list[dict]:
+    """Same 3-step seed+search as _seed_and_search(), but through a
+    _PageSession (an already-Cloudflare-solved browser page) instead of a
+    plain httpx client -- for the 3 _CLOUDFLARE_BLOCKED hosts. Identical
+    logic to _seed_and_search(); kept separate rather than parameterizing
+    one function over both session types, since _PageSession's .get()/.post()
+    already duck-type the httpx interface closely enough that forcing a
+    single call site to handle both would add indirection without reducing
+    real complexity."""
+    try:
+        await session.get(base)
+        lrindex_url = base + _LRINDEX
+        resp = await session.get(lrindex_url)
+        if resp.status_code != 200:
+            log.warning("ccs_name.stealthy_seed_failed", base=base, status=resp.status_code)
+            return []
+
+        exec_url = base + _EXEC
+        headers = {**_HDRS, "Referer": lrindex_url}
+        resp = await session.post(exec_url, data=_body(surname), headers=headers)
+        if resp.status_code != 200:
+            log.warning("ccs_name.stealthy_search_failed", surname=surname, status=resp.status_code)
+            return []
+
+        all_rows = _parse_rows(resp.text)
+        distress_rows = [r for r in all_rows if _has_distress_signal(r)]
+        if distress_rows:
+            log.info("ccs_name.stealthy_distress_found", surname=surname,
+                    total=len(all_rows), distress=len(distress_rows))
+        return distress_rows
+    except Exception as exc:  # noqa: BLE001
+        log.error("ccs_name.stealthy_exception", surname=surname, error=str(exc)[:200])
+        return []
+
+
+async def _run_stealthy_county(county: str, subdomain: str) -> list[dict]:
+    """One county, fully through a Cloudflare-solved browser session: solve
+    once, then loop every surname as in-page fetch() calls on that same
+    solved page (same reasoning as enrichment_gaston_rod.py's _run_stealthy --
+    a fresh plain session here would hit the exact wall this function exists
+    to get past). Each of the 3 blocked counties is a different origin, so
+    this is called once per county rather than trying to share one browser
+    session across all of them (cross-origin fetch() from a page loaded on
+    a DIFFERENT county's domain would not carry that other domain's own
+    Cloudflare clearance or cookies)."""
+    base = _BASE.format(subdomain=subdomain)
+    county_instruments: list[dict] = []
+
+    async def page_action(page):
+        session = _PageSession(page)
+        for surname in _COMMON_SURNAMES:
+            instruments = await _stealthy_seed_and_search(session, base, surname)
+            county_instruments.extend(instruments)
+
+    try:
+        from scrapling.fetchers import StealthyFetcher
+    except Exception as exc:  # noqa: BLE001
+        log.warning("ccs_name.scrapling_missing", county=county, error=str(exc)[:160])
+        return []
+
+    try:
+        await StealthyFetcher.async_fetch(
+            base + "/",
+            headless=True,
+            network_idle=True,
+            timeout=60000,
+            page_action=page_action,
+            solve_cloudflare=True,
+            wait=5000,
+        )
+    except Exception as exc:  # noqa: BLE001
+        log.warning("ccs_name.stealthy_fetch_failed", county=county, error=str(exc)[:200])
+
+    return county_instruments
+
+
 class NcCcsNameSearchScraper(BaseScraper):
     """NC CCS 4 counties via per-surname discovery."""
     
@@ -180,21 +273,41 @@ class NcCcsNameSearchScraper(BaseScraper):
     timeout_s = 1800.0  # 30 min for all counties
     
     async def fetch(self) -> list[Listing]:
-        """Search each county × common surnames for distress signals."""
-        
+        """Search each county x common surnames for distress signals.
+
+        Gates (not Cloudflare-blocked) uses the original plain-httpx path.
+        Caldwell/Franklin/Hertford (confirmed blocked 2026-11-24) each get
+        their own StealthyFetcher-solved browser session via
+        _run_stealthy_county() -- see _CLOUDFLARE_BLOCKED and the module
+        docstring."""
+
         results: list[Listing] = []
-        
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-            for county, subdomain in _COUNTIES.items():
-                base = _BASE.format(subdomain=subdomain)
-                county_instruments: list[dict] = []
-                
-                log.info("ccs_name.county_start", county=county)
-                
-                for surname in _COMMON_SURNAMES:
-                    instruments = await _seed_and_search(client, base, surname)
-                    county_instruments.extend(instruments)
-                
+        per_county_instruments: dict[str, list[dict]] = {}
+
+        blocked = [(c, s) for c, s in _COUNTIES.items() if c in _CLOUDFLARE_BLOCKED]
+        unblocked = [(c, s) for c, s in _COUNTIES.items() if c not in _CLOUDFLARE_BLOCKED]
+
+        for county, subdomain in blocked:
+            log.info("ccs_name.county_start", county=county, path="stealthy")
+            per_county_instruments[county] = await _run_stealthy_county(county, subdomain)
+
+        if unblocked:
+            async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+                for county, subdomain in unblocked:
+                    base = _BASE.format(subdomain=subdomain)
+                    log.info("ccs_name.county_start", county=county, path="httpx")
+                    county_instruments: list[dict] = []
+                    for surname in _COMMON_SURNAMES:
+                        instruments = await _seed_and_search(client, base, surname)
+                        county_instruments.extend(instruments)
+                    per_county_instruments[county] = county_instruments
+
+        for county, county_instruments in per_county_instruments.items():
+                # base was only in scope inside the fetch loops above (and
+                # never set at all for blocked counties, handled inside
+                # _run_stealthy_county) -- recompute it fresh per county here
+                # rather than relying on a leftover loop variable.
+                base = _BASE.format(subdomain=_COUNTIES[county])
                 # Dedupe by doc number within county
                 seen = set()
                 unique_instruments = []
