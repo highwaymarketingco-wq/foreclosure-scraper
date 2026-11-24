@@ -8,12 +8,12 @@
   "unconfirmed": 194,
   "wall": 0
  },
- "generated_at": "2026-11-24T23:32:12Z",
+ "generated_at": "2026-11-24T23:43:34Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T23:08:28Z",
+  "at": "2026-11-24T23:43:34Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,14 +21,13 @@
   "requests": {
    "errors": {},
    "requests": {
-    "arcgisserver.lincolncountync.gov": 40,
-    "devsvcs.gastonianc.gov": 130,
-    "gis.buncombecounty.org": 54,
-    "mapping.mitchellcountync.gov": 10,
+    "devsvcs.gastonianc.gov": 21,
+    "gis.buncombecounty.org": 51,
+    "mapping.mitchellcountync.gov": 50,
     "maps.spartanburgcounty.org": 50,
-    "portal-nc.tylertech.cloud": 39,
-    "registerofdeeds.buncombenc.gov": 29,
-    "vt.ncsbe.gov": 150,
+    "portal-nc.tylertech.cloud": 40,
+    "services1.arcgis.com": 4,
+    "vt.ncsbe.gov": 144,
     "www.courtlistener.com": 2
    }
   },
@@ -36,7 +35,7 @@
    "checked": 7,
    "unconfirmed": 7
   },
-  "seconds": 991,
+  "seconds": 697,
   "selection": {
    "applies": 465,
    "due_ttl": 7,

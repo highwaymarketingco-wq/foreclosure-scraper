@@ -1,19 +1,19 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 1351,
+  "confirmed": 1381,
   "refuted": 4,
-  "rows": 1448,
+  "rows": 1478,
   "stale": 74,
   "unconfirmed": 19,
   "wall": 0
  },
- "generated_at": "2026-11-24T23:34:03Z",
+ "generated_at": "2026-11-24T23:43:35Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T23:08:28Z",
+  "at": "2026-11-24T23:43:34Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,45 +21,44 @@
   "requests": {
    "errors": {},
    "requests": {
-    "arcgisserver.lincolncountync.gov": 40,
-    "devsvcs.gastonianc.gov": 130,
-    "gis.buncombecounty.org": 54,
-    "mapping.mitchellcountync.gov": 10,
+    "devsvcs.gastonianc.gov": 21,
+    "gis.buncombecounty.org": 51,
+    "mapping.mitchellcountync.gov": 50,
     "maps.spartanburgcounty.org": 50,
-    "portal-nc.tylertech.cloud": 39,
-    "registerofdeeds.buncombenc.gov": 29,
-    "vt.ncsbe.gov": 150,
+    "portal-nc.tylertech.cloud": 40,
+    "services1.arcgis.com": 4,
+    "vt.ncsbe.gov": 144,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 45,
-   "stale": 5
+   "confirmed": 48,
+   "stale": 2
   },
-  "seconds": 991,
+  "seconds": 697,
   "selection": {
    "applies": 1737,
-   "due_new": 359,
+   "due_new": 309,
    "due_retry": 1,
    "due_ttl": 3,
    "due_version": 4,
    "not_due_retry": 18,
-   "not_due_ttl": 1352
+   "not_due_ttl": 1402
   },
   "source": null,
   "tier": null
  },
- "rows": 1448,
+ "rows": 1478,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 1283332,
+   "bytes": 1307907,
    "file": "000.json",
-   "rows": 1448,
-   "sha256": "30105a54f1be7c21f1a6667a9a2d0ef85e359c5680fe752c639216380056b57f"
+   "rows": 1478,
+   "sha256": "643b8a78a321d1fe7ded1a89170acba2a6802218c60dc8d686592bd1080f55ed"
   }
  ],
  "signal": "vacant_structure",
