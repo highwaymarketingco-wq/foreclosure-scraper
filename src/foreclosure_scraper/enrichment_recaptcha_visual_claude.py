@@ -115,6 +115,16 @@ Return ONLY the JSON, no explanation."""
         text_chunks = [b.text for b in resp.content if hasattr(b, "text")]
         raw_text = "\n".join(text_chunks).strip()
         
+        # Strip markdown code blocks if present
+        if raw_text.startswith("```"):
+            lines = raw_text.split("\n")
+            # Remove first line (```json or ```) and last line (```)
+            if lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            raw_text = "\n".join(lines).strip()
+        
         # Parse JSON response
         import json
         try:
