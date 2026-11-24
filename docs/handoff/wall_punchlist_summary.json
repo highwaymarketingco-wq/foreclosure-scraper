@@ -2,63 +2,63 @@
  "board_rows": 633730,
  "by_category": {
   "uncovered": 165215,
-  "wall": 22519
+  "wall": 22512
  },
  "format_version": 1,
  "kind": "wall_punchlist_summary",
  "ledger_problems": {},
  "ledgers": {
   "bankruptcy_stay": {
-   "entries": 295,
-   "generated_at": "2026-11-24T02:30:31Z"
+   "entries": 314,
+   "generated_at": "2026-11-24T03:07:28Z"
   },
   "code_enforcement": {
-   "entries": 1257,
-   "generated_at": "2026-11-24T02:30:31Z"
+   "entries": 1307,
+   "generated_at": "2026-11-24T03:07:28Z"
   },
   "comps": {
    "entries": 844,
    "generated_at": "2026-11-24T02:06:18Z"
   },
   "court_wall": {
-   "entries": 1484,
-   "generated_at": "2026-11-24T02:30:31Z"
+   "entries": 1534,
+   "generated_at": "2026-11-24T03:07:28Z"
   },
   "divorce": {
-   "entries": 208,
-   "generated_at": "2026-11-24T02:30:31Z"
+   "entries": 258,
+   "generated_at": "2026-11-24T03:07:28Z"
   },
   "elderly_disabled": {
-   "entries": 5826,
-   "generated_at": "2026-11-24T02:30:31Z"
+   "entries": 5876,
+   "generated_at": "2026-11-24T03:07:28Z"
   },
   "foreclosure_rod": {
-   "entries": 115,
-   "generated_at": "2026-11-24T02:30:31Z"
+   "entries": 151,
+   "generated_at": "2026-11-24T03:07:28Z"
   },
   "foreclosure_sale_list": {
-   "entries": 335,
-   "generated_at": "2026-11-24T02:30:31Z"
+   "entries": 342,
+   "generated_at": "2026-11-24T03:07:28Z"
   },
   "heir_roll": {
-   "entries": 14304,
-   "generated_at": "2026-11-24T02:30:31Z"
+   "entries": 14354,
+   "generated_at": "2026-11-24T03:07:29Z"
   },
   "jail_booking": {
-   "entries": 237,
-   "generated_at": "2026-11-24T02:30:31Z"
+   "entries": 275,
+   "generated_at": "2026-11-24T03:07:29Z"
   },
   "lien_registry_wall": {
-   "entries": 10,
-   "generated_at": "2026-11-24T02:30:31Z"
+   "entries": 60,
+   "generated_at": "2026-11-24T03:07:29Z"
   },
   "nc_ecourts_case": {
-   "entries": 8038,
-   "generated_at": "2026-11-24T02:30:32Z"
+   "entries": 8080,
+   "generated_at": "2026-11-24T03:07:29Z"
   },
   "probate_heir": {
-   "entries": 135,
-   "generated_at": "2026-11-24T02:30:32Z"
+   "entries": 181,
+   "generated_at": "2026-11-24T03:07:29Z"
   },
   "tax_lien": {
    "entries": 103737,
@@ -69,11 +69,11 @@
    "generated_at": "2026-10-20T14:49:27Z"
   },
   "vacant_structure": {
-   "entries": 470,
-   "generated_at": "2026-11-24T02:30:31Z"
+   "entries": 520,
+   "generated_at": "2026-11-24T03:07:28Z"
   }
  },
- "listings": 187734,
+ "listings": 187727,
  "uncovered": {
   "by_scraper_source": {
    "city_websites.charlotte_open_data": 4585,
@@ -160,7 +160,7 @@
    "counties_sc.sc_probate_notices.gaffneyledger": 47,
    "counties_sc.sc_probate_notices.laurenscountyadvertiser": 23,
    "counties_sc.sc_probate_notices.yourpickenscounty": 99,
-   "counties_sc.sc_public_index": 3798,
+   "counties_sc.sc_public_index": 3797,
    "counties_sc.sc_public_index_export": 1,
    "counties_sc.sc_public_index_lis_pendens": 477,
    "counties_sc.sc_public_notices": 1604,
@@ -189,12 +189,12 @@
    "national.usda_properties": 1,
    "national.xome": 1,
    "public_notices.gannett_obituaries": 1,
-   "public_notices.nc_notices_counties": 903,
+   "public_notices.nc_notices_counties": 897,
    "public_notices.ncnotices": 30,
    "reo.vrm_va_reo": 2
   },
   "by_signal": {
-   "court_wall": 8893,
+   "court_wall": 8886,
    "divorce": 4904,
    "lien_registry_wall": 8722
   },
@@ -202,20 +202,20 @@
    "brock_scott_waf": 49,
    "divorce_sc_wall": 4904,
    "nc_est": 3058,
-   "nc_sp": 248,
+   "nc_sp": 242,
    "sc_lien_registries": 8722,
    "sc_notice_body": 1569,
-   "sc_publicindex": 3969
+   "sc_publicindex": 3968
   },
   "by_wall_state": {
-   "not_yet_labelled": 20842,
-   "recorded": 1677
+   "not_yet_labelled": 20735,
+   "recorded": 1777
   },
   "top_counties": {
    "NC:cabarrus": 299,
    "NC:guilford": 309,
    "NC:johnston": 263,
-   "SC:anderson": 1451,
+   "SC:anderson": 1450,
    "SC:beaufort": 1234,
    "SC:charleston": 3403,
    "SC:cherokee": 1075,

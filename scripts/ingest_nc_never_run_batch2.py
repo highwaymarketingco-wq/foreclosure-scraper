@@ -35,7 +35,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import contextlib
 import sys
 from pathlib import Path
 
@@ -54,7 +53,7 @@ from foreclosure_scraper.scrapers.counties_nc.mcdowell_tax_foreclosure import Mc
 from foreclosure_scraper.scrapers.counties_nc.new_hanover_foreclosures import NewHanoverForeclosures  # noqa: E402
 from foreclosure_scraper.scrapers.counties_nc.nc_coastal_tax_foreclosure import NCCoastalTaxForeclosure  # noqa: E402
 from foreclosure_scraper.scrapers.counties_nc.rutherford_foreclosure import RutherfordForeclosure  # noqa: E402
-from foreclosure_scraper.web_artifact import board_lock, load_board, write_artifact  # noqa: E402
+from foreclosure_scraper.web_artifact import append_new_rows, board_lock  # noqa: E402
 
 SCRAPER_CLASSES = [
     BrunswickLegalNotices, BuncombeTaxForeclosure, ClevelandTaxForeclosure,
@@ -63,29 +62,20 @@ SCRAPER_CLASSES = [
     RutherfordForeclosure,
 ]
 
-#: SCOPED BY SOURCE, NOT BY COUNTY -- deliberately, after a dry run of a
-#: county-scoped version came back NET NEGATIVE (-50 to -51 rows) twice in a
-#: row. Root cause traced to New Hanover specifically (12 GENUINELY DISTINCT
-#: liensnc addresses -- Juno Dr + Sidbury Landing, a subdivision -- all
-#: sharing one subdivision-PARENT tax parcel, fused into 1 row by dedupe()'s
-#: Pass 1 exact-key bucketing, which runs BEFORE the house-number guard that
-#: only protects Pass 2's fuzzy matching), but excluding just that county
-#: only recovered 1 of the ~50 missing rows -- the rest is smaller, quieter
-#: instances of the same class of pre-existing cross-source key collision
-#: scattered across the other 10 counties, apparently never surfaced before
-#: because this broad a scope had never been deduped in one pass.
-#:
-#: All 10 scrapers here show ZERO existing board rows for their OWN slugs
-#: (confirmed before writing this script), so there is nothing of theirs to
-#: merge against, and scoping to "rows from these 10 sources" costs nothing
-#: real: it is empty today. This adds the 30 new rows without touching any
-#: pre-existing board data at all, so whatever latent cross-source dedup
-#: opportunities (or further poisoned-key risks) exist in these counties'
-#: EXISTING rows are left exactly as they are -- neither fixed nor further
-#: risked by this ingest. See docs/WEEKEND_LOOP_QUEUE.md's 2026-09-15 entry:
-#: the underlying issue (Pass 1 has no poisoned-parcel-id guard, only Pass 2
-#: does) is a real, separate, codebase-wide finding that deserves its own
-#: dedicated investigation, not a fix folded into this ingest.
+#: REWRITTEN 2026-11-23 (found never having been run at all -- its own load_board()
+#: call crashes outright now that the board is 5.7GB, same BoardLoadTooLarge family as
+#: daily_api_refresh.py's confirmed 19GB OOM kill). Was: load_board() the WHOLE board,
+#: filter to these 10 sources' existing rows (SOURCE_SLUGS, below) to dodge a real
+#: NET-NEGATIVE cross-source dedupe collision (New Hanover's 12 distinct liensnc
+#: addresses sharing one subdivision-parent tax parcel, fused by dedupe()'s Pass 1
+#: exact-key bucketing), then write_artifact() the WHOLE board back. Now:
+#: append_new_rows() streams the existing board ONCE (never materializes it), and its
+#: dedupe check is additive-only BY CONSTRUCTION -- a candidate matching an existing
+#: row is skipped, the existing row is never touched -- so the exact net-negative
+#: failure mode above (an existing row getting fused/lost) cannot happen here at all,
+#: not just avoided by scoping. SOURCE_SLUGS no longer filters anything (nothing to
+#: filter now that load_board() is gone) -- kept as the expected-slugs sanity check in
+#: main() below, so a scraper's slug drifting silently out of this set is caught.
 SOURCE_SLUGS = {
     "counties_nc.brunswick_legal_notices", "counties_nc.buncombe_tax_foreclosure",
     "counties_nc.cleveland_tax_foreclosure", "counties_nc.gaston_tax_foreclosures",
@@ -123,28 +113,21 @@ def main() -> int:
     if not new_rows:
         print("nothing to land — aborting.")
         return 1
+    unexpected = {li.source for li in new_rows} - SOURCE_SLUGS
+    assert not unexpected, f"scraper slug drifted out of SOURCE_SLUGS: {unexpected}"
 
-    lock = contextlib.nullcontext() if args.dry_run else board_lock(REPO, owner="nc_batch2_ingest")
-    with lock:
-        rows = load_board(REPO / "docs")
-        before = len(rows)
-        print(f"board rows before: {before:,}")
+    self_deduped = dedupe(new_rows)
+    print(f"self-deduped (within this batch): {len(new_rows):,} -> {len(self_deduped):,}")
 
-        is_target = lambda li: li.source in SOURCE_SLUGS
-        target_rows = [li for li in rows if is_target(li)]
-        other_rows = [li for li in rows if not is_target(li)]
-        print(f"existing rows from these 10 sources: {len(target_rows):,}")
+    if args.dry_run:
+        print("\nDRY RUN — nothing written (append_new_rows() would stream-check these "
+              "against the existing board and skip any already present).")
+        return 0
 
-        target_merged = dedupe(target_rows + new_rows)
-        merged = other_rows + target_merged
-        print(f"board rows after dedupe: {len(merged):,} (net new: {len(merged) - before:,})")
-
-        if args.dry_run:
-            print("\nDRY RUN — nothing written.")
-            return 0
-
-        write_artifact(merged, {"nc_batch2_ingest": len(new_rows)}, docs_dir=REPO / "docs")
-        print(f"\nwrote board: {len(merged):,} rows")
+    with board_lock(REPO, owner="nc_batch2_ingest", wait=1800, poll=10):
+        stats = append_new_rows(self_deduped, {"nc_batch2_ingest": len(self_deduped)},
+                                docs_dir=REPO / "docs")
+    print(f"\n{stats}")
     return 0
 
 
