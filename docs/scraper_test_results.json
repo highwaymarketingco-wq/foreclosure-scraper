@@ -798,5 +798,245 @@
     "count": 528,
     "error": null,
     "time": 40.781999
+  },
+  {
+    "name": "CherokeeSCROD",
+    "slug": "counties_sc.cherokee_rod",
+    "status": "empty",
+    "count": 0,
+    "error": null,
+    "time": 3.5e-05
+  },
+  {
+    "name": "ChesterDelinquentTax",
+    "slug": "counties_sc.chester_delinquent_tax",
+    "status": "empty",
+    "count": 0,
+    "error": null,
+    "time": 10.173091
+  },
+  {
+    "name": "CityOfUnionScraper",
+    "slug": "counties_sc.city_of_union",
+    "status": "empty",
+    "count": 0,
+    "error": null,
+    "time": 62.912402
+  },
+  {
+    "name": "ClarendonTaxAuction",
+    "slug": "counties_sc.clarendon_tax_auction",
+    "status": "empty",
+    "count": 0,
+    "error": null,
+    "time": 5e-05
+  },
+  {
+    "name": "ColletonTaxSale",
+    "slug": "counties_sc.colleton_tax_sale",
+    "status": "success",
+    "count": 2324,
+    "error": null,
+    "time": 8.404746
+  },
+  {
+    "name": "DarlingtonDelinquentTax",
+    "slug": "counties_sc.darlington_delinquent_tax",
+    "status": "empty",
+    "count": 0,
+    "error": null,
+    "time": 0.724097
+  },
+  {
+    "name": "DarlingtonRecordhub",
+    "slug": "counties_sc.darlington_recordhub",
+    "status": "empty",
+    "count": 0,
+    "error": null,
+    "time": 25.66228
+  },
+  {
+    "name": "DillonDelinquentTax",
+    "slug": "counties_sc.dillon_delinquent_tax",
+    "status": "empty",
+    "count": 0,
+    "error": null,
+    "time": 0.775744
+  },
+  {
+    "name": "DillonSheriff",
+    "slug": "counties_sc.dillon_sheriff",
+    "status": "empty",
+    "count": 0,
+    "error": null,
+    "time": 0.687835
+  },
+  {
+    "name": "DorchesterBillTraxDelinquentTax",
+    "slug": "counties_sc.dorchester_billtrax_delinquent_tax",
+    "status": "timeout",
+    "count": 0,
+    "error": null,
+    "time": 90.025238
+  },
+  {
+    "name": "EdgefieldDelinquentTax",
+    "slug": "counties_sc.edgefield_delinquent_tax",
+    "status": "success",
+    "count": 16,
+    "error": null,
+    "time": 0.459829
+  },
+  {
+    "name": "FairfieldDelinquentTax",
+    "slug": "counties_sc.fairfield_delinquent_tax",
+    "status": "empty",
+    "count": 0,
+    "error": null,
+    "time": 0.542967
+  },
+  {
+    "name": "FairfieldOverageClaims",
+    "slug": "counties_sc.fairfield_overage_claims",
+    "status": "success",
+    "count": 60,
+    "error": null,
+    "time": 1.223121
+  },
+  {
+    "name": "FlorenceDelinquentTax",
+    "slug": "counties_sc.florence_delinquent_tax",
+    "status": "success",
+    "count": 978,
+    "error": null,
+    "time": 4.842652
+  },
+  {
+    "name": "GeorgetownCivicEngage",
+    "slug": "counties_sc.georgetown_civicengage",
+    "status": "success",
+    "count": 75,
+    "error": null,
+    "time": 19.890718
+  },
+  {
+    "name": "GreenvilleDelinquentTax",
+    "slug": "counties_sc.greenville_delinquent_tax",
+    "status": "success",
+    "count": 396,
+    "error": null,
+    "time": 1.234233
+  },
+  {
+    "name": "GreenvilleHardDistress",
+    "slug": "counties_sc.greenville_tax_distress",
+    "status": "success",
+    "count": 39608,
+    "error": null,
+    "time": 50.321968
+  },
+  {
+    "name": "GreenvilleMIEAdverts",
+    "slug": "counties_sc.greenville_mie_adverts",
+    "status": "success",
+    "count": 400,
+    "error": null,
+    "time": 28.495415
+  },
+  {
+    "name": "GreenvilleProbate",
+    "slug": "counties_sc.greenville_probate",
+    "status": "timeout",
+    "count": 0,
+    "error": null,
+    "time": 90.001064
+  },
+  {
+    "name": "GreenwoodCorebtpayDelinquentTax",
+    "slug": "counties_sc.greenwood_corebtpay_delinquent_tax",
+    "status": "timeout",
+    "count": 0,
+    "error": null,
+    "time": 90.009063
+  },
+  {
+    "name": "GreenwoodDelinquentTax",
+    "slug": "counties_sc.greenwood_delinquent_tax",
+    "status": "empty",
+    "count": 0,
+    "error": null,
+    "time": 1.925805
+  },
+  {
+    "name": "HorryDelinquentXlsx",
+    "slug": "counties_sc.horry_delinquent_xlsx",
+    "status": "success",
+    "count": 2230,
+    "error": null,
+    "time": 4.736849
+  },
+  {
+    "name": "HorryFLC",
+    "slug": "counties_sc.horry_flc",
+    "status": "success",
+    "count": 20,
+    "error": null,
+    "time": 3.415091
+  },
+  {
+    "name": "HorryProbate",
+    "slug": "counties_sc.horry_probate",
+    "status": "timeout",
+    "count": 0,
+    "error": null,
+    "time": 90.002306
+  },
+  {
+    "name": "KershawFLC",
+    "slug": "counties_sc.kershaw_flc",
+    "status": "empty",
+    "count": 0,
+    "error": null,
+    "time": 2.9e-05
+  },
+  {
+    "name": "LancasterDelinquentTax",
+    "slug": "counties_sc.lancaster_delinquent_tax",
+    "status": "success",
+    "count": 1,
+    "error": null,
+    "time": 2.240472
+  },
+  {
+    "name": "LaurensDelinquentTax",
+    "slug": "counties_sc.laurens_delinquent_tax",
+    "status": "empty",
+    "count": 0,
+    "error": null,
+    "time": 0.672268
+  },
+  {
+    "name": "LaurensOverageClaims",
+    "slug": "counties_sc.laurens_overage_claims",
+    "status": "error",
+    "count": 0,
+    "error": "Laurens overage list is a scanned PDF unread: no OCR key is configured. Set GEMINI_API_KEY (or GEMINI_API_KEY_1..N). Raising rather than returning 0 so a missing key is never mistaken for an empty sou",
+    "time": 1.163001
+  },
+  {
+    "name": "LexingtonFLC",
+    "slug": "counties_sc.lexington_flc",
+    "status": "empty",
+    "count": 0,
+    "error": null,
+    "time": 2.55558
+  },
+  {
+    "name": "LexingtonHomestead",
+    "slug": "counties_sc.lexington_homestead",
+    "status": "success",
+    "count": 28422,
+    "error": null,
+    "time": 15.205601
   }
 ]
