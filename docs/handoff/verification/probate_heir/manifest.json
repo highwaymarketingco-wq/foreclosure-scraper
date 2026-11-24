@@ -1,14 +1,14 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 73,
+  "confirmed": 84,
   "refuted": 2,
-  "rows": 506,
-  "stale": 129,
+  "rows": 546,
+  "stale": 158,
   "unconfirmed": 302,
   "wall": 0
  },
- "generated_at": "2026-11-24T10:26:17Z",
+ "generated_at": "2026-11-24T10:52:10Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
@@ -65,16 +65,16 @@
   "source": null,
   "tier": null
  },
- "rows": 506,
+ "rows": 546,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 763294,
+   "bytes": 797078,
    "file": "000.json",
-   "rows": 506,
-   "sha256": "36a2749c0367059846a4c5aff0dc7e9eaeed7a5e63f09af0709dc47f524997f3"
+   "rows": 546,
+   "sha256": "48b5054dc20a164a5e15d1dff2e8f9be70d695797fe4eefe8019a20a592fda7c"
   }
  ],
  "signal": "probate_heir",
