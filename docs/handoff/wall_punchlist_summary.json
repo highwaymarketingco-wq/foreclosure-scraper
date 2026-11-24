@@ -2,63 +2,63 @@
  "board_rows": 636657,
  "by_category": {
   "uncovered": 165748,
-  "wall": 22507
+  "wall": 22500
  },
  "format_version": 1,
  "kind": "wall_punchlist_summary",
  "ledger_problems": {},
  "ledgers": {
   "bankruptcy_stay": {
-   "entries": 532,
-   "generated_at": "2026-11-24T08:11:15Z"
+   "entries": 571,
+   "generated_at": "2026-11-24T10:26:15Z"
   },
   "code_enforcement": {
-   "entries": 1557,
-   "generated_at": "2026-11-24T08:11:15Z"
+   "entries": 1657,
+   "generated_at": "2026-11-24T10:26:15Z"
   },
   "comps": {
    "entries": 2214,
    "generated_at": "2026-11-24T07:43:27Z"
   },
   "court_wall": {
-   "entries": 1784,
-   "generated_at": "2026-11-24T08:11:16Z"
+   "entries": 1884,
+   "generated_at": "2026-11-24T10:26:15Z"
   },
   "divorce": {
-   "entries": 508,
-   "generated_at": "2026-11-24T08:11:16Z"
+   "entries": 608,
+   "generated_at": "2026-11-24T10:26:15Z"
   },
   "elderly_disabled": {
-   "entries": 6124,
-   "generated_at": "2026-11-24T08:11:16Z"
+   "entries": 6224,
+   "generated_at": "2026-11-24T10:26:16Z"
   },
   "foreclosure_rod": {
    "entries": 236,
-   "generated_at": "2026-11-24T08:11:16Z"
+   "generated_at": "2026-11-24T10:26:16Z"
   },
   "foreclosure_sale_list": {
-   "entries": 387,
-   "generated_at": "2026-11-24T08:11:16Z"
+   "entries": 411,
+   "generated_at": "2026-11-24T10:26:16Z"
   },
   "heir_roll": {
-   "entries": 14604,
-   "generated_at": "2026-11-24T08:11:17Z"
+   "entries": 14704,
+   "generated_at": "2026-11-24T10:26:16Z"
   },
   "jail_booking": {
-   "entries": 522,
-   "generated_at": "2026-11-24T08:11:17Z"
+   "entries": 622,
+   "generated_at": "2026-11-24T10:26:17Z"
   },
   "lien_registry_wall": {
-   "entries": 310,
-   "generated_at": "2026-11-24T08:11:17Z"
+   "entries": 410,
+   "generated_at": "2026-11-24T10:26:17Z"
   },
   "nc_ecourts_case": {
-   "entries": 8173,
-   "generated_at": "2026-11-24T08:11:18Z"
+   "entries": 8269,
+   "generated_at": "2026-11-24T10:26:17Z"
   },
   "probate_heir": {
-   "entries": 406,
-   "generated_at": "2026-11-24T08:11:18Z"
+   "entries": 506,
+   "generated_at": "2026-11-24T10:26:17Z"
   },
   "tax_lien": {
    "entries": 103737,
@@ -69,11 +69,11 @@
    "generated_at": "2026-10-20T14:49:27Z"
   },
   "vacant_structure": {
-   "entries": 770,
-   "generated_at": "2026-11-24T08:11:15Z"
+   "entries": 840,
+   "generated_at": "2026-11-24T10:26:15Z"
   }
  },
- "listings": 188255,
+ "listings": 188248,
  "uncovered": {
   "by_scraper_source": {
    "city_websites.charlotte_open_data": 4585,
@@ -137,7 +137,7 @@
  },
  "wall": {
   "by_scraper_source": {
-   "counties.column_legal_notices": 2373,
+   "counties.column_legal_notices": 2372,
    "counties.multi_year_delinquent_tax": 167,
    "counties_generic.arcgis_distress.greenville_unpaid_tax_parcels": 163,
    "counties_generic.arcgis_distress.pickens_flood_damage": 54,
@@ -163,7 +163,7 @@
    "counties_sc.sc_public_index": 3794,
    "counties_sc.sc_public_index_export": 1,
    "counties_sc.sc_public_index_lis_pendens": 475,
-   "counties_sc.sc_public_notices": 1604,
+   "counties_sc.sc_public_notices": 1600,
    "counties_sc.sc_rod_acclaim": 14,
    "counties_sc.sc_state_tax_lien": 336,
    "counties_sc.sc_ust_registry": 62,
@@ -189,12 +189,12 @@
    "national.usda_properties": 1,
    "national.xome": 1,
    "public_notices.gannett_obituaries": 1,
-   "public_notices.nc_notices_counties": 897,
+   "public_notices.nc_notices_counties": 895,
    "public_notices.ncnotices": 30,
    "reo.vrm_va_reo": 2
   },
   "by_signal": {
-   "court_wall": 8881,
+   "court_wall": 8874,
    "divorce": 4904,
    "lien_registry_wall": 8722
   },
@@ -202,14 +202,14 @@
    "brock_scott_waf": 49,
    "divorce_sc_wall": 4904,
    "nc_est": 3058,
-   "nc_sp": 242,
+   "nc_sp": 239,
    "sc_lien_registries": 8722,
-   "sc_notice_body": 1569,
+   "sc_notice_body": 1565,
    "sc_publicindex": 3963
   },
   "by_wall_state": {
-   "not_yet_labelled": 20080,
-   "recorded": 2427
+   "not_yet_labelled": 19773,
+   "recorded": 2727
   },
   "top_counties": {
    "NC:cabarrus": 299,
@@ -223,7 +223,7 @@
    "SC:horry": 1672,
    "SC:laurens": 1106,
    "SC:oconee": 1087,
-   "SC:pickens": 1538,
+   "SC:pickens": 1534,
    "SC:spartanburg": 3664,
    "SC:union": 439,
    "SC:york": 515
