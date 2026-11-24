@@ -3,38 +3,38 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 810,
+  "rows": 860,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 810
+  "wall": 860
  },
- "generated_at": "2026-11-24T18:31:31Z",
+ "generated_at": "2026-11-24T19:09:57Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T18:31:31Z",
+  "at": "2026-11-24T19:09:57Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
   "recheck_only": false,
   "requests": {
-   "errors": {
-    "gis.transylvaniacounty.org": 2
-   },
+   "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 164,
+    "arcgisserver.lincolncountync.gov": 13,
+    "devsvcs.gastonianc.gov": 170,
     "gis.buncombecounty.org": 50,
-    "gis.transylvaniacounty.org": 54,
+    "gis.transylvaniacounty.org": 13,
     "maps.spartanburgcounty.org": 50,
-    "portal-nc.tylertech.cloud": 44,
-    "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:buncombecountyso.policetocitizen.com": 1,
+    "portal-nc.tylertech.cloud": 43,
+    "roster:74.218.167.200": 1,
     "roster:cherokee-so-sc.zuercherportal.com": 1,
     "roster:laurens-911-sc.zuercherportal.com": 1,
+    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
+    "roster:morgantonpdnc.policetocitizen.com": 1,
     "roster:oconee-so-sc.zuercherportal.com": 1,
-    "roster:p2c.lincolnsheriff.org": 1,
     "roster:tepsweb.cityofgastonia.com": 1,
+    "services1.arcgis.com": 24,
     "vt.ncsbe.gov": 147,
     "www.courtlistener.com": 2,
     "www.southcarolinaprobate.net": 150
@@ -44,26 +44,26 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 1765,
+  "seconds": 1362,
   "selection": {
    "applies": 66565,
-   "due_new": 65793,
-   "not_due_ttl": 772,
+   "due_new": 65743,
+   "not_due_ttl": 822,
    "same_property_queued": 1
   },
   "source": null,
   "tier": null
  },
- "rows": 810,
+ "rows": 860,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 738924,
+   "bytes": 784394,
    "file": "000.json",
-   "rows": 810,
-   "sha256": "38df243ff92e695b51dc9576ac9136f1927facb09cdcd74d7f3a74cbc9add719"
+   "rows": 860,
+   "sha256": "52d9e363b1c74fe26d671171291b91fdd055e19d4ec65080b22d44330206f8ee"
   }
  ],
  "signal": "lien_registry_wall",
