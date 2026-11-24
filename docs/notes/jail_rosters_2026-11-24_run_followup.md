@@ -86,6 +86,29 @@ it, not chased further here):**
   (check what a real browser request to the Sumter portal actually returns)
   before chasing further, not more guessing at the request body.
 
+## Follow-up: checked for the same drift in the other 2 shared fetchers
+
+`enrichment_jail_bookings.py` and `scrapers/national/jail_bookings.py` share
+three fetcher function names (`_fetch_zuercher`, `_fetch_p2c_centralsquare`,
+`_fetch_p2c_jqgrid`), each independently defined (not imported) in both
+files — exactly the shape that let the zuercher URL bug drift unfixed in one
+copy. Diffed all three:
+
+- `_fetch_zuercher`: fixed this session (doubled-scheme URL, commit 1bc809b).
+- `_fetch_p2c_centralsquare`: fixed this session (Buncombe-listId fallback
+  instead of auto-discovery, commit 21959fe) — currently latent (every
+  existing ROSTERS entry already carries an explicit listId) but closes a
+  real future risk.
+- `_fetch_p2c_jqgrid`: also diverged, but only in robustness (the twin file's
+  copy wraps its two network calls in `_vendor_retrying()`; this file's copy
+  doesn't) and a log-event name, not correctness — no silently-wrong-data
+  path like the other two. Left as-is: cron-level relaunch every 5 min
+  already self-heals a transient failure here, so the cost of the gap is low,
+  and porting it cleanly would mean also porting `_vendor_retrying()` itself
+  (defined in the twin file) rather than a two-line fix. Worth doing in a
+  future pass that's specifically about hardening this file's retry
+  behavior, not squeezed in here.
+
 ## Operational lesson already captured in the loop prompt, not repeating here
 
 `backfill_jail_rosters.py` holds `board_lock` for its entire run (not released
