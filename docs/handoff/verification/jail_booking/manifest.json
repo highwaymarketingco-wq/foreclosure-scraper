@@ -1,19 +1,19 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 334,
+  "confirmed": 353,
   "refuted": 24,
-  "rows": 572,
-  "stale": 66,
-  "unconfirmed": 146,
+  "rows": 622,
+  "stale": 79,
+  "unconfirmed": 164,
   "wall": 0
  },
- "generated_at": "2026-11-24T08:39:38Z",
+ "generated_at": "2026-11-24T10:26:17Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T08:39:38Z",
+  "at": "2026-11-24T10:26:17Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,47 +21,63 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 54,
+    "gis.buncombecounty.org": 50,
     "gisweb.hendersoncountync.gov": 50,
-    "maps.spartanburgcounty.org": 50,
-    "portal-nc.tylertech.cloud": 35,
-    "registerofdeeds.buncombenc.gov": 42,
-    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "maps.spartanburgcounty.org": 20,
+    "portal-nc.tylertech.cloud": 37,
+    "roster:apps.pittcountync.gov": 1,
+    "roster:cc.southernsoftware.com": 3,
+    "roster:cumberlandsheriffnc.gov": 1,
+    "roster:guilfordcountysheriff.policetocitizen.com": 1,
+    "roster:injail.catawbacountync.gov": 1,
     "roster:laurens-911-sc.zuercherportal.com": 1,
-    "vt.ncsbe.gov": 147,
+    "roster:legacyweb.randolphcountync.gov": 1,
+    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
+    "roster:morgantonpdnc.policetocitizen.com": 1,
+    "roster:onlineservices.cabarruscounty.us": 1,
+    "roster:p2c.iredellcountync.gov": 1,
+    "roster:p2c.nhcgov.com": 1,
+    "roster:pasquotank-911-nc.zuercherportal.com": 1,
+    "roster:rowancountync.policetocitizen.com": 1,
+    "roster:tepsweb.cityofgastonia.com": 1,
+    "roster:wakeso.policetocitizen.com": 1,
+    "roster:www2.co.davidson.nc.us": 1,
+    "roster:www2.dconc.gov": 1,
+    "services1.arcgis.com": 3,
+    "vt.ncsbe.gov": 144,
     "webgis2.durhamnc.gov": 3,
-    "www.courtlistener.com": 74,
-    "www.southcarolinaprobate.net": 87
+    "www.courtlistener.com": 64,
+    "www.southcarolinaprobate.net": 150
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 36,
+   "confirmed": 19,
    "stale": 13,
-   "unconfirmed": 1
+   "unconfirmed": 18
   },
-  "seconds": 1077,
+  "seconds": 2517,
   "selection": {
    "applies": 907,
-   "due_new": 462,
+   "due_new": 412,
    "due_retry": 7,
    "due_version": 126,
-   "not_due_retry": 110,
-   "not_due_ttl": 202
+   "not_due_retry": 111,
+   "not_due_ttl": 251
   },
   "source": null,
   "tier": null
  },
- "rows": 572,
+ "rows": 622,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 673572,
+   "bytes": 727865,
    "file": "000.json",
-   "rows": 572,
-   "sha256": "05bc5cf8d77b641980540d67c9e83fc1fb3f0c29399514181dbd555ac5423a9c"
+   "rows": 622,
+   "sha256": "3ae1a235ed66c4b23c7c25fb3dca6fc24e0ca9de235514881078ea3692564d91"
   }
  ],
  "signal": "jail_booking",
