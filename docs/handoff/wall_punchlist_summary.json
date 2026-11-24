@@ -1,7 +1,7 @@
 {
- "board_rows": 633730,
+ "board_rows": 636657,
  "by_category": {
-  "uncovered": 165215,
+  "uncovered": 165748,
   "wall": 22512
  },
  "format_version": 1,
@@ -9,56 +9,56 @@
  "ledger_problems": {},
  "ledgers": {
   "bankruptcy_stay": {
-   "entries": 314,
-   "generated_at": "2026-11-24T03:07:28Z"
+   "entries": 336,
+   "generated_at": "2026-11-24T03:52:43Z"
   },
   "code_enforcement": {
-   "entries": 1307,
-   "generated_at": "2026-11-24T03:07:28Z"
+   "entries": 1357,
+   "generated_at": "2026-11-24T03:52:43Z"
   },
   "comps": {
-   "entries": 844,
-   "generated_at": "2026-11-24T02:06:18Z"
+   "entries": 1317,
+   "generated_at": "2026-11-24T04:49:05Z"
   },
   "court_wall": {
-   "entries": 1534,
-   "generated_at": "2026-11-24T03:07:28Z"
+   "entries": 1584,
+   "generated_at": "2026-11-24T03:52:43Z"
   },
   "divorce": {
-   "entries": 258,
-   "generated_at": "2026-11-24T03:07:28Z"
+   "entries": 308,
+   "generated_at": "2026-11-24T03:52:44Z"
   },
   "elderly_disabled": {
-   "entries": 5876,
-   "generated_at": "2026-11-24T03:07:28Z"
+   "entries": 5924,
+   "generated_at": "2026-11-24T03:52:44Z"
   },
   "foreclosure_rod": {
-   "entries": 151,
-   "generated_at": "2026-11-24T03:07:28Z"
+   "entries": 201,
+   "generated_at": "2026-11-24T03:52:44Z"
   },
   "foreclosure_sale_list": {
    "entries": 342,
-   "generated_at": "2026-11-24T03:07:28Z"
+   "generated_at": "2026-11-24T03:52:44Z"
   },
   "heir_roll": {
-   "entries": 14354,
-   "generated_at": "2026-11-24T03:07:29Z"
+   "entries": 14404,
+   "generated_at": "2026-11-24T03:52:45Z"
   },
   "jail_booking": {
-   "entries": 275,
-   "generated_at": "2026-11-24T03:07:29Z"
+   "entries": 322,
+   "generated_at": "2026-11-24T03:52:45Z"
   },
   "lien_registry_wall": {
-   "entries": 60,
-   "generated_at": "2026-11-24T03:07:29Z"
+   "entries": 110,
+   "generated_at": "2026-11-24T03:52:45Z"
   },
   "nc_ecourts_case": {
-   "entries": 8080,
-   "generated_at": "2026-11-24T03:07:29Z"
+   "entries": 8118,
+   "generated_at": "2026-11-24T03:52:46Z"
   },
   "probate_heir": {
-   "entries": 181,
-   "generated_at": "2026-11-24T03:07:29Z"
+   "entries": 231,
+   "generated_at": "2026-11-24T03:52:46Z"
   },
   "tax_lien": {
    "entries": 103737,
@@ -69,26 +69,26 @@
    "generated_at": "2026-10-20T14:49:27Z"
   },
   "vacant_structure": {
-   "entries": 520,
-   "generated_at": "2026-11-24T03:07:28Z"
+   "entries": 570,
+   "generated_at": "2026-11-24T03:52:43Z"
   }
  },
- "listings": 187727,
+ "listings": 188260,
  "uncovered": {
   "by_scraper_source": {
    "city_websites.charlotte_open_data": 4585,
-   "counties_generic.arcgis_distress.burke_storm_damage": 413,
+   "counties_generic.arcgis_distress.burke_storm_damage": 442,
    "counties_generic.arcgis_distress.greensboro_code_housing": 603,
-   "counties_generic.arcgis_distress.new_hanover_demolition_permits": 1326,
+   "counties_generic.arcgis_distress.new_hanover_demolition_permits": 1352,
    "counties_generic.arcgis_distress.raleigh_structure_fires": 381,
    "counties_generic.arcgis_distress.rocky_mount_blight_survey_2025": 384,
    "counties_generic.arcgis_distress.spartanburg_infill_eligible": 1062,
-   "counties_generic.arcgis_distress.spartanburg_property_cleanup": 2050,
-   "counties_generic.epa_frs.acres": 1535,
+   "counties_generic.arcgis_distress.spartanburg_property_cleanup": 2051,
+   "counties_generic.epa_frs.acres": 1553,
    "counties_generic.epa_frs.sems": 1984,
-   "counties_generic.state_contamination.nc_dam_safety": 7491,
-   "counties_generic.state_contamination.nc_inactive_hazardous": 1455,
-   "counties_generic.state_contamination.nc_ust_incidents": 37565,
+   "counties_generic.state_contamination.nc_dam_safety": 7492,
+   "counties_generic.state_contamination.nc_inactive_hazardous": 1459,
+   "counties_generic.state_contamination.nc_ust_incidents": 37642,
    "counties_nc.albemarle_observer_tax_lists": 5089,
    "counties_nc.asheville_helene": 692,
    "counties_nc.gaston_vacant": 20220,
@@ -118,21 +118,21 @@
    "public_notices.echovita_obituaries": 419
   },
   "top_counties": {
-   "NC:cumberland": 2181,
-   "NC:durham": 2003,
-   "NC:forsyth": 2406,
+   "NC:cumberland": 2183,
+   "NC:durham": 2006,
+   "NC:forsyth": 2407,
    "NC:gaston": 22107,
-   "NC:guilford": 4621,
-   "NC:lincoln": 15093,
+   "NC:guilford": 4628,
+   "NC:lincoln": 15168,
    "NC:mcdowell": 2944,
-   "NC:mecklenburg": 8680,
-   "NC:polk": 2052,
-   "NC:transylvania": 11368,
-   "NC:wake": 3869,
+   "NC:mecklenburg": 8685,
+   "NC:polk": 2053,
+   "NC:transylvania": 11370,
+   "NC:wake": 3871,
    "SC:charleston": 9527,
-   "SC:greenville": 1935,
+   "SC:greenville": 2234,
    "SC:pickens": 2214,
-   "SC:spartanburg": 10528
+   "SC:spartanburg": 10529
   }
  },
  "wall": {
@@ -208,8 +208,8 @@
    "sc_publicindex": 3968
   },
   "by_wall_state": {
-   "not_yet_labelled": 20735,
-   "recorded": 1777
+   "not_yet_labelled": 20635,
+   "recorded": 1877
   },
   "top_counties": {
    "NC:cabarrus": 299,
