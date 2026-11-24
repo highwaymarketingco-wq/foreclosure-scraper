@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 5301,
-  "refuted": 54,
-  "rows": 6095,
-  "stale": 297,
-  "unconfirmed": 443,
+  "confirmed": 5579,
+  "refuted": 59,
+  "rows": 6394,
+  "stale": 310,
+  "unconfirmed": 446,
   "wall": 0
  },
- "generated_at": "2026-11-24T21:14:13Z",
+ "generated_at": "2026-11-24T22:06:39Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T21:14:12Z",
+  "at": "2026-11-24T22:06:39Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 300,
@@ -21,46 +21,46 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 339
+    "gis.buncombecounty.org": 294
    }
   },
   "result": {
    "checked": 300,
-   "confirmed": 258,
-   "refuted": 7,
-   "stale": 34,
-   "unconfirmed": 1
+   "confirmed": 278,
+   "refuted": 5,
+   "stale": 13,
+   "unconfirmed": 4
   },
-  "seconds": 687,
+  "seconds": 612,
   "selection": {
    "applies": 9615,
-   "due_new": 3767,
+   "due_new": 3468,
    "due_retry": 4,
    "due_ttl": 96,
    "not_due_retry": 441,
-   "not_due_ttl": 5307,
-   "same_property_queued": 2
+   "not_due_ttl": 5606,
+   "same_property_queued": 6
   },
   "source": null,
   "tier": null
  },
- "rows": 6095,
+ "rows": 6394,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 6505819,
+   "bytes": 6819102,
    "file": "000.json",
-   "rows": 3056,
-   "sha256": "3ecbb38464cf88aac74f93ed8578fb4b531d76a8ecb0143e6f5936c677892638"
+   "rows": 3200,
+   "sha256": "cbd30789831251f1acdd9712d297e47eb82daa009d34cb1b2dd5346f754e2f86"
   },
   {
    "bucket": 1,
-   "bytes": 6446227,
+   "bytes": 6780730,
    "file": "001.json",
-   "rows": 3039,
-   "sha256": "24c2aebcd674115e5c4d497459e5d96eb86af889bf75eb3a43c23c6759ec6eb6"
+   "rows": 3194,
+   "sha256": "6709c6a50bd4c8525af1db7906844f4fb5ce0d24fea7207a662bacdba5c59958"
   }
  ],
  "signal": "comps",
