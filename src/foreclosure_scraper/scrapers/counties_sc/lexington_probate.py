@@ -149,40 +149,32 @@ async def _solve_audio_challenge(page, challenge_frame) -> bool:
         clicks = result.get("clicks", [])
         log.info("lexington_probate.grid_challenge", clicks=clicks[:10])
         
-        # Click each grid square
+        # Click each grid square with MOUSE MOVEMENTS (not just .click())
         for row, col in clicks:
             try:
-                # reCAPTCHA grid squares are typically in a table
-                # Try multiple selectors
-                clicked = await challenge_frame.evaluate(f"""() => {{
-                    // Try table-based selector
-                    const table = document.querySelector('.rc-imageselect-table');
-                    if (table) {{
-                        const rows = table.querySelectorAll('tr');
-                        if (rows[{row}]) {{
-                            const cells = rows[{row}].querySelectorAll('td');
-                            if (cells[{col}]) {{
-                                cells[{col}].click();
-                                return true;
-                            }}
-                        }}
-                    }}
-                    
-                    // Try tile-based selector (3x3 or 4x4 grid)
+                # Find the tile and get its bounding box
+                bbox = await challenge_frame.evaluate(f"""() => {{
                     const tiles = document.querySelectorAll('.rc-imageselect-tile');
-                    const cols = Math.sqrt(tiles.length);  // 3 for 3x3, 4 for 4x4
+                    const cols = Math.sqrt(tiles.length);
                     const index = {row} * cols + {col};
                     if (tiles[index]) {{
-                        tiles[index].click();
-                        return true;
+                        const rect = tiles[index].getBoundingClientRect();
+                        return {{x: rect.x + rect.width/2, y: rect.y + rect.height/2}};
                     }}
-                    
-                    return false;
+                    return null;
                 }}""")
-                if clicked:
-                    await asyncio.sleep(0.5)
+                
+                if bbox:
+                    # Move mouse to center of tile and click
+                    await page.mouse.move(bbox['x'], bbox['y'])
+                    await asyncio.sleep(0.1)
+                    await page.mouse.click(bbox['x'], bbox['y'])
+                    log.info("lexington_probate.mouse_click", row=row, col=col)
+                    await asyncio.sleep(0.3)
+                else:
+                    log.warning("lexington_probate.tile_not_found", row=row, col=col)
             except Exception as exc:
-                log.debug("lexington_probate.grid_click_failed", row=row, col=col, error=str(exc)[:80])
+                log.debug("lexington_probate.mouse_click_failed", row=row, col=col, error=str(exc)[:80])
         
         await asyncio.sleep(1)
         
