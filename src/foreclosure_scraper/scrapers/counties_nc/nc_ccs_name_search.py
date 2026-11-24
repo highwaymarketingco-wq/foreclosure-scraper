@@ -48,15 +48,28 @@ log = structlog.get_logger()
 # sibling enrichment_probate_spartan.py already uses for its own migrated-
 # tenant case.
 #
-# NOT YET A WORKING SEARCH, only a correct landing page: confirmed live this
-# tenant is on an OLDER classic-ASP CCS deployment (default.asp/disclaimer.asp
-# /searchonline.asp), NOT the modern /LRSearch/LRIndex + /LRSearch/
-# ExecuteSearch app Gaston/Caldwell/Franklin/Gates all share -- that path
-# 404s here. searchonline.asp itself also 404s on a bare GET (confirmed live
-# 2026-11-24); the disclaimer page links it as a relative href, so it likely
-# needs the actual disclaimer-accept POST replayed first (session-gated),
-# not just a direct GET. Still open: find the real search-flow paths for
-# THIS platform generation before Hertford will yield anything.
+# NOT YET A WORKING SEARCH, but now FULLY MAPPED (2026-11-24): confirmed
+# live this tenant is on an OLDER classic-ASP CCS deployment, NOT the modern
+# /LRSearch/LRIndex + /LRSearch/ExecuteSearch app Gaston/Caldwell/Franklin/
+# Gates all share -- that path 404s here. The disclaimer.asp page's REAL
+# "accept" control is a javascript: link (not a form/GET), and it points at
+# a DIFFERENT tenant folder than the one in this dict -- "hertfordncNW"
+# (note the "nw" suffix), not "hertfordnc": https://us4.courthousecomputer
+# systems.com/hertfordncnw/application.asp?resize=true. THAT url (not the
+# base in this dict) IS the one actually behind Cloudflare (confirmed: plain
+# curl gets a real "Just a moment..." 403 challenge page there) -- solved
+# fine with the same StealthyFetcher bypass the other 3 counties use.
+# Once solved, application.asp is a 3-tab frameset; the real search lives in
+# its "Consolidated Land Index" tab, an iframe at realestatesearch.asp
+# (confirmed live, 181KB real form). That form posts to a different endpoint
+# entirely -- SearchService.asp, not ExecuteSearch -- with DIFFERENT field
+# names than Gaston's body(): last, given, searchtype (radio 1/2/3),
+# fromdate/todate, datefilter, indextype (radio, 3 checked by default),
+# codetype (radio, 3="Either" checked), matchtype (beginswith/exactmatch/
+# matchcontains radio, beginswith checked), plus docnumber/booknumber/
+# pagenumber/description fields. Still open: build the actual POST to
+# SearchService.asp with these field names (a genuinely different request
+# shape, not a port of _body()) and parse its response format.
 _COUNTIES = {
     "Caldwell": "caldwellnc",
     "Franklin": "franklinnc",
