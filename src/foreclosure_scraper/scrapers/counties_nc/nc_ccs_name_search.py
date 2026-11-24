@@ -67,9 +67,39 @@ log = structlog.get_logger()
 # fromdate/todate, datefilter, indextype (radio, 3 checked by default),
 # codetype (radio, 3="Either" checked), matchtype (beginswith/exactmatch/
 # matchcontains radio, beginswith checked), plus docnumber/booknumber/
-# pagenumber/description fields. Still open: build the actual POST to
-# SearchService.asp with these field names (a genuinely different request
-# shape, not a port of _body()) and parse its response format.
+# pagenumber/description fields.
+#
+# FULL REQUEST SHAPE NOW KNOWN (read the real inline JS, not guessed):
+# the form's real submit path is realestatesearch.asp's own `Search()` ->
+# `mgr.trySearch()` -> `POST SearchService.asp` with BODY (not querystring)
+# `cmd=search&<qs>&rnd=<Math.random()>`, qs built in this EXACT field order
+# via a `qsItem(pd, name)` helper that only emits a field when it has a
+# truthy value: indextype, searchtype, codetype, fromdate, todate,
+# sortorder, instrumenttypes, description, docnumber, booknumber,
+# pagenumber, taxfrom, taxto, resultstype, maxrecordcount,
+# similarnamesearch1, similarnamesearch2, symbolsetout, usecontains,
+# exactmatch, directoryresultlink, filteruniquedocuments (last/given go
+# first, built separately). Response is XML (`dataType: "xml"`, parsed via
+# `dom.getElementsByTagName('recordcount')` etc.), NOT JSON -- a real
+# parser for this needs an XML reader, not _parse_rows()'s regex-over-HTML
+# approach the LRSearch siblings use. CLIENT-SIDE VALIDATION (may or may
+# not be enforced server-side too, untested): last/given name must be 2+
+# characters, or the JS alerts and refuses to send anything -- don't test
+# single-letter searches here the way Caldwell's zero-yield investigation
+# did. OPEN QUESTION: the request may need a `search_token` field read from
+# `window.parent.searchToken` (the application.asp frameset page, not this
+# iframe) -- grep that page's own script for whether it actually assigns
+# this property; if it never does, the token is skipped entirely (confirmed
+# in the JS: `tok = window.parent.searchToken ? ... : ''`, and empty tok
+# means no token param is sent at all). A live attempt to call the page's
+# own `Search()` via Playwright's frame.evaluate() hit "Search is not
+# defined" at the 3s mark tried so far -- likely just needs a longer wait
+# for the Manager/mgr init script to finish, not a sign the function
+# doesn't exist (it's defined plainly at the top of this same iframe's
+# inline script). Next real step: retry that same live-drive approach with
+# a longer settle time (10s+) before calling Search(), or hand-build the
+# POST per the shape above and compare against what a real browser actually
+# sends over the wire (network-capture it, don't guess blind).
 _COUNTIES = {
     "Caldwell": "caldwellnc",
     "Franklin": "franklinnc",
