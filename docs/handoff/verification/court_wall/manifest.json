@@ -3,17 +3,17 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 1684,
+  "rows": 1734,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 1684
+  "wall": 1734
  },
- "generated_at": "2026-11-24T06:01:23Z",
+ "generated_at": "2026-11-24T06:30:26Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T06:01:23Z",
+  "at": "2026-11-24T06:30:26Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,46 +21,50 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 74,
-    "portal-nc.tylertech.cloud": 37,
-    "registerofdeeds.buncombenc.gov": 128,
+    "gis.buncombecounty.org": 56,
+    "portal-nc.tylertech.cloud": 34,
+    "registerofdeeds.buncombenc.gov": 104,
     "roster:anderson-so-sc.zuercherportal.com": 1,
+    "roster:cc.southernsoftware.com": 1,
     "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
+    "roster:mugshots.spartanburgsheriff.org": 1,
+    "roster:oconee-so-sc.zuercherportal.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
+    "roster:tepsweb.cityofgastonia.com": 1,
     "roster:union-so-sc.zuercherportal.com": 1,
+    "roster:wakeso.policetocitizen.com": 1,
     "services.nconemap.gov": 50,
-    "tax.buncombenc.gov": 21,
-    "vt.ncsbe.gov": 141,
+    "tax.buncombenc.gov": 27,
+    "vt.ncsbe.gov": 150,
     "webgis2.durhamnc.gov": 3,
-    "www.courtlistener.com": 75,
-    "www.greenwoodsc.gov": 50,
-    "www.southcarolinaprobate.net": 24
+    "www.courtlistener.com": 57,
+    "www.greenwoodsc.gov": 50
    }
   },
   "result": {
    "checked": 50,
    "wall": 50
   },
-  "seconds": 1185,
+  "seconds": 1128,
   "selection": {
    "applies": 9035,
-   "due_new": 7280,
-   "not_due_ttl": 1755
+   "due_new": 7230,
+   "not_due_ttl": 1805
   },
   "source": null,
   "tier": null
  },
- "rows": 1684,
+ "rows": 1734,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 1303067,
+   "bytes": 1340515,
    "file": "000.json",
-   "rows": 1684,
-   "sha256": "28c0fa0f2b4dd534a7279e4064b30d09849ba6cf1a41a3277b3f6fac930740d9"
+   "rows": 1734,
+   "sha256": "8eda636350fc158dde0b60a01b16c911456c620ca4839081073a44b62ec60e6e"
   }
  ],
  "signal": "court_wall",

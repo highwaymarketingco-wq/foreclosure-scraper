@@ -8,12 +8,12 @@
   "unconfirmed": 175,
   "wall": 0
  },
- "generated_at": "2026-11-24T06:01:24Z",
+ "generated_at": "2026-11-24T06:30:27Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T06:01:24Z",
+  "at": "2026-11-24T06:30:27Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,38 +21,33 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 74,
-    "portal-nc.tylertech.cloud": 37,
-    "registerofdeeds.buncombenc.gov": 128,
+    "gis.buncombecounty.org": 56,
+    "portal-nc.tylertech.cloud": 34,
+    "registerofdeeds.buncombenc.gov": 104,
     "roster:anderson-so-sc.zuercherportal.com": 1,
+    "roster:cc.southernsoftware.com": 1,
     "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
+    "roster:mugshots.spartanburgsheriff.org": 1,
+    "roster:oconee-so-sc.zuercherportal.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
+    "roster:tepsweb.cityofgastonia.com": 1,
     "roster:union-so-sc.zuercherportal.com": 1,
+    "roster:wakeso.policetocitizen.com": 1,
     "services.nconemap.gov": 50,
-    "tax.buncombenc.gov": 21,
-    "vt.ncsbe.gov": 141,
+    "tax.buncombenc.gov": 27,
+    "vt.ncsbe.gov": 150,
     "webgis2.durhamnc.gov": 3,
-    "www.courtlistener.com": 75,
-    "www.greenwoodsc.gov": 50,
-    "www.southcarolinaprobate.net": 24
+    "www.courtlistener.com": 57,
+    "www.greenwoodsc.gov": 50
    }
   },
-  "result": {
-   "checked": 21,
-   "confirmed": 8,
-   "refuted": 1,
-   "stale": 4,
-   "unconfirmed": 8
-  },
-  "seconds": 1185,
+  "result": {},
+  "seconds": 1128,
   "selection": {
    "applies": 184,
-   "due_retry": 1,
-   "due_ttl": 3,
-   "due_version": 17,
-   "not_due_retry": 118,
-   "not_due_ttl": 45
+   "not_due_retry": 126,
+   "not_due_ttl": 58
   },
   "source": null,
   "tier": null

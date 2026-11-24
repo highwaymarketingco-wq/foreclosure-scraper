@@ -1,19 +1,19 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 232,
+  "confirmed": 263,
   "refuted": 24,
-  "rows": 422,
-  "stale": 38,
-  "unconfirmed": 126,
+  "rows": 472,
+  "stale": 47,
+  "unconfirmed": 136,
   "wall": 0
  },
- "generated_at": "2026-11-24T06:01:25Z",
+ "generated_at": "2026-11-24T06:30:28Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T06:01:25Z",
+  "at": "2026-11-24T06:30:27Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,51 +21,55 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 74,
-    "portal-nc.tylertech.cloud": 37,
-    "registerofdeeds.buncombenc.gov": 128,
+    "gis.buncombecounty.org": 56,
+    "portal-nc.tylertech.cloud": 34,
+    "registerofdeeds.buncombenc.gov": 104,
     "roster:anderson-so-sc.zuercherportal.com": 1,
+    "roster:cc.southernsoftware.com": 1,
     "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
+    "roster:mugshots.spartanburgsheriff.org": 1,
+    "roster:oconee-so-sc.zuercherportal.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
+    "roster:tepsweb.cityofgastonia.com": 1,
     "roster:union-so-sc.zuercherportal.com": 1,
+    "roster:wakeso.policetocitizen.com": 1,
     "services.nconemap.gov": 50,
-    "tax.buncombenc.gov": 21,
-    "vt.ncsbe.gov": 141,
+    "tax.buncombenc.gov": 27,
+    "vt.ncsbe.gov": 150,
     "webgis2.durhamnc.gov": 3,
-    "www.courtlistener.com": 75,
-    "www.greenwoodsc.gov": 50,
-    "www.southcarolinaprobate.net": 24
+    "www.courtlistener.com": 57,
+    "www.greenwoodsc.gov": 50
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 28,
-   "stale": 7,
-   "unconfirmed": 15
+   "confirmed": 31,
+   "stale": 9,
+   "unconfirmed": 10
   },
-  "seconds": 1185,
+  "seconds": 1128,
   "selection": {
    "applies": 907,
-   "due_new": 612,
+   "due_new": 562,
    "due_retry": 7,
    "due_version": 126,
-   "not_due_retry": 76,
-   "not_due_ttl": 86
+   "not_due_retry": 91,
+   "not_due_ttl": 121
   },
   "source": null,
   "tier": null
  },
- "rows": 422,
+ "rows": 472,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 509461,
+   "bytes": 563090,
    "file": "000.json",
-   "rows": 422,
-   "sha256": "bde7c29b5f058e09e1a272a14ef9bba98b297b10fcf9c2be43723836b8019931"
+   "rows": 472,
+   "sha256": "eb5b61f379d9f7ef1e19a77c6c5e1a1bfe6c56d9e1fc976aa726b79fbede33a3"
   }
  ],
  "signal": "jail_booking",

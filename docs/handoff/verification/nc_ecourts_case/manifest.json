@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 7589,
-  "refuted": 25,
-  "rows": 8118,
-  "stale": 420,
+  "confirmed": 7596,
+  "refuted": 26,
+  "rows": 8125,
+  "stale": 419,
   "unconfirmed": 84,
   "wall": 0
  },
- "generated_at": "2026-11-24T06:01:26Z",
+ "generated_at": "2026-11-24T06:30:28Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T06:01:25Z",
+  "at": "2026-11-24T06:30:28Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,58 +21,64 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 74,
-    "portal-nc.tylertech.cloud": 37,
-    "registerofdeeds.buncombenc.gov": 128,
+    "gis.buncombecounty.org": 56,
+    "portal-nc.tylertech.cloud": 34,
+    "registerofdeeds.buncombenc.gov": 104,
     "roster:anderson-so-sc.zuercherportal.com": 1,
+    "roster:cc.southernsoftware.com": 1,
     "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
+    "roster:mugshots.spartanburgsheriff.org": 1,
+    "roster:oconee-so-sc.zuercherportal.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
+    "roster:tepsweb.cityofgastonia.com": 1,
     "roster:union-so-sc.zuercherportal.com": 1,
+    "roster:wakeso.policetocitizen.com": 1,
     "services.nconemap.gov": 50,
-    "tax.buncombenc.gov": 21,
-    "vt.ncsbe.gov": 141,
+    "tax.buncombenc.gov": 27,
+    "vt.ncsbe.gov": 150,
     "webgis2.durhamnc.gov": 3,
-    "www.courtlistener.com": 75,
-    "www.greenwoodsc.gov": 50,
-    "www.southcarolinaprobate.net": 24
+    "www.courtlistener.com": 57,
+    "www.greenwoodsc.gov": 50
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 18,
-   "stale": 24,
-   "unconfirmed": 8
+   "confirmed": 16,
+   "refuted": 5,
+   "stale": 3,
+   "unconfirmed": 26
   },
-  "seconds": 1185,
+  "seconds": 1128,
   "selection": {
    "applies": 25671,
    "due_new": 17873,
-   "due_retry": 38,
-   "due_ttl": 752,
-   "not_due_retry": 57,
-   "not_due_ttl": 6951
+   "due_retry": 31,
+   "due_ttl": 702,
+   "not_due_retry": 64,
+   "not_due_ttl": 7001,
+   "same_property_queued": 1
   },
   "source": null,
   "tier": null
  },
- "rows": 8118,
+ "rows": 8125,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 5043921,
+   "bytes": 5047897,
    "file": "000.json",
-   "rows": 4061,
-   "sha256": "8fa040928cd6f949ed2a92fff9ebcc079903df2cdeecb7c220612f4beec29eb2"
+   "rows": 4063,
+   "sha256": "c8dd4bfa9116a9b9601bb5c1d0c65a3be9bbc3727092834f17dd4f1f71928ba3"
   },
   {
    "bucket": 1,
-   "bytes": 5044509,
+   "bytes": 5054331,
    "file": "001.json",
-   "rows": 4057,
-   "sha256": "6e3ef74bda93a7679e2759cf2cdc98df6b8248e98d83a69bc311751d77f3f8d1"
+   "rows": 4062,
+   "sha256": "72b49f9ee9cbf1747bed51a2a49a64b847197825d93615e46a196cf2301ca2a7"
   }
  ],
  "signal": "nc_ecourts_case",
