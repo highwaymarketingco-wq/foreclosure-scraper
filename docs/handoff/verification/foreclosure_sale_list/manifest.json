@@ -8,7 +8,7 @@
   "unconfirmed": 80,
   "wall": 0
  },
- "generated_at": "2026-11-24T13:25:14Z",
+ "generated_at": "2026-11-24T13:56:59Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
@@ -55,10 +55,10 @@
  "shards": [
   {
    "bucket": 0,
-   "bytes": 471918,
+   "bytes": 473362,
    "file": "000.json",
    "rows": 420,
-   "sha256": "307c69fdb25e50b220e6a5f04290b2506916c6640c77860a3c4a08b972dfc614"
+   "sha256": "7494083b54c5088b30b29e3772863337605f2b6bdd69da316510753db7a52300"
   }
  ],
  "signal": "foreclosure_sale_list",
