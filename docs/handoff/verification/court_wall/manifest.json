@@ -3,67 +3,75 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 1484,
+  "rows": 1534,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 1484
+  "wall": 1534
  },
- "generated_at": "2026-11-24T02:30:31Z",
+ "generated_at": "2026-11-24T03:07:28Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T02:30:31Z",
+  "at": "2026-11-24T03:07:28Z",
   "county": null,
   "host": "SMB-LTSEO05",
-  "max_rows": 10,
+  "max_rows": 50,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 28,
-    "gis.charlottenc.gov": 14,
-    "portal-nc.tylertech.cloud": 8,
-    "registerofdeeds.buncombenc.gov": 33,
+    "arcgisserver.lincolncountync.gov": 15,
+    "gis.buncombecounty.org": 114,
+    "gis.charlottenc.gov": 90,
+    "gis.transylvaniacounty.org": 1,
+    "portal-nc.tylertech.cloud": 40,
+    "registerofdeeds.buncombenc.gov": 177,
     "rockhillgis.cityofrockhill.com": 3,
-    "roster:cc.southernsoftware.com": 1,
+    "roster:buncombecountyso.policetocitizen.com": 1,
+    "roster:cc.southernsoftware.com": 4,
     "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:laurens-911-sc.zuercherportal.com": 1,
-    "roster:lexingtonsheriffsc.policetocitizen.com": 1,
+    "roster:forsythsheriffnc.policetocitizen.com": 1,
+    "roster:guilfordcountysheriff.policetocitizen.com": 1,
+    "roster:legacyweb.randolphcountync.gov": 1,
     "roster:oconee-so-sc.zuercherportal.com": 1,
-    "roster:union-so-sc.zuercherportal.com": 1,
-    "services.nconemap.gov": 10,
-    "tax.buncombenc.gov": 22,
-    "vt.ncsbe.gov": 63,
+    "roster:pickens-so-sc.zuercherportal.com": 1,
+    "roster:rowancountync.policetocitizen.com": 1,
+    "roster:tepsweb.cityofgastonia.com": 1,
+    "roster:www2.co.davidson.nc.us": 1,
+    "services.nconemap.gov": 33,
+    "services9.arcgis.com": 1,
+    "tax.buncombenc.gov": 21,
+    "vt.ncsbe.gov": 309,
     "webgis2.durhamnc.gov": 3,
-    "www.courtlistener.com": 15,
-    "www.greenwoodsc.gov": 10
+    "www.courtlistener.com": 78,
+    "www.greenwoodsc.gov": 50
    }
   },
   "result": {
-   "checked": 10,
-   "wall": 10
+   "checked": 50,
+   "wall": 50
   },
-  "seconds": 612,
+  "seconds": 1988,
   "selection": {
    "applies": 9035,
-   "due_new": 7463,
-   "not_due_ttl": 1572,
-   "same_property_queued": 3
+   "due_new": 7452,
+   "not_due_ttl": 1583,
+   "same_property_queued": 14
   },
   "source": null,
   "tier": null
  },
- "rows": 1484,
+ "rows": 1534,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 1148941,
+   "bytes": 1190354,
    "file": "000.json",
-   "rows": 1484,
-   "sha256": "3cd97f9339573f2feccf37d63ae53f75aef7b960625994fc274b57ed2be638e6"
+   "rows": 1534,
+   "sha256": "7a116b73f8d3c60c449a0d1c64e9fb0b91b07084096184fa6d1334254b63716d"
   }
  ],
  "signal": "court_wall",
