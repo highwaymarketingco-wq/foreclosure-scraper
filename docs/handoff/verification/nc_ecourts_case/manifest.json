@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 7595,
-  "refuted": 23,
+  "confirmed": 7591,
+  "refuted": 25,
   "rows": 8118,
-  "stale": 416,
+  "stale": 418,
   "unconfirmed": 84,
   "wall": 0
  },
- "generated_at": "2026-11-24T03:52:46Z",
+ "generated_at": "2026-11-24T05:32:54Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T03:52:45Z",
+  "at": "2026-11-24T05:32:54Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,48 +21,44 @@
   "requests": {
    "errors": {},
    "requests": {
-    "arcgisserver.lincolncountync.gov": 11,
-    "gis.buncombecounty.org": 113,
-    "gis.charlottenc.gov": 88,
-    "portal-nc.tylertech.cloud": 38,
-    "registerofdeeds.buncombenc.gov": 145,
+    "arcgisserver.lincolncountync.gov": 6,
+    "gis.buncombecounty.org": 99,
+    "gis.charlottenc.gov": 4,
+    "portal-nc.tylertech.cloud": 37,
+    "registerofdeeds.buncombenc.gov": 207,
     "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:apps.alamance-nc.com": 1,
-    "roster:buncombecountyso.policetocitizen.com": 1,
-    "roster:cc.southernsoftware.com": 1,
-    "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:cumberlandsheriffnc.gov": 1,
-    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "roster:bookings.darlingtonsheriff.org": 1,
+    "roster:brunswick-so-nc.zuercherportal.com": 1,
+    "roster:colleton-so-sc.zuercherportal.com": 1,
+    "roster:kershaw-so-sc.zuercherportal.com": 1,
     "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "roster:p2c.lincolnsheriff.org": 1,
+    "roster:morgantonpdnc.policetocitizen.com": 1,
+    "roster:oconee-so-sc.zuercherportal.com": 1,
     "roster:p2c.nhcgov.com": 1,
-    "roster:pickens-so-sc.zuercherportal.com": 1,
-    "roster:union-so-sc.zuercherportal.com": 1,
+    "roster:tepsweb.cityofgastonia.com": 1,
     "roster:wakeso.policetocitizen.com": 1,
-    "services.nconemap.gov": 39,
-    "tax.buncombenc.gov": 45,
-    "vt.ncsbe.gov": 336,
+    "services.nconemap.gov": 50,
+    "vt.ncsbe.gov": 327,
     "webgis2.durhamnc.gov": 3,
-    "www.courtlistener.com": 65,
+    "www.courtlistener.com": 50,
     "www.greenwoodsc.gov": 50
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 29,
+   "confirmed": 20,
    "refuted": 4,
-   "stale": 3,
-   "unconfirmed": 14
+   "stale": 14,
+   "unconfirmed": 12
   },
-  "seconds": 2161,
+  "seconds": 1572,
   "selection": {
    "applies": 25671,
-   "due_new": 17911,
-   "due_retry": 51,
-   "due_ttl": 803,
-   "not_due_retry": 33,
-   "not_due_ttl": 6873,
-   "same_property_queued": 1
+   "due_new": 17873,
+   "due_retry": 49,
+   "due_ttl": 793,
+   "not_due_retry": 46,
+   "not_due_ttl": 6910
   },
   "source": null,
   "tier": null
@@ -73,17 +69,17 @@
  "shards": [
   {
    "bucket": 0,
-   "bytes": 5040548,
+   "bytes": 5041854,
    "file": "000.json",
-   "rows": 4063,
-   "sha256": "bf6a63d26edbe2f1aed808de0603f77d190ce05451460739920e5d6cab67e912"
+   "rows": 4061,
+   "sha256": "50d081c9359b7032714fedd6db1ac794477c2cdbbd8fc17484ae062fb242bd60"
   },
   {
    "bucket": 1,
-   "bytes": 5034878,
+   "bytes": 5040985,
    "file": "001.json",
-   "rows": 4055,
-   "sha256": "b6e7dd3a7da6e02c525c33c6e1349645e806a6067823426511377b467191b9ba"
+   "rows": 4057,
+   "sha256": "0d6be32f44b895ea7d0eaf795c9d668079b2cd25d7dff433ee0081f78b171882"
   }
  ],
  "signal": "nc_ecourts_case",
