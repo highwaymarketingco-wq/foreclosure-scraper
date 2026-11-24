@@ -1,19 +1,19 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 2247,
-  "refuted": 19,
-  "rows": 2807,
-  "stale": 118,
-  "unconfirmed": 423,
+  "confirmed": 2531,
+  "refuted": 20,
+  "rows": 3106,
+  "stale": 130,
+  "unconfirmed": 425,
   "wall": 0
  },
- "generated_at": "2026-11-24T12:21:22Z",
+ "generated_at": "2026-11-24T12:52:34Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T12:21:22Z",
+  "at": "2026-11-24T12:52:34Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 300,
@@ -21,37 +21,39 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 436
+    "gis.buncombecounty.org": 469
    }
   },
   "result": {
    "checked": 300,
-   "confirmed": 289,
-   "stale": 4,
-   "unconfirmed": 7
+   "confirmed": 284,
+   "refuted": 1,
+   "stale": 12,
+   "unconfirmed": 3
   },
-  "seconds": 890,
+  "seconds": 966,
   "selection": {
    "applies": 9615,
-   "due_new": 7072,
+   "due_new": 6771,
    "due_retry": 4,
    "due_ttl": 96,
-   "not_due_retry": 415,
-   "not_due_ttl": 2028
+   "not_due_retry": 421,
+   "not_due_ttl": 2323,
+   "same_property_queued": 2
   },
   "source": null,
   "tier": null
  },
- "rows": 2807,
+ "rows": 3106,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 5880858,
+   "bytes": 6520364,
    "file": "000.json",
-   "rows": 2807,
-   "sha256": "59c93d62293c7789cd6733b4be2767ef9788b887f3160f923516750567333b0d"
+   "rows": 3106,
+   "sha256": "dbe44899503706516fc02b1fcded2e4c03a635e459bf9534e360f2f96978987d"
   }
  ],
  "signal": "comps",
