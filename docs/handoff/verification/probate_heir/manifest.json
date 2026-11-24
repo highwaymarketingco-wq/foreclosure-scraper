@@ -1,19 +1,19 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 150,
+  "confirmed": 157,
   "refuted": 2,
-  "rows": 656,
-  "stale": 202,
-  "unconfirmed": 302,
+  "rows": 706,
+  "stale": 235,
+  "unconfirmed": 312,
   "wall": 0
  },
- "generated_at": "2026-11-24T13:25:16Z",
+ "generated_at": "2026-11-24T14:03:53Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T13:25:16Z",
+  "at": "2026-11-24T14:03:53Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,44 +21,48 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 51,
+    "gis.buncombecounty.org": 50,
     "gis.charlottenc.gov": 100,
-    "gis.rutherfordcountync.gov": 1,
-    "gis.transylvaniacounty.org": 49,
-    "portal-nc.tylertech.cloud": 36,
+    "gis.transylvaniacounty.org": 50,
+    "portal-nc.tylertech.cloud": 34,
+    "registerofdeeds.buncombenc.gov": 4,
+    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "roster:oconee-so-sc.zuercherportal.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
-    "vt.ncsbe.gov": 141,
+    "roster:union-so-sc.zuercherportal.com": 1,
+    "vt.ncsbe.gov": 144,
     "www.courtlistener.com": 2,
     "www.greenwoodsc.gov": 50,
-    "www.southcarolinaprobate.net": 150
+    "www.southcarolinaprobate.net": 120
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 12,
-   "stale": 38
+   "confirmed": 7,
+   "stale": 33,
+   "unconfirmed": 10
   },
-  "seconds": 1099,
+  "seconds": 1033,
   "selection": {
    "applies": 1052,
-   "due_new": 460,
+   "due_new": 410,
    "due_version": 4,
    "not_due_retry": 289,
-   "not_due_ttl": 299
+   "not_due_ttl": 349
   },
   "source": null,
   "tier": null
  },
- "rows": 656,
+ "rows": 706,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 889726,
+   "bytes": 935958,
    "file": "000.json",
-   "rows": 656,
-   "sha256": "b4a650197383a8b6d8ae1b8e42b078293a743a9e408308eb2853dc62dba4055e"
+   "rows": 706,
+   "sha256": "c4c4fe560e6f3e2361366fe857f1d84ec7f9c847537f979dc2c153f51211dbf7"
   }
  ],
  "signal": "probate_heir",

@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 7791,
+  "confirmed": 7809,
   "refuted": 26,
-  "rows": 8421,
-  "stale": 474,
-  "unconfirmed": 130,
+  "rows": 8461,
+  "stale": 488,
+  "unconfirmed": 138,
   "wall": 0
  },
- "generated_at": "2026-11-24T13:58:59Z",
+ "generated_at": "2026-11-24T14:03:53Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T13:25:15Z",
+  "at": "2026-11-24T14:03:52Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,53 +21,56 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 51,
+    "gis.buncombecounty.org": 50,
     "gis.charlottenc.gov": 100,
-    "gis.rutherfordcountync.gov": 1,
-    "gis.transylvaniacounty.org": 49,
-    "portal-nc.tylertech.cloud": 36,
+    "gis.transylvaniacounty.org": 50,
+    "portal-nc.tylertech.cloud": 34,
+    "registerofdeeds.buncombenc.gov": 4,
+    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "roster:oconee-so-sc.zuercherportal.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
-    "vt.ncsbe.gov": 141,
+    "roster:union-so-sc.zuercherportal.com": 1,
+    "vt.ncsbe.gov": 144,
     "www.courtlistener.com": 2,
     "www.greenwoodsc.gov": 50,
-    "www.southcarolinaprobate.net": 150
+    "www.southcarolinaprobate.net": 120
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 24,
-   "stale": 11,
-   "unconfirmed": 15
+   "confirmed": 22,
+   "stale": 15,
+   "unconfirmed": 13
   },
-  "seconds": 1099,
+  "seconds": 1033,
   "selection": {
    "applies": 25671,
-   "due_new": 17611,
+   "due_new": 17563,
    "due_retry": 3,
    "due_ttl": 670,
-   "not_due_retry": 122,
-   "not_due_ttl": 7265
+   "not_due_retry": 135,
+   "not_due_ttl": 7300
   },
   "source": null,
   "tier": null
  },
- "rows": 8421,
+ "rows": 8461,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 5241755,
+   "bytes": 5267778,
    "file": "000.json",
-   "rows": 4227,
-   "sha256": "67a1d97f95fb3182f1d8d7249b6cc88995faef66d43fc3fdba9b0bd4f2decd3a"
+   "rows": 4249,
+   "sha256": "dee1a9c61be224d4c8662884d0a68f460e85e9b1bd741d57ddeda11ef1e4de28"
   },
   {
    "bucket": 1,
-   "bytes": 5210833,
+   "bytes": 5231451,
    "file": "001.json",
-   "rows": 4194,
-   "sha256": "ed6b68a9d232069ac60d1b10684776bfb14a1c520f4e0e1a8ed030355fdc2dce"
+   "rows": 4212,
+   "sha256": "c9060dbabf640efcefe8602915ddafe2031848b06e43cf6bfb0c06b4f1afef4c"
   }
  ],
  "signal": "nc_ecourts_case",
