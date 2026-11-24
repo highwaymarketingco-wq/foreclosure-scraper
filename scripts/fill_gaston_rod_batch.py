@@ -1,0 +1,105 @@
+#!/usr/bin/env python3
+"""Bounded, checkpointed Gaston NC ROD lien-existence enrichment.
+
+fill_gaston_rod.py (the original) calls load_board() + write_artifact() over the
+whole board just to patch a scoped subset of NC/Gaston rows -- the same double-
+materialization pattern already fixed elsewhere this session (see
+patch_existing_rows()'s own docstring, and resolver_backfill_parcel.py for the
+reference). 24,531 Gaston rows need this check (measured 2026-11-24); that's
+many hours of real network time at the pacing this enrichment needs, not a
+one-shot run, so this takes --max-lookups to process ONE bounded batch per
+invocation and checkpoint just those rows via patch_existing_rows().
+
+enrich_gaston_rod() itself (enrichment_gaston_rod.py) is unchanged -- it already
+opens one Cloudflare-solved browser session and loops every target it's given,
+so a single call per invocation (not per-chunk) is correct here: splitting into
+multiple internal chunks would just pay the Cloudflare-solve overhead (~5-15s)
+repeatedly for no benefit.
+
+Usage:
+    python scripts/fill_gaston_rod_batch.py --max-lookups 300
+    python scripts/fill_gaston_rod_batch.py --max-lookups 300 --dry-run
+"""
+from __future__ import annotations
+
+import argparse
+import asyncio
+import contextlib
+import sys
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO / "src"))
+
+from foreclosure_scraper.board_stream import iter_board_rows  # noqa: E402
+from foreclosure_scraper.enrichment_gaston_rod import enrich_gaston_rod  # noqa: E402
+from foreclosure_scraper.models import Listing  # noqa: E402
+from foreclosure_scraper.web_artifact import board_lock, patch_existing_rows  # noqa: E402
+
+
+def _collect_targets(docs: Path, cap: int) -> list[Listing]:
+    """NC/Gaston rows with an owner_name and no raw['rod'] yet -- streamed, cheap
+    dict-level pre-filter before ever validating into a real Listing, same
+    pattern as resolver_backfill_parcel.py's _collect_targets()."""
+    targets: list[Listing] = []
+    for rec in iter_board_rows(docs / "listings.json.gz"):
+        if rec.get("state") != "NC" or not rec.get("owner_name"):
+            continue
+        county = (rec.get("county") or "").strip().upper().replace(" COUNTY", "")
+        if county != "GASTON":
+            continue
+        raw = rec.get("raw")
+        if isinstance(raw, dict) and "rod" in raw:
+            continue
+        try:
+            li = Listing.model_validate(rec)
+        except Exception:  # noqa: BLE001 - a malformed row must not crash the collector
+            continue
+        targets.append(li)
+        if len(targets) >= cap:
+            break
+    return targets
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--max-lookups", type=int, default=300,
+                     help="How many Gaston rows to check this run (default 300).")
+    ap.add_argument("--dry-run", action="store_true")
+    args = ap.parse_args()
+
+    docs = REPO / "docs"
+    targets = _collect_targets(docs, args.max_lookups)
+    print(f"targets this run: {len(targets):,} (cap {args.max_lookups:,})")
+    if not targets:
+        return 0
+
+    # Identity captured before enrich_gaston_rod() mutates li.raw -- dedupe_key()
+    # never reads raw, so order doesn't matter here, but matching the reference
+    # pattern (resolver_backfill_parcel.py) keeps this consistent and safe if
+    # that invariant ever changes.
+    pre_keys = {li.dedupe_key(): li for li in targets}
+
+    stats = asyncio.run(enrich_gaston_rod(targets, max_lookups=args.max_lookups))
+    print("enrich_gaston_rod stats:", stats)
+
+    patches: dict[str, dict] = {}
+    for key, li in pre_keys.items():
+        if isinstance(li.raw, dict) and li.raw.get("rod"):
+            patches[key] = {"raw": {"rod": li.raw["rod"]}}
+
+    print(f"rows with a real rod result to patch: {len(patches):,}")
+    if args.dry_run or not patches:
+        print("DRY RUN or nothing to patch -- not writing." if args.dry_run else "nothing to patch.")
+        return 0
+
+    with board_lock(REPO, owner="fill_gaston_rod_batch", wait=1800, poll=10):
+        result = patch_existing_rows(
+            patches, {"notes": "Gaston NC ROD lien-existence by owner name (batched)"},
+            docs_dir=docs)
+    print("patch result:", result)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

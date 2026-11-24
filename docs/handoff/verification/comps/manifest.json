@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 3631,
-  "refuted": 32,
-  "rows": 4301,
-  "stale": 197,
+  "confirmed": 3908,
+  "refuted": 36,
+  "rows": 4600,
+  "stale": 215,
   "unconfirmed": 441,
   "wall": 0
  },
- "generated_at": "2026-11-24T16:47:40Z",
+ "generated_at": "2026-11-24T17:44:22Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T16:47:40Z",
+  "at": "2026-11-24T17:44:22Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 300,
@@ -21,46 +21,46 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 335
+    "gis.buncombecounty.org": 369
    }
   },
   "result": {
    "checked": 300,
-   "confirmed": 261,
-   "refuted": 3,
-   "stale": 32,
-   "unconfirmed": 4
+   "confirmed": 277,
+   "refuted": 4,
+   "stale": 18,
+   "unconfirmed": 1
   },
-  "seconds": 670,
+  "seconds": 771,
   "selection": {
    "applies": 9615,
-   "due_new": 5568,
+   "due_new": 5266,
    "due_retry": 4,
    "due_ttl": 96,
-   "not_due_retry": 436,
-   "not_due_ttl": 3511,
-   "same_property_queued": 4
+   "not_due_retry": 439,
+   "not_due_ttl": 3810,
+   "same_property_queued": 2
   },
   "source": null,
   "tier": null
  },
- "rows": 4301,
+ "rows": 4600,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4549198,
+   "bytes": 4869704,
    "file": "000.json",
-   "rows": 2153,
-   "sha256": "b6c289dfc76195a5a72afe8f1da5f687917b76f3bcb78a914d608e049d3ebed7"
+   "rows": 2300,
+   "sha256": "68cb287a646805921ad6d17a766ffb51809557bb0e302418e8a26117d0829631"
   },
   {
    "bucket": 1,
-   "bytes": 4521600,
+   "bytes": 4854866,
    "file": "001.json",
-   "rows": 2148,
-   "sha256": "41c013c99f0b29972acb6716d70606278969da26e5f36cc51ae9ff7970d33c50"
+   "rows": 2300,
+   "sha256": "b3586c129b7cfb4e1bbfee075a1dbedb8f6c282502e93c4caa6c269142afab99"
   }
  ],
  "signal": "comps",
