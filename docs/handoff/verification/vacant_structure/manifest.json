@@ -8,12 +8,12 @@
   "unconfirmed": 19,
   "wall": 0
  },
- "generated_at": "2026-11-24T21:33:50Z",
+ "generated_at": "2026-11-24T21:48:35Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T19:09:55Z",
+  "at": "2026-11-24T21:48:35Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,39 +21,32 @@
   "requests": {
    "errors": {},
    "requests": {
-    "arcgisserver.lincolncountync.gov": 13,
-    "devsvcs.gastonianc.gov": 170,
+    "arcgisserver.lincolncountync.gov": 50,
+    "devsvcs.gastonianc.gov": 136,
     "gis.buncombecounty.org": 50,
-    "gis.transylvaniacounty.org": 13,
     "maps.spartanburgcounty.org": 50,
-    "portal-nc.tylertech.cloud": 43,
-    "roster:74.218.167.200": 1,
-    "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "portal-nc.tylertech.cloud": 39,
+    "roster:inmatesinjail.yorkcountygov.com": 1,
     "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "roster:morgantonpdnc.policetocitizen.com": 1,
-    "roster:oconee-so-sc.zuercherportal.com": 1,
-    "roster:tepsweb.cityofgastonia.com": 1,
-    "services1.arcgis.com": 24,
-    "vt.ncsbe.gov": 147,
+    "vt.ncsbe.gov": 150,
     "www.courtlistener.com": 2,
     "www.southcarolinaprobate.net": 150
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 46,
-   "stale": 4
+   "confirmed": 43,
+   "stale": 7
   },
-  "seconds": 1362,
+  "seconds": 1300,
   "selection": {
    "applies": 1737,
-   "due_new": 509,
+   "due_new": 459,
    "due_retry": 1,
    "due_ttl": 3,
    "due_version": 4,
    "not_due_retry": 18,
-   "not_due_ttl": 1202
+   "not_due_ttl": 1252
   },
   "source": null,
   "tier": null

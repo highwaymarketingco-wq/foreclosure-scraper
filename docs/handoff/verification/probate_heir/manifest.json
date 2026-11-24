@@ -1,19 +1,19 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 247,
+  "confirmed": 265,
   "refuted": 2,
-  "rows": 986,
-  "stale": 296,
+  "rows": 1006,
+  "stale": 298,
   "unconfirmed": 441,
   "wall": 0
  },
- "generated_at": "2026-11-24T21:46:34Z",
+ "generated_at": "2026-11-24T21:48:38Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T19:09:58Z",
+  "at": "2026-11-24T21:48:38Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,51 +21,44 @@
   "requests": {
    "errors": {},
    "requests": {
-    "arcgisserver.lincolncountync.gov": 13,
-    "devsvcs.gastonianc.gov": 170,
+    "arcgisserver.lincolncountync.gov": 50,
+    "devsvcs.gastonianc.gov": 136,
     "gis.buncombecounty.org": 50,
-    "gis.transylvaniacounty.org": 13,
     "maps.spartanburgcounty.org": 50,
-    "portal-nc.tylertech.cloud": 43,
-    "roster:74.218.167.200": 1,
-    "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "portal-nc.tylertech.cloud": 39,
+    "roster:inmatesinjail.yorkcountygov.com": 1,
     "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "roster:morgantonpdnc.policetocitizen.com": 1,
-    "roster:oconee-so-sc.zuercherportal.com": 1,
-    "roster:tepsweb.cityofgastonia.com": 1,
-    "services1.arcgis.com": 24,
-    "vt.ncsbe.gov": 147,
+    "vt.ncsbe.gov": 150,
     "www.courtlistener.com": 2,
     "www.southcarolinaprobate.net": 150
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 32,
-   "stale": 18
+   "confirmed": 35,
+   "stale": 15
   },
-  "seconds": 1362,
+  "seconds": 1300,
   "selection": {
    "applies": 1052,
-   "due_new": 160,
+   "due_new": 110,
    "due_version": 4,
    "not_due_retry": 428,
-   "not_due_ttl": 460
+   "not_due_ttl": 510
   },
   "source": null,
   "tier": null
  },
- "rows": 986,
+ "rows": 1006,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 1260019,
+   "bytes": 1276805,
    "file": "000.json",
-   "rows": 986,
-   "sha256": "e6425f2849dc68c53346df9e59e6c6cc25eb8d55374ae8f88eda21e2f990f431"
+   "rows": 1006,
+   "sha256": "720608b1fc40db9748cce66d58fb1f861df8252454401eb310e370765d3badc7"
   }
  ],
  "signal": "probate_heir",
