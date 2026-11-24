@@ -1,19 +1,19 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 436,
+  "confirmed": 481,
   "refuted": 24,
-  "rows": 722,
+  "rows": 772,
   "stale": 92,
-  "unconfirmed": 168,
+  "unconfirmed": 173,
   "wall": 0
  },
- "generated_at": "2026-11-24T11:54:00Z",
+ "generated_at": "2026-11-24T13:25:15Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T11:54:00Z",
+  "at": "2026-11-24T13:25:15Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,49 +21,45 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 67,
-    "gis.charlottenc.gov": 40,
-    "gis.rutherfordcountync.gov": 50,
-    "portal-nc.tylertech.cloud": 32,
-    "rockhillgis.cityofrockhill.com": 9,
-    "roster:anderson-so-sc.zuercherportal.com": 1,
+    "gis.buncombecounty.org": 51,
+    "gis.charlottenc.gov": 100,
+    "gis.rutherfordcountync.gov": 1,
+    "gis.transylvaniacounty.org": 49,
+    "portal-nc.tylertech.cloud": 36,
     "roster:pickens-so-sc.zuercherportal.com": 1,
-    "services.arcgis.com": 3,
-    "vt.ncsbe.gov": 144,
-    "webgis2.durhamnc.gov": 3,
+    "vt.ncsbe.gov": 141,
     "www.courtlistener.com": 2,
-    "www.greenwoodsc.gov": 39,
+    "www.greenwoodsc.gov": 50,
     "www.southcarolinaprobate.net": 150
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 41,
-   "stale": 8,
-   "unconfirmed": 1
+   "confirmed": 45,
+   "unconfirmed": 5
   },
-  "seconds": 1030,
+  "seconds": 1099,
   "selection": {
    "applies": 906,
-   "due_new": 312,
+   "due_new": 262,
    "due_retry": 7,
    "due_version": 126,
-   "not_due_retry": 132,
-   "not_due_ttl": 329
+   "not_due_retry": 133,
+   "not_due_ttl": 378
   },
   "source": null,
   "tier": null
  },
- "rows": 722,
+ "rows": 772,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 840825,
+   "bytes": 895576,
    "file": "000.json",
-   "rows": 722,
-   "sha256": "2305f21bf4791802d309f4790d2d07bf02b113cd01779f1c675f43b316b82173"
+   "rows": 772,
+   "sha256": "defa8fd9220142603d3daaba5a32b389409be4f664a4853c01245b3057c1219d"
   }
  ],
  "signal": "jail_booking",

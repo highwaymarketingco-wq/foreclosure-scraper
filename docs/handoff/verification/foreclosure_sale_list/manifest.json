@@ -8,12 +8,12 @@
   "unconfirmed": 80,
   "wall": 0
  },
- "generated_at": "2026-11-24T11:53:59Z",
+ "generated_at": "2026-11-24T13:25:14Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T11:53:59Z",
+  "at": "2026-11-24T13:25:14Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,18 +21,15 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 67,
-    "gis.charlottenc.gov": 40,
-    "gis.rutherfordcountync.gov": 50,
-    "portal-nc.tylertech.cloud": 32,
-    "rockhillgis.cityofrockhill.com": 9,
-    "roster:anderson-so-sc.zuercherportal.com": 1,
+    "gis.buncombecounty.org": 51,
+    "gis.charlottenc.gov": 100,
+    "gis.rutherfordcountync.gov": 1,
+    "gis.transylvaniacounty.org": 49,
+    "portal-nc.tylertech.cloud": 36,
     "roster:pickens-so-sc.zuercherportal.com": 1,
-    "services.arcgis.com": 3,
-    "vt.ncsbe.gov": 144,
-    "webgis2.durhamnc.gov": 3,
+    "vt.ncsbe.gov": 141,
     "www.courtlistener.com": 2,
-    "www.greenwoodsc.gov": 39,
+    "www.greenwoodsc.gov": 50,
     "www.southcarolinaprobate.net": 150
    }
   },
@@ -40,13 +37,13 @@
    "checked": 50,
    "unconfirmed": 50
   },
-  "seconds": 1030,
+  "seconds": 1099,
   "selection": {
    "applies": 418,
    "due_new": 1,
-   "due_retry": 28,
+   "due_retry": 19,
    "due_ttl": 40,
-   "not_due_retry": 53,
+   "not_due_retry": 62,
    "not_due_ttl": 296
   },
   "source": null,
@@ -58,10 +55,10 @@
  "shards": [
   {
    "bucket": 0,
-   "bytes": 470354,
+   "bytes": 471918,
    "file": "000.json",
    "rows": 420,
-   "sha256": "b0ec51e2cca207d2564f95cb5423c147f207cbce6bf4b3408cd7898913b05091"
+   "sha256": "307c69fdb25e50b220e6a5f04290b2506916c6640c77860a3c4a08b972dfc614"
   }
  ],
  "signal": "foreclosure_sale_list",

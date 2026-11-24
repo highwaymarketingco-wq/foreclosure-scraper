@@ -1,19 +1,19 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 892,
+  "confirmed": 942,
   "refuted": 4,
-  "rows": 928,
+  "rows": 978,
   "stale": 13,
   "unconfirmed": 19,
   "wall": 0
  },
- "generated_at": "2026-11-24T11:53:59Z",
+ "generated_at": "2026-11-24T13:25:13Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T11:53:59Z",
+  "at": "2026-11-24T13:25:13Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,49 +21,45 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 67,
-    "gis.charlottenc.gov": 40,
-    "gis.rutherfordcountync.gov": 50,
-    "portal-nc.tylertech.cloud": 32,
-    "rockhillgis.cityofrockhill.com": 9,
-    "roster:anderson-so-sc.zuercherportal.com": 1,
+    "gis.buncombecounty.org": 51,
+    "gis.charlottenc.gov": 100,
+    "gis.rutherfordcountync.gov": 1,
+    "gis.transylvaniacounty.org": 49,
+    "portal-nc.tylertech.cloud": 36,
     "roster:pickens-so-sc.zuercherportal.com": 1,
-    "services.arcgis.com": 3,
-    "vt.ncsbe.gov": 144,
-    "webgis2.durhamnc.gov": 3,
+    "vt.ncsbe.gov": 141,
     "www.courtlistener.com": 2,
-    "www.greenwoodsc.gov": 39,
+    "www.greenwoodsc.gov": 50,
     "www.southcarolinaprobate.net": 150
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 49,
-   "refuted": 1
+   "confirmed": 50
   },
-  "seconds": 1030,
+  "seconds": 1099,
   "selection": {
    "applies": 1737,
-   "due_new": 859,
+   "due_new": 809,
    "due_retry": 1,
    "due_ttl": 3,
    "due_version": 4,
    "not_due_retry": 18,
-   "not_due_ttl": 852
+   "not_due_ttl": 902
   },
   "source": null,
   "tier": null
  },
- "rows": 928,
+ "rows": 978,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 856550,
+   "bytes": 897218,
    "file": "000.json",
-   "rows": 928,
-   "sha256": "d0b9b103112dafe841265c864bbd4c8ade6664fcff11b4f1f1cd65f1d6469131"
+   "rows": 978,
+   "sha256": "8a738998b0ecad8e9bb1d10cf31c5f6acb289ba68af682b49f1b58b526d19a82"
   }
  ],
  "signal": "vacant_structure",

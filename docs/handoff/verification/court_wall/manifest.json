@@ -3,17 +3,17 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 1984,
+  "rows": 2033,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 1984
+  "wall": 2033
  },
- "generated_at": "2026-11-24T11:53:59Z",
+ "generated_at": "2026-11-24T13:25:13Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T11:53:59Z",
+  "at": "2026-11-24T13:25:13Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,18 +21,15 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 67,
-    "gis.charlottenc.gov": 40,
-    "gis.rutherfordcountync.gov": 50,
-    "portal-nc.tylertech.cloud": 32,
-    "rockhillgis.cityofrockhill.com": 9,
-    "roster:anderson-so-sc.zuercherportal.com": 1,
+    "gis.buncombecounty.org": 51,
+    "gis.charlottenc.gov": 100,
+    "gis.rutherfordcountync.gov": 1,
+    "gis.transylvaniacounty.org": 49,
+    "portal-nc.tylertech.cloud": 36,
     "roster:pickens-so-sc.zuercherportal.com": 1,
-    "services.arcgis.com": 3,
-    "vt.ncsbe.gov": 144,
-    "webgis2.durhamnc.gov": 3,
+    "vt.ncsbe.gov": 141,
     "www.courtlistener.com": 2,
-    "www.greenwoodsc.gov": 39,
+    "www.greenwoodsc.gov": 50,
     "www.southcarolinaprobate.net": 150
    }
   },
@@ -40,25 +37,25 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 1030,
+  "seconds": 1099,
   "selection": {
    "applies": 9035,
-   "due_new": 6958,
-   "not_due_ttl": 2077
+   "due_new": 6908,
+   "not_due_ttl": 2127
   },
   "source": null,
   "tier": null
  },
- "rows": 1984,
+ "rows": 2033,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 1531320,
+   "bytes": 1570650,
    "file": "000.json",
-   "rows": 1984,
-   "sha256": "37487d00bc8f4c958282c5f7214514eca74a395df3d6e1a7d4515c74a67579ea"
+   "rows": 2033,
+   "sha256": "6c97786a1f00d91ab0a338db1b372c5e518b06f79a69771123d5c4eb49b5bbf4"
   }
  ],
  "signal": "court_wall",
