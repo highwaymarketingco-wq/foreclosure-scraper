@@ -96,8 +96,28 @@ log = structlog.get_logger()
 # defined" at the 3s mark tried so far -- likely just needs a longer wait
 # for the Manager/mgr init script to finish, not a sign the function
 # doesn't exist (it's defined plainly at the top of this same iframe's
-# inline script). Next real step: retry that same live-drive approach with
-# a longer settle time (10s+) before calling Search(), or hand-build the
+# inline script).
+#
+# UPDATE 2026-11-24 (later same day): the "longer wait" theory was WRONG --
+# retested at 5s AND 10s, jQuery itself (`typeof window.jQuery`) stays
+# `undefined` either way, so nothing downstream of it (including Search/
+# mgr) ever initializes. Not a Cloudflare block on the jQuery asset either
+# (ruled out two ways: a plain curl to that exact URL 403s with no
+# clearance cookie, as expected, but an in-page `fetch()` from INSIDE the
+# live solved session, same URL, returns a real 200 with real jQuery 1.6.4
+# source -- so the resource itself is reachable fine from this session).
+# The real anomaly: listening for every network response matching "jquery"
+# or "webcore" during a real page load captured ZERO requests -- the
+# browser never even ATTEMPTS to fetch any of the iframe's <script src>
+# tags, despite them being present in the DOM (`document.scripts.length`
+# reports 12, `document.getElementById('last')` finds the real form). No
+# CSP header blocks this (checked: only `x-frame-options: SAMEORIGIN` on
+# the iframe's own response, nothing script-blocking). This now looks like
+# something about how the iframe's scripts get parsed/executed (or not)
+# that a network-level or timing fix won't touch -- worth a real,
+# non-headless, eyes-on-screenshot session to see if the SAME thing happens
+# to a human, or scrapling/Playwright-specific iframe script-execution
+# debugging, before any more blind timing/retry attempts. Next real step: hand-build the
 # POST per the shape above and compare against what a real browser actually
 # sends over the wire (network-capture it, don't guess blind).
 _COUNTIES = {
