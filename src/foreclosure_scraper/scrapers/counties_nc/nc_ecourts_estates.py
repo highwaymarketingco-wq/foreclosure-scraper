@@ -191,11 +191,12 @@ def _row_to_listing(row: dict, slug: str) -> Optional[Listing]:
       }
     """
     case_type = row.get("case_type") or ""
-    # Guard: require a positive estate-shaped caseType. Previously an empty
-    # case_type passed through this guard (the `if case_type and ...` check
-    # skipped when case_type was falsy), letting criminal rows (CR/CRS numbers)
-    # through when the category filter wasn't applied. Now: no caseType, no pass.
-    if not case_type or not ESTATE_CASE_TYPE_RE.search(case_type):
+    # Guard: When case_type is present, require estate keywords. When empty,
+    # trust the category filter (site layout changed 2026-11, no longer prints
+    # per-row case_type once filtered to Estate category). Criminal case numbers
+    # are caught by the second guard below. (Claude 2026-11-24: 220 raw rows,
+    # 0 listings due to this overly strict check)
+    if case_type and not ESTATE_CASE_TYPE_RE.search(case_type):
         return None
 
     case_number = (row.get("case_number") or "").strip()
