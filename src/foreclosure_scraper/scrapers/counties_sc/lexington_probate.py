@@ -4,8 +4,11 @@ www.lex-co.com/ProbateSearch/estates is an Angular SPA that renders reCAPTCHA V2
 in explicit mode after page load. Without solving it the search endpoint returns
 HTTP 401 / no results.
 
+**IMPORTANT:** Headful mode required (headless=True gets blocked by Google anti-bot).
+Run on VM only (DISPLAY=:99), NOT on Mac (user frustrated by local browsers).
+
 Strategy:
-1. Launch patchright (stealth Chromium) headless browser.
+1. Launch patchright (stealth Chromium) HEADFUL browser on VM.
 2. Navigate to the probate search page; wait for Angular to boot and reCAPTCHA
    iframes to appear.
 3. Click the reCAPTCHA checkbox — Google may auto-tick it (risk score low enough).
@@ -15,6 +18,7 @@ Strategy:
 6. Parse the results table into Listing objects.
 
 CAPTCHA solver re-verified against live page structure 2026-11-09.
+Headless→headful fix verified 2026-11-24 (audio loads in headful, blocked in headless).
 Groq API key read from GROQ_API_KEY env var or ~/.secrets/groq_api_key.txt.
 """
 from __future__ import annotations
@@ -322,8 +326,12 @@ class LexingtonProbateScraper(BaseScraper):
 
         async with async_playwright() as p:
             browser = await p.chromium.launch(
-                headless=True,
-                args=["--no-sandbox", "--disable-gpu"],
+                headless=False,  # Changed 2026-11-24: headful mode works, headless blocked
+                args=[
+                    "--disable-blink-features=AutomationControlled",
+                    "--no-sandbox",
+                    "--disable-gpu",
+                ],
             )
             page = await browser.new_page()
 

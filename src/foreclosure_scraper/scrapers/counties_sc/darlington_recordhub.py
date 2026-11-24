@@ -330,9 +330,10 @@ class DarlingtonRecordhub(BaseScraper):
         out = self.partial
         
         async with async_playwright() as p:
-            # Launch browser with stealth settings
+            # Launch browser with stealth settings (HEADFUL required - 2026-11-24)
+            # Google blocks audio reCAPTCHA in headless mode
             browser = await p.chromium.launch(
-                headless=True,
+                headless=False,  # Changed 2026-11-24: same fix as Lexington
                 args=[
                     "--disable-blink-features=AutomationControlled",
                     "--disable-dev-shm-usage",

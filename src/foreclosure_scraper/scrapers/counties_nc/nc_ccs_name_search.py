@@ -34,11 +34,23 @@ from ...enrichment_gaston_rod import _PageSession
 
 log = structlog.get_logger()
 
-# County subdomains
+# County subdomains. FIXED 2026-11-24 (Hertford): the dedicated subdomain
+# "hertfordnc.courthousecomputersystems.com" is DEAD -- confirmed live, a real
+# browser navigation there (and a plain curl once past Cloudflare) 302s away
+# to the vendor's own generic marketing page (courthousecomputersystems.com/
+# corporate/), never Hertford's tenant. The real live tenant is at a
+# county.gov-linked "framed" portal (hertfordrod.net, itself just an iframe
+# wrapper, confirmed live) pointing at a DIFFERENT, shared-cluster host +
+# path pattern CCS has migrated some tenants to: "us4.courthousecomputer
+# systems.com/hertfordnc/" -- confirmed live (200, real Register of Deeds
+# content, not the marketing page). Stored here as a FULL URL (see
+# _resolve_base()) rather than a bare subdomain, same pattern this file's
+# sibling enrichment_probate_spartan.py already uses for its own migrated-
+# tenant case.
 _COUNTIES = {
     "Caldwell": "caldwellnc",
     "Franklin": "franklinnc",
-    "Hertford": "hertfordnc",
+    "Hertford": "https://us4.courthousecomputersystems.com/hertfordnc",
     "Gates": "gatesnc",
 }
 
@@ -50,6 +62,16 @@ _CLOUDFLARE_BLOCKED = {"Caldwell", "Franklin", "Hertford"}
 _BASE = "https://{subdomain}.courthousecomputersystems.com"
 _LRINDEX = "/LRSearch/LRIndex?searchTabID=0"
 _EXEC = "/LRSearch/ExecuteSearch"
+
+
+def _resolve_base(subdomain: str) -> str:
+    """A _COUNTIES value is normally a bare subdomain on the shared
+    courthousecomputersystems.com host; Hertford's value is a full URL on a
+    different host+path instead (see _COUNTIES's own 2026-11-24 comment) --
+    accept either, same convention as enrichment_probate_spartan.py's PORTALS.
+    """
+    return subdomain.rstrip("/") if subdomain.startswith(("http://", "https://")) \
+        else _BASE.format(subdomain=subdomain)
 
 _HDRS = {
     "X-Requested-With": "XMLHttpRequest",
@@ -233,7 +255,7 @@ async def _run_stealthy_county(county: str, subdomain: str) -> list[dict]:
     session across all of them (cross-origin fetch() from a page loaded on
     a DIFFERENT county's domain would not carry that other domain's own
     Cloudflare clearance or cookies)."""
-    base = _BASE.format(subdomain=subdomain)
+    base = _resolve_base(subdomain)
     county_instruments: list[dict] = []
 
     async def page_action(page):
@@ -294,7 +316,7 @@ class NcCcsNameSearchScraper(BaseScraper):
         if unblocked:
             async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
                 for county, subdomain in unblocked:
-                    base = _BASE.format(subdomain=subdomain)
+                    base = _resolve_base(subdomain)
                     log.info("ccs_name.county_start", county=county, path="httpx")
                     county_instruments: list[dict] = []
                     for surname in _COMMON_SURNAMES:
@@ -307,7 +329,7 @@ class NcCcsNameSearchScraper(BaseScraper):
                 # never set at all for blocked counties, handled inside
                 # _run_stealthy_county) -- recompute it fresh per county here
                 # rather than relying on a leftover loop variable.
-                base = _BASE.format(subdomain=_COUNTIES[county])
+                base = _resolve_base(_COUNTIES[county])
                 # Dedupe by doc number within county
                 seen = set()
                 unique_instruments = []
