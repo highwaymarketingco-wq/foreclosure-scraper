@@ -1,74 +1,71 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 190,
+  "confirmed": 198,
   "refuted": 2,
-  "rows": 896,
-  "stale": 263,
+  "rows": 906,
+  "stale": 265,
   "unconfirmed": 441,
   "wall": 0
  },
- "generated_at": "2026-11-24T18:30:28Z",
+ "generated_at": "2026-11-24T18:31:32Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T17:17:07Z",
+  "at": "2026-11-24T18:31:32Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
   "recheck_only": false,
   "requests": {
-   "errors": {},
+   "errors": {
+    "gis.transylvaniacounty.org": 2
+   },
    "requests": {
-    "devsvcs.gastonianc.gov": 160,
-    "gis.buncombecounty.org": 57,
-    "gis.transylvaniacounty.org": 50,
+    "devsvcs.gastonianc.gov": 164,
+    "gis.buncombecounty.org": 50,
+    "gis.transylvaniacounty.org": 54,
     "maps.spartanburgcounty.org": 50,
-    "portal-nc.tylertech.cloud": 37,
-    "registerofdeeds.buncombenc.gov": 59,
+    "portal-nc.tylertech.cloud": 44,
     "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:brunswick-so-nc.zuercherportal.com": 1,
     "roster:buncombecountyso.policetocitizen.com": 1,
-    "roster:cc.southernsoftware.com": 1,
     "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:jail.richlandcountysc.gov": 1,
     "roster:laurens-911-sc.zuercherportal.com": 1,
-    "roster:mugshots.spartanburgsheriff.org": 1,
     "roster:oconee-so-sc.zuercherportal.com": 1,
-    "roster:pickens-so-sc.zuercherportal.com": 1,
+    "roster:p2c.lincolnsheriff.org": 1,
+    "roster:tepsweb.cityofgastonia.com": 1,
     "vt.ncsbe.gov": 147,
     "www.courtlistener.com": 2,
-    "www.southcarolinaprobate.net": 63
+    "www.southcarolinaprobate.net": 150
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 11,
-   "stale": 10,
-   "unconfirmed": 29
+   "confirmed": 30,
+   "stale": 20
   },
-  "seconds": 1219,
+  "seconds": 1765,
   "selection": {
    "applies": 1052,
-   "due_new": 260,
+   "due_new": 210,
    "due_version": 4,
-   "not_due_retry": 399,
-   "not_due_ttl": 389
+   "not_due_retry": 428,
+   "not_due_ttl": 410
   },
   "source": null,
   "tier": null
  },
- "rows": 896,
+ "rows": 906,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 1182786,
+   "bytes": 1191327,
    "file": "000.json",
-   "rows": 896,
-   "sha256": "1ffe0e2e5557fa5f04154fa65be29845e5d18b7fa7fce5bef602af20c06a1d6e"
+   "rows": 906,
+   "sha256": "c0fa403afe62b5ede0ea7fc22008d386213330362e69d9dce7565fa22c0d2169"
   }
  ],
  "signal": "probate_heir",

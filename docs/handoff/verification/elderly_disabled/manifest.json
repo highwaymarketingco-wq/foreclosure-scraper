@@ -8,53 +8,50 @@
   "unconfirmed": 74,
   "wall": 0
  },
- "generated_at": "2026-11-24T18:14:50Z",
+ "generated_at": "2026-11-24T18:31:30Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T17:17:05Z",
+  "at": "2026-11-24T18:31:29Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
   "recheck_only": false,
   "requests": {
-   "errors": {},
+   "errors": {
+    "gis.transylvaniacounty.org": 2
+   },
    "requests": {
-    "devsvcs.gastonianc.gov": 160,
-    "gis.buncombecounty.org": 57,
-    "gis.transylvaniacounty.org": 50,
+    "devsvcs.gastonianc.gov": 164,
+    "gis.buncombecounty.org": 50,
+    "gis.transylvaniacounty.org": 54,
     "maps.spartanburgcounty.org": 50,
-    "portal-nc.tylertech.cloud": 37,
-    "registerofdeeds.buncombenc.gov": 59,
+    "portal-nc.tylertech.cloud": 44,
     "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:brunswick-so-nc.zuercherportal.com": 1,
     "roster:buncombecountyso.policetocitizen.com": 1,
-    "roster:cc.southernsoftware.com": 1,
     "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:jail.richlandcountysc.gov": 1,
     "roster:laurens-911-sc.zuercherportal.com": 1,
-    "roster:mugshots.spartanburgsheriff.org": 1,
     "roster:oconee-so-sc.zuercherportal.com": 1,
-    "roster:pickens-so-sc.zuercherportal.com": 1,
+    "roster:p2c.lincolnsheriff.org": 1,
+    "roster:tepsweb.cityofgastonia.com": 1,
     "vt.ncsbe.gov": 147,
     "www.courtlistener.com": 2,
-    "www.southcarolinaprobate.net": 63
+    "www.southcarolinaprobate.net": 150
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 49,
-   "unconfirmed": 1
+   "confirmed": 50
   },
-  "seconds": 1219,
+  "seconds": 1765,
   "selection": {
    "applies": 140892,
-   "due_new": 133396,
+   "due_new": 133346,
    "due_retry": 3,
    "due_version": 1,
-   "not_due_retry": 61,
-   "not_due_ttl": 7431,
+   "not_due_retry": 62,
+   "not_due_ttl": 7480,
    "same_property_queued": 1
   },
   "source": null,
