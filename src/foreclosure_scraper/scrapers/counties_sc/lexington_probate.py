@@ -130,8 +130,9 @@ async def _solve_audio_challenge(page, challenge_frame) -> bool:
     from foreclosure_scraper.enrichment_recaptcha_visual_claude import solve_recaptcha_visual_claude
     
     # Take screenshot of the reCAPTCHA challenge
+    # NOTE: Screenshot the page, not the frame (frames don't have screenshot method)
     try:
-        screenshot_bytes = await challenge_frame.screenshot(type="png")
+        screenshot_bytes = await page.screenshot(type="png")
     except Exception as exc:
         log.debug("lexington_probate.screenshot_failed", error=str(exc)[:80])
         return False
