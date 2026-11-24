@@ -73,3 +73,28 @@ Checked whether other scrapers import `enrichment_gaston_rod` and would be affec
 only `tests/test_gaston_rod.py` does. `darlington_recordhub.py`, `sc_countyfusion_rod.py`,
 `sc_avenu_rod.py` do not reference this module despite superficially similar grep hits on unrelated
 terms — confirmed by checking each file directly, not assumed from the first grep.
+
+## Addendum 2026-11-24, later same day: NC eCourts category-filter investigation hit a NEW wall
+
+Retried `/tmp/gaston_investigate_scratch/run_category_investigation.py` after
+confirming Gemini keys now fail fast (HTTP 429 "exceeded your current quota",
+not the earlier slow 503 "high demand" storm) -- the fast-fail meant the WAF
+puzzle solve succeeded cleanly on attempt 1 this time (`waf.solved
+attempts_used=1`, after keys 0-4 rotated past quota and key 5 answered).
+
+But immediately after the solved WAF puzzle, the page landed on
+`https://portal-nc.tylertech.cloud/Portal/Home/Dashboard/29` showing a flat
+**403 Forbidden** -- a different wall than the original category-filter bug
+this script was built to diagnose, and one that did not appear on the
+earlier attempt today (that one got past WAF fine and reached the real
+search-form timeout). This looks like TylerTech's own portal rate-limiting
+or flagging this Mac's IP given the volume of automated WAF-solving traffic
+sent to it today (this investigation plus whatever Hermes ran).
+
+Not worth retrying again today from this IP -- same category as the
+Lexington reCAPTCHA finding (see
+docs/LEXINGTON_PROBATE_RECAPTCHA_STATUS_2026-11-24.md): a traffic-pattern/IP
+reputation block, not a code bug, that needs a cooldown or a different
+egress IP (e.g. the VM's) rather than more same-IP attempts. The original
+category-filter DOM bug is still unconfirmed/unfixed -- this 403 blocked
+reaching it again, it didn't answer it.
