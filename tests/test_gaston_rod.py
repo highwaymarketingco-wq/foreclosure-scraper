@@ -143,16 +143,34 @@ async def test_search_instruments_still_treats_a_genuine_empty_result_as_no_rows
     assert await search_instruments(s, "SMITH") == []
 
 
+class _FakePage:
+    """Stands in for the Playwright page _PageSession wraps: queued (status, text)
+    replies to page.evaluate(), same shape _FakeSession queued to .get()/.post()."""
+
+    def __init__(self, replies):
+        self._replies = list(replies)
+        self.calls = 0
+
+    async def evaluate(self, _script, _arg=None):
+        self.calls += 1
+        status, text = self._replies.pop(0)
+        return {"status": status, "text": text}
+
+
+async def _fake_run_stealthy_factory(page):
+    """Returns a _run_stealthy replacement that calls page_action with a fixed
+    fake page instead of launching a real Cloudflare-solving browser."""
+    async def _fake_run_stealthy(page_action):
+        await page_action(page)
+    return _fake_run_stealthy
+
+
 @pytest.mark.asyncio
 async def test_enrich_gaston_rod_stops_immediately_on_a_walled_seed(monkeypatch):
     from types import SimpleNamespace
 
-    class _WalledSession(_FakeSession):
-        async def get(self, url, **kw):
-            self.calls += 1
-            raise GastonWall("seed GET /: HTTP 403")
-
-    monkeypatch.setattr(GR, "AsyncSession", lambda **kw: _WalledSession([]))
+    page = _FakePage([(403, "<title>Attention Required! | Cloudflare</title>")])
+    monkeypatch.setattr(GR, "_run_stealthy", await _fake_run_stealthy_factory(page))
     monkeypatch.setenv("FORECLOSURE_GASTON_ROD", "1")
     li = SimpleNamespace(state="NC", county="Gaston", owner_name="SMITH, JOHN", raw={})
     stats = await enrich_gaston_rod([li])
@@ -165,26 +183,12 @@ async def test_enrich_gaston_rod_stops_immediately_on_a_walled_seed(monkeypatch)
 async def test_enrich_gaston_rod_stops_after_the_first_walled_lookup_not_the_whole_queue(monkeypatch):
     from types import SimpleNamespace
 
-    class _SeedOkThenWalledSession:
-        def __init__(self, **kw):
-            self.gets = 0
-            self.posts = 0
-
-        async def get(self, url, **kw):
-            self.gets += 1
-            return _FakeResp(200, "ok")
-
-        async def post(self, url, **kw):
-            self.posts += 1
-            return _FakeResp(403, "<title>Attention Required! | Cloudflare</title>")
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *a):
-            return False
-
-    monkeypatch.setattr(GR, "AsyncSession", _SeedOkThenWalledSession)
+    # 2 clean GETs for _seed(), then the first search POST hits a Cloudflare page.
+    page = _FakePage([
+        (200, "ok"), (200, "ok"),
+        (403, "<title>Attention Required! | Cloudflare</title>"),
+    ])
+    monkeypatch.setattr(GR, "_run_stealthy", await _fake_run_stealthy_factory(page))
     monkeypatch.setenv("FORECLOSURE_GASTON_ROD", "1")
     targets = [SimpleNamespace(state="NC", county="Gaston", owner_name=f"SMITH, J{i}", raw={})
                for i in range(5)]
@@ -192,3 +196,19 @@ async def test_enrich_gaston_rod_stops_after_the_first_walled_lookup_not_the_who
     assert stats["error"] == "walled"
     assert stats["searched"] == 0   # the wall hit on the very first lookup
     assert stats["targets"] == 5    # but the queue itself was never trimmed
+
+
+@pytest.mark.asyncio
+async def test_enrich_gaston_rod_records_a_real_match_end_to_end(monkeypatch):
+    from types import SimpleNamespace
+
+    page = _FakePage([(200, "ok"), (200, "ok"), (200, SAMPLE)])
+    monkeypatch.setattr(GR, "_run_stealthy", await _fake_run_stealthy_factory(page))
+    monkeypatch.setenv("FORECLOSURE_GASTON_ROD", "1")
+    li = SimpleNamespace(state="NC", county="Gaston", owner_name="SMITH, JOHN", raw={})
+    stats = await enrich_gaston_rod([li])
+    assert "error" not in stats
+    assert stats["searched"] == 1
+    assert stats["with_instruments"] == 1
+    assert stats["with_mortgage"] == 1
+    assert li.raw["rod"]["instrument_count"] == 2
