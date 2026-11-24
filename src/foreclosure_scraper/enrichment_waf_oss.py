@@ -189,7 +189,7 @@ async def _identify_tiles_claude(
         f"No other text."
     )
     body = {
-        "model": "claude-sonnet-4-20250514",
+        "model": "claude-sonnet-5-5",
         "max_tokens": 100,
         "messages": [{
             "role": "user",
