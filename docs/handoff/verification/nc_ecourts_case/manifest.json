@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 7642,
+  "confirmed": 7675,
   "refuted": 26,
-  "rows": 8173,
-  "stale": 420,
-  "unconfirmed": 85,
+  "rows": 8221,
+  "stale": 428,
+  "unconfirmed": 92,
   "wall": 0
  },
- "generated_at": "2026-11-24T08:11:18Z",
+ "generated_at": "2026-11-24T08:39:38Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T08:11:17Z",
+  "at": "2026-11-24T08:39:38Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,74 +21,55 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 78,
-    "gis.charlottenc.gov": 8,
-    "gisweb.hendersoncountync.gov": 4,
-    "maps.spartanburgcounty.org": 10,
-    "portal-nc.tylertech.cloud": 30,
-    "registerofdeeds.buncombenc.gov": 112,
-    "roster:buncombecountyso.policetocitizen.com": 1,
-    "roster:cc.southernsoftware.com": 3,
+    "gis.buncombecounty.org": 54,
+    "gisweb.hendersoncountync.gov": 50,
+    "maps.spartanburgcounty.org": 50,
+    "portal-nc.tylertech.cloud": 35,
+    "registerofdeeds.buncombenc.gov": 42,
     "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:forsythsheriffnc.policetocitizen.com": 1,
-    "roster:guilfordcountysheriff.policetocitizen.com": 1,
-    "roster:injail.catawbacountync.gov": 1,
-    "roster:legacyweb.randolphcountync.gov": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "roster:onlineservices.cabarruscounty.us": 1,
-    "roster:p2c.iredellcountync.gov": 1,
-    "roster:p2c.lincolnsheriff.org": 1,
-    "roster:p2c.nhcgov.com": 1,
-    "roster:pickens-so-sc.zuercherportal.com": 1,
-    "roster:rowancountync.policetocitizen.com": 1,
-    "roster:tepsweb.cityofgastonia.com": 1,
-    "roster:www.fcso.org": 1,
-    "roster:www2.dconc.gov": 1,
-    "services.nconemap.gov": 42,
-    "services1.arcgis.com": 4,
-    "tax.buncombenc.gov": 19,
-    "vt.ncsbe.gov": 144,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "vt.ncsbe.gov": 147,
     "webgis2.durhamnc.gov": 3,
-    "www.courtlistener.com": 91,
-    "www.greenwoodsc.gov": 32
+    "www.courtlistener.com": 74,
+    "www.southcarolinaprobate.net": 87
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 46,
-   "stale": 1,
-   "unconfirmed": 3
+   "confirmed": 33,
+   "stale": 8,
+   "unconfirmed": 9
   },
-  "seconds": 1176,
+  "seconds": 1077,
   "selection": {
    "applies": 25671,
-   "due_new": 17866,
+   "due_new": 17812,
    "due_retry": 3,
    "due_ttl": 670,
-   "not_due_retry": 92,
-   "not_due_ttl": 7040,
-   "same_property_queued": 6
+   "not_due_retry": 93,
+   "not_due_ttl": 7093,
+   "same_property_queued": 9
   },
   "source": null,
   "tier": null
  },
- "rows": 8173,
+ "rows": 8221,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 5075923,
+   "bytes": 5110770,
    "file": "000.json",
-   "rows": 4086,
-   "sha256": "25c7b603b608c858829825ee828842e56bb2b9f280fc1a8cfaeff1ac0a371151"
+   "rows": 4115,
+   "sha256": "925cf23540038cda4f12abcc1f6e1474f8745443a016f9c58af005ac042d558a"
   },
   {
    "bucket": 1,
-   "bytes": 5085190,
+   "bytes": 5107870,
    "file": "001.json",
-   "rows": 4087,
-   "sha256": "59cf2a5144d4c6abd9d19666a479339d425a7e3e643a57ff82d3751e460e8823"
+   "rows": 4106,
+   "sha256": "5fe25152a88f7891633e38ef56ca901f417dd7590ceb8183dc0f42bda14f873b"
   }
  ],
  "signal": "nc_ecourts_case",
