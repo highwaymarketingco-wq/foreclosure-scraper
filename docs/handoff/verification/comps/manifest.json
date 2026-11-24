@@ -1,59 +1,53 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 218,
+  "confirmed": 232,
   "refuted": 3,
-  "rows": 240,
+  "rows": 254,
   "stale": 7,
   "unconfirmed": 12,
   "wall": 0
  },
- "generated_at": "2026-10-17T14:28:27Z",
+ "generated_at": "2026-11-24T01:17:57Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-10-17T14:28:27Z",
-  "county": null,
+  "at": "2026-11-24T01:17:57Z",
+  "county": "Buncombe",
   "host": "SMB-LTSEO05",
-  "max_rows": 300,
+  "max_rows": 15,
   "recheck_only": false,
   "requests": {
    "errors": {},
    "requests": {
-    "berkeleycountysc.paystar.io": 10,
-    "cama.harnett.org": 3,
-    "services1.arcgis.com": 31,
-    "spartanburgcountytax.qpaybill.com": 4,
-    "tax.buncombenc.gov": 41,
-    "tax.transylvaniacounty.org": 56,
-    "taxbill.catawbacountync.gov": 555
+    "gis.buncombecounty.org": 35
    }
   },
   "result": {
-   "budget_stop": 1
+   "checked": 15,
+   "confirmed": 15
   },
-  "seconds": 1513,
+  "seconds": 81,
   "selection": {
-   "applies": 8430,
-   "due_new": 8211,
-   "not_due_retry": 10,
-   "not_due_ttl": 209,
-   "same_property_queued": 1
+   "applies": 9615,
+   "due_new": 9376,
+   "due_retry": 12,
+   "due_ttl": 227
   },
   "source": null,
   "tier": null
  },
- "rows": 240,
+ "rows": 254,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 503657,
+   "bytes": 532859,
    "file": "000.json",
-   "rows": 240,
-   "sha256": "9a2b1a200bdfb6df00251c79dcad9494e2a4550526140d233ce980af443a4422"
+   "rows": 254,
+   "sha256": "2e3baad6c1e04a3445bbeb88b58992e889783077a5a2b8bd8660a811064f6232"
   }
  ],
  "signal": "comps",
