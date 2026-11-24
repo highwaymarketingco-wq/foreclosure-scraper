@@ -1,0 +1,122 @@
+[
+  {
+    "status": "error",
+    "name": "NcItsPublicTax",
+    "error": "'coroutine' object is not iterable"
+  },
+  {
+    "status": "error",
+    "name": "NcTylerTechEstatesScraper",
+    "error": "'coroutine' object is not iterable"
+  },
+  {
+    "status": "error",
+    "name": "NcCivicplusTaxSaleScraper",
+    "error": "'coroutine' object is not iterable"
+  },
+  {
+    "status": "error",
+    "name": "NCECourtsDivorce",
+    "error": "'coroutine' object is not iterable"
+  },
+  {
+    "status": "error",
+    "name": "NCTaxLienAds",
+    "error": "'coroutine' object is not iterable"
+  },
+  {
+    "status": "error",
+    "name": "TransylvaniaDelinquentTax",
+    "error": "'coroutine' object is not iterable"
+  },
+  {
+    "status": "error",
+    "name": "IredellDelinquentTax",
+    "error": "'coroutine' object is not iterable"
+  },
+  {
+    "status": "error",
+    "name": "NCMetroDemolitionPermits",
+    "error": "'coroutine' object is not iterable"
+  },
+  {
+    "status": "error",
+    "name": "PolkTaxAuction",
+    "error": "'coroutine' object is not iterable"
+  },
+  {
+    "status": "error",
+    "name": "NCPtsCloudDelinquentTax",
+    "error": "'coroutine' object is not iterable"
+  },
+  {
+    "status": "error",
+    "name": "NcCchsDeedsScraper",
+    "error": "'coroutine' object is not iterable"
+  },
+  {
+    "status": "error",
+    "name": "JohnstonDelinquentTaxCrosswalk",
+    "error": "'coroutine' object is not iterable"
+  },
+  {
+    "status": "error",
+    "name": "NCRodSubstituteTrustee",
+    "error": "'coroutine' object is not iterable"
+  },
+  {
+    "status": "error",
+    "name": "MecklenburgTaxForeclosures",
+    "error": "'coroutine' object is not iterable"
+  },
+  {
+    "status": "error",
+    "name": "NcRowanCottScraper",
+    "error": "'coroutine' object is not iterable"
+  },
+  {
+    "status": "error",
+    "name": "NCHeirEstateParcels",
+    "error": "'coroutine' object is not iterable"
+  },
+  {
+    "status": "error",
+    "name": "NCECourtsLisPendens",
+    "error": "'coroutine' object is not iterable"
+  },
+  {
+    "status": "error",
+    "name": "NcRodCaptchaScraper",
+    "error": "'coroutine' object is not iterable"
+  },
+  {
+    "status": "error",
+    "name": "GastoniaCodeEnforcement",
+    "error": "'coroutine' object is not iterable"
+  },
+  {
+    "status": "error",
+    "name": "HendersonForeclosureParcels",
+    "error": "'coroutine' object is not iterable"
+  },
+  {
+    "status": "error",
+    "name": "NODDiscovery",
+    "error": "'coroutine' object is not iterable"
+  },
+  {
+    "status": "error",
+    "name": "ArcgisDistressLayers",
+    "error": "'coroutine' object is not iterable"
+  },
+  {
+    "status": "error",
+    "name": "MultiYearDelinquency",
+    "error": "'coroutine' object is not iterable"
+  },
+  {
+    "status": "error",
+    "name": "LiensNCIncrementalScraper",
+    "error": "'coroutine' object is not iterable"
+  }
+]

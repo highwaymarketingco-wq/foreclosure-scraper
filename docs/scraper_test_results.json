@@ -518,5 +518,285 @@
     "count": 0,
     "error": null,
     "time": 90.591459
+  },
+  {
+    "name": "NcRowanCottScraper",
+    "slug": "counties_nc.nc_rowan_cott",
+    "status": "timeout",
+    "count": 0,
+    "error": null,
+    "time": 90.149149
+  },
+  {
+    "name": "NCTaxLienAds",
+    "slug": "counties_nc.nc_tax_lien_ads",
+    "status": "timeout",
+    "count": 0,
+    "error": null,
+    "time": 90.038345
+  },
+  {
+    "name": "NcTylerTechEstatesScraper",
+    "slug": "counties_nc.nc_tylertech_estates",
+    "status": "timeout",
+    "count": 0,
+    "error": null,
+    "time": 90.093389
+  },
+  {
+    "name": "NCHFAREO",
+    "slug": "counties_nc.nchfa_reo",
+    "status": "empty",
+    "count": 0,
+    "error": null,
+    "time": 0.912103
+  },
+  {
+    "name": "NewHanoverForeclosures",
+    "slug": "counties_nc.new_hanover_foreclosures",
+    "status": "success",
+    "count": 1,
+    "error": null,
+    "time": 1.325482
+  },
+  {
+    "name": "PolkTaxAuction",
+    "slug": "counties_nc.polk_tax",
+    "status": "timeout",
+    "count": 0,
+    "error": null,
+    "time": 90.014442
+  },
+  {
+    "name": "RockyMountBlightSurvey",
+    "slug": "counties_nc.rocky_mount_blight_survey",
+    "status": "success",
+    "count": 618,
+    "error": null,
+    "time": 13.090328
+  },
+  {
+    "name": "RowanDelinquentTax",
+    "slug": "counties_nc.rowan_delinquent_tax",
+    "status": "success",
+    "count": 2555,
+    "error": null,
+    "time": 10.539602
+  },
+  {
+    "name": "RutherfordForeclosure",
+    "slug": "counties_nc.rutherford_foreclosure",
+    "status": "success",
+    "count": 23,
+    "error": null,
+    "time": 2.359291
+  },
+  {
+    "name": "RutherfordDelinquentTax",
+    "slug": "counties_nc.rutherford_tax",
+    "status": "success",
+    "count": 9328,
+    "error": null,
+    "time": 63.790401
+  },
+  {
+    "name": "RutherfordWildfireDelinquent",
+    "slug": "counties_nc.rutherford_wildfire_tax",
+    "status": "success",
+    "count": 1476,
+    "error": null,
+    "time": 1.11788
+  },
+  {
+    "name": "StokesDelinquentTax",
+    "slug": "counties_nc.stokes_delinquent_tax",
+    "status": "success",
+    "count": 4,
+    "error": null,
+    "time": 1.899014
+  },
+  {
+    "name": "SwainTaxForeclosures",
+    "slug": "counties_nc.swain_tax_foreclosures",
+    "status": "success",
+    "count": 1,
+    "error": null,
+    "time": 6.37778
+  },
+  {
+    "name": "TransylvaniaDelinquentTax",
+    "slug": "counties_nc.transylvania_delinquent_tax",
+    "status": "timeout",
+    "count": 0,
+    "error": null,
+    "time": 90.002352
+  },
+  {
+    "name": "TransylvaniaVacant",
+    "slug": "counties_nc.transylvania_vacant",
+    "status": "success",
+    "count": 11129,
+    "error": null,
+    "time": 5.048923
+  },
+  {
+    "name": "UnionDelinquentTax",
+    "slug": "counties_nc.union_delinquent_tax",
+    "status": "success",
+    "count": 325,
+    "error": null,
+    "time": 2.445592
+  },
+  {
+    "name": "WakeCodeCases",
+    "slug": "counties_nc.wake_code_cases",
+    "status": "success",
+    "count": 73,
+    "error": null,
+    "time": 0.582555
+  },
+  {
+    "name": "WakeTaxForeclosure",
+    "slug": "counties_nc.wake_tax_foreclosure",
+    "status": "success",
+    "count": 4,
+    "error": null,
+    "time": 8.720462
+  },
+  {
+    "name": "WNCRodForeclosureStarts",
+    "slug": "counties_nc.wnc_rod_foreclosure_starts",
+    "status": "timeout",
+    "count": 0,
+    "error": null,
+    "time": 90.002566
+  },
+  {
+    "name": "WNCTaxForeclosures",
+    "slug": "counties_nc.wnc_tax_foreclosures",
+    "status": "success",
+    "count": 6,
+    "error": null,
+    "time": 25.784453
+  },
+  {
+    "name": "AbbevilleDelinquentTax",
+    "slug": "counties_sc.abbeville_delinquent_tax",
+    "status": "empty",
+    "count": 0,
+    "error": null,
+    "time": 1.666043
+  },
+  {
+    "name": "AikenDelinquentTax",
+    "slug": "counties_sc.aiken_delinquent_tax",
+    "status": "empty",
+    "count": 0,
+    "error": null,
+    "time": 0.720515
+  },
+  {
+    "name": "AndersonAcpassDeeds",
+    "slug": "counties_sc.anderson_acpass_deeds",
+    "status": "success",
+    "count": 17,
+    "error": null,
+    "time": 48.735509
+  },
+  {
+    "name": "AndersonMasterInEquity",
+    "slug": "counties_sc.anderson_master_in_equity",
+    "status": "success",
+    "count": 51,
+    "error": null,
+    "time": 18.40208
+  },
+  {
+    "name": "AndersonSheriff",
+    "slug": "counties_sc.anderson_sheriff",
+    "status": "error",
+    "count": 0,
+    "error": "",
+    "time": 8.043363
+  },
+  {
+    "name": "BambergSheriff",
+    "slug": "counties_sc.bamberg_sheriff",
+    "status": "empty",
+    "count": 0,
+    "error": null,
+    "time": 0.535072
+  },
+  {
+    "name": "BarnwellSheriff",
+    "slug": "counties_sc.barnwell_sheriff",
+    "status": "empty",
+    "count": 0,
+    "error": null,
+    "time": 0.368049
+  },
+  {
+    "name": "BeaufortFLC",
+    "slug": "counties_sc.beaufort_flc",
+    "status": "success",
+    "count": 23,
+    "error": null,
+    "time": 1.041192
+  },
+  {
+    "name": "BerkeleyPaystarTax",
+    "slug": "counties_sc.berkeley_paystar_tax",
+    "status": "empty",
+    "count": 0,
+    "error": null,
+    "time": 0.427053
+  },
+  {
+    "name": "CalhounOverageClaims",
+    "slug": "counties_sc.calhoun_overage_claims",
+    "status": "success",
+    "count": 74,
+    "error": null,
+    "time": 0.657402
+  },
+  {
+    "name": "CharlestonDelinquentTax",
+    "slug": "counties_sc.charleston_delinquent_tax",
+    "status": "success",
+    "count": 1760,
+    "error": null,
+    "time": 23.83715
+  },
+  {
+    "name": "CharlestonEnergovHistory",
+    "slug": "counties_sc.charleston_energov_history",
+    "status": "timeout",
+    "count": 0,
+    "error": null,
+    "time": 90.011721
+  },
+  {
+    "name": "CharlestonMasterInEquity",
+    "slug": "counties_sc.charleston_mie",
+    "status": "success",
+    "count": 47,
+    "error": null,
+    "time": 2.078962
+  },
+  {
+    "name": "CharlestonTaxSaleXlsx",
+    "slug": "counties_sc.charleston_tax_sale_xlsx",
+    "status": "success",
+    "count": 1481,
+    "error": null,
+    "time": 13.961281
+  },
+  {
+    "name": "CherokeeDelinquentTaxScraper",
+    "slug": "counties_sc.cherokee_delinquent_tax",
+    "status": "success",
+    "count": 528,
+    "error": null,
+    "time": 40.781999
   }
 ]

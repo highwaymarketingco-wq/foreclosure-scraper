@@ -368,7 +368,7 @@ class GreenvilleProbate(BaseScraper):
                     if case_number in seen:
                         continue
                     seen.add(case_number)
-                    await asyncio.sleep(0.5)
+                    await asyncio.sleep(2.0)  # Increased from 0.5s - Imperva rate limiting
                     try:
                         detail = await _fetch_detail(client, case_number)
                     except httpx.HTTPError as exc:
@@ -384,5 +384,5 @@ class GreenvilleProbate(BaseScraper):
                 log.info("greenville_probate.surname_done", surname=surname,
                           count=name_hits, stale_or_old=name_stale,
                           rows_sampled=len(rows), max_age_days=MAX_AGE_DAYS)
-                await asyncio.sleep(1.0)
+                await asyncio.sleep(3.0)  # Increased from 1s - Imperva rate limiting
         return out

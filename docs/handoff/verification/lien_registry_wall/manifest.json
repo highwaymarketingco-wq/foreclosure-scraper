@@ -3,12 +3,12 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 710,
+  "rows": 760,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 710
+  "wall": 760
  },
- "generated_at": "2026-11-24T15:40:10Z",
+ "generated_at": "2026-11-24T17:13:43Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
@@ -62,16 +62,16 @@
   "source": null,
   "tier": null
  },
- "rows": 710,
+ "rows": 760,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 647879,
+   "bytes": 693357,
    "file": "000.json",
-   "rows": 710,
-   "sha256": "4c48bbb5736bb993677e287fcc14d3cec360853eccb479106f59b9cc1e62198d"
+   "rows": 760,
+   "sha256": "a84283691563658c39eef90141bed35d10a28b685f5635d90ddd5395d6e22789"
   }
  ],
  "signal": "lien_registry_wall",
