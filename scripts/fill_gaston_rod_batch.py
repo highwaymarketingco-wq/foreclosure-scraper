@@ -30,6 +30,12 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "src"))
+# This board (5.9GB+) is over patch_existing_rows()'s default 2300MB ceiling.
+# patch_existing_rows() is measurably cheap per row regardless of board size
+# (see BOARD_PATCH_MAX_SOURCE_MB's own comment in web_artifact.py) -- this is
+# the sanctioned override for one supervised run, same pattern used by every
+# other patch-based script this session (lrcpwa_refresh.py, the VM wrappers).
+os.environ.setdefault("BOARD_PATCH_ALLOW_LARGE", "1")
 
 from foreclosure_scraper.board_stream import iter_board_rows  # noqa: E402
 from foreclosure_scraper.enrichment_gaston_rod import enrich_gaston_rod  # noqa: E402
