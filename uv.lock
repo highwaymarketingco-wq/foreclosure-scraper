@@ -559,6 +559,7 @@ source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
     { name = "beautifulsoup4" },
+    { name = "certifi" },
     { name = "cryptography" },
     { name = "curl-cffi" },
     { name = "feedparser" },
@@ -603,6 +604,7 @@ dev = [
 requires-dist = [
     { name = "anthropic", specifier = ">=0.97.0" },
     { name = "beautifulsoup4", specifier = ">=4.12" },
+    { name = "certifi", specifier = ">=2024.2.2" },
     { name = "cryptography", specifier = ">=42" },
     { name = "curl-cffi", specifier = ">=0.15.0" },
     { name = "feedparser", specifier = ">=6.0" },
