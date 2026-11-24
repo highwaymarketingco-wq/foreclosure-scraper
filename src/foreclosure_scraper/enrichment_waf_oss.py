@@ -242,9 +242,9 @@ async def solve_waf_via_browser(page) -> bool:
     # AWS WAF on portal-nc serves an escalating number of puzzles when
     # the source IP looks suspicious (GitHub Actions runner IPs definitely
     # do). Verified 2026-05-13: 1 puzzle on a "good" run, 8+ on a "bad"
-    # run with answers all correct. 20 covers worst observed without
-    # exhausting the 4-min StealthyFetcher timeout (20 × ~4s = 80s).
-    MAX_PUZZLES = 20
+    # run with answers all correct. Increased to 50 (2026-11-24) after
+    # observing 20+ puzzles on CountyFusion/NC eCourts. Env override available.
+    MAX_PUZZLES = int(os.environ.get("WAF_MAX_PUZZLES", "50"))
     attempt = 0
 
     # Self-imposed wall-clock budget (see MAX_TOTAL_SOLVE_SECONDS docstring
