@@ -358,5 +358,165 @@
     "count": 0,
     "error": null,
     "time": 13.918591
+  },
+  {
+    "name": "NcAvalonTaxScraper",
+    "slug": "counties_nc.nc_avalon_tax",
+    "status": "empty",
+    "count": 0,
+    "error": null,
+    "time": 58.480868
+  },
+  {
+    "name": "NCBankruptcySales",
+    "slug": "counties_nc.nc_bankruptcy_sales",
+    "status": "success",
+    "count": 3,
+    "error": null,
+    "time": 0.895731
+  },
+  {
+    "name": "NcCchsDeedsScraper",
+    "slug": "counties_nc.nc_cchs_deeds",
+    "status": "timeout",
+    "count": 0,
+    "error": null,
+    "time": 90.175691
+  },
+  {
+    "name": "NcCivicplusTaxSaleScraper",
+    "slug": "counties_nc.nc_civicplus_tax_sale",
+    "status": "timeout",
+    "count": 0,
+    "error": null,
+    "time": 90.00958
+  },
+  {
+    "name": "NCCoastalTaxForeclosure",
+    "slug": "counties_nc.nc_coastal_tax_foreclosure",
+    "status": "success",
+    "count": 1,
+    "error": null,
+    "time": 7.427112
+  },
+  {
+    "name": "NCCountyCsvDelinquentTax",
+    "slug": "counties_nc.nc_county_csv_delinquent_tax",
+    "status": "success",
+    "count": 1270,
+    "error": null,
+    "time": 0.730293
+  },
+  {
+    "name": "NCCountyPdfDelinquentTax",
+    "slug": "counties_nc.nc_county_pdf_delinquent_tax",
+    "status": "success",
+    "count": 8941,
+    "error": null,
+    "time": 8.173015
+  },
+  {
+    "name": "NCCountyTaxForeclosure",
+    "slug": "counties_nc.nc_county_tax_foreclosure",
+    "status": "success",
+    "count": 88,
+    "error": null,
+    "time": 14.560218
+  },
+  {
+    "name": "NCDEQDSCA",
+    "slug": "counties_nc.nc_deq_dsca",
+    "status": "success",
+    "count": 57,
+    "error": null,
+    "time": 5.645949
+  },
+  {
+    "name": "NCECourtsDivorce",
+    "slug": "counties_nc.nc_ecourts_divorce",
+    "status": "timeout",
+    "count": 0,
+    "error": null,
+    "time": 90.006386
+  },
+  {
+    "name": "NCECourtsEstates",
+    "slug": "counties_nc.nc_ecourts_estates",
+    "status": "empty",
+    "count": 0,
+    "error": null,
+    "time": 14.577229
+  },
+  {
+    "name": "NCECourtsLisPendens",
+    "slug": "counties_nc.nc_ecourts_lis_pendens",
+    "status": "timeout",
+    "count": 0,
+    "error": null,
+    "time": 90.001185
+  },
+  {
+    "name": "NCGovDealsRealProperty",
+    "slug": "counties_nc.nc_govdeals_real_property",
+    "status": "success",
+    "count": 4,
+    "error": null,
+    "time": 1.111366
+  },
+  {
+    "name": "NCHeirEstateParcels",
+    "slug": "counties_nc.nc_heir_estate_parcels",
+    "status": "timeout",
+    "count": 0,
+    "error": null,
+    "time": 90.003566
+  },
+  {
+    "name": "NcItsPublicTax",
+    "slug": "counties_nc.nc_its_public_tax",
+    "status": "timeout",
+    "count": 0,
+    "error": null,
+    "time": 90.004395
+  },
+  {
+    "name": "NCMetroDemolitionPermits",
+    "slug": "counties_nc.nc_metro_demolition_permits",
+    "status": "timeout",
+    "count": 0,
+    "error": null,
+    "time": 90.158421
+  },
+  {
+    "name": "NCPtsCloudDelinquentTax",
+    "slug": "counties_nc.nc_ptscloud_delinquent_tax",
+    "status": "timeout",
+    "count": 0,
+    "error": null,
+    "time": 90.140022
+  },
+  {
+    "name": "NcRodCaptchaScraper",
+    "slug": "counties_nc.nc_rod_captcha",
+    "status": "timeout",
+    "count": 0,
+    "error": null,
+    "time": 93.604726
+  },
+  {
+    "name": "NCRodLogan",
+    "slug": "counties_nc.nc_rod_logan",
+    "status": "success",
+    "count": 14,
+    "error": null,
+    "time": 72.53028
+  },
+  {
+    "name": "NCRodSubstituteTrustee",
+    "slug": "counties_nc.nc_rod_substitute_trustee",
+    "status": "timeout",
+    "count": 0,
+    "error": null,
+    "time": 90.591459
   }
 ]
