@@ -572,11 +572,30 @@ async def _fetch_p2c_centralsquare(target: str) -> list[dict]:
     a 400 and never populates TotalCount, so page in blocks of 200 until a
     short page. DOB is redacted on the public feed; Age + ArrestDate survive.
     Compliant: open JSON-XHR + standard anti-forgery echo, no login/CAPTCHA.
+
+    `target` not carrying a `|listId` used to silently default to "23"
+    (Buncombe's own id) -- wrong for any other tenant, and nothing surfaced
+    the mistake (the API still returns 200s, just for the wrong agency's
+    roster or an empty one). Every tenant's own host-relative
+    `/api/Agency/InitialSettings` (no auth, no id required) answers with its
+    own AgencyId directly, so auto-discover it instead of guessing when
+    `target` doesn't already carry an explicit listId. Same fix already
+    proven live in scrapers/national/jail_bookings.py's own copy of this
+    function (2026-11-05, Lexington SC build); ported here 2026-11-24.
     """
     from curl_cffi.requests import AsyncSession
     host, _, list_id = target.partition("|")
-    list_id = list_id or "23"
-    api = f"{host}/api/Inmates/{list_id}"
+
+    async def _discover_list_id(s: "AsyncSession") -> str:
+        try:
+            r = await s.get(f"{host}/api/Agency/InitialSettings", timeout=20)
+            agency_id = (r.json() or {}).get("AgencyId")
+            if agency_id:
+                return str(agency_id)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("jail.p2c_cs_discover_fail", host=host, error=str(exc)[:120])
+        return "23"  # last-resort fallback: Buncombe's own id, same as pre-fix behavior
+
     page_size = 200
     out: list[dict] = []
     try:
@@ -584,6 +603,9 @@ async def _fetch_p2c_centralsquare(target: str) -> list[dict]:
         # (gaston_rod, sc_divorce): it tolerates a TLS-intercepting proxy in the
         # run environment, NOT a cert/WAF defeat on the source itself.
         async with AsyncSession(impersonate="chrome", verify=False) as s:
+            if not list_id:
+                list_id = await _discover_list_id(s)
+            api = f"{host}/api/Inmates/{list_id}"
             # 1) establish the XSRF-TOKEN cookie via an app-route GET
             await s.get(f"{host}/en/Inmates", timeout=25)
             token = s.cookies.get("XSRF-TOKEN")
