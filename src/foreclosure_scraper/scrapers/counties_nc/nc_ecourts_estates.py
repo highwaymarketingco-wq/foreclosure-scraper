@@ -110,7 +110,15 @@ ESTATE_CASE_TYPE_RE = re.compile(
 
 # Criminal case-number prefixes that must never appear in an estate result.
 # If the category filter fails and criminal cases leak in, this catches them.
-_CRIMINAL_CASE_RE = re.compile(r"^\s*(CR|CRS|IF|VR|CVL)\s*\d", re.I)
+# FOUND 2026-11-24: NC Odyssey's real format on this portal is a 2-digit YEAR
+# prefix before the type code (e.g. "25CR325205-800", "24CR705025-800" --
+# live-captured, confirmed criminal), not a bare "CR123456". The old ^-anchored
+# pattern never matched that prefix, so these leaked straight through as
+# "listings" once the case_type guard above was relaxed to trust an empty
+# case_type (2026-11-24, commit a49bfc4) -- 10 criminal cases landed as fake
+# estate rows in a live test. Match the type code at the very start OR right
+# after a short digit run (the year), with an optional separator.
+_CRIMINAL_CASE_RE = re.compile(r"^\s*\d{0,4}[-\s]?(CR|CRS|IF|VR|CVL)\s*\d", re.I)
 
 # Party-role labels for the actionable contact on an estate. The decedent is
 # the property owner; the executor/administrator/PR is the person who can sell.
