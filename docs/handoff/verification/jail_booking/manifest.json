@@ -1,14 +1,14 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 568,
+  "confirmed": 552,
   "refuted": 26,
   "rows": 938,
-  "stale": 139,
-  "unconfirmed": 203,
+  "stale": 149,
+  "unconfirmed": 209,
   "wall": 0
  },
- "generated_at": "2026-11-24T17:17:06Z",
+ "generated_at": "2026-11-24T18:24:58Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
@@ -66,10 +66,10 @@
  "shards": [
   {
    "bucket": 0,
-   "bytes": 1083501,
+   "bytes": 1087304,
    "file": "000.json",
    "rows": 938,
-   "sha256": "524fbe6a8c48f180b41c0c628593d2eecda3e05e5e172a66fd2fa36e8856ef96"
+   "sha256": "63fb3d7e6564506c18adca846f06bc9a3f934eacba7bd8d3b5590ab2b5e3dbeb"
   }
  ],
  "signal": "jail_booking",
