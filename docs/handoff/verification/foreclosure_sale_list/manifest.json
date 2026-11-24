@@ -1,14 +1,14 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 299,
+  "confirmed": 309,
   "refuted": 0,
-  "rows": 399,
-  "stale": 21,
-  "unconfirmed": 79,
+  "rows": 411,
+  "stale": 22,
+  "unconfirmed": 80,
   "wall": 0
  },
- "generated_at": "2026-11-24T08:39:37Z",
+ "generated_at": "2026-11-24T10:15:41Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
@@ -52,16 +52,16 @@
   "source": null,
   "tier": null
  },
- "rows": 399,
+ "rows": 411,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 445332,
+   "bytes": 458080,
    "file": "000.json",
-   "rows": 399,
-   "sha256": "819355063e6e1ee06ca78451ecde1e04b989542d06e866c95a635924d53aa122"
+   "rows": 411,
+   "sha256": "54bcdec51b48b8b0b72a8889038c6ef827350a5d6d6e7ab022c87fd62f5819c2"
   }
  ],
  "signal": "foreclosure_sale_list",
