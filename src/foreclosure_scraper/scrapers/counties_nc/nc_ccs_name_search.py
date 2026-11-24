@@ -47,6 +47,16 @@ log = structlog.get_logger()
 # _resolve_base()) rather than a bare subdomain, same pattern this file's
 # sibling enrichment_probate_spartan.py already uses for its own migrated-
 # tenant case.
+#
+# NOT YET A WORKING SEARCH, only a correct landing page: confirmed live this
+# tenant is on an OLDER classic-ASP CCS deployment (default.asp/disclaimer.asp
+# /searchonline.asp), NOT the modern /LRSearch/LRIndex + /LRSearch/
+# ExecuteSearch app Gaston/Caldwell/Franklin/Gates all share -- that path
+# 404s here. searchonline.asp itself also 404s on a bare GET (confirmed live
+# 2026-11-24); the disclaimer page links it as a relative href, so it likely
+# needs the actual disclaimer-accept POST replayed first (session-gated),
+# not just a direct GET. Still open: find the real search-flow paths for
+# THIS platform generation before Hertford will yield anything.
 _COUNTIES = {
     "Caldwell": "caldwellnc",
     "Franklin": "franklinnc",
