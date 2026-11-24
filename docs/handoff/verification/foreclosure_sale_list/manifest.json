@@ -3,17 +3,17 @@
  "counts": {
   "confirmed": 271,
   "refuted": 0,
-  "rows": 348,
+  "rows": 361,
   "stale": 16,
-  "unconfirmed": 61,
+  "unconfirmed": 74,
   "wall": 0
  },
- "generated_at": "2026-11-24T05:32:53Z",
+ "generated_at": "2026-11-24T06:01:24Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T05:32:53Z",
+  "at": "2026-11-24T06:01:24Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,55 +21,49 @@
   "requests": {
    "errors": {},
    "requests": {
-    "arcgisserver.lincolncountync.gov": 6,
-    "gis.buncombecounty.org": 99,
-    "gis.charlottenc.gov": 4,
+    "gis.buncombecounty.org": 74,
     "portal-nc.tylertech.cloud": 37,
-    "registerofdeeds.buncombenc.gov": 207,
+    "registerofdeeds.buncombenc.gov": 128,
     "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:bookings.darlingtonsheriff.org": 1,
-    "roster:brunswick-so-nc.zuercherportal.com": 1,
-    "roster:colleton-so-sc.zuercherportal.com": 1,
-    "roster:kershaw-so-sc.zuercherportal.com": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "roster:morgantonpdnc.policetocitizen.com": 1,
-    "roster:oconee-so-sc.zuercherportal.com": 1,
-    "roster:p2c.nhcgov.com": 1,
-    "roster:tepsweb.cityofgastonia.com": 1,
-    "roster:wakeso.policetocitizen.com": 1,
+    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "roster:pickens-so-sc.zuercherportal.com": 1,
+    "roster:union-so-sc.zuercherportal.com": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 327,
+    "tax.buncombenc.gov": 21,
+    "vt.ncsbe.gov": 141,
     "webgis2.durhamnc.gov": 3,
-    "www.courtlistener.com": 50,
-    "www.greenwoodsc.gov": 50
+    "www.courtlistener.com": 75,
+    "www.greenwoodsc.gov": 50,
+    "www.southcarolinaprobate.net": 24
    }
   },
   "result": {
    "checked": 50,
    "unconfirmed": 50
   },
-  "seconds": 1572,
+  "seconds": 1185,
   "selection": {
    "applies": 418,
-   "due_new": 79,
-   "due_retry": 38,
+   "due_new": 73,
+   "due_retry": 31,
    "due_ttl": 40,
-   "not_due_retry": 18,
+   "not_due_retry": 31,
    "not_due_ttl": 243
   },
   "source": null,
   "tier": null
  },
- "rows": 348,
+ "rows": 361,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 388465,
+   "bytes": 405904,
    "file": "000.json",
-   "rows": 348,
-   "sha256": "592a848a184e189e414a0457c7a976b258fd46f60135706b8866a35c76d4abfa"
+   "rows": 361,
+   "sha256": "056d79747a13a62816ebde9c5bd3b623577422f1903427f24eb7b4af8987a65d"
   }
  ],
  "signal": "foreclosure_sale_list",

@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 14267,
+  "confirmed": 14314,
   "refuted": 11,
-  "rows": 14454,
+  "rows": 14504,
   "stale": 33,
-  "unconfirmed": 143,
+  "unconfirmed": 146,
   "wall": 0
  },
- "generated_at": "2026-11-24T05:32:53Z",
+ "generated_at": "2026-11-24T06:01:25Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T05:32:53Z",
+  "at": "2026-11-24T06:01:24Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,63 +21,58 @@
   "requests": {
    "errors": {},
    "requests": {
-    "arcgisserver.lincolncountync.gov": 6,
-    "gis.buncombecounty.org": 99,
-    "gis.charlottenc.gov": 4,
+    "gis.buncombecounty.org": 74,
     "portal-nc.tylertech.cloud": 37,
-    "registerofdeeds.buncombenc.gov": 207,
+    "registerofdeeds.buncombenc.gov": 128,
     "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:bookings.darlingtonsheriff.org": 1,
-    "roster:brunswick-so-nc.zuercherportal.com": 1,
-    "roster:colleton-so-sc.zuercherportal.com": 1,
-    "roster:kershaw-so-sc.zuercherportal.com": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "roster:morgantonpdnc.policetocitizen.com": 1,
-    "roster:oconee-so-sc.zuercherportal.com": 1,
-    "roster:p2c.nhcgov.com": 1,
-    "roster:tepsweb.cityofgastonia.com": 1,
-    "roster:wakeso.policetocitizen.com": 1,
+    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "roster:pickens-so-sc.zuercherportal.com": 1,
+    "roster:union-so-sc.zuercherportal.com": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 327,
+    "tax.buncombenc.gov": 21,
+    "vt.ncsbe.gov": 141,
     "webgis2.durhamnc.gov": 3,
-    "www.courtlistener.com": 50,
-    "www.greenwoodsc.gov": 50
+    "www.courtlistener.com": 75,
+    "www.greenwoodsc.gov": 50,
+    "www.southcarolinaprobate.net": 24
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 50
+   "confirmed": 47,
+   "unconfirmed": 3
   },
-  "seconds": 1572,
+  "seconds": 1185,
   "selection": {
    "applies": 44671,
-   "due_new": 30323,
+   "due_new": 30273,
    "due_retry": 26,
    "due_retry_transient": 24,
    "due_ttl": 432,
    "not_due_retry": 89,
-   "not_due_ttl": 13777
+   "not_due_ttl": 13827
   },
   "source": null,
   "tier": null
  },
- "rows": 14454,
+ "rows": 14504,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 6934085,
+   "bytes": 6951782,
    "file": "000.json",
-   "rows": 7286,
-   "sha256": "6afd503395440278c8e9c6b962b9fe3deb84c96da1dc74094c482da0facdddc8"
+   "rows": 7305,
+   "sha256": "46be16dcf0775bb0b5e03947bdedaf03e4c8c23891b4d7f0cf95577f188c0a48"
   },
   {
    "bucket": 1,
-   "bytes": 6830529,
+   "bytes": 6859528,
    "file": "001.json",
-   "rows": 7168,
-   "sha256": "bfca43a23552be552d3201aa8378f6effa0c46fe26906306ee1e49617abf9dae"
+   "rows": 7199,
+   "sha256": "28c7c033a5af36143969c6c4c3638db0a3ff58f7b3837b980de4df954c371cf4"
   }
  ],
  "signal": "heir_roll",
