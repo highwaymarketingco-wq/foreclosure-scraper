@@ -8,12 +8,12 @@
   "unconfirmed": 0,
   "wall": 510
  },
- "generated_at": "2026-11-24T11:47:56Z",
+ "generated_at": "2026-11-24T11:54:00Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T10:53:13Z",
+  "at": "2026-11-24T11:54:00Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,23 +21,18 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 54,
-    "gis.rutherfordcountync.gov": 2,
-    "gisweb.hendersoncountync.gov": 49,
-    "maps.spartanburgcounty.org": 1,
-    "portal-nc.tylertech.cloud": 35,
-    "rockhillgis.cityofrockhill.com": 3,
+    "gis.buncombecounty.org": 67,
+    "gis.charlottenc.gov": 40,
+    "gis.rutherfordcountync.gov": 50,
+    "portal-nc.tylertech.cloud": 32,
+    "rockhillgis.cityofrockhill.com": 9,
     "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:apps.alamance-nc.com": 1,
-    "roster:apps.pittcountync.gov": 1,
-    "roster:guilfordcountysheriff.policetocitizen.com": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "roster:www2.dconc.gov": 1,
-    "services.arcgis.com": 6,
-    "services1.arcgis.com": 3,
+    "roster:pickens-so-sc.zuercherportal.com": 1,
+    "services.arcgis.com": 3,
     "vt.ncsbe.gov": 144,
     "webgis2.durhamnc.gov": 3,
-    "www.courtlistener.com": 39,
+    "www.courtlistener.com": 2,
+    "www.greenwoodsc.gov": 39,
     "www.southcarolinaprobate.net": 150
    }
   },
@@ -45,11 +40,11 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 991,
+  "seconds": 1030,
   "selection": {
    "applies": 66565,
-   "due_new": 66143,
-   "not_due_ttl": 422,
+   "due_new": 66093,
+   "not_due_ttl": 472,
    "same_property_queued": 1
   },
   "source": null,
