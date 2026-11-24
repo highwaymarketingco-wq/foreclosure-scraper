@@ -37,7 +37,7 @@ from foreclosure_scraper.block_binding import FALLBACK_POINT_MIN_ROWS  # noqa: E
 from foreclosure_scraper.enrichment_deed_chain import enrich_deed_chain  # noqa: E402
 from foreclosure_scraper.models import Listing  # noqa: E402
 from foreclosure_scraper.web_artifact import (  # noqa: E402
-    _APPEND_SIG_FIELDS, board_lock, board_patch_size_state, patch_existing_rows,
+    BoardLockBusy, _APPEND_SIG_FIELDS, board_lock, board_patch_size_state, patch_existing_rows,
 )
 
 _LIGHT_FIELDS = _APPEND_SIG_FIELDS + ("raw", "latitude", "longitude")
@@ -127,9 +127,27 @@ def main() -> int:
                 patches[key] = {"raw": {"deed_chain": li.raw["deed_chain"]}}
         if not patches or args.dry_run:
             return
-        with board_lock(REPO, owner="deed_chain_backfill_v2", wait=600, poll=10):
-            pstats = patch_existing_rows(
-                patches, {"deed_chain_backfill_v2_batch": len(patches)}, docs_dir=docs_dir)
+        # FIXED 2026-11-24: board_lock(wait=600) already retries internally for up to 600s,
+        # but on this VM that is NOT always enough -- the other standing lanes (meck_gis_attrs,
+        # meck_code_enforcement) are observed live holding the SAME lock for 10+ minutes at a
+        # stretch. Before this fix, a single BoardLockBusy here was uncaught and crashed the
+        # WHOLE multi-hour run (pass 1 + however much of pass 2 had completed), and the
+        # supervisor's relaunch starts over from row 0 every time -- on a contended host this
+        # could mean near-zero net progress despite "running continuously" for hours (confirmed
+        # live: logs/manual_deed_chain_v2_run.log shows BoardLockBusy crashes on most
+        # invocations). Retrying the SAME lock acquisition a few more times here (each with its
+        # own full 600s internal wait) costs nothing when the lock is free, and turns a
+        # transient long hold into "wait a while longer" instead of "lose this whole run."
+        for attempt in range(4):
+            try:
+                with board_lock(REPO, owner="deed_chain_backfill_v2", wait=600, poll=10):
+                    pstats = patch_existing_rows(
+                        patches, {"deed_chain_backfill_v2_batch": len(patches)}, docs_dir=docs_dir)
+                break
+            except BoardLockBusy as exc:
+                if attempt == 3:
+                    raise
+                print(f"  board lock busy (attempt {attempt + 1}/4), retrying: {exc}")
         print(f"  patch_existing_rows: {pstats}")
         total_patched += pstats.get("applied", 0)
 
