@@ -1,14 +1,14 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 1812,
+  "confirmed": 1827,
   "refuted": 176,
-  "rows": 2157,
-  "stale": 166,
+  "rows": 2177,
+  "stale": 171,
   "unconfirmed": 3,
   "wall": 0
  },
- "generated_at": "2026-11-24T21:48:35Z",
+ "generated_at": "2026-11-24T22:18:49Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
@@ -50,16 +50,16 @@
   "source": null,
   "tier": null
  },
- "rows": 2157,
+ "rows": 2177,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 2402225,
+   "bytes": 2432299,
    "file": "000.json",
-   "rows": 2157,
-   "sha256": "803443dcc5871ddadbfb77fece0e815b43bb6c179e02e817fd53839feb022358"
+   "rows": 2177,
+   "sha256": "9a32acfb8f72e3e69a75cdd16c5a8ffddf57d99888347f205947a0a34b287323"
   }
  ],
  "signal": "code_enforcement",
