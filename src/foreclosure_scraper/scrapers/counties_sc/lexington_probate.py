@@ -139,23 +139,25 @@ async def _solve_audio_challenge(page, challenge_frame) -> bool:
         log.debug("lexington_probate.audio_btn_error", error=str(exc)[:80])
         return False
 
-    await asyncio.sleep(4)
-
-    # Get audio source URL
+    # Wait for audio element to load with retries (increased from 4s, 2026-11-24)
     audio_url: str | None = None
-    try:
-        audio_url = await challenge_frame.evaluate("""() => {
-            const a = document.querySelector('audio source') || document.querySelector('audio');
-            if (a) return a.src || a.getAttribute('src');
-            const l = document.querySelector('.rc-audiochallenge-tdownload-link');
-            if (l) return l.href;
-            return null;
-        }""")
-    except Exception:
-        pass
+    for attempt in range(5):
+        await asyncio.sleep(2)
+        try:
+            audio_url = await challenge_frame.evaluate("""() => {
+                const a = document.querySelector('audio source') || document.querySelector('audio');
+                if (a) return a.src || a.getAttribute('src');
+                const l = document.querySelector('.rc-audiochallenge-tdownload-link');
+                if (l) return l.href;
+                return null;
+            }""")
+            if audio_url:
+                break
+        except Exception:
+            pass
 
     if not audio_url:
-        log.debug("lexington_probate.no_audio_url")
+        log.debug("lexington_probate.no_audio_url", attempts=5)
         return False
 
     # Download audio
