@@ -1,0 +1,362 @@
+[
+  {
+    "name": "AshevilleMinHousing",
+    "slug": "city_websites.asheville_min_housing",
+    "status": "empty",
+    "count": 0,
+    "error": null,
+    "time": 2.3e-05
+  },
+  {
+    "name": "CharlotteOpenData",
+    "slug": "city_websites.charlotte_open_data",
+    "status": "success",
+    "count": 2737,
+    "error": null,
+    "time": 2.431075
+  },
+  {
+    "name": "CityWebsites",
+    "slug": "city_websites.search",
+    "status": "empty",
+    "count": 0,
+    "error": null,
+    "time": 1.6e-05
+  },
+  {
+    "name": "RaleighStructureFires",
+    "slug": "city_websites.raleigh_structure_fires",
+    "status": "success",
+    "count": 385,
+    "error": null,
+    "time": 1.721778
+  },
+  {
+    "name": "ArcgisDistressLayers",
+    "slug": "counties_generic.arcgis_distress_layers",
+    "status": "timeout",
+    "count": 0,
+    "error": null,
+    "time": 90.043865
+  },
+  {
+    "name": "EpaFrsSites",
+    "slug": "counties_generic.epa_frs_sites",
+    "status": "success",
+    "count": 3803,
+    "error": null,
+    "time": 52.393513
+  },
+  {
+    "name": "LiensNCIncrementalScraper",
+    "slug": "counties_generic.liensnc",
+    "status": "timeout",
+    "count": 0,
+    "error": null,
+    "time": 90.01448
+  },
+  {
+    "name": "MultiYearDelinquency",
+    "slug": "counties.multi_year_delinquent_tax",
+    "status": "timeout",
+    "count": 0,
+    "error": null,
+    "time": 90.004749
+  },
+  {
+    "name": "NODDiscovery",
+    "slug": "counties.nod_discovery",
+    "status": "timeout",
+    "count": 0,
+    "error": null,
+    "time": 90.003679
+  },
+  {
+    "name": "CountySitemapWalker",
+    "slug": "counties.sitemap_walker",
+    "status": "success",
+    "count": 72,
+    "error": null,
+    "time": 25.355473
+  },
+  {
+    "name": "StateContamination",
+    "slug": "counties_generic.state_contamination",
+    "status": "success",
+    "count": 53827,
+    "error": null,
+    "time": 71.158845
+  },
+  {
+    "name": "AlbemarleObserverTaxLists",
+    "slug": "counties_nc.albemarle_observer_tax_lists",
+    "status": "success",
+    "count": 9333,
+    "error": null,
+    "time": 24.144638
+  },
+  {
+    "name": "AshevilleCodeEnforcement",
+    "slug": "counties_nc.asheville_code_enforcement",
+    "status": "empty",
+    "count": 0,
+    "error": null,
+    "time": 0.612825
+  },
+  {
+    "name": "AshevilleHeleneDamage",
+    "slug": "counties_nc.asheville_helene",
+    "status": "success",
+    "count": 652,
+    "error": null,
+    "time": 6.267304
+  },
+  {
+    "name": "AshevilleSTRPermits",
+    "slug": "counties_nc.asheville_str_permits",
+    "status": "success",
+    "count": 673,
+    "error": null,
+    "time": 1.593674
+  },
+  {
+    "name": "BrunswickLegalNotices",
+    "slug": "counties_nc.brunswick_legal_notices",
+    "status": "success",
+    "count": 1,
+    "error": null,
+    "time": 6.485639
+  },
+  {
+    "name": "BuncombeDelinquentTax",
+    "slug": "counties_nc.buncombe_delinquent_tax",
+    "status": "success",
+    "count": 1181,
+    "error": null,
+    "time": 1.028096
+  },
+  {
+    "name": "BuncombeElderly",
+    "slug": "counties_nc.buncombe_elderly",
+    "status": "success",
+    "count": 4363,
+    "error": null,
+    "time": 5.263456
+  },
+  {
+    "name": "BuncombeTax",
+    "slug": "counties_nc.buncombe_tax",
+    "status": "success",
+    "count": 39,
+    "error": null,
+    "time": 1.203291
+  },
+  {
+    "name": "BuncombeTaxForeclosure",
+    "slug": "counties_nc.buncombe_tax_foreclosure",
+    "status": "success",
+    "count": 4,
+    "error": null,
+    "time": 1.818988
+  },
+  {
+    "name": "ClevelandTaxForeclosure",
+    "slug": "counties_nc.cleveland_tax",
+    "status": "success",
+    "count": 11,
+    "error": null,
+    "time": 2.003062
+  },
+  {
+    "name": "CumberlandDelinquentTax",
+    "slug": "counties_nc.cumberland_delinquent_tax",
+    "status": "success",
+    "count": 3755,
+    "error": null,
+    "time": 1.994453
+  },
+  {
+    "name": "CumberlandTaxForeclosure",
+    "slug": "counties_nc.cumberland_tax_foreclosure",
+    "status": "empty",
+    "count": 0,
+    "error": null,
+    "time": 10.613659
+  },
+  {
+    "name": "DcIpBlockScraper",
+    "slug": "counties_nc.dc_ip_block",
+    "status": "empty",
+    "count": 0,
+    "error": null,
+    "time": 7.380718
+  },
+  {
+    "name": "EdgecombeTaxForeclosure",
+    "slug": "counties_nc.edgecombe_tax_foreclosure",
+    "status": "success",
+    "count": 15,
+    "error": null,
+    "time": 0.542479
+  },
+  {
+    "name": "GastonSurplusProperties",
+    "slug": "counties_nc.gaston_surplus_properties",
+    "status": "empty",
+    "count": 0,
+    "error": null,
+    "time": 6.703612
+  },
+  {
+    "name": "GastonTaxForeclosures",
+    "slug": "counties_nc.gaston_tax_foreclosures",
+    "status": "success",
+    "count": 81,
+    "error": null,
+    "time": 8.27965
+  },
+  {
+    "name": "GastonVacant",
+    "slug": "counties_nc.gaston_vacant",
+    "status": "success",
+    "count": 21751,
+    "error": null,
+    "time": 14.368538
+  },
+  {
+    "name": "GastoniaCodeEnforcement",
+    "slug": "counties_nc.gastonia_code_enforcement",
+    "status": "timeout",
+    "count": 0,
+    "error": null,
+    "time": 90.004183
+  },
+  {
+    "name": "GuilfordTaxForeclosures",
+    "slug": "counties_nc.guilford_tax_foreclosures",
+    "status": "success",
+    "count": 969,
+    "error": null,
+    "time": 0.917209
+  },
+  {
+    "name": "HaywoodTaxForeclosures",
+    "slug": "counties_nc.haywood_tax_foreclosures",
+    "status": "success",
+    "count": 3,
+    "error": null,
+    "time": 4.310828
+  },
+  {
+    "name": "HendersonCodeViolations",
+    "slug": "counties_nc.henderson_code_violations",
+    "status": "success",
+    "count": 176,
+    "error": null,
+    "time": 5.075302
+  },
+  {
+    "name": "HendersonForeclosureParcels",
+    "slug": "counties_nc.henderson_foreclosure_parcels",
+    "status": "error",
+    "count": 0,
+    "error": "https://gisweb.hendersoncountync.gov/arcgis/rest/services/Parcels/FeatureServer/0/query -> HTTP 403",
+    "time": 1.283753
+  },
+  {
+    "name": "HendersonTaxForeclosure",
+    "slug": "counties_nc.henderson_tax",
+    "status": "success",
+    "count": 15,
+    "error": null,
+    "time": 0.181764
+  },
+  {
+    "name": "HendersonvilleVacantStructures",
+    "slug": "counties_nc.hendersonville_vacant_structures",
+    "status": "success",
+    "count": 51,
+    "error": null,
+    "time": 2.198749
+  },
+  {
+    "name": "IredellDelinquentTax",
+    "slug": "counties_nc.iredell_delinquent_tax",
+    "status": "timeout",
+    "count": 0,
+    "error": null,
+    "time": 90.002548
+  },
+  {
+    "name": "JohnstonDelinquentTaxCrosswalk",
+    "slug": "counties_nc.johnston_delinquent_tax_crosswalk",
+    "status": "timeout",
+    "count": 0,
+    "error": null,
+    "time": 90.00102
+  },
+  {
+    "name": "KinstonProposedDemolition",
+    "slug": "counties_nc.kinston_proposed_demolition",
+    "status": "success",
+    "count": 45,
+    "error": null,
+    "time": 0.754949
+  },
+  {
+    "name": "LincolnCodeViolations",
+    "slug": "counties_nc.lincoln_code_violations",
+    "status": "success",
+    "count": 63,
+    "error": null,
+    "time": 0.424894
+  },
+  {
+    "name": "LincolnVacant",
+    "slug": "counties_nc.lincoln_vacant",
+    "status": "success",
+    "count": 14726,
+    "error": null,
+    "time": 3.54074
+  },
+  {
+    "name": "McDowellProbate",
+    "slug": "counties_nc.mcdowell_probate",
+    "status": "success",
+    "count": 414,
+    "error": null,
+    "time": 0.922409
+  },
+  {
+    "name": "McDowellTaxForeclosure",
+    "slug": "counties_nc.mcdowell_tax_foreclosure",
+    "status": "success",
+    "count": 1,
+    "error": null,
+    "time": 1.751016
+  },
+  {
+    "name": "MecklenburgDelinquentTax",
+    "slug": "counties_nc.mecklenburg_delinquent_tax",
+    "status": "empty",
+    "count": 0,
+    "error": null,
+    "time": 0.000371
+  },
+  {
+    "name": "MecklenburgTaxForeclosures",
+    "slug": "counties_nc.mecklenburg_tax_foreclosures",
+    "status": "timeout",
+    "count": 0,
+    "error": null,
+    "time": 90.006261
+  },
+  {
+    "name": "MorgantonNcScraper",
+    "slug": "counties_nc.morganton_nc",
+    "status": "empty",
+    "count": 0,
+    "error": null,
+    "time": 13.918591
+  }
+]

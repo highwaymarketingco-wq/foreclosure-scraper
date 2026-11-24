@@ -8,7 +8,7 @@
   "unconfirmed": 194,
   "wall": 0
  },
- "generated_at": "2026-11-24T15:40:06Z",
+ "generated_at": "2026-11-24T16:57:02Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
@@ -71,7 +71,7 @@
    "bytes": 630374,
    "file": "000.json",
    "rows": 571,
-   "sha256": "785e252eba30063083d98d9b1d668524525ee6bd415867f8f8989aead26172eb"
+   "sha256": "fcfe48b4b6325182a14430aac7b17ecf4532ee992b26342f5190f02816f2ad35"
   }
  ],
  "signal": "bankruptcy_stay",
