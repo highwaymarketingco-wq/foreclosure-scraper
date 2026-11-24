@@ -90,7 +90,7 @@ import math
 import re
 import zipfile
 import xml.etree.ElementTree as ET
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from io import BytesIO
 from typing import Iterable, Optional
 from urllib.parse import urljoin
@@ -823,25 +823,63 @@ async def _fetch_zuercher(subdomain: str) -> list[dict]:
     is used as-is (just appending the API path), anything else still gets the
     original {subdomain}.zuercherportal.com treatment. Request/response shape
     is identical across both hosts -- only the base URL differs.
+
+    FIXED 2026-11-24 (Sumter): the cloudgov.com host ALSO needs a CSRF
+    handshake the legacy zuercherportal.com tenants never do (this file's own
+    2026-11-05 comment above flagged this as unsolved -- "still returns 0 rows
+    until that's built"). Root-caused live via a real browser network capture
+    of the app's OWN request sequence (not a guess-and-reload loop): GET / to
+    seed AWSALB, GET /api/portal/config/xsrf_token (sets XSRF-TOKEN + session
+    cookies via a NORMAL Set-Cookie header -- confirmed live with a plain
+    httpx/curl_cffi session, no browser needed; the vendor's x-csrf-token
+    request header must echo the XSRF-TOKEN cookie value, Flask-WTF's
+    double-submit convention), then GET /api/portal/inmates/init (seeds
+    server-side session state further -- the POST 500s without this step even
+    with a valid CSRF token). The working POST body also differs slightly
+    from the legacy shape: `in_custody` is a bare "YYYY-MM-DD" date on this
+    host (not a full ISO datetime), and `cell_block`/`held_for_agency` are
+    omitted (this host's backend 500s on fields the legacy one tolerates, per
+    live testing). Confirmed end-to-end 2026-11-24: 483 real Sumter records,
+    full DOB + hold_reasons (real warrant numbers/charges/bond) + mugshot.
     """
     from curl_cffi.requests import AsyncSession
 
     base = subdomain.rstrip("/") if subdomain.startswith(("http://", "https://")) \
         else f"https://{subdomain}.zuercherportal.com"
     url = f"{base}/api/portal/inmates/load"
+    cloudgov = "centralsquarecloudgov.com" in base
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
-    body = {
-        "name": "", "race": "all", "sex": "all", "cell_block": "all",
-        "held_for_agency": "any", "in_custody": now,
-        "paging": {"count": 2000, "start": 0},
-        "sorting": {"sort_by_column_tag": "name", "sort_descending": False},
-    }
+    if cloudgov:
+        body = {
+            "name": "", "race": "all", "sex": "all",
+            "in_custody": date.today().isoformat(),
+            "paging": {"count": 2000, "start": 0},
+            "sorting": {"sort_by_column_tag": "name", "sort_descending": False},
+        }
+    else:
+        body = {
+            "name": "", "race": "all", "sex": "all", "cell_block": "all",
+            "held_for_agency": "any", "in_custody": now,
+            "paging": {"count": 2000, "start": 0},
+            "sorting": {"sort_by_column_tag": "name", "sort_descending": False},
+        }
     out: list[dict] = []
     try:
         async with AsyncSession(impersonate="chrome", verify=False) as s:
+            post_kwargs = {}
+            if cloudgov:
+                await s.get(base + "/", timeout=30)
+                xsrf_resp = await s.get(f"{base}/api/portal/config/xsrf_token",
+                                        headers={"accept": "application/json"}, timeout=30)
+                xsrf = xsrf_resp.cookies.get("XSRF-TOKEN") or s.cookies.get("XSRF-TOKEN")
+                headers = {"x-csrf-token": xsrf, "origin": base,
+                           "referer": base + "/inmates", "content-type": "application/json"}
+                await s.get(f"{base}/api/portal/inmates/init",
+                            headers={"accept": "application/json", **headers}, timeout=30)
+                post_kwargs = {"headers": headers}
             async for attempt in _vendor_retrying():
                 with attempt:
-                    r = await s.post(url, json=body, timeout=30)
+                    r = await s.post(url, json=body, timeout=30, **post_kwargs)
             recs = (r.json() or {}).get("records") or []
     except Exception as exc:  # noqa: BLE001
         log.warning("jail_scraper.zuercher_fail", subdomain=subdomain,
