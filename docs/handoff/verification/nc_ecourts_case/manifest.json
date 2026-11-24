@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 7955,
+  "confirmed": 7990,
   "refuted": 26,
-  "rows": 8797,
-  "stale": 644,
-  "unconfirmed": 172,
+  "rows": 8845,
+  "stale": 654,
+  "unconfirmed": 175,
   "wall": 0
  },
- "generated_at": "2026-11-24T22:39:01Z",
+ "generated_at": "2026-11-24T23:08:30Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T22:39:00Z",
+  "at": "2026-11-24T23:08:30Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,52 +21,52 @@
   "requests": {
    "errors": {},
    "requests": {
-    "arcgisserver.lincolncountync.gov": 50,
-    "devsvcs.gastonianc.gov": 149,
-    "gis.buncombecounty.org": 85,
+    "arcgisserver.lincolncountync.gov": 40,
+    "devsvcs.gastonianc.gov": 130,
+    "gis.buncombecounty.org": 54,
+    "mapping.mitchellcountync.gov": 10,
     "maps.spartanburgcounty.org": 50,
     "portal-nc.tylertech.cloud": 39,
-    "registerofdeeds.buncombenc.gov": 118,
-    "vt.ncsbe.gov": 270,
-    "www.courtlistener.com": 2,
-    "www.southcarolinaprobate.net": 21
+    "registerofdeeds.buncombenc.gov": 29,
+    "vt.ncsbe.gov": 150,
+    "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 27,
-   "stale": 16,
-   "unconfirmed": 7
+   "confirmed": 35,
+   "stale": 10,
+   "unconfirmed": 5
   },
-  "seconds": 1339,
+  "seconds": 991,
   "selection": {
    "applies": 25671,
-   "due_new": 17227,
+   "due_new": 17179,
    "due_retry": 3,
    "due_ttl": 670,
-   "not_due_retry": 175,
-   "not_due_ttl": 7596
+   "not_due_retry": 180,
+   "not_due_ttl": 7639
   },
   "source": null,
   "tier": null
  },
- "rows": 8797,
+ "rows": 8845,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 5468757,
+   "bytes": 5499701,
    "file": "000.json",
-   "rows": 4416,
-   "sha256": "e941b38b181b3d4e6292642c3e71d612ce920c9d251f35fd2d4c7a71e9783118"
+   "rows": 4442,
+   "sha256": "d60db721cd2aaada51233464a05caeee201b6b30c19772c3f64dcfb3a82f3cd2"
   },
   {
    "bucket": 1,
-   "bytes": 5432274,
+   "bytes": 5458750,
    "file": "001.json",
-   "rows": 4381,
-   "sha256": "9a75c43da61f7b64c088394c9690efb13ef24acec3db7a6466df13dcb044331f"
+   "rows": 4403,
+   "sha256": "fd4334b2119b080d46d8a6ffa6f6899e86ccb09c97ec26a7d1a78ffbdfbc1a43"
   }
  ],
  "signal": "nc_ecourts_case",

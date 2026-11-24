@@ -8,12 +8,12 @@
   "unconfirmed": 80,
   "wall": 0
  },
- "generated_at": "2026-11-24T22:38:59Z",
+ "generated_at": "2026-11-24T23:08:29Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T22:38:59Z",
+  "at": "2026-11-24T23:08:29Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,22 +21,22 @@
   "requests": {
    "errors": {},
    "requests": {
-    "arcgisserver.lincolncountync.gov": 50,
-    "devsvcs.gastonianc.gov": 149,
-    "gis.buncombecounty.org": 85,
+    "arcgisserver.lincolncountync.gov": 40,
+    "devsvcs.gastonianc.gov": 130,
+    "gis.buncombecounty.org": 54,
+    "mapping.mitchellcountync.gov": 10,
     "maps.spartanburgcounty.org": 50,
     "portal-nc.tylertech.cloud": 39,
-    "registerofdeeds.buncombenc.gov": 118,
-    "vt.ncsbe.gov": 270,
-    "www.courtlistener.com": 2,
-    "www.southcarolinaprobate.net": 21
+    "registerofdeeds.buncombenc.gov": 29,
+    "vt.ncsbe.gov": 150,
+    "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 40,
    "unconfirmed": 40
   },
-  "seconds": 1339,
+  "seconds": 991,
   "selection": {
    "applies": 418,
    "due_new": 1,
@@ -56,7 +56,7 @@
    "bytes": 473974,
    "file": "000.json",
    "rows": 420,
-   "sha256": "ffd0358cba3e8f00269e15e48360c10841dc219e2d9ccc4aff597258cfff1a05"
+   "sha256": "6ccdad4d05a4062b1e4c8960508cb41008fc71c4533d8883c1aa3dd0aff341c1"
   }
  ],
  "signal": "foreclosure_sale_list",

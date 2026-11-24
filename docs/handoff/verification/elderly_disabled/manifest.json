@@ -1,19 +1,19 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 6552,
+  "confirmed": 6592,
   "refuted": 99,
-  "rows": 6784,
+  "rows": 6824,
   "stale": 59,
   "unconfirmed": 74,
   "wall": 0
  },
- "generated_at": "2026-11-24T22:59:32Z",
+ "generated_at": "2026-11-24T23:08:29Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T22:38:59Z",
+  "at": "2026-11-24T23:08:29Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,44 +21,44 @@
   "requests": {
    "errors": {},
    "requests": {
-    "arcgisserver.lincolncountync.gov": 50,
-    "devsvcs.gastonianc.gov": 149,
-    "gis.buncombecounty.org": 85,
+    "arcgisserver.lincolncountync.gov": 40,
+    "devsvcs.gastonianc.gov": 130,
+    "gis.buncombecounty.org": 54,
+    "mapping.mitchellcountync.gov": 10,
     "maps.spartanburgcounty.org": 50,
     "portal-nc.tylertech.cloud": 39,
-    "registerofdeeds.buncombenc.gov": 118,
-    "vt.ncsbe.gov": 270,
-    "www.courtlistener.com": 2,
-    "www.southcarolinaprobate.net": 21
+    "registerofdeeds.buncombenc.gov": 29,
+    "vt.ncsbe.gov": 150,
+    "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
    "confirmed": 50
   },
-  "seconds": 1339,
+  "seconds": 991,
   "selection": {
    "applies": 140892,
-   "due_new": 133196,
+   "due_new": 133146,
    "due_retry": 3,
    "due_version": 1,
    "not_due_retry": 62,
-   "not_due_ttl": 7630,
+   "not_due_ttl": 7680,
    "same_property_queued": 1
   },
   "source": null,
   "tier": null
  },
- "rows": 6784,
+ "rows": 6824,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 6662835,
+   "bytes": 6713146,
    "file": "000.json",
-   "rows": 6784,
-   "sha256": "d278d056752154d4e7bd330a488b17eadd62627b7ef1d2728c104c548bd4e1d2"
+   "rows": 6824,
+   "sha256": "9d33b2788c1a010d7e1f963e8b20406813850ddbc47431b7af1c9036b09c5f6e"
   }
  ],
  "signal": "elderly_disabled",

@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 15049,
+  "confirmed": 15099,
   "refuted": 11,
-  "rows": 15254,
+  "rows": 15304,
   "stale": 43,
   "unconfirmed": 151,
   "wall": 0
  },
- "generated_at": "2026-11-24T22:39:00Z",
+ "generated_at": "2026-11-24T23:08:29Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T22:38:59Z",
+  "at": "2026-11-24T23:08:29Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,52 +21,51 @@
   "requests": {
    "errors": {},
    "requests": {
-    "arcgisserver.lincolncountync.gov": 50,
-    "devsvcs.gastonianc.gov": 149,
-    "gis.buncombecounty.org": 85,
+    "arcgisserver.lincolncountync.gov": 40,
+    "devsvcs.gastonianc.gov": 130,
+    "gis.buncombecounty.org": 54,
+    "mapping.mitchellcountync.gov": 10,
     "maps.spartanburgcounty.org": 50,
     "portal-nc.tylertech.cloud": 39,
-    "registerofdeeds.buncombenc.gov": 118,
-    "vt.ncsbe.gov": 270,
-    "www.courtlistener.com": 2,
-    "www.southcarolinaprobate.net": 21
+    "registerofdeeds.buncombenc.gov": 29,
+    "vt.ncsbe.gov": 150,
+    "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 49,
-   "unconfirmed": 1
+   "confirmed": 50
   },
-  "seconds": 1339,
+  "seconds": 991,
   "selection": {
    "applies": 44671,
-   "due_new": 29523,
+   "due_new": 29473,
    "due_retry": 26,
    "due_retry_transient": 24,
    "due_ttl": 432,
-   "not_due_retry": 96,
-   "not_due_ttl": 14570
+   "not_due_retry": 97,
+   "not_due_ttl": 14619
   },
   "source": null,
   "tier": null
  },
- "rows": 15254,
+ "rows": 15304,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 7299971,
+   "bytes": 7329187,
    "file": "000.json",
-   "rows": 7672,
-   "sha256": "ec953ab93a49ee38c472c236c6dbaef83c18f5f92f8d73dcb2ac009246d6ca94"
+   "rows": 7702,
+   "sha256": "90c167ed0e233325da53bd125a992546435d055a8000ae371aa2ed34102c920b"
   },
   {
    "bucket": 1,
-   "bytes": 7223201,
+   "bytes": 7242672,
    "file": "001.json",
-   "rows": 7582,
-   "sha256": "177fda211bfa8281989a305eb8789ab7004e0663f3f2b91e9a7c85d817907a2c"
+   "rows": 7602,
+   "sha256": "376eb6edc38b401f59efcf0a79db4bd292b720e10e16cbdaead0e6c7bf7321d6"
   }
  ],
  "signal": "heir_roll",
