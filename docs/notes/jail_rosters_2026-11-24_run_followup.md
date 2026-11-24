@@ -58,6 +58,34 @@ declined to claim them screened. A retry scoped to just the counties that didn't
 get a healthy fetch (not all 61 again) would be the efficient way to mop these up
 — check `idx.healthy` per county in a future run rather than re-running everything.
 
+**Update, same day, targeted retry of the 3 ROSTERS-covered ones (Greenville
+isn't in `backfill_jail_rosters.py`'s own ROSTERS — a different script covers
+it, not chased further here):**
+
+- **Transylvania and Guilford**: both healthy on retry (114 and 1,130 in
+  custody respectively). The original failure was transient, now resolved —
+  no code change needed.
+- **Sumter**: found and fixed a real bug. `enrichment_jail_bookings.py`'s own
+  `_fetch_zuercher()` assumed every zuercher tenant's `subdomain` field is a
+  bare slug on the legacy `zuercherportal.com` domain, but Sumter's entry
+  (`"https://portal-sc-sumter-pd.centralsquarecloudgov.com"`) is a full URL on
+  CentralSquare's newer cloud host — producing a doubled-scheme URL
+  (`https://https://...`) that failed DNS resolution outright. The exact same
+  bug was already found and fixed in `scrapers/national/jail_bookings.py`'s
+  own `_fetch_zuercher` on 2026-11-05 (its own docstring cites Sumter by name)
+  but that fix was never ported to this second copy of the same function in
+  `enrichment_jail_bookings.py`. Ported it (accept either a bare subdomain or
+  a full base URL) — commit pending. Also matched the other file's
+  `verify=False` for good measure.
+  **Residual, unresolved**: after the URL fix, Sumter's request now succeeds
+  (no exception, no DNS error) but still returns zero records — confirmed not
+  a regression (Kershaw, a normal legacy-domain zuercher county, still returns
+  126 in custody fine). So the URL bug is fixed, but something about the
+  CentralSquare cloud host's actual response shape or auth requirement for
+  THIS specific tenant is still unaccounted for — needs live reconnaissance
+  (check what a real browser request to the Sumter portal actually returns)
+  before chasing further, not more guessing at the request body.
+
 ## Operational lesson already captured in the loop prompt, not repeating here
 
 `backfill_jail_rosters.py` holds `board_lock` for its entire run (not released

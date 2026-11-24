@@ -497,7 +497,16 @@ def _split_zuercher_name(name: str) -> Optional[tuple[str, str, str]]:
 
 async def _fetch_zuercher(subdomain: str) -> list[dict]:
     from curl_cffi.requests import AsyncSession
-    url = f"https://{subdomain}.zuercherportal.com/api/portal/inmates/load"
+    # `subdomain` is normally a bare subdomain on the legacy zuercherportal.com
+    # domain. Some tenants (e.g. Sumter SC) are migrated to CentralSquare's
+    # newer cloud host ("centralsquarecloudgov.com") under a FULL base URL
+    # instead -- accept either, same fix already applied in
+    # scrapers/national/jail_bookings.py's own _fetch_zuercher (2026-11-05).
+    # Without this, a full-URL subdomain produces a doubled-scheme URL
+    # ("https://https://...") that fails DNS resolution outright.
+    base = subdomain.rstrip("/") if subdomain.startswith(("http://", "https://")) \
+        else f"https://{subdomain}.zuercherportal.com"
+    url = f"{base}/api/portal/inmates/load"
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
     body = {"name": "", "race": "all", "sex": "all", "cell_block": "all",
             "held_for_agency": "any", "in_custody": now,
@@ -505,7 +514,7 @@ async def _fetch_zuercher(subdomain: str) -> list[dict]:
             "sorting": {"sort_by_column_tag": "name", "sort_descending": False}}
     out: list[dict] = []
     try:
-        async with AsyncSession(impersonate="chrome") as s:
+        async with AsyncSession(impersonate="chrome", verify=False) as s:
             r = await s.post(url, json=body, timeout=30)
             recs = (r.json() or {}).get("records") or []
     except Exception as exc:  # noqa: BLE001
