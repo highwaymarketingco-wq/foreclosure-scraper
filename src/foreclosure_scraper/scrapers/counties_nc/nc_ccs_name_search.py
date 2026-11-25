@@ -273,6 +273,63 @@ def _text(html: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", html or "")).strip()
 
 
+# FOUND 2026-11-25: captured the REAL request body from a live browser session
+# against Gates County's actual search form -- accepted its disclaimer (user's
+# explicit go-ahead), selected "Select All" in the Document Types picker, and
+# instrumented the page's own XMLHttpRequest/fetch (the search runs inside an
+# iframe with its own window -- top-level instrumentation sees nothing) to
+# capture what it actually sent. Two real bugs confirmed against the body this
+# function used to send:
+#   1. DocTypes was missing entirely. The "real, well-formed, empty grid"
+#      symptom (Gates AND Caldwell, 2026-11-25 investigation) was never a
+#      wrong SearchTabID/IndexType -- a request with no DocTypes selected
+#      legitimately searches zero document categories, so an empty grid is
+#      the CORRECT response to the body this function used to send. Selecting
+#      "Select All" and resubmitting returned 3,125 real records for SMITH.
+#   2. Several fields were sent as array-style params (MultiNameLast[],
+#      MultiNameSearchType[], AdvancedDescriptionQualifier[],
+#      AdvancedDescriptionAndOr[]) that the real traffic does not use at all
+#      -- it sends plain MultiNameLast, MultiNameSearchType, etc. ASP.NET MVC
+#      model binding is often lenient about this for a single value, which is
+#      likely why Gates/Caldwell still returned a real (if empty) 200 rather
+#      than erroring -- but Franklin's distinct "Fatal error during search:
+#      The given key was not present in the dictionary" crash is consistent
+#      with exactly this kind of stricter, per-tenant binding difference.
+# _DOC_TYPES is the exact comma-separated code list the live "Select All"
+# checkbox produced, already URL-encoded -- sending the full set matches the
+# one combination already PROVEN live to return real data, rather than risk
+# under-selecting and reintroducing a different empty-by-omission bug.
+_DOC_TYPES = (
+    "A%2FAGMT%2CA%2FAMND%2CA%2FAS-AGMT%2CA%2FDIS%2CA%2FDT%2CA%2FINC%2CA%2FLEASE%2CA%2FM%2CA%2FN%2C"
+    "A%2FRENTS%2CADM%2CADM%2FC%2CADM%2FD%2CADM%2FL%2CADM%2FM%2CADM%2FN%2CADM%2FP%2CADM%2FS%2CAFDVT%2C"
+    "AFFT%2CAGMT%2CAM%2CAM%2FCORP%2CAM%2FDT%2CAMND%2CAN%2FAMD%2CAPPMT%2CAPPT%2CARINC%2CARORG%2C"
+    "ARTICLES%2CASGMT%2CASGMT%2FCORP%2CASGN%2CASGN%2FS%2FTR%2CASUMP%2FA%2CAUTH%2CB%2FS%2CBK%2FPET%2C"
+    "C%2CC%2FD%2CC%2FINS%2CC%2FINST%2CC%2FL%2CC%2FNF%2CC%2FO%2CC%2FSAT%2CC%2FTD%2CCAN%2CCE%2CCEMD%2C"
+    "CERT%2CCERT%2FCORP%2CCERT%2FS%2CCERT%2FT%2CCL%2CCM%2FD%2CCOM%2FD%2CCONF%2CCONS%2CCONT%2C"
+    "COR%2FA-DT%2CCOR%2FAGMT%2CCOR%2FASGN%2CCOR%2FDT%2CCOR%2FMA%2CCOR%2FNR%2CCOR%2FPA%2CCOR%2FPR%2C"
+    "COR%2FREL%2CCOR%2FTMD%2CCOV%2CCOVNT%2CCP%2CCREATE%2CCT%2FO%2CCX%2CD%2FA%2CD%2FDED%2CD%2FEASE%2C"
+    "D%2FG%2CD%2FS%2CD%2FSUB%2CD%2FT%2CD%2FT+%26+A%2CDBK%2CDEC%2CDEC%2FINT%2CDEC%2FTR%2CDECL%2C"
+    "DECREE%2CDED%2CDEED%2CDEED%2FF%2CDEED%2FRE%2CDISC%2CDISL%2CDR%2CDT%2FASGN%2CDT%2FASGN+RE%2CDU%2C"
+    "E%2FA%2CE%2FST%2CEASE%2CEQUIP%2FDISC%2CESMT%2CEST%2CEST%2FC%2CEX%2FDEED%2CEXT%2CF%2CFCL%2C"
+    "FF%2FAMND%2CFF%2FASGN%2CFF%2FSUB-A%2CFF%2FTERM%2CFIX%2FF%2CFL%2CH%2FD%2CHEALTH%2FPA%2CHISDEED%2C"
+    "HISPLB%2CHISPLC%2CHISROW%2CHOME%2FD%2CHWYROW%2CINACT%2CIND%2CINTST%2CJGMT%2CL%2FAGMT%2CL%2FP%2C"
+    "L%2FR%2CLAND%2FC%2CLE%2FTRM%2CLEASE%2CLIS%2FP%2CLTD%2FPA%2CM%2CM%2FA%2CM%2FC%2CM%2FL%2CM%2FRES%2C"
+    "MEMO%2CMEMOR%2CMERG%2CMF%2CMO%2CMOD-S%2FA%2CMOD%2FA%2CMOD%2FDT%2CMORTGAGE%2CMOVE%2CMTG%2CN%2FC%2C"
+    "N%2FCLAIM%2CN%2FCLOSURE%2CN%2FR%2CN%2FS%2CN%2FSAT%2CN%2FSAT-ASGN%2CNAT%2CNOTCE%2CNOTICE%2CNSFF%2C"
+    "O%2COD%2FT%2COPLAT%2COPT%2CORD%2CORDER%2CP%2FA%2CP%2FN%2CP%2FR%2CP%2FREL%2CPBK%2CPC%2CPETN%2C"
+    "PLAT%2CPLATDB%2CPM%2CPN%2CPRE%2FAGM%2CPRMT%2CPTN%2CPTND%2CPTNR%2CPTNS%2CQCD%2CQD%2CR%2FC%2C"
+    "R%2FCM%2CR%2FCOV%2CR%2FL%2CR%2FM%2FA%2CR%2FT%2CR%2FW%2CR%2FWILL%2CRE%2CREAFF%2CRECT%2CREDEV%2C"
+    "REJ%2FFF%2CREL%2CREL%2FCON%2CREL%2FD%2CREL%2FDT%2CRENC%2CRENUN%2CREQ%2CRES%2FAIF%2CRES%2FD%2C"
+    "RESCISSI%2CRESIG%2CRESIGN%2CRESOL%2CREST%2FCOV%2CREV%2CREV%2FD%2CREV%2FPA%2CREV%2FTR%2CREVOC%2C"
+    "RF%2CRFN%2CRIDER%2CRL%2CRQ%2CRS%2CRS%2FTR%2CS%2FDEED%2CS%2FINS%2CS%2FINS%2FCORP%2CS%2FT%2CS%2FTR%2C"
+    "S%2FTR%26REL%2CSALE%2CSAT%2CSAT%2FDT%2CSEP%2FA%2CSEP%2FAGMT%2CSETTL%2CSRF%2FD%2CST%2FASGN%2C"
+    "STIP-AGMT%2CSUB%2FA%2CSUB%2FD%2CSUB%2FL%2CSUB%2FM%2FAGMT%2CSUP%2CSUP%2FDT%2CT%2FD%2CTD%2CTERM%2C"
+    "TERM%2FCORP%2CTERM%2FLEASE%2CTERM%2FOPT%2CTM%2FAGMT%2CTM%2FD%2CTM%2FREL%2CTMB%2FD%2CTN%2CTR%2FD%2C"
+    "TR%2FD%2FFORE%2CTRAN%2FL%2CTRANS%2CTRUST%2FAGMT%2CU%2CU%2FU%2CUCC%2CUCCAMND%2CUU%2CW%2FA%2FN%2C"
+    "W%2FN%2FFCL%2CWAIVER%2CWILL%2CWVR"
+)
+
+
 def _body(last: str) -> str:
     """Build POST body for surname search."""
     params = [
@@ -286,17 +343,18 @@ def _body(last: str) -> str:
         "LRMatchContainsDefaultOn=False",
         "allRowsAreExpanded=false",
         "SearchType=3",
-        f"MultiNameLast%5B%5D={urllib.parse.quote(last)}",
-        "MultiNameGiven%5B%5D=",  # Empty first name
-        "MultiNameSearchType%5B%5D=3",
+        f"MultiNameLast={urllib.parse.quote(last)}",
+        "MultiNameGiven=",  # Empty first name
+        "MultiNameSearchType=3",
         "SearchRefDocs=false",
+        f"DocTypes={_DOC_TYPES}",
         "SimilarNameSearch=none",
         "MatchType=beginswith",
         "CodeType=3",
         "IndexType=3",
         "SymbolSetOut=false",
-        "AdvancedDescriptionQualifier%5B%5D=%2B%2B",
-        "AdvancedDescriptionAndOr%5B%5D=AND",
+        "AdvancedDescriptionQualifier=%2B%2B",
+        "AdvancedDescriptionAndOr=AND",
         "ResultsType=1",
         "ExpandAllRows=false",
         "HighlightSearchTermsInResults=false",
