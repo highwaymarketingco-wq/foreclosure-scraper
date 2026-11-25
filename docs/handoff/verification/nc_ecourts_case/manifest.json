@@ -1,74 +1,74 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 8392,
+  "confirmed": 8420,
   "refuted": 26,
-  "rows": 9613,
-  "stale": 989,
+  "rows": 9661,
+  "stale": 1009,
   "unconfirmed": 206,
   "wall": 0
  },
- "generated_at": "2026-11-25T14:07:00Z",
+ "generated_at": "2026-11-25T14:47:25Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-25T14:06:59Z",
+  "at": "2026-11-25T14:47:24Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
   "recheck_only": false,
   "requests": {
-   "errors": {
-    "services.nconemap.gov": 1
-   },
+   "errors": {},
    "requests": {
     "arcgisserver.lincolncountync.gov": 6,
-    "gis.buncombecounty.org": 51,
-    "gis.charlottenc.gov": 28,
-    "portal-nc.tylertech.cloud": 42,
-    "services.nconemap.gov": 51,
-    "services1.arcgis.com": 10,
-    "vt.ncsbe.gov": 129,
+    "devsvcs.gastonianc.gov": 4,
+    "gis.buncombecounty.org": 60,
+    "portal-nc.tylertech.cloud": 41,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "roster:union-so-sc.zuercherportal.com": 1,
+    "services.nconemap.gov": 50,
+    "services1.arcgis.com": 7,
+    "vt.ncsbe.gov": 135,
     "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 22,
-   "stale": 24,
-   "unconfirmed": 4
+   "confirmed": 28,
+   "stale": 20,
+   "unconfirmed": 2
   },
-  "seconds": 888,
+  "seconds": 648,
   "selection": {
    "applies": 25671,
-   "due_new": 16411,
+   "due_new": 16363,
    "due_retry": 3,
    "due_ttl": 670,
-   "not_due_retry": 212,
-   "not_due_ttl": 8375
+   "not_due_retry": 214,
+   "not_due_ttl": 8421
   },
   "source": null,
   "tier": null
  },
- "rows": 9613,
+ "rows": 9661,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 5984315,
+   "bytes": 6012369,
    "file": "000.json",
-   "rows": 4842,
-   "sha256": "b072b248801c6109c8210d25d86ee56f30410779efdf13438bb4f206c7286395"
+   "rows": 4865,
+   "sha256": "47ccf00fa902c4994c9ac18156ba43d94dd2a311dff4b9de07e9f2dff65be884"
   },
   {
    "bucket": 1,
-   "bytes": 5902653,
+   "bytes": 5933150,
    "file": "001.json",
-   "rows": 4771,
-   "sha256": "1848921849cabdf439c9cad193e639aa7bba8afcf472e4f6ba9dc9cfef100367"
+   "rows": 4796,
+   "sha256": "e863de7f21bccb0a6f1040f430f4abada13fe03acd5ed8571ce482bc29ec322d"
   }
  ],
  "signal": "nc_ecourts_case",

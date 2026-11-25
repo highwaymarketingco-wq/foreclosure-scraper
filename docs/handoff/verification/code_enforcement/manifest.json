@@ -1,67 +1,68 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 2210,
-  "refuted": 534,
-  "rows": 2977,
-  "stale": 224,
-  "unconfirmed": 9,
+  "confirmed": 2249,
+  "refuted": 537,
+  "rows": 3027,
+  "stale": 225,
+  "unconfirmed": 16,
   "wall": 0
  },
- "generated_at": "2026-11-25T14:06:57Z",
+ "generated_at": "2026-11-25T14:47:22Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-25T14:06:57Z",
+  "at": "2026-11-25T14:47:22Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
   "recheck_only": false,
   "requests": {
-   "errors": {
-    "services.nconemap.gov": 1
-   },
+   "errors": {},
    "requests": {
     "arcgisserver.lincolncountync.gov": 6,
-    "gis.buncombecounty.org": 51,
-    "gis.charlottenc.gov": 28,
-    "portal-nc.tylertech.cloud": 42,
-    "services.nconemap.gov": 51,
-    "services1.arcgis.com": 10,
-    "vt.ncsbe.gov": 129,
+    "devsvcs.gastonianc.gov": 4,
+    "gis.buncombecounty.org": 60,
+    "portal-nc.tylertech.cloud": 41,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "roster:union-so-sc.zuercherportal.com": 1,
+    "services.nconemap.gov": 50,
+    "services1.arcgis.com": 7,
+    "vt.ncsbe.gov": 135,
     "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 35,
-   "refuted": 12,
+   "confirmed": 39,
+   "refuted": 3,
    "stale": 1,
-   "unconfirmed": 2
+   "unconfirmed": 7
   },
-  "seconds": 888,
+  "seconds": 648,
   "selection": {
    "applies": 11927,
-   "due_new": 8882,
+   "due_new": 8832,
    "due_ttl": 112,
-   "not_due_retry": 12,
-   "not_due_ttl": 2921
+   "not_due_retry": 14,
+   "not_due_ttl": 2969,
+   "same_property_queued": 1
   },
   "source": null,
   "tier": null
  },
- "rows": 2977,
+ "rows": 3027,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 3287176,
+   "bytes": 3346538,
    "file": "000.json",
-   "rows": 2977,
-   "sha256": "8ec800544fd5b7c8d6ff8ec2bbfd0340300a2c1e9851438a49fa25cd8eb7be38"
+   "rows": 3027,
+   "sha256": "7aff1b442176f995f5e1eeaf715622fd0e479ad1c69235066f7884027f3d70fa"
   }
  ],
  "signal": "code_enforcement",

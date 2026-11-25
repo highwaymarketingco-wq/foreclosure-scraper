@@ -3,33 +3,33 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 3283,
+  "rows": 3333,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 3283
+  "wall": 3333
  },
- "generated_at": "2026-11-25T14:06:58Z",
+ "generated_at": "2026-11-25T14:47:23Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-25T14:06:58Z",
+  "at": "2026-11-25T14:47:22Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
   "recheck_only": false,
   "requests": {
-   "errors": {
-    "services.nconemap.gov": 1
-   },
+   "errors": {},
    "requests": {
     "arcgisserver.lincolncountync.gov": 6,
-    "gis.buncombecounty.org": 51,
-    "gis.charlottenc.gov": 28,
-    "portal-nc.tylertech.cloud": 42,
-    "services.nconemap.gov": 51,
-    "services1.arcgis.com": 10,
-    "vt.ncsbe.gov": 129,
+    "devsvcs.gastonianc.gov": 4,
+    "gis.buncombecounty.org": 60,
+    "portal-nc.tylertech.cloud": 41,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "roster:union-so-sc.zuercherportal.com": 1,
+    "services.nconemap.gov": 50,
+    "services1.arcgis.com": 7,
+    "vt.ncsbe.gov": 135,
     "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
@@ -38,25 +38,25 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 888,
+  "seconds": 648,
   "selection": {
    "applies": 9035,
-   "due_new": 5649,
-   "not_due_ttl": 3386
+   "due_new": 5599,
+   "not_due_ttl": 3436
   },
   "source": null,
   "tier": null
  },
- "rows": 3283,
+ "rows": 3333,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 2517399,
+   "bytes": 2555015,
    "file": "000.json",
-   "rows": 3283,
-   "sha256": "5bd823ca91c8ac84c5cabb00a9103be64b45f832e7dba59b8f24cd84e7c32d28"
+   "rows": 3333,
+   "sha256": "53e0b8e47a3b3fe668b2d667db40472935dda0cbbee9c14da80f75cfa329d39c"
   }
  ],
  "signal": "court_wall",
