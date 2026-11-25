@@ -3,32 +3,33 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 1710,
+  "rows": 1810,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 1710
+  "wall": 1810
  },
- "generated_at": "2026-11-25T12:24:07Z",
+ "generated_at": "2026-11-25T14:06:59Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-25T12:24:07Z",
+  "at": "2026-11-25T14:06:59Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
   "recheck_only": false,
   "requests": {
-   "errors": {},
+   "errors": {
+    "services.nconemap.gov": 1
+   },
    "requests": {
-    "devsvcs.gastonianc.gov": 2,
-    "gis.buncombecounty.org": 50,
-    "gis.charlottenc.gov": 88,
-    "portal-nc.tylertech.cloud": 36,
-    "roster:anderson-so-sc.zuercherportal.com": 1,
-    "services.nconemap.gov": 50,
-    "services1.arcgis.com": 3,
-    "vt.ncsbe.gov": 144,
+    "arcgisserver.lincolncountync.gov": 6,
+    "gis.buncombecounty.org": 51,
+    "gis.charlottenc.gov": 28,
+    "portal-nc.tylertech.cloud": 42,
+    "services.nconemap.gov": 51,
+    "services1.arcgis.com": 10,
+    "vt.ncsbe.gov": 129,
     "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
@@ -37,26 +38,26 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 743,
+  "seconds": 888,
   "selection": {
    "applies": 66565,
-   "due_new": 64872,
-   "not_due_ttl": 1693,
-   "same_property_queued": 4
+   "due_new": 64766,
+   "not_due_ttl": 1799,
+   "same_property_queued": 5
   },
   "source": null,
   "tier": null
  },
- "rows": 1710,
+ "rows": 1810,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 1540767,
+   "bytes": 1629458,
    "file": "000.json",
-   "rows": 1710,
-   "sha256": "ff98e4758aaaed9dd0124b8811b425cb529c90a4369175b7d5da261801cf8a66"
+   "rows": 1810,
+   "sha256": "aa3ff67e7e5a9614f1a7f2e53f53eaeb45ffbc5b9b074472c0b8d08ce347a9b7"
   }
  ],
  "signal": "lien_registry_wall",

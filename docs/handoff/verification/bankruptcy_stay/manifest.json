@@ -8,27 +8,28 @@
   "unconfirmed": 194,
   "wall": 0
  },
- "generated_at": "2026-11-25T12:24:05Z",
+ "generated_at": "2026-11-25T14:06:57Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-25T12:24:05Z",
+  "at": "2026-11-25T14:06:57Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
   "recheck_only": false,
   "requests": {
-   "errors": {},
+   "errors": {
+    "services.nconemap.gov": 1
+   },
    "requests": {
-    "devsvcs.gastonianc.gov": 2,
-    "gis.buncombecounty.org": 50,
-    "gis.charlottenc.gov": 88,
-    "portal-nc.tylertech.cloud": 36,
-    "roster:anderson-so-sc.zuercherportal.com": 1,
-    "services.nconemap.gov": 50,
-    "services1.arcgis.com": 3,
-    "vt.ncsbe.gov": 144,
+    "arcgisserver.lincolncountync.gov": 6,
+    "gis.buncombecounty.org": 51,
+    "gis.charlottenc.gov": 28,
+    "portal-nc.tylertech.cloud": 42,
+    "services.nconemap.gov": 51,
+    "services1.arcgis.com": 10,
+    "vt.ncsbe.gov": 129,
     "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
@@ -37,7 +38,7 @@
    "checked": 7,
    "unconfirmed": 7
   },
-  "seconds": 743,
+  "seconds": 888,
   "selection": {
    "applies": 465,
    "due_ttl": 7,
@@ -56,7 +57,7 @@
    "bytes": 630380,
    "file": "000.json",
    "rows": 571,
-   "sha256": "52437eb49e8ed802843f5359cc79434184fb880901e1939ffef34756f81d541f"
+   "sha256": "9a7aa008fbc39220023267a11765ac4082ec16e0a1522ae4355d8011f6f04c9e"
   }
  ],
  "signal": "bankruptcy_stay",

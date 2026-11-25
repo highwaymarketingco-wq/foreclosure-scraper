@@ -1,72 +1,75 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 15796,
+  "confirmed": 15868,
   "refuted": 11,
-  "rows": 16004,
-  "stale": 43,
-  "unconfirmed": 154,
+  "rows": 16104,
+  "stale": 46,
+  "unconfirmed": 179,
   "wall": 0
  },
- "generated_at": "2026-11-25T12:24:07Z",
+ "generated_at": "2026-11-25T14:06:59Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-25T12:24:06Z",
+  "at": "2026-11-25T14:06:58Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
   "recheck_only": false,
   "requests": {
-   "errors": {},
+   "errors": {
+    "services.nconemap.gov": 1
+   },
    "requests": {
-    "devsvcs.gastonianc.gov": 2,
-    "gis.buncombecounty.org": 50,
-    "gis.charlottenc.gov": 88,
-    "portal-nc.tylertech.cloud": 36,
-    "roster:anderson-so-sc.zuercherportal.com": 1,
-    "services.nconemap.gov": 50,
-    "services1.arcgis.com": 3,
-    "vt.ncsbe.gov": 144,
+    "arcgisserver.lincolncountync.gov": 6,
+    "gis.buncombecounty.org": 51,
+    "gis.charlottenc.gov": 28,
+    "portal-nc.tylertech.cloud": 42,
+    "services.nconemap.gov": 51,
+    "services1.arcgis.com": 10,
+    "vt.ncsbe.gov": 129,
     "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 50
+   "confirmed": 40,
+   "stale": 1,
+   "unconfirmed": 9
   },
-  "seconds": 743,
+  "seconds": 888,
   "selection": {
    "applies": 44671,
-   "due_new": 28773,
-   "due_retry": 39,
+   "due_new": 28673,
+   "due_retry": 42,
    "due_retry_transient": 24,
    "due_ttl": 432,
-   "not_due_retry": 87,
-   "not_due_ttl": 15316
+   "not_due_retry": 100,
+   "not_due_ttl": 15400
   },
   "source": null,
   "tier": null
  },
- "rows": 16004,
+ "rows": 16104,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 7679320,
+   "bytes": 7718508,
    "file": "000.json",
-   "rows": 8070,
-   "sha256": "a54528d9d778a962504e2e83619dc6f6807372f43ab03c19b7b4ecfb2efa6b41"
+   "rows": 8112,
+   "sha256": "a87673452aa27b2a00ae20fe6bb51cb955ed3045b35b2bba1981d13cc0a9d558"
   },
   {
    "bucket": 1,
-   "bytes": 7556797,
+   "bytes": 7611029,
    "file": "001.json",
-   "rows": 7934,
-   "sha256": "ed9e277510c4f4ed8f16b9206c538e65115d50b6d5e8d521c5a79a0da1d658c8"
+   "rows": 7992,
+   "sha256": "1d3a01827a4d5cc77fb27a180fa17e575ea2d455adcac93eda5eb3830f178a6d"
   }
  ],
  "signal": "heir_roll",

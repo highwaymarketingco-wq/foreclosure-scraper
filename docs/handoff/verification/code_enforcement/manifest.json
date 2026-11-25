@@ -1,66 +1,67 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 2157,
-  "refuted": 494,
-  "rows": 2877,
-  "stale": 219,
-  "unconfirmed": 7,
+  "confirmed": 2210,
+  "refuted": 534,
+  "rows": 2977,
+  "stale": 224,
+  "unconfirmed": 9,
   "wall": 0
  },
- "generated_at": "2026-11-25T12:24:05Z",
+ "generated_at": "2026-11-25T14:06:57Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-25T12:24:05Z",
+  "at": "2026-11-25T14:06:57Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
   "recheck_only": false,
   "requests": {
-   "errors": {},
+   "errors": {
+    "services.nconemap.gov": 1
+   },
    "requests": {
-    "devsvcs.gastonianc.gov": 2,
-    "gis.buncombecounty.org": 50,
-    "gis.charlottenc.gov": 88,
-    "portal-nc.tylertech.cloud": 36,
-    "roster:anderson-so-sc.zuercherportal.com": 1,
-    "services.nconemap.gov": 50,
-    "services1.arcgis.com": 3,
-    "vt.ncsbe.gov": 144,
+    "arcgisserver.lincolncountync.gov": 6,
+    "gis.buncombecounty.org": 51,
+    "gis.charlottenc.gov": 28,
+    "portal-nc.tylertech.cloud": 42,
+    "services.nconemap.gov": 51,
+    "services1.arcgis.com": 10,
+    "vt.ncsbe.gov": 129,
     "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 25,
-   "refuted": 24,
-   "stale": 1
+   "confirmed": 35,
+   "refuted": 12,
+   "stale": 1,
+   "unconfirmed": 2
   },
-  "seconds": 743,
+  "seconds": 888,
   "selection": {
    "applies": 11927,
-   "due_new": 8983,
+   "due_new": 8882,
    "due_ttl": 112,
    "not_due_retry": 12,
-   "not_due_ttl": 2820,
-   "same_property_queued": 1
+   "not_due_ttl": 2921
   },
   "source": null,
   "tier": null
  },
- "rows": 2877,
+ "rows": 2977,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 3186216,
+   "bytes": 3287176,
    "file": "000.json",
-   "rows": 2877,
-   "sha256": "162ae975194de1b3fdfbfe5907935a1aab44450b0ba7704cdf836360a3053689"
+   "rows": 2977,
+   "sha256": "8ec800544fd5b7c8d6ff8ec2bbfd0340300a2c1e9851438a49fa25cd8eb7be38"
   }
  ],
  "signal": "code_enforcement",
