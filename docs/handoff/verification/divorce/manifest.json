@@ -3,37 +3,41 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 1508,
+  "rows": 1558,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 1508
+  "wall": 1558
  },
- "generated_at": "2026-11-25T03:06:05Z",
+ "generated_at": "2026-11-25T03:34:33Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-25T03:06:05Z",
+  "at": "2026-11-25T03:34:33Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
   "recheck_only": false,
   "requests": {
-   "errors": {
-    "vt.ncsbe.gov": 1
-   },
+   "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 50,
+    "gis.buncombecounty.org": 72,
     "gis.charlottenc.gov": 80,
-    "maps.spartanburgcounty.org": 50,
-    "portal-nc.tylertech.cloud": 38,
+    "gisweb.hendersoncountync.gov": 2,
+    "maps.spartanburgcounty.org": 5,
+    "portal-nc.tylertech.cloud": 41,
+    "rockhillgis.cityofrockhill.com": 3,
+    "roster:buncombecountyso.policetocitizen.com": 1,
+    "roster:cc.southernsoftware.com": 2,
     "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:laurens-911-sc.zuercherportal.com": 1,
-    "roster:oconee-so-sc.zuercherportal.com": 1,
-    "roster:union-so-sc.zuercherportal.com": 1,
-    "services1.arcgis.com": 10,
+    "roster:guilfordcountysheriff.policetocitizen.com": 1,
+    "roster:pickens-so-sc.zuercherportal.com": 1,
+    "roster:rowancountync.policetocitizen.com": 1,
+    "roster:www2.co.davidson.nc.us": 1,
+    "services1.arcgis.com": 13,
     "services9.arcgis.com": 50,
-    "vt.ncsbe.gov": 142,
+    "vt.ncsbe.gov": 126,
+    "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
   },
@@ -41,26 +45,26 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 855,
+  "seconds": 1072,
   "selection": {
    "applies": 4916,
-   "due_new": 3457,
-   "not_due_ttl": 1459,
+   "due_new": 3407,
+   "not_due_ttl": 1509,
    "same_property_queued": 1
   },
   "source": null,
   "tier": null
  },
- "rows": 1508,
+ "rows": 1558,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 1304084,
+   "bytes": 1348063,
    "file": "000.json",
-   "rows": 1508,
-   "sha256": "4960a28bf27d90a67163404bbd16da32fe9947c51d6ba8fb3c4d79587789f85d"
+   "rows": 1558,
+   "sha256": "84dba90e0eda456b032a8981962a3db934a397c1a4db802aec8cfa2096eb1bbf"
   }
  ],
  "signal": "divorce",

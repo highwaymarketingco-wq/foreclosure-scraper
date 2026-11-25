@@ -1,39 +1,43 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 15398,
+  "confirmed": 15448,
   "refuted": 11,
-  "rows": 15604,
+  "rows": 15654,
   "stale": 43,
   "unconfirmed": 152,
   "wall": 0
  },
- "generated_at": "2026-11-25T03:06:07Z",
+ "generated_at": "2026-11-25T03:34:34Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-25T03:06:06Z",
+  "at": "2026-11-25T03:34:33Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
   "recheck_only": false,
   "requests": {
-   "errors": {
-    "vt.ncsbe.gov": 1
-   },
+   "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 50,
+    "gis.buncombecounty.org": 72,
     "gis.charlottenc.gov": 80,
-    "maps.spartanburgcounty.org": 50,
-    "portal-nc.tylertech.cloud": 38,
+    "gisweb.hendersoncountync.gov": 2,
+    "maps.spartanburgcounty.org": 5,
+    "portal-nc.tylertech.cloud": 41,
+    "rockhillgis.cityofrockhill.com": 3,
+    "roster:buncombecountyso.policetocitizen.com": 1,
+    "roster:cc.southernsoftware.com": 2,
     "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:laurens-911-sc.zuercherportal.com": 1,
-    "roster:oconee-so-sc.zuercherportal.com": 1,
-    "roster:union-so-sc.zuercherportal.com": 1,
-    "services1.arcgis.com": 10,
+    "roster:guilfordcountysheriff.policetocitizen.com": 1,
+    "roster:pickens-so-sc.zuercherportal.com": 1,
+    "roster:rowancountync.policetocitizen.com": 1,
+    "roster:www2.co.davidson.nc.us": 1,
+    "services1.arcgis.com": 13,
     "services9.arcgis.com": 50,
-    "vt.ncsbe.gov": 142,
+    "vt.ncsbe.gov": 126,
+    "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
   },
@@ -41,36 +45,36 @@
    "checked": 50,
    "confirmed": 50
   },
-  "seconds": 855,
+  "seconds": 1072,
   "selection": {
    "applies": 44671,
-   "due_new": 29173,
+   "due_new": 29123,
    "due_retry": 29,
    "due_retry_transient": 24,
    "due_ttl": 432,
    "not_due_retry": 95,
-   "not_due_ttl": 14918
+   "not_due_ttl": 14968
   },
   "source": null,
   "tier": null
  },
- "rows": 15604,
+ "rows": 15654,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 7482610,
+   "bytes": 7514761,
    "file": "000.json",
-   "rows": 7860,
-   "sha256": "8b27035650855d77204bdeecdb318ce8e30faccbb695b7da8355c6c932673811"
+   "rows": 7894,
+   "sha256": "3687e6fc0d55cdb8b5c3fc1fbfd9bfe3c72123a91c8c986b91689f43b3d71d95"
   },
   {
    "bucket": 1,
-   "bytes": 7380255,
+   "bytes": 7395433,
    "file": "001.json",
-   "rows": 7744,
-   "sha256": "c9d969f417e0e1185e04d11a247c98199190cdde6d9dabc2350e87f2427777a8"
+   "rows": 7760,
+   "sha256": "f211a3e30d6615307c20b612d5795637ba29a0b2bcd3ecada0e77d538e07099b"
   }
  ],
  "signal": "heir_roll",
