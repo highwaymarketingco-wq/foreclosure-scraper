@@ -8,12 +8,12 @@
   "unconfirmed": 80,
   "wall": 0
  },
- "generated_at": "2026-11-25T14:47:23Z",
+ "generated_at": "2026-11-25T18:35:13Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-25T14:47:23Z",
+  "at": "2026-11-25T18:35:13Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,31 +21,26 @@
   "requests": {
    "errors": {},
    "requests": {
-    "arcgisserver.lincolncountync.gov": 6,
-    "devsvcs.gastonianc.gov": 4,
-    "gis.buncombecounty.org": 60,
-    "portal-nc.tylertech.cloud": 41,
-    "roster:laurens-911-sc.zuercherportal.com": 1,
-    "roster:union-so-sc.zuercherportal.com": 1,
-    "services.nconemap.gov": 50,
+    "gis.buncombecounty.org": 70,
+    "portal-nc.tylertech.cloud": 36,
+    "services.nconemap.gov": 51,
     "services1.arcgis.com": 7,
-    "vt.ncsbe.gov": 135,
-    "webgis2.durhamnc.gov": 3,
+    "vt.ncsbe.gov": 144,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 9,
-   "unconfirmed": 41
+   "confirmed": 4,
+   "unconfirmed": 46
   },
-  "seconds": 648,
+  "seconds": 787,
   "selection": {
    "applies": 418,
    "due_new": 1,
-   "due_ttl": 168,
+   "due_ttl": 132,
    "not_due_retry": 81,
-   "not_due_ttl": 168,
+   "not_due_ttl": 204,
    "same_property_queued": 1
   },
   "source": null,
@@ -57,10 +52,10 @@
  "shards": [
   {
    "bucket": 0,
-   "bytes": 488127,
+   "bytes": 492282,
    "file": "000.json",
    "rows": 420,
-   "sha256": "cdb21fb744ecd99ffe758c07f2da0126cbb70e6a3f6354871227d8cb9aa93bf5"
+   "sha256": "67f911368e66255b2807b18d6c6b5fe7d67b7795762c86ce56bc068a08bb07ea"
   }
  ],
  "signal": "foreclosure_sale_list",

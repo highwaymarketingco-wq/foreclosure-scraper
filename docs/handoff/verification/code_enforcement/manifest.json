@@ -1,19 +1,19 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 2249,
+  "confirmed": 2449,
   "refuted": 537,
-  "rows": 3027,
+  "rows": 3227,
   "stale": 225,
   "unconfirmed": 16,
   "wall": 0
  },
- "generated_at": "2026-11-25T14:47:22Z",
+ "generated_at": "2026-11-25T18:35:12Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-25T14:47:22Z",
+  "at": "2026-11-25T18:35:12Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,48 +21,39 @@
   "requests": {
    "errors": {},
    "requests": {
-    "arcgisserver.lincolncountync.gov": 6,
-    "devsvcs.gastonianc.gov": 4,
-    "gis.buncombecounty.org": 60,
-    "portal-nc.tylertech.cloud": 41,
-    "roster:laurens-911-sc.zuercherportal.com": 1,
-    "roster:union-so-sc.zuercherportal.com": 1,
-    "services.nconemap.gov": 50,
+    "gis.buncombecounty.org": 70,
+    "portal-nc.tylertech.cloud": 36,
+    "services.nconemap.gov": 51,
     "services1.arcgis.com": 7,
-    "vt.ncsbe.gov": 135,
-    "webgis2.durhamnc.gov": 3,
+    "vt.ncsbe.gov": 144,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 39,
-   "refuted": 3,
-   "stale": 1,
-   "unconfirmed": 7
+   "confirmed": 50
   },
-  "seconds": 648,
+  "seconds": 787,
   "selection": {
    "applies": 11927,
-   "due_new": 8832,
+   "due_new": 8631,
    "due_ttl": 112,
-   "not_due_retry": 14,
-   "not_due_ttl": 2969,
-   "same_property_queued": 1
+   "not_due_retry": 22,
+   "not_due_ttl": 3162
   },
   "source": null,
   "tier": null
  },
- "rows": 3027,
+ "rows": 3227,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 3346538,
+   "bytes": 3601503,
    "file": "000.json",
-   "rows": 3027,
-   "sha256": "7aff1b442176f995f5e1eeaf715622fd0e479ad1c69235066f7884027f3d70fa"
+   "rows": 3227,
+   "sha256": "0a6802ba47113d29e47c5c44aaad91e4781afd5f0078f0189fd0b315e59d8818"
   }
  ],
  "signal": "code_enforcement",
