@@ -8,12 +8,12 @@
   "unconfirmed": 1054,
   "wall": 0
  },
- "generated_at": "2026-11-25T22:56:57Z",
+ "generated_at": "2026-11-25T23:21:49Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-25T22:56:56Z",
+  "at": "2026-11-25T23:21:48Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 300,
@@ -28,7 +28,7 @@
    "checked": 2,
    "unconfirmed": 2
   },
-  "seconds": 5,
+  "seconds": 4,
   "selection": {
    "applies": 9615,
    "due_ttl": 2,
@@ -61,14 +61,14 @@
    "bytes": 5009953,
    "file": "002.json",
    "rows": 2354,
-   "sha256": "dc084f929093d4e3778c296f9e458cc5020dbfaa7a32603ec915e1474b2f149d"
+   "sha256": "2eacc12790d275a94cb0931028282c3dd2c91b64559a01b6ea351cac359609c2"
   },
   {
    "bucket": 3,
    "bytes": 5023499,
    "file": "003.json",
    "rows": 2362,
-   "sha256": "57fc934dd4b08d3f976f7c6cff289a5d9adf4ae2acad15293bca6173f30157dc"
+   "sha256": "7ed806ee7a3660c77631d57f3aba7ccef35f0ff3cfe7ccf9da64cfa8fbf9b5e8"
   }
  ],
  "signal": "comps",
