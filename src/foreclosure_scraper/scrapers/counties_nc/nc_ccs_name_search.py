@@ -120,11 +120,99 @@ log = structlog.get_logger()
 # debugging, before any more blind timing/retry attempts. Next real step: hand-build the
 # POST per the shape above and compare against what a real browser actually
 # sends over the wire (network-capture it, don't guess blind).
+#
+# RESOLVED 2026-11-25, two real findings from live eyes-on debugging (Playwright
+# page/response event listeners registered via page_setup, BEFORE navigation --
+# the earlier "zero requests" reading came from reading performance.getEntriesByType()
+# AFTER the fact, which reports zeroed duration/transferSize for this cross-cutting
+# response regardless of whether it actually loaded; it is not reliable evidence of
+# "never requested" and should not be trusted again here).
+#
+# FINDING 1 -- a real bug, now understood: _run_stealthy_county() points
+# StealthyFetcher.async_fetch()'s own TOP-LEVEL target at `base + "/"` (the bare
+# tenant root). solve_cloudflare=True's automatic detect+solve runs ONCE,
+# automatically, against THAT url, before page_action ever runs -- but the bare
+# root is NOT the Cloudflare-protected url; application.asp?resize=true is (see
+# the 2026-11-24 entry above). Confirmed live: pointing async_fetch() itself at
+# application.asp?resize=true made the detector correctly find `cType:
+# 'interactive'`, solve a real Cloudflare Turnstile challenge, and land on the
+# genuine page (title "La'Tia L. Wynn ... Register of Deeds, Hertford County, NC",
+# 20+ real frames including realestatesearch.asp) -- vs. solving the bare root,
+# which scrapling's own detector sometimes fails to recognize at all ("No
+# Cloudflare challenge found", confirmed reproduced twice), leaving the whole
+# session unsolved. ACTION: any future stealthy fetch of this tenant should solve
+# against application.asp?resize=true directly (or whatever the real protected
+# url is for a given tenant), not the bare subdomain root.
+#
+# FINDING 2 -- the real jQuery mechanism, narrowed to execution, not loading:
+# with the Cloudflare fix above, jquery.min.js's real network response (captured
+# via page.on("response"), not performance timing) is a clean 200, from_cache=
+# false, 91,671 bytes decompressed, correct jQuery-1.6.4 header and UMD closing
+# line, and `node --check` on the exact captured body passes -- the file is not
+# corrupted, truncated, or blocked at the network layer at all. No
+# page.on("pageerror") or uncaught exception fires anywhere on the page. Yet
+# `typeof window.jQuery` stays "undefined" no matter HOW the file is run inside
+# this specific frame via a NATIVE execution path: as a real <script src> tag
+# (original observation), via plain eval(code), AND via
+# document.createElement('script') + appendChild (onload fires "loaded" cleanly,
+# jQuery still absent after). A plain `window.__x = 42` assignment in the same
+# frame works fine, so window itself is not frozen/proxied -- this is specific
+# to jQuery's own `(function(window, undefined){ ... window.jQuery = window.$ =
+# jQuery; })(window);` wrapper failing to bind to the TRUE global window when
+# parsed/run via any of those native paths on THIS page (old 2016-era CCS
+# markup; a plausible cause is a named DOM element shadowing the bare `window`
+# identifier for top-level script execution, though the exact mechanism was not
+# fully isolated -- not worth more time once a working fix was found, below).
+#
+# WORKING FIX, confirmed live: fetch the script's own source text and run it via
+# `new Function(code).call(window)` instead of any native path --
+# `jquery_after: "function"` every time, reliably. Replaying ALL of
+# realestatesearch.asp's own <script src> files in document order this same way
+# (Sarissa.js, OpenDocumentImage.js, Slider.js, AutoComplete.js, jquery.min.js,
+# jquery.cookie.js, jquery.maskedinput-1.3.min.js, Querystring.js) succeeds
+# cleanly for every one of them -- jQuery ends up genuinely initialized
+# (`typeof window.jQuery === "function"`).
+#
+# REMAINING GAP (new, precisely scoped, not yet solved): the LAST script --
+# realestatesearch.asp's own big (150,328-char) inline script, the one that
+# actually builds `mgr`/`Search`/`trySearch` -- throws `ReferenceError:
+# OpenImageWindow is not defined` partway through when replayed the same way,
+# so mgr/Search/trySearch are STILL "undefined" even with jQuery itself fixed.
+# OpenImageWindow is not defined anywhere in the TOP (application.asp) frame
+# either (checked directly, confirmed absent and not even mentioned in any of
+# its own scripts) -- likely a function that belongs to one of the OTHER
+# sibling frames (IndexBookImageView.asp / viewimage.asp / viewimageframe.asp,
+# all real frames confirmed present in the solved frameset) for an unrelated
+# "view document image" feature bundled into the same inline script as the
+# search Manager, not something Search() itself should need to call. NEXT
+# STEP for whoever picks this back up: find OpenImageWindow's real home (one of
+# those sibling frames, via window.parent.<framename>.OpenImageWindow or
+# similar), either stub it out harmlessly before replaying this inline script
+# (cheapest fix if it's truly unrelated to search) or make it resolve for real;
+# then re-run this same replay-in-order technique and confirm trySearch becomes
+# callable, before attempting a real POST to SearchService.asp per the shape
+# documented above.
 _COUNTIES = {
     "Caldwell": "caldwellnc",
     "Franklin": "franklinnc",
-    "Hertford": "https://us4.courthousecomputersystems.com/hertfordnc",
+    # FIXED 2026-11-25: "hertfordnc" (no "nw") is the confirmed-dead tenant from the
+    # 2026-11-24 entry above -- this was never updated to the real one once it was
+    # found, because the Cloudflare+jQuery chain downstream of it wasn't solved yet
+    # either. Both are now far enough along (see the 2026-11-25 entries above) that
+    # pointing this at the real tenant is worth landing on its own.
+    "Hertford": "https://us4.courthousecomputersystems.com/hertfordncnw",
     "Gates": "gatesnc",
+}
+
+# 2026-11-25: per-county override for the URL StealthyFetcher's own solve_cloudflare
+# should run its automatic detect+solve against -- see the module docstring's
+# "FINDING 1" entry. Hertford's real Cloudflare-protected url is application.asp,
+# not its bare tenant root (confirmed live); Caldwell/Franklin are a different,
+# modern LRSearch platform never tested against this specific failure mode, so they
+# keep defaulting to the bare root (base + "/") rather than guessing a path change
+# for them too.
+_SOLVE_URL_OVERRIDE = {
+    "Hertford": "/application.asp?resize=true",
 }
 
 # Confirmed live 2026-11-24 (see module docstring) -- these 3 need the
@@ -343,9 +431,10 @@ async def _run_stealthy_county(county: str, subdomain: str) -> list[dict]:
         log.warning("ccs_name.scrapling_missing", county=county, error=str(exc)[:160])
         return []
 
+    solve_url = base + _SOLVE_URL_OVERRIDE.get(county, "/")
     try:
         await StealthyFetcher.async_fetch(
-            base + "/",
+            solve_url,
             headless=True,
             network_idle=True,
             timeout=60000,
