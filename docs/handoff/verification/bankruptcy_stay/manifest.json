@@ -8,12 +8,12 @@
   "unconfirmed": 194,
   "wall": 0
  },
- "generated_at": "2026-11-24T23:43:34Z",
+ "generated_at": "2026-11-25T01:08:56Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T23:43:34Z",
+  "at": "2026-11-25T01:08:56Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,13 +21,13 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 21,
-    "gis.buncombecounty.org": 51,
+    "gis.buncombecounty.org": 52,
+    "gis.charlottenc.gov": 24,
     "mapping.mitchellcountync.gov": 50,
     "maps.spartanburgcounty.org": 50,
-    "portal-nc.tylertech.cloud": 40,
+    "portal-nc.tylertech.cloud": 38,
     "services1.arcgis.com": 4,
-    "vt.ncsbe.gov": 144,
+    "vt.ncsbe.gov": 141,
     "www.courtlistener.com": 2
    }
   },
@@ -35,7 +35,7 @@
    "checked": 7,
    "unconfirmed": 7
   },
-  "seconds": 697,
+  "seconds": 719,
   "selection": {
    "applies": 465,
    "due_ttl": 7,
@@ -54,7 +54,7 @@
    "bytes": 630380,
    "file": "000.json",
    "rows": 571,
-   "sha256": "2d8b0031f5ebffcdd2ac6fbcc8169de3a66411c3d71c439e2e0e4693f014a2dd"
+   "sha256": "d5c7bba084e5adc0f9712b274e250c211fdbd70316e864394dbef3020f86704f"
   }
  ],
  "signal": "bankruptcy_stay",

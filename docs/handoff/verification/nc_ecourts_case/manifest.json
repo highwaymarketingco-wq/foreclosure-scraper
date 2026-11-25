@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 8011,
+  "confirmed": 8036,
   "refuted": 26,
-  "rows": 8893,
-  "stale": 678,
-  "unconfirmed": 178,
+  "rows": 8941,
+  "stale": 699,
+  "unconfirmed": 180,
   "wall": 0
  },
- "generated_at": "2026-11-24T23:43:37Z",
+ "generated_at": "2026-11-25T01:08:59Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-24T23:43:36Z",
+  "at": "2026-11-25T01:08:59Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,51 +21,51 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 21,
-    "gis.buncombecounty.org": 51,
+    "gis.buncombecounty.org": 52,
+    "gis.charlottenc.gov": 24,
     "mapping.mitchellcountync.gov": 50,
     "maps.spartanburgcounty.org": 50,
-    "portal-nc.tylertech.cloud": 40,
+    "portal-nc.tylertech.cloud": 38,
     "services1.arcgis.com": 4,
-    "vt.ncsbe.gov": 144,
+    "vt.ncsbe.gov": 141,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 21,
-   "stale": 24,
-   "unconfirmed": 5
+   "confirmed": 25,
+   "stale": 21,
+   "unconfirmed": 4
   },
-  "seconds": 697,
+  "seconds": 719,
   "selection": {
    "applies": 25671,
-   "due_new": 17131,
+   "due_new": 17083,
    "due_retry": 3,
    "due_ttl": 670,
-   "not_due_retry": 183,
-   "not_due_ttl": 7684
+   "not_due_retry": 186,
+   "not_due_ttl": 7729
   },
   "source": null,
   "tier": null
  },
- "rows": 8893,
+ "rows": 8941,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 5525150,
+   "bytes": 5558989,
    "file": "000.json",
-   "rows": 4463,
-   "sha256": "11e4135297721f069a8c1bda23ade3cd2d5cc7dd43ef4fb2e74afb51622f2923"
+   "rows": 4491,
+   "sha256": "684957b9a0d09aa74538f3422a4acf405f96a1da9b9b64e1ebda8afa25069127"
   },
   {
    "bucket": 1,
-   "bytes": 5491218,
+   "bytes": 5515616,
    "file": "001.json",
-   "rows": 4430,
-   "sha256": "9721470b0cdf81acd8d288d1eb26e1fe80a8f1b45aede62ea32cbc18327d8199"
+   "rows": 4450,
+   "sha256": "34056e7250c02ca3db16dc55db2c9555f793303eaac10f4f6aa221c8f415180c"
   }
  ],
  "signal": "nc_ecourts_case",
