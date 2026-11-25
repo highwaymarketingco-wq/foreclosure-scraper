@@ -243,10 +243,47 @@ async def _solve_audio_challenge(page, challenge_frame) -> bool:
 
 
 async def _do_captcha_flow(page, max_attempts: int = 8) -> bool:
-    """Full reCAPTCHA V2 flow: checkbox click + visual challenge with Claude.
+    """Full reCAPTCHA V2 flow: 2Captcha (paid) → Claude vision → audio (last resort).
 
     Returns True when a valid token is in the page.
     """
+    # Strategy 1: Try 2Captcha first (most reliable, $0.001 per solve)
+    try:
+        from foreclosure_scraper.enrichment_2captcha import solve_recaptcha_v2 as solve_2captcha
+        import os
+        
+        has_2captcha = bool(os.environ.get("TWOCAPTCHA_API_KEY") or 
+                          os.path.exists(os.path.expanduser("~/.secrets/2captcha_api_key.txt")) or
+                          os.path.exists(".secrets/2captcha_api_key.txt"))
+        
+        if has_2captcha:
+            log.info("lexington_probate.trying_2captcha")
+            # Extract site key
+            site_key = await page.evaluate("""() => {
+                const el = document.querySelector('[data-sitekey]');
+                return el ? el.getAttribute('data-sitekey') : null;
+            }""")
+            
+            if site_key:
+                token = await solve_2captcha(site_key, page.url)
+                if token:
+                    # Inject token
+                    await page.evaluate(f'''
+                        document.getElementById("g-recaptcha-response").innerHTML = "{token}";
+                        if (typeof grecaptcha !== 'undefined') {{
+                            grecaptcha.getResponse = function() {{ return "{token}"; }};
+                        }}
+                    ''')
+                    log.info("lexington_probate.2captcha_success")
+                    return True
+                else:
+                    log.warning("lexington_probate.2captcha_no_token")
+            else:
+                log.warning("lexington_probate.no_sitekey")
+    except Exception as exc:
+        log.warning("lexington_probate.2captcha_failed", error=str(exc)[:200])
+    
+    # Strategy 2: Fallback to interactive flow (Claude vision or audio)
     anchor = await _find_anchor_frame(page)
     if anchor:
         try:
@@ -259,7 +296,7 @@ async def _do_captcha_flow(page, max_attempts: int = 8) -> bool:
     if await _get_recaptcha_response(page):
         return True
 
-    # Audio-solver loop
+    # Audio-solver loop (Claude vision built in)
     for attempt in range(max_attempts):
         challenge = await _find_challenge_frame(page)
         if not challenge:

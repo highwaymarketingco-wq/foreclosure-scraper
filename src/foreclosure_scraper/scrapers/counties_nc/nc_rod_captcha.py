@@ -1173,9 +1173,49 @@ class NcRodCaptchaScraper(BaseScraper):
                             continue
 
                     elif gate == "recaptcha":
+                        # Try 2Captcha first (paid but reliable), fallback to audio
                         try:
-                            from ...enrichment_recaptcha_audio import solve_recaptcha_v2
-                            gate_cleared = await solve_recaptcha_v2(page)
+                            from ...enrichment_2captcha import solve_recaptcha_v2 as solve_2captcha
+                            import os
+                            
+                            # Only try 2Captcha if API key is available
+                            has_2captcha = bool(os.environ.get("TWOCAPTCHA_API_KEY") or 
+                                              os.path.exists(os.path.expanduser("~/.secrets/2captcha_api_key.txt")) or
+                                              os.path.exists(".secrets/2captcha_api_key.txt"))
+                            
+                            if has_2captcha:
+                                log.info("nc_rod_captcha.trying_2captcha", county=county)
+                                # Extract site key from page
+                                site_key = await page.evaluate("""() => {
+                                    const el = document.querySelector('[data-sitekey]');
+                                    return el ? el.getAttribute('data-sitekey') : null;
+                                }""")
+                                
+                                if site_key:
+                                    current_url = page.url
+                                    token = await solve_2captcha(site_key, current_url)
+                                    
+                                    if token:
+                                        # Inject token into page
+                                        await page.evaluate(f'''
+                                            document.getElementById("g-recaptcha-response").innerHTML = "{token}";
+                                            if (typeof grecaptcha !== 'undefined') {{
+                                                grecaptcha.getResponse = function() {{ return "{token}"; }};
+                                            }}
+                                        ''')
+                                        log.info("nc_rod_captcha.2captcha_success", county=county)
+                                        gate_cleared = True
+                                    else:
+                                        log.warning("nc_rod_captcha.2captcha_no_token", county=county)
+                                else:
+                                    log.warning("nc_rod_captcha.no_sitekey", county=county)
+                            
+                            # Fallback to audio solver if 2Captcha not available or failed
+                            if not gate_cleared:
+                                log.info("nc_rod_captcha.trying_audio_fallback", county=county)
+                                from ...enrichment_recaptcha_audio import solve_recaptcha_v2
+                                gate_cleared = await solve_recaptcha_v2(page)
+                                
                         except Exception as exc:
                             log.warning("nc_rod_captcha.recaptcha_failed", county=county, error=str(exc)[:160])
 
