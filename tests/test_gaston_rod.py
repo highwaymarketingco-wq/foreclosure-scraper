@@ -212,3 +212,29 @@ async def test_enrich_gaston_rod_records_a_real_match_end_to_end(monkeypatch):
     assert stats["with_instruments"] == 1
     assert stats["with_mortgage"] == 1
     assert li.raw["rod"]["instrument_count"] == 2
+
+
+@pytest.mark.asyncio
+async def test_enrich_gaston_rod_stamps_a_genuine_empty_result_too(monkeypatch):
+    """FIXED 2026-11-25: a genuine 'searched, found nothing' result used to be
+    silently dropped (`if not rows: continue`), leaving li.raw with no 'rod' key
+    at all -- indistinguishable from 'never checked'. Confirmed live via
+    logs/gaston_rod_batch_continuous.log: 72 of 73 real cron runs found 0
+    instruments, and because nothing ever got stamped, the SAME small set of
+    early-stream rows got re-selected and re-searched every 10 minutes for over
+    a day, with near-zero real progress on the other ~24,500 target rows.
+    classify([]) must now get written just like a real match does."""
+    from types import SimpleNamespace
+
+    page = _FakePage([(200, "ok"), (200, "ok"), (200, "<html>Object reference not set</html>")])
+    monkeypatch.setattr(GR, "_run_stealthy", await _fake_run_stealthy_factory(page))
+    monkeypatch.setenv("FORECLOSURE_GASTON_ROD", "1")
+    li = SimpleNamespace(state="NC", county="Gaston", owner_name="NOBODY, HOME", raw={})
+    stats = await enrich_gaston_rod([li])
+    assert "error" not in stats
+    assert stats["searched"] == 1
+    assert stats["with_instruments"] == 0
+    assert "rod" in li.raw, "a genuine zero-hit result must still be stamped, or it looks unchecked forever"
+    assert li.raw["rod"]["instrument_count"] == 0
+    assert li.raw["rod"]["has_mortgage"] is False
+    assert li.raw["rod"]["has_adverse_lien"] is False

@@ -288,17 +288,33 @@ async def enrich_gaston_rod(listings, max_lookups: int | None = None) -> dict:
                 stats["wall_reason"] = str(exc)
                 return
             stats["searched"] += 1
-            if not rows:
-                continue
+            # FIXED 2026-11-25: the old `if not rows: continue` left a genuine
+            # "searched, found nothing" result completely unstamped -- confirmed
+            # live via scripts/supervise_gaston_rod_batch.sh's own cron log
+            # (logs/gaston_rod_batch_continuous.log): 72 of its 73 runs since
+            # 2026-11-24 found 0 instruments, and since NOTHING ever got written
+            # for a 0-result row, both this function's own re-check filter
+            # (above) and fill_gaston_rod_batch.py's _collect_targets() kept
+            # re-selecting the SAME small set of early-stream Gaston rows every
+            # 10 minutes for well over a day -- near-zero real progress toward
+            # the real target (24,531 rows) despite the cron "running
+            # successfully" by every process/HTTP-level signal. classify([])
+            # already produces the exact right "checked, 0 instruments" shape
+            # (instrument_count=0, has_mortgage/has_adverse_lien=False) -- no
+            # new shape needed, just stop skipping it. This also fixes a smaller
+            # secondary bug: the 0.4s rate-limit sleep was being skipped on
+            # every zero-hit search (the common case), so zero-hit lookups were
+            # firing back to back with no pacing at all.
             summary = classify(rows)
             if not isinstance(li.raw, dict):
                 li.raw = {}
             li.raw["rod"] = summary
-            stats["with_instruments"] += 1
-            if summary["has_mortgage"]:
-                stats["with_mortgage"] += 1
-            if summary["has_adverse_lien"]:
-                stats["with_adverse"] += 1
+            if rows:
+                stats["with_instruments"] += 1
+                if summary["has_mortgage"]:
+                    stats["with_mortgage"] += 1
+                if summary["has_adverse_lien"]:
+                    stats["with_adverse"] += 1
             await asyncio.sleep(0.4)
 
     try:
