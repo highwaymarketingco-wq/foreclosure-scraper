@@ -1,19 +1,19 @@
 {
  "buckets": 4,
  "counts": {
-  "confirmed": 7022,
-  "refuted": 65,
-  "rows": 8487,
-  "stale": 346,
+  "confirmed": 7313,
+  "refuted": 69,
+  "rows": 8786,
+  "stale": 350,
   "unconfirmed": 1054,
   "wall": 0
  },
- "generated_at": "2026-11-25T04:50:15Z",
+ "generated_at": "2026-11-25T05:09:21Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-25T04:50:14Z",
+  "at": "2026-11-25T05:09:20Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 300,
@@ -21,60 +21,60 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 250
+    "gis.buncombecounty.org": 199
    }
   },
   "result": {
    "checked": 300,
-   "confirmed": 92,
-   "refuted": 2,
-   "stale": 2,
-   "unconfirmed": 204
+   "confirmed": 291,
+   "refuted": 4,
+   "stale": 4,
+   "unconfirmed": 1
   },
-  "seconds": 518,
+  "seconds": 445,
   "selection": {
    "applies": 9615,
-   "due_new": 1371,
+   "due_new": 1072,
    "due_retry": 4,
    "due_ttl": 96,
-   "not_due_retry": 849,
-   "not_due_ttl": 7295,
+   "not_due_retry": 1052,
+   "not_due_ttl": 7391,
    "same_property_queued": 2
   },
   "source": null,
   "tier": null
  },
- "rows": 8487,
+ "rows": 8786,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4653229,
+   "bytes": 4801622,
    "file": "000.json",
-   "rows": 2188,
-   "sha256": "deeffc5804a16cfe754ab863998e1adbdfae803337670e6cffa788b98288ed58"
+   "rows": 2260,
+   "sha256": "0fb412acdcd364af63789d9f864e5c50838e0430ab545d0f4c5d7f88a29bab1d"
   },
   {
    "bucket": 1,
-   "bytes": 4499325,
+   "bytes": 4641381,
    "file": "001.json",
-   "rows": 2128,
-   "sha256": "f991b3594016a3c178460ddce91d187e32ec8d6283902766f1a5b66705c7f39d"
+   "rows": 2198,
+   "sha256": "05dfa7fb04f795291711d3962e80b7894232bdb5abacaa3fe13f78c3ac28f50d"
   },
   {
    "bucket": 2,
-   "bytes": 4396413,
+   "bytes": 4572841,
    "file": "002.json",
-   "rows": 2069,
-   "sha256": "4f364dcb2468545d88bd18e585c94d9f67c68953dcaae92ffebc8399ea9b655a"
+   "rows": 2154,
+   "sha256": "dd4d94d814634473817fee5ab192c9791229588c2913e6bbf5ac60ed9b77f1af"
   },
   {
    "bucket": 3,
-   "bytes": 4460521,
+   "bytes": 4611614,
    "file": "003.json",
-   "rows": 2102,
-   "sha256": "0122bd77639ce24d1f95bca42a17ce98d08cf33d71e05f644af587530f0f38d2"
+   "rows": 2174,
+   "sha256": "288757599c83b7a40b0dc482bebd13f9abfd01de9e176fafc29110c0ca237d1f"
   }
  ],
  "signal": "comps",
