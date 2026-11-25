@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
 # Self-looping comps/comps_tight backfill sweep (2026-11-11).
 #
-# Cycles backfill_comps.py across the three biggest known gaps (Mecklenburg,
-# Wake, Buncombe -- 57,151 comps_tight rows between them, per
-# docs/gap_matrix/low_yield_queue.md) plus a periodic no-filter pass that
-# sweeps board order for the other ~146 counties' smaller gaps (149
-# county-cells, 296,464 comps_tight rows total board-wide).
+# Cycles backfill_comps.py across the biggest known gaps plus a periodic
+# no-filter pass that sweeps board order for the rest. UPDATED 2026-11-25:
+# the original three (Mecklenburg, Wake, Buncombe -- 57,151 comps_tight rows
+# combined, per docs/gap_matrix/low_yield_queue.md, itself generated from the
+# 2026-11-04 gap list) were stale -- a fresh gap_matrix run same day found
+# York (80,660 comps_tight rows) and Spartanburg (39,001) each bigger than
+# any single one of the original three, and together more than double all
+# three combined. Added both rather than replacing the original three, since
+# nothing here suggested Mecklenburg/Wake/Buncombe stopped being real gaps,
+# just that they're no longer the ONLY big ones. Re-check docs/gap_matrix's
+# freshest gap_list before assuming this 5-county set is still current.
 #
 # NO `|| break` ANYWHERE -- a bare BoardLockBusy exit (code 1, this board has
 # many concurrent writers tonight) must not kill the loop; it just means this
@@ -31,7 +37,7 @@ ITERATIONS=400
 
 mkdir -p logs
 
-COUNTIES=("Mecklenburg:NC" "Wake:NC" "Buncombe:NC" "")
+COUNTIES=("Mecklenburg:NC" "Wake:NC" "Buncombe:NC" "York:SC" "Spartanburg:SC" "")
 
 i=0
 while [ "$i" -lt "$ITERATIONS" ]; do
