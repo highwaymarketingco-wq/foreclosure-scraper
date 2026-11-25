@@ -3,39 +3,29 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 3583,
+  "rows": 3633,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 3583
+  "wall": 3633
  },
- "generated_at": "2026-11-25T19:27:02Z",
+ "generated_at": "2026-11-25T20:06:04Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-25T19:27:02Z",
+  "at": "2026-11-25T20:06:04Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
   "recheck_only": false,
   "requests": {
-   "errors": {
-    "roster:anderson-so-sc.zuercherportal.com": 1
-   },
+   "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 71,
-    "portal-nc.tylertech.cloud": 40,
-    "roster:74.218.167.200": 1,
-    "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:buncombecountyso.policetocitizen.com": 1,
-    "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:laurens-911-sc.zuercherportal.com": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "roster:oconee-so-sc.zuercherportal.com": 1,
-    "roster:tepsweb.cityofgastonia.com": 1,
-    "services.nconemap.gov": 50,
+    "gis.buncombecounty.org": 61,
+    "portal-nc.tylertech.cloud": 36,
+    "services.nconemap.gov": 51,
     "services1.arcgis.com": 7,
-    "vt.ncsbe.gov": 141,
+    "vt.ncsbe.gov": 138,
     "www.courtlistener.com": 2
    }
   },
@@ -43,25 +33,25 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 863,
+  "seconds": 792,
   "selection": {
    "applies": 9035,
-   "due_new": 5349,
-   "not_due_ttl": 3686
+   "due_new": 5299,
+   "not_due_ttl": 3736
   },
   "source": null,
   "tier": null
  },
- "rows": 3583,
+ "rows": 3633,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 2744724,
+   "bytes": 2782435,
    "file": "000.json",
-   "rows": 3583,
-   "sha256": "7b124cf184811f16f48d87061ff37e3dd9e9a55e8fa00341982ec6c77fd6564b"
+   "rows": 3633,
+   "sha256": "73f95dcac8db86544fa33cd34b0a913cf7c9c13ab01d6630a8938df3b9fcc03f"
   }
  ],
  "signal": "court_wall",

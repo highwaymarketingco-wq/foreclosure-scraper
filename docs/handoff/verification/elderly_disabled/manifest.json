@@ -1,71 +1,62 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 7658,
+  "confirmed": 7706,
   "refuted": 99,
-  "rows": 7924,
+  "rows": 7974,
   "stale": 59,
-  "unconfirmed": 108,
+  "unconfirmed": 110,
   "wall": 0
  },
- "generated_at": "2026-11-25T19:27:03Z",
+ "generated_at": "2026-11-25T20:06:05Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-25T19:27:03Z",
+  "at": "2026-11-25T20:06:04Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
   "recheck_only": false,
   "requests": {
-   "errors": {
-    "roster:anderson-so-sc.zuercherportal.com": 1
-   },
+   "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 71,
-    "portal-nc.tylertech.cloud": 40,
-    "roster:74.218.167.200": 1,
-    "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:buncombecountyso.policetocitizen.com": 1,
-    "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:laurens-911-sc.zuercherportal.com": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "roster:oconee-so-sc.zuercherportal.com": 1,
-    "roster:tepsweb.cityofgastonia.com": 1,
-    "services.nconemap.gov": 50,
+    "gis.buncombecounty.org": 61,
+    "portal-nc.tylertech.cloud": 36,
+    "services.nconemap.gov": 51,
     "services1.arcgis.com": 7,
-    "vt.ncsbe.gov": 141,
+    "vt.ncsbe.gov": 138,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 50
+   "confirmed": 48,
+   "unconfirmed": 2
   },
-  "seconds": 863,
+  "seconds": 792,
   "selection": {
    "applies": 140892,
-   "due_new": 132046,
+   "due_new": 131996,
    "due_retry": 3,
    "due_version": 1,
    "not_due_retry": 96,
-   "not_due_ttl": 8746,
+   "not_due_ttl": 8796,
    "same_property_queued": 1
   },
   "source": null,
   "tier": null
  },
- "rows": 7924,
+ "rows": 7974,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 8099664,
+   "bytes": 8162568,
    "file": "000.json",
-   "rows": 7924,
-   "sha256": "377795bca1b87389159606f70cc9534de6f2b515cb52603f65daeed38eb0f01b"
+   "rows": 7974,
+   "sha256": "173f5f60d01c388d4839649cba31dfcb70edf6566bb92186543300f9c39fb3dd"
   }
  ],
  "signal": "elderly_disabled",

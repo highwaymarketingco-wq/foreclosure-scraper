@@ -3,39 +3,29 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 2308,
+  "rows": 2358,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 2308
+  "wall": 2358
  },
- "generated_at": "2026-11-25T19:27:03Z",
+ "generated_at": "2026-11-25T20:06:04Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-25T19:27:02Z",
+  "at": "2026-11-25T20:06:04Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
   "recheck_only": false,
   "requests": {
-   "errors": {
-    "roster:anderson-so-sc.zuercherportal.com": 1
-   },
+   "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 71,
-    "portal-nc.tylertech.cloud": 40,
-    "roster:74.218.167.200": 1,
-    "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:buncombecountyso.policetocitizen.com": 1,
-    "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:laurens-911-sc.zuercherportal.com": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "roster:oconee-so-sc.zuercherportal.com": 1,
-    "roster:tepsweb.cityofgastonia.com": 1,
-    "services.nconemap.gov": 50,
+    "gis.buncombecounty.org": 61,
+    "portal-nc.tylertech.cloud": 36,
+    "services.nconemap.gov": 51,
     "services1.arcgis.com": 7,
-    "vt.ncsbe.gov": 141,
+    "vt.ncsbe.gov": 138,
     "www.courtlistener.com": 2
    }
   },
@@ -43,25 +33,25 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 863,
+  "seconds": 792,
   "selection": {
    "applies": 4916,
-   "due_new": 2641,
-   "not_due_ttl": 2275
+   "due_new": 2591,
+   "not_due_ttl": 2325
   },
   "source": null,
   "tier": null
  },
- "rows": 2308,
+ "rows": 2358,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 1988651,
+   "bytes": 2031986,
    "file": "000.json",
-   "rows": 2308,
-   "sha256": "1b835a07305bc552d96e9401943d9c523e8def03ef645f032909c519ddb2eb74"
+   "rows": 2358,
+   "sha256": "014338adb92a3468da9caa4107840e9373fe033f27f409f59e3f8cd96aa1e07a"
   }
  ],
  "signal": "divorce",

@@ -1,41 +1,31 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 2499,
+  "confirmed": 2549,
   "refuted": 537,
-  "rows": 3277,
+  "rows": 3327,
   "stale": 225,
   "unconfirmed": 16,
   "wall": 0
  },
- "generated_at": "2026-11-25T19:27:02Z",
+ "generated_at": "2026-11-25T20:06:04Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-25T19:27:02Z",
+  "at": "2026-11-25T20:06:04Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
   "recheck_only": false,
   "requests": {
-   "errors": {
-    "roster:anderson-so-sc.zuercherportal.com": 1
-   },
+   "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 71,
-    "portal-nc.tylertech.cloud": 40,
-    "roster:74.218.167.200": 1,
-    "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:buncombecountyso.policetocitizen.com": 1,
-    "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:laurens-911-sc.zuercherportal.com": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "roster:oconee-so-sc.zuercherportal.com": 1,
-    "roster:tepsweb.cityofgastonia.com": 1,
-    "services.nconemap.gov": 50,
+    "gis.buncombecounty.org": 61,
+    "portal-nc.tylertech.cloud": 36,
+    "services.nconemap.gov": 51,
     "services1.arcgis.com": 7,
-    "vt.ncsbe.gov": 141,
+    "vt.ncsbe.gov": 138,
     "www.courtlistener.com": 2
    }
   },
@@ -43,27 +33,27 @@
    "checked": 50,
    "confirmed": 50
   },
-  "seconds": 863,
+  "seconds": 792,
   "selection": {
    "applies": 11927,
-   "due_new": 8581,
+   "due_new": 8531,
    "due_ttl": 112,
    "not_due_retry": 22,
-   "not_due_ttl": 3212
+   "not_due_ttl": 3262
   },
   "source": null,
   "tier": null
  },
- "rows": 3277,
+ "rows": 3327,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 3662862,
+   "bytes": 3724077,
    "file": "000.json",
-   "rows": 3277,
-   "sha256": "45f7e534b9897808667112f8e7cdf82e27a2edef4cf7f94fbf597de6f2af2cf2"
+   "rows": 3327,
+   "sha256": "6435a071e32292f61cb444a5d1b1ddfd9ebb869a28f45093b43ecf3acbbf40e2"
   }
  ],
  "signal": "code_enforcement",
