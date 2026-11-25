@@ -1,69 +1,79 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 8515,
+  "confirmed": 8544,
   "refuted": 26,
-  "rows": 9853,
-  "stale": 1084,
-  "unconfirmed": 228,
+  "rows": 9901,
+  "stale": 1098,
+  "unconfirmed": 233,
   "wall": 0
  },
- "generated_at": "2026-11-25T18:35:15Z",
+ "generated_at": "2026-11-25T19:27:05Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-25T18:35:14Z",
+  "at": "2026-11-25T19:27:05Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
   "recheck_only": false,
   "requests": {
-   "errors": {},
+   "errors": {
+    "roster:anderson-so-sc.zuercherportal.com": 1
+   },
    "requests": {
-    "gis.buncombecounty.org": 70,
-    "portal-nc.tylertech.cloud": 36,
-    "services.nconemap.gov": 51,
+    "gis.buncombecounty.org": 71,
+    "portal-nc.tylertech.cloud": 40,
+    "roster:74.218.167.200": 1,
+    "roster:anderson-so-sc.zuercherportal.com": 1,
+    "roster:buncombecountyso.policetocitizen.com": 1,
+    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
+    "roster:oconee-so-sc.zuercherportal.com": 1,
+    "roster:tepsweb.cityofgastonia.com": 1,
+    "services.nconemap.gov": 50,
     "services1.arcgis.com": 7,
-    "vt.ncsbe.gov": 144,
+    "vt.ncsbe.gov": 141,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 22,
-   "stale": 15,
-   "unconfirmed": 13
+   "confirmed": 29,
+   "stale": 14,
+   "unconfirmed": 7
   },
-  "seconds": 787,
+  "seconds": 863,
   "selection": {
    "applies": 25671,
-   "due_new": 16171,
+   "due_new": 16123,
    "due_retry": 3,
    "due_ttl": 670,
-   "not_due_retry": 225,
-   "not_due_ttl": 8602
+   "not_due_retry": 236,
+   "not_due_ttl": 8639
   },
   "source": null,
   "tier": null
  },
- "rows": 9853,
+ "rows": 9901,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 6130148,
+   "bytes": 6162227,
    "file": "000.json",
-   "rows": 4964,
-   "sha256": "0dfcf7fb146008dc35fea3cb48d1470ae6485128a6e66ffbfbd8ab7dfa71a679"
+   "rows": 4991,
+   "sha256": "34356467815caee8aa5b1709c51c3a51125cc25f6dfa340343f0aba000458bf0"
   },
   {
    "bucket": 1,
-   "bytes": 6043016,
+   "bytes": 6068020,
    "file": "001.json",
-   "rows": 4889,
-   "sha256": "147493160172fe4281c1c3d35a169b1080efdc54c76dbbd97c942997fcf2f449"
+   "rows": 4910,
+   "sha256": "e61c1acc0eaef862cdbdb550f3f2701f3dd8fd143e6e7e8e8c8b2d51cb815e7b"
   }
  ],
  "signal": "nc_ecourts_case",

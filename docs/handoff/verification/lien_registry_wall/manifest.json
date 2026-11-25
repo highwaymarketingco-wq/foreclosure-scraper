@@ -3,29 +3,39 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 2060,
+  "rows": 2110,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 2060
+  "wall": 2110
  },
- "generated_at": "2026-11-25T18:35:14Z",
+ "generated_at": "2026-11-25T19:27:05Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-25T18:35:14Z",
+  "at": "2026-11-25T19:27:05Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
   "recheck_only": false,
   "requests": {
-   "errors": {},
+   "errors": {
+    "roster:anderson-so-sc.zuercherportal.com": 1
+   },
    "requests": {
-    "gis.buncombecounty.org": 70,
-    "portal-nc.tylertech.cloud": 36,
-    "services.nconemap.gov": 51,
+    "gis.buncombecounty.org": 71,
+    "portal-nc.tylertech.cloud": 40,
+    "roster:74.218.167.200": 1,
+    "roster:anderson-so-sc.zuercherportal.com": 1,
+    "roster:buncombecountyso.policetocitizen.com": 1,
+    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
+    "roster:oconee-so-sc.zuercherportal.com": 1,
+    "roster:tepsweb.cityofgastonia.com": 1,
+    "services.nconemap.gov": 50,
     "services1.arcgis.com": 7,
-    "vt.ncsbe.gov": 144,
+    "vt.ncsbe.gov": 141,
     "www.courtlistener.com": 2
    }
   },
@@ -33,25 +43,26 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 787,
+  "seconds": 863,
   "selection": {
    "applies": 66565,
-   "due_new": 64510,
-   "not_due_ttl": 2055
+   "due_new": 64460,
+   "not_due_ttl": 2105,
+   "same_property_queued": 2
   },
   "source": null,
   "tier": null
  },
- "rows": 2060,
+ "rows": 2110,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 1850178,
+   "bytes": 1894565,
    "file": "000.json",
-   "rows": 2060,
-   "sha256": "1d51be9ba586bb3e83b06dedc855ec033c90b741ac2fdbb2c73a7e62ef660938"
+   "rows": 2110,
+   "sha256": "90bc17e3e47ef0897d343ac12df08d752e3e36d1f187522a8599b4c5586e12b2"
   }
  ],
  "signal": "lien_registry_wall",
