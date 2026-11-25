@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 16267,
+  "confirmed": 16317,
   "refuted": 11,
-  "rows": 16504,
+  "rows": 16554,
   "stale": 46,
   "unconfirmed": 180,
   "wall": 0
  },
- "generated_at": "2026-11-25T20:54:35Z",
+ "generated_at": "2026-11-25T21:31:11Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-25T20:54:34Z",
+  "at": "2026-11-25T21:31:09Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,11 +21,11 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 62,
+    "gis.buncombecounty.org": 86,
     "portal-nc.tylertech.cloud": 41,
     "services.nconemap.gov": 50,
     "services1.arcgis.com": 7,
-    "vt.ncsbe.gov": 141,
+    "vt.ncsbe.gov": 144,
     "www.courtlistener.com": 2
    }
   },
@@ -33,36 +33,36 @@
    "checked": 50,
    "confirmed": 50
   },
-  "seconds": 723,
+  "seconds": 819,
   "selection": {
    "applies": 44671,
-   "due_new": 28273,
-   "due_retry": 45,
+   "due_new": 28223,
+   "due_retry": 46,
    "due_retry_transient": 24,
    "due_ttl": 432,
-   "not_due_retry": 107,
-   "not_due_ttl": 15790
+   "not_due_retry": 106,
+   "not_due_ttl": 15840
   },
   "source": null,
   "tier": null
  },
- "rows": 16504,
+ "rows": 16554,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 7909578,
+   "bytes": 7934779,
    "file": "000.json",
-   "rows": 8314,
-   "sha256": "fa2186bebfb565ea9a8b36b4eb7ba2bab100a17306c5b102a6e2951b9a7153b6"
+   "rows": 8340,
+   "sha256": "1843fb03989020792a03ac322ef5dc24d71b35dcc98d597418692dd6f4c41d4a"
   },
   {
    "bucket": 1,
-   "bytes": 7798431,
+   "bytes": 7821741,
    "file": "001.json",
-   "rows": 8190,
-   "sha256": "301554a1abecfadda0d13317be2c43b6331681203edc6e331a6d12dae5ad3417"
+   "rows": 8214,
+   "sha256": "053f8258a80b426e32ec6b4b989cd98647cb1acacefe45b61be507771c1880dd"
   }
  ],
  "signal": "heir_roll",

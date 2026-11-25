@@ -8,12 +8,12 @@
   "unconfirmed": 194,
   "wall": 0
  },
- "generated_at": "2026-11-25T20:54:32Z",
+ "generated_at": "2026-11-25T21:31:06Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-25T20:54:32Z",
+  "at": "2026-11-25T21:31:06Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,11 +21,11 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 62,
+    "gis.buncombecounty.org": 86,
     "portal-nc.tylertech.cloud": 41,
     "services.nconemap.gov": 50,
     "services1.arcgis.com": 7,
-    "vt.ncsbe.gov": 141,
+    "vt.ncsbe.gov": 144,
     "www.courtlistener.com": 2
    }
   },
@@ -33,7 +33,7 @@
    "checked": 7,
    "unconfirmed": 7
   },
-  "seconds": 723,
+  "seconds": 819,
   "selection": {
    "applies": 465,
    "due_ttl": 7,
@@ -52,7 +52,7 @@
    "bytes": 630380,
    "file": "000.json",
    "rows": 571,
-   "sha256": "c72ec42844e388d46564b3b6bc0771c4c20ed3d14d0890f0b90832422cdff4c7"
+   "sha256": "a95c18dbaefdf7494aeeaf7ea009dd831b4e28b5cde6c96e31139d2dff3b4c06"
   }
  ],
  "signal": "bankruptcy_stay",
