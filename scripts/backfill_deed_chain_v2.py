@@ -25,12 +25,47 @@ Fixed with a genuine two-pass, bounded-memory design:
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "src"))
+
+# AUTO-RESUME (2026-11-25). Found live via gap_matrix.py: despite the two board_lock retry
+# fixes above both confirmed firing-and-succeeding, real board coverage for deed_chain_fetched
+# and its 3 dependents had NOT moved AT ALL since the 2026-11-24 baseline (covered=129,900,
+# identical digit-for-digit in both runs). Root cause: this script's own --skip-rows flag
+# already existed for manual resume, but the standing wrapper
+# (for i in $(seq 1 1000); do python3.12 scripts/backfill_deed_chain_v2.py --allow-large; ...)
+# never passes it, so EVERY crash-and-relaunch starts pass 2 over at row 0. Every "deed_chain.done"
+# line logged this session shows IDENTICAL stamped/cleared counts for the first one or two
+# batches -- direct proof the run has never gotten past ~40,000 of 633,730 rows before something
+# (lock contention, a future exception type, host load) ends it, no matter how robust a single
+# flush() is. This file persists the last successfully-flushed row boundary locally (per host,
+# not git-tracked -- logs/ is gitignored) so a relaunch resumes instead of redoing the same
+# early rows forever; a full clean finish resets it to 0 so the next natural pass re-scans
+# everything (to pick up newly added/changed rows), rather than resuming into "0 rows left"
+# forever.
+_RESUME_FILE = REPO / "logs" / "deed_chain_v2_resume.json"
+
+
+def _load_resume_skip() -> int:
+    try:
+        return max(0, int(json.loads(_RESUME_FILE.read_text())["skip_rows"]))
+    except (OSError, ValueError, KeyError, TypeError):
+        return 0
+
+
+def _save_resume_skip(n: int) -> None:
+    from datetime import datetime, timezone
+    try:
+        _RESUME_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _RESUME_FILE.write_text(json.dumps(
+            {"skip_rows": n, "updated_at": datetime.now(timezone.utc).isoformat()}))
+    except OSError:
+        pass  # resume is a throughput optimization, never worth failing the run over
 
 from foreclosure_scraper.board_stream import iter_board_rows  # noqa: E402
 from foreclosure_scraper.block_binding import FALLBACK_POINT_MIN_ROWS  # noqa: E402
@@ -70,13 +105,16 @@ def main() -> int:
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--allow-large", action="store_true")
     ap.add_argument("--batch-size", type=int, default=20000)
-    ap.add_argument("--skip-rows", type=int, default=0,
-                     help="Resume support: skip this many streamed rows before batching (the "
-                          "22 batches already written this session covered rows 1-440,000; a "
-                          "transient BoardIntegrityError crashed the setup for the final ~7,664-"
-                          "row tail, re-confirmed clean on a fresh read -- no need to redo "
-                          "everything already successfully patched).")
+    ap.add_argument("--skip-rows", type=int, default=None,
+                     help="Resume support: skip this many streamed rows before batching. If "
+                          "omitted (the normal case -- the standing wrapper never passes this), "
+                          "auto-resumes from logs/deed_chain_v2_resume.json, the last row "
+                          "boundary this host successfully flushed. Pass 0 explicitly to force "
+                          "a full fresh pass, ignoring any saved resume point.")
     args = ap.parse_args()
+    skip_rows = args.skip_rows if args.skip_rows is not None else _load_resume_skip()
+    if skip_rows:
+        print(f"resuming: skipping {skip_rows:,} rows already flushed by a prior run")
 
     docs_dir = REPO / "docs"
     if not args.dry_run:
@@ -173,7 +211,7 @@ def main() -> int:
     print("pass 2: streaming board in batches...")
     for rec in iter_board_rows(docs_dir / "listings.json.gz"):
         total_rows += 1
-        if total_rows <= args.skip_rows:
+        if total_rows <= skip_rows:
             continue
         raw = rec.get("raw") if isinstance(rec.get("raw"), dict) else {}
         had_before = bool(raw.get("deed_chain"))
@@ -189,7 +227,14 @@ def main() -> int:
             print(f"  batch at row {total_rows:,}...")
             flush(batch)
             batch = []
+            if not args.dry_run:
+                _save_resume_skip(total_rows)
     flush(batch)
+    if not args.dry_run:
+        # reached the end clean -- reset to 0 so the next natural pass re-scans the whole
+        # board (new/changed rows since this run), instead of resuming into "nothing left"
+        # forever.
+        _save_resume_skip(0)
 
     print(f"\nboard rows: {total_rows:,}")
     print(f"rows with deed_chain before: {before_count:,}")
