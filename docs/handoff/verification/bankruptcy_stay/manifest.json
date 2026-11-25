@@ -8,12 +8,12 @@
   "unconfirmed": 194,
   "wall": 0
  },
- "generated_at": "2026-11-25T07:07:09Z",
+ "generated_at": "2026-11-25T09:16:36Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-25T07:07:09Z",
+  "at": "2026-11-25T09:16:36Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,18 +21,19 @@
   "requests": {
    "errors": {},
    "requests": {
-    "arcserver2.oconeesc.com": 30,
-    "gis.buncombecounty.org": 50,
-    "gis.charlottenc.gov": 26,
-    "portal-nc.tylertech.cloud": 42,
-    "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:mugshots.spartanburgsheriff.org": 1,
-    "roster:pickens-so-sc.zuercherportal.com": 1,
+    "devsvcs.gastonianc.gov": 6,
+    "gis.buncombecounty.org": 51,
+    "portal-nc.tylertech.cloud": 31,
+    "rockhillgis.cityofrockhill.com": 3,
+    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "roster:forsythsheriffnc.policetocitizen.com": 1,
+    "roster:injail.catawbacountync.gov": 1,
+    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
+    "roster:p2c.lincolnsheriff.org": 1,
     "roster:tepsweb.cityofgastonia.com": 1,
-    "roster:union-so-sc.zuercherportal.com": 1,
-    "services.nconemap.gov": 1,
-    "services1.arcgis.com": 19,
-    "vt.ncsbe.gov": 141,
+    "roster:www2.dconc.gov": 1,
+    "services.nconemap.gov": 50,
+    "vt.ncsbe.gov": 135,
     "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
@@ -41,7 +42,7 @@
    "checked": 7,
    "unconfirmed": 7
   },
-  "seconds": 627,
+  "seconds": 593,
   "selection": {
    "applies": 465,
    "due_ttl": 7,
@@ -60,7 +61,7 @@
    "bytes": 630380,
    "file": "000.json",
    "rows": 571,
-   "sha256": "4aa33461031f3afe583dff4a34086f91f2fc7968863f529b37b3ef65b3e34389"
+   "sha256": "8b2fec9e9065b7be89e96d185ba9084e70cf4e25f324cc1af79d75c1d4aa5890"
   }
  ],
  "signal": "bankruptcy_stay",

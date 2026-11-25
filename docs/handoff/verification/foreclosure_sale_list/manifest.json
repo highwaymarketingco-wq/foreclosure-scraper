@@ -8,12 +8,12 @@
   "unconfirmed": 80,
   "wall": 0
  },
- "generated_at": "2026-11-25T07:07:10Z",
+ "generated_at": "2026-11-25T09:16:38Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-25T07:07:10Z",
+  "at": "2026-11-25T09:16:38Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,18 +21,19 @@
   "requests": {
    "errors": {},
    "requests": {
-    "arcserver2.oconeesc.com": 30,
-    "gis.buncombecounty.org": 50,
-    "gis.charlottenc.gov": 26,
-    "portal-nc.tylertech.cloud": 42,
-    "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:mugshots.spartanburgsheriff.org": 1,
-    "roster:pickens-so-sc.zuercherportal.com": 1,
+    "devsvcs.gastonianc.gov": 6,
+    "gis.buncombecounty.org": 51,
+    "portal-nc.tylertech.cloud": 31,
+    "rockhillgis.cityofrockhill.com": 3,
+    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "roster:forsythsheriffnc.policetocitizen.com": 1,
+    "roster:injail.catawbacountync.gov": 1,
+    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
+    "roster:p2c.lincolnsheriff.org": 1,
     "roster:tepsweb.cityofgastonia.com": 1,
-    "roster:union-so-sc.zuercherportal.com": 1,
-    "services.nconemap.gov": 1,
-    "services1.arcgis.com": 19,
-    "vt.ncsbe.gov": 141,
+    "roster:www2.dconc.gov": 1,
+    "services.nconemap.gov": 50,
+    "vt.ncsbe.gov": 135,
     "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
@@ -42,13 +43,13 @@
    "confirmed": 11,
    "unconfirmed": 39
   },
-  "seconds": 627,
+  "seconds": 593,
   "selection": {
    "applies": 418,
    "due_new": 1,
-   "due_ttl": 165,
+   "due_ttl": 228,
    "not_due_retry": 81,
-   "not_due_ttl": 171
+   "not_due_ttl": 108
   },
   "source": null,
   "tier": null
@@ -59,10 +60,10 @@
  "shards": [
   {
    "bucket": 0,
-   "bytes": 477656,
+   "bytes": 479320,
    "file": "000.json",
    "rows": 420,
-   "sha256": "7a1059ecd1248c25c9a75a7fa878014138a1188f043fadaaec6c6c29ef62c0ae"
+   "sha256": "17a0220f9342a21782ab5794bbe72b2d370ffd494d5cd475a1924890e7b566e6"
   }
  ],
  "signal": "foreclosure_sale_list",
