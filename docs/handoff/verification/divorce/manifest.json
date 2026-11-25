@@ -3,17 +3,17 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 1308,
+  "rows": 1358,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 1308
+  "wall": 1358
  },
- "generated_at": "2026-11-25T01:08:57Z",
+ "generated_at": "2026-11-25T01:30:41Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-25T01:08:56Z",
+  "at": "2026-11-25T01:30:41Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,13 +21,12 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 52,
-    "gis.charlottenc.gov": 24,
+    "gis.buncombecounty.org": 50,
+    "gis.charlottenc.gov": 100,
     "mapping.mitchellcountync.gov": 50,
     "maps.spartanburgcounty.org": 50,
-    "portal-nc.tylertech.cloud": 38,
-    "services1.arcgis.com": 4,
-    "vt.ncsbe.gov": 141,
+    "portal-nc.tylertech.cloud": 40,
+    "vt.ncsbe.gov": 144,
     "www.courtlistener.com": 2
    }
   },
@@ -35,26 +34,26 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 719,
+  "seconds": 839,
   "selection": {
    "applies": 4916,
-   "due_new": 3657,
-   "not_due_ttl": 1259,
+   "due_new": 3607,
+   "not_due_ttl": 1309,
    "same_property_queued": 1
   },
   "source": null,
   "tier": null
  },
- "rows": 1308,
+ "rows": 1358,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 1129033,
+   "bytes": 1172276,
    "file": "000.json",
-   "rows": 1308,
-   "sha256": "b4de524aaf7740e54234333254167114cc00232292eec22012ec347838c6b6d1"
+   "rows": 1358,
+   "sha256": "4a3621515443d49c5b6a528d11a95ebf0f9bd92f30aa4313c6c3f6522ce5da71"
   }
  ],
  "signal": "divorce",
