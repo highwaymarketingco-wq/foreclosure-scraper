@@ -1,19 +1,19 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 6932,
+  "confirmed": 6982,
   "refuted": 99,
-  "rows": 7174,
+  "rows": 7224,
   "stale": 59,
   "unconfirmed": 84,
   "wall": 0
  },
- "generated_at": "2026-11-25T03:34:33Z",
+ "generated_at": "2026-11-25T03:55:57Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-25T03:34:33Z",
+  "at": "2026-11-25T03:55:57Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,54 +21,55 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 72,
-    "gis.charlottenc.gov": 80,
-    "gisweb.hendersoncountync.gov": 2,
-    "maps.spartanburgcounty.org": 5,
-    "portal-nc.tylertech.cloud": 41,
-    "rockhillgis.cityofrockhill.com": 3,
+    "gis.buncombecounty.org": 66,
+    "gis.charlottenc.gov": 100,
+    "laurenscountygis.org": 14,
+    "maps.spartanburgcounty.org": 9,
+    "portal-nc.tylertech.cloud": 42,
+    "roster:anderson-so-sc.zuercherportal.com": 1,
+    "roster:apps.alamance-nc.com": 1,
     "roster:buncombecountyso.policetocitizen.com": 1,
-    "roster:cc.southernsoftware.com": 2,
     "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:guilfordcountysheriff.policetocitizen.com": 1,
+    "roster:cumberlandsheriffnc.gov": 1,
+    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
+    "roster:p2c.lincolnsheriff.org": 1,
+    "roster:p2c.nhcgov.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
-    "roster:rowancountync.policetocitizen.com": 1,
-    "roster:www2.co.davidson.nc.us": 1,
-    "services1.arcgis.com": 13,
-    "services9.arcgis.com": 50,
-    "vt.ncsbe.gov": 126,
-    "webgis2.durhamnc.gov": 3,
+    "roster:union-so-sc.zuercherportal.com": 1,
+    "roster:wakeso.policetocitizen.com": 1,
+    "services.nconemap.gov": 24,
+    "services1.arcgis.com": 4,
+    "vt.ncsbe.gov": 75,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 43,
-   "unconfirmed": 7
+   "confirmed": 50
   },
-  "seconds": 1072,
+  "seconds": 845,
   "selection": {
    "applies": 140892,
-   "due_new": 132796,
+   "due_new": 132746,
    "due_retry": 3,
    "due_version": 1,
-   "not_due_retry": 65,
-   "not_due_ttl": 8027,
+   "not_due_retry": 72,
+   "not_due_ttl": 8070,
    "same_property_queued": 1
   },
   "source": null,
   "tier": null
  },
- "rows": 7174,
+ "rows": 7224,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 7155952,
+   "bytes": 7218279,
    "file": "000.json",
-   "rows": 7174,
-   "sha256": "67c248f389d057c3b1c569f6acca93ff26a24e9dd9392f864e85c8974a67de28"
+   "rows": 7224,
+   "sha256": "8e87b45fc400779d9945be2a1956da609b8b0a25714eda2234c762ea5c69eb5c"
   }
  ],
  "signal": "elderly_disabled",

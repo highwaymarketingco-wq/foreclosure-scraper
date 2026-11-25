@@ -3,17 +3,17 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 2833,
+  "rows": 2883,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 2833
+  "wall": 2883
  },
- "generated_at": "2026-11-25T03:34:33Z",
+ "generated_at": "2026-11-25T03:55:57Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-25T03:34:33Z",
+  "at": "2026-11-25T03:55:57Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,23 +21,25 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 72,
-    "gis.charlottenc.gov": 80,
-    "gisweb.hendersoncountync.gov": 2,
-    "maps.spartanburgcounty.org": 5,
-    "portal-nc.tylertech.cloud": 41,
-    "rockhillgis.cityofrockhill.com": 3,
+    "gis.buncombecounty.org": 66,
+    "gis.charlottenc.gov": 100,
+    "laurenscountygis.org": 14,
+    "maps.spartanburgcounty.org": 9,
+    "portal-nc.tylertech.cloud": 42,
+    "roster:anderson-so-sc.zuercherportal.com": 1,
+    "roster:apps.alamance-nc.com": 1,
     "roster:buncombecountyso.policetocitizen.com": 1,
-    "roster:cc.southernsoftware.com": 2,
     "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:guilfordcountysheriff.policetocitizen.com": 1,
+    "roster:cumberlandsheriffnc.gov": 1,
+    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
+    "roster:p2c.lincolnsheriff.org": 1,
+    "roster:p2c.nhcgov.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
-    "roster:rowancountync.policetocitizen.com": 1,
-    "roster:www2.co.davidson.nc.us": 1,
-    "services1.arcgis.com": 13,
-    "services9.arcgis.com": 50,
-    "vt.ncsbe.gov": 126,
-    "webgis2.durhamnc.gov": 3,
+    "roster:union-so-sc.zuercherportal.com": 1,
+    "roster:wakeso.policetocitizen.com": 1,
+    "services.nconemap.gov": 24,
+    "services1.arcgis.com": 4,
+    "vt.ncsbe.gov": 75,
     "www.courtlistener.com": 2
    }
   },
@@ -45,26 +47,26 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 1072,
+  "seconds": 845,
   "selection": {
    "applies": 9035,
-   "due_new": 6104,
-   "not_due_ttl": 2931,
-   "same_property_queued": 2
+   "due_new": 6052,
+   "not_due_ttl": 2983,
+   "same_property_queued": 3
   },
   "source": null,
   "tier": null
  },
- "rows": 2833,
+ "rows": 2883,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 2178131,
+   "bytes": 2215327,
    "file": "000.json",
-   "rows": 2833,
-   "sha256": "2f04a4b11ad2a25d8a53596c98e7dae8d1fbe9174bf06801edab8f7c5441d354"
+   "rows": 2883,
+   "sha256": "72daa702e03aca96bc642381923afa1b003e4866b0f363b3f274e2027a0f8ad2"
   }
  ],
  "signal": "court_wall",
