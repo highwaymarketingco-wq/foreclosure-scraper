@@ -26,6 +26,7 @@ import argparse
 import asyncio
 import os
 import sys
+from collections import Counter
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -43,11 +44,10 @@ from foreclosure_scraper.models import Listing  # noqa: E402
 from foreclosure_scraper.web_artifact import board_lock, patch_existing_rows  # noqa: E402
 
 
-def _collect_targets(docs: Path, cap: int) -> list[Listing]:
-    """NC/Gaston rows with an owner_name and no raw['rod'] yet -- streamed, cheap
-    dict-level pre-filter before ever validating into a real Listing, same
-    pattern as resolver_backfill_parcel.py's _collect_targets()."""
-    targets: list[Listing] = []
+def _unchecked_gaston_rows(docs: Path):
+    """Shared scan used by both passes in _collect_targets() below -- NC/Gaston
+    rows with an owner_name and no raw['rod'] yet, streamed and validated into
+    real Listings."""
     for rec in iter_board_rows(docs / "listings.json.gz"):
         if rec.get("state") != "NC" or not rec.get("owner_name"):
             continue
@@ -58,12 +58,46 @@ def _collect_targets(docs: Path, cap: int) -> list[Listing]:
         if isinstance(raw, dict) and "rod" in raw:
             continue
         try:
-            li = Listing.model_validate(rec)
+            yield Listing.model_validate(rec)
         except Exception:  # noqa: BLE001 - a malformed row must not crash the collector
+            continue
+
+
+def _collect_targets(docs: Path, cap: int) -> list[Listing]:
+    """Up to `cap` unchecked NC/Gaston rows, excluding any whose dedupe_key()
+    is shared with another unchecked row in the same pool.
+
+    FIXED 2026-11-25: a prior version fed every unchecked row straight into
+    enrich_gaston_rod() regardless of identity. main()'s own
+    `pre_keys = {li.dedupe_key(): li for li in targets}` then silently
+    collapsed any rows sharing a key down to one survivor, and
+    patch_existing_rows()'s unsafe-identity guard correctly refuses to write
+    that survivor back whenever its key is genuinely non-unique board-wide
+    (confirmed live: a cluster of Gaston rows with no parcel_id/address/
+    case_number all fall through dedupe_key()'s final `url:{source_url}`
+    branch, sharing one identity because they were all originally sourced
+    from the same informational page). Since nothing about them ever gets
+    written to disk, the exact same cluster was re-selected and re-searched
+    every single cron tick -- 4 consecutive 10-minute batches with identical
+    stats and zero real writes, confirmed via logs/gaston_rod_batch_continuous.log.
+    Counting dedupe_key() occurrences up front and excluding non-unique rows
+    from the selection pool entirely stops wasting rate-limited search budget
+    on rows that could never be safely patched anyway, freeing it for the
+    rest of the ~24,500-row backlog that CAN be written back."""
+    key_counts: Counter[str] = Counter(li.dedupe_key() for li in _unchecked_gaston_rows(docs))
+
+    targets: list[Listing] = []
+    skipped_unsafe = 0
+    for li in _unchecked_gaston_rows(docs):
+        if key_counts[li.dedupe_key()] > 1:
+            skipped_unsafe += 1
             continue
         targets.append(li)
         if len(targets) >= cap:
             break
+    if skipped_unsafe:
+        print(f"skipped {skipped_unsafe:,} rows up front: dedupe_key shared with "
+              f"another unchecked row (can never be safely patched individually)")
     return targets
 
 
