@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 16317,
+  "confirmed": 16367,
   "refuted": 11,
-  "rows": 16554,
+  "rows": 16604,
   "stale": 46,
   "unconfirmed": 180,
   "wall": 0
  },
- "generated_at": "2026-11-25T21:31:11Z",
+ "generated_at": "2026-11-25T22:30:32Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-25T21:31:09Z",
+  "at": "2026-11-25T22:30:31Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,11 +21,13 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 86,
-    "portal-nc.tylertech.cloud": 41,
+    "gis.buncombecounty.org": 66,
+    "portal-nc.tylertech.cloud": 42,
+    "roster:inmatesinjail.yorkcountygov.com": 1,
+    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
     "services.nconemap.gov": 50,
     "services1.arcgis.com": 7,
-    "vt.ncsbe.gov": 144,
+    "vt.ncsbe.gov": 138,
     "www.courtlistener.com": 2
    }
   },
@@ -33,36 +35,36 @@
    "checked": 50,
    "confirmed": 50
   },
-  "seconds": 819,
+  "seconds": 797,
   "selection": {
    "applies": 44671,
-   "due_new": 28223,
+   "due_new": 28173,
    "due_retry": 46,
    "due_retry_transient": 24,
    "due_ttl": 432,
    "not_due_retry": 106,
-   "not_due_ttl": 15840
+   "not_due_ttl": 15890
   },
   "source": null,
   "tier": null
  },
- "rows": 16554,
+ "rows": 16604,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 7934779,
+   "bytes": 7961958,
    "file": "000.json",
-   "rows": 8340,
-   "sha256": "1843fb03989020792a03ac322ef5dc24d71b35dcc98d597418692dd6f4c41d4a"
+   "rows": 8368,
+   "sha256": "349cceb98c882a20349194998875d0f555356fe0555bda8dd8ab320bf3790a0c"
   },
   {
    "bucket": 1,
-   "bytes": 7821741,
+   "bytes": 7843154,
    "file": "001.json",
-   "rows": 8214,
-   "sha256": "053f8258a80b426e32ec6b4b989cd98647cb1acacefe45b61be507771c1880dd"
+   "rows": 8236,
+   "sha256": "4ca80de3a0055c0ae1f5fab558ac084b10d345f765233825b69e642dd13f4c0b"
   }
  ],
  "signal": "heir_roll",
