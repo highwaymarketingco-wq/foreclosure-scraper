@@ -3,43 +3,33 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 3133,
+  "rows": 3183,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 3133
+  "wall": 3183
  },
- "generated_at": "2026-11-25T11:29:42Z",
+ "generated_at": "2026-11-25T12:24:05Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-25T11:29:41Z",
+  "at": "2026-11-25T12:24:05Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
   "recheck_only": false,
   "requests": {
-   "errors": {
-    "gis.buncombecounty.org": 50
-   },
+   "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 35,
-    "gis.buncombecounty.org": 84,
-    "gis.charlottenc.gov": 38,
-    "portal-nc.tylertech.cloud": 35,
+    "devsvcs.gastonianc.gov": 2,
+    "gis.buncombecounty.org": 50,
+    "gis.charlottenc.gov": 88,
+    "portal-nc.tylertech.cloud": 36,
     "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:apps.pittcountync.gov": 1,
-    "roster:cc.southernsoftware.com": 3,
-    "roster:cumberlandsheriffnc.gov": 1,
-    "roster:guilfordcountysheriff.policetocitizen.com": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "roster:p2c.nhcgov.com": 1,
-    "roster:rowancountync.policetocitizen.com": 1,
-    "roster:wakeso.policetocitizen.com": 1,
-    "roster:www2.co.davidson.nc.us": 1,
-    "roster:www2.dconc.gov": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 96,
+    "services1.arcgis.com": 3,
+    "vt.ncsbe.gov": 144,
+    "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
   },
@@ -47,25 +37,25 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 1359,
+  "seconds": 743,
   "selection": {
    "applies": 9035,
-   "due_new": 5799,
-   "not_due_ttl": 3236
+   "due_new": 5749,
+   "not_due_ttl": 3286
   },
   "source": null,
   "tier": null
  },
- "rows": 3133,
+ "rows": 3183,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 2404941,
+   "bytes": 2442491,
    "file": "000.json",
-   "rows": 3133,
-   "sha256": "7254f20bc947bf0bde0fa0c9b033db8a9de48ba7a9b907c58222f090c6895409"
+   "rows": 3183,
+   "sha256": "1566ac2441422ecf6e6fccb767c8fe8fb879a9ac4dfc91dfac931b2214bd5410"
   }
  ],
  "signal": "court_wall",

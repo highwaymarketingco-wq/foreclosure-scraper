@@ -1,45 +1,35 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 15746,
+  "confirmed": 15796,
   "refuted": 11,
-  "rows": 15954,
+  "rows": 16004,
   "stale": 43,
   "unconfirmed": 154,
   "wall": 0
  },
- "generated_at": "2026-11-25T11:29:43Z",
+ "generated_at": "2026-11-25T12:24:07Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-25T11:29:42Z",
+  "at": "2026-11-25T12:24:06Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
   "recheck_only": false,
   "requests": {
-   "errors": {
-    "gis.buncombecounty.org": 50
-   },
+   "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 35,
-    "gis.buncombecounty.org": 84,
-    "gis.charlottenc.gov": 38,
-    "portal-nc.tylertech.cloud": 35,
+    "devsvcs.gastonianc.gov": 2,
+    "gis.buncombecounty.org": 50,
+    "gis.charlottenc.gov": 88,
+    "portal-nc.tylertech.cloud": 36,
     "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:apps.pittcountync.gov": 1,
-    "roster:cc.southernsoftware.com": 3,
-    "roster:cumberlandsheriffnc.gov": 1,
-    "roster:guilfordcountysheriff.policetocitizen.com": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "roster:p2c.nhcgov.com": 1,
-    "roster:rowancountync.policetocitizen.com": 1,
-    "roster:wakeso.policetocitizen.com": 1,
-    "roster:www2.co.davidson.nc.us": 1,
-    "roster:www2.dconc.gov": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 96,
+    "services1.arcgis.com": 3,
+    "vt.ncsbe.gov": 144,
+    "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
   },
@@ -47,36 +37,36 @@
    "checked": 50,
    "confirmed": 50
   },
-  "seconds": 1359,
+  "seconds": 743,
   "selection": {
    "applies": 44671,
-   "due_new": 28823,
+   "due_new": 28773,
    "due_retry": 39,
    "due_retry_transient": 24,
    "due_ttl": 432,
    "not_due_retry": 87,
-   "not_due_ttl": 15266
+   "not_due_ttl": 15316
   },
   "source": null,
   "tier": null
  },
- "rows": 15954,
+ "rows": 16004,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 7659362,
+   "bytes": 7679320,
    "file": "000.json",
-   "rows": 8048,
-   "sha256": "b92d46105c1b9af851a8a85cee551ab70907071c589fff7b1348a63b3bd6b3c1"
+   "rows": 8070,
+   "sha256": "a54528d9d778a962504e2e83619dc6f6807372f43ab03c19b7b4ecfb2efa6b41"
   },
   {
    "bucket": 1,
-   "bytes": 7531433,
+   "bytes": 7556797,
    "file": "001.json",
-   "rows": 7906,
-   "sha256": "aaccc62a89a0c09cc2e1ad61e1e6cd526264fd8a1412b1765b9212e2755f4db3"
+   "rows": 7934,
+   "sha256": "ed9e277510c4f4ed8f16b9206c538e65115d50b6d5e8d521c5a79a0da1d658c8"
   }
  ],
  "signal": "heir_roll",
