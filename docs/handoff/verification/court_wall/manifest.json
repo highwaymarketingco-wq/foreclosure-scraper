@@ -3,30 +3,37 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 2633,
+  "rows": 2783,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 2633
+  "wall": 2783
  },
- "generated_at": "2026-11-25T01:30:41Z",
+ "generated_at": "2026-11-25T03:06:05Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-25T01:30:41Z",
+  "at": "2026-11-25T03:06:05Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
   "recheck_only": false,
   "requests": {
-   "errors": {},
+   "errors": {
+    "vt.ncsbe.gov": 1
+   },
    "requests": {
     "gis.buncombecounty.org": 50,
-    "gis.charlottenc.gov": 100,
-    "mapping.mitchellcountync.gov": 50,
+    "gis.charlottenc.gov": 80,
     "maps.spartanburgcounty.org": 50,
-    "portal-nc.tylertech.cloud": 40,
-    "vt.ncsbe.gov": 144,
+    "portal-nc.tylertech.cloud": 38,
+    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "roster:oconee-so-sc.zuercherportal.com": 1,
+    "roster:union-so-sc.zuercherportal.com": 1,
+    "services1.arcgis.com": 10,
+    "services9.arcgis.com": 50,
+    "vt.ncsbe.gov": 142,
     "www.courtlistener.com": 2
    }
   },
@@ -34,25 +41,25 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 839,
+  "seconds": 855,
   "selection": {
    "applies": 9035,
-   "due_new": 6304,
-   "not_due_ttl": 2731
+   "due_new": 6154,
+   "not_due_ttl": 2881
   },
   "source": null,
   "tier": null
  },
- "rows": 2633,
+ "rows": 2783,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 2029171,
+   "bytes": 2140909,
    "file": "000.json",
-   "rows": 2633,
-   "sha256": "5c1c18f7006df5d8feac519f064769234998ebbc0bed4cafebac5c5dbf3bdb92"
+   "rows": 2783,
+   "sha256": "54b6d62fdd98101cf8f23ac198948cee0e687cac4af1f50ea1505205e49dc38b"
   }
  ],
  "signal": "court_wall",

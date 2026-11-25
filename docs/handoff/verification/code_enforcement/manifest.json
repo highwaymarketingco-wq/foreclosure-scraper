@@ -1,62 +1,70 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 1929,
-  "refuted": 203,
-  "rows": 2327,
-  "stale": 191,
+  "confirmed": 2026,
+  "refuted": 255,
+  "rows": 2477,
+  "stale": 192,
   "unconfirmed": 4,
   "wall": 0
  },
- "generated_at": "2026-11-25T01:30:41Z",
+ "generated_at": "2026-11-25T03:06:05Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-25T01:30:40Z",
+  "at": "2026-11-25T03:06:05Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
   "recheck_only": false,
   "requests": {
-   "errors": {},
+   "errors": {
+    "vt.ncsbe.gov": 1
+   },
    "requests": {
     "gis.buncombecounty.org": 50,
-    "gis.charlottenc.gov": 100,
-    "mapping.mitchellcountync.gov": 50,
+    "gis.charlottenc.gov": 80,
     "maps.spartanburgcounty.org": 50,
-    "portal-nc.tylertech.cloud": 40,
-    "vt.ncsbe.gov": 144,
+    "portal-nc.tylertech.cloud": 38,
+    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "roster:oconee-so-sc.zuercherportal.com": 1,
+    "roster:union-so-sc.zuercherportal.com": 1,
+    "services1.arcgis.com": 10,
+    "services9.arcgis.com": 50,
+    "vt.ncsbe.gov": 142,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 27,
-   "refuted": 23
+   "confirmed": 36,
+   "refuted": 13,
+   "stale": 1
   },
-  "seconds": 839,
+  "seconds": 855,
   "selection": {
    "applies": 11928,
-   "due_new": 9547,
+   "due_new": 9393,
    "due_ttl": 112,
    "not_due_retry": 4,
-   "not_due_ttl": 2265,
+   "not_due_ttl": 2419,
    "same_property_queued": 1
   },
   "source": null,
   "tier": null
  },
- "rows": 2327,
+ "rows": 2477,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 2628811,
+   "bytes": 2780022,
    "file": "000.json",
-   "rows": 2327,
-   "sha256": "c8ef9443deb7965fc85a883c49ffc3a4d350455c66360724b8df976d5e426b21"
+   "rows": 2477,
+   "sha256": "986a9cb61f0de224f31a606925c551580b0f89782fefc7a6bbaa3da8be62bdf7"
   }
  ],
  "signal": "code_enforcement",

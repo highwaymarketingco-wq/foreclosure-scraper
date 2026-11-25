@@ -1,32 +1,39 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 15249,
+  "confirmed": 15398,
   "refuted": 11,
-  "rows": 15454,
+  "rows": 15604,
   "stale": 43,
-  "unconfirmed": 151,
+  "unconfirmed": 152,
   "wall": 0
  },
- "generated_at": "2026-11-25T01:30:44Z",
+ "generated_at": "2026-11-25T03:06:07Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-25T01:30:42Z",
+  "at": "2026-11-25T03:06:06Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
   "recheck_only": false,
   "requests": {
-   "errors": {},
+   "errors": {
+    "vt.ncsbe.gov": 1
+   },
    "requests": {
     "gis.buncombecounty.org": 50,
-    "gis.charlottenc.gov": 100,
-    "mapping.mitchellcountync.gov": 50,
+    "gis.charlottenc.gov": 80,
     "maps.spartanburgcounty.org": 50,
-    "portal-nc.tylertech.cloud": 40,
-    "vt.ncsbe.gov": 144,
+    "portal-nc.tylertech.cloud": 38,
+    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "roster:oconee-so-sc.zuercherportal.com": 1,
+    "roster:union-so-sc.zuercherportal.com": 1,
+    "services1.arcgis.com": 10,
+    "services9.arcgis.com": 50,
+    "vt.ncsbe.gov": 142,
     "www.courtlistener.com": 2
    }
   },
@@ -34,36 +41,36 @@
    "checked": 50,
    "confirmed": 50
   },
-  "seconds": 839,
+  "seconds": 855,
   "selection": {
    "applies": 44671,
-   "due_new": 29323,
-   "due_retry": 26,
+   "due_new": 29173,
+   "due_retry": 29,
    "due_retry_transient": 24,
    "due_ttl": 432,
-   "not_due_retry": 97,
-   "not_due_ttl": 14769
+   "not_due_retry": 95,
+   "not_due_ttl": 14918
   },
   "source": null,
   "tier": null
  },
- "rows": 15454,
+ "rows": 15604,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 7407176,
+   "bytes": 7482610,
    "file": "000.json",
-   "rows": 7782,
-   "sha256": "35e03f890e394a14353006f5498e4a6fc4427e135619c3bffce767b67a039a54"
+   "rows": 7860,
+   "sha256": "8b27035650855d77204bdeecdb318ce8e30faccbb695b7da8355c6c932673811"
   },
   {
    "bucket": 1,
-   "bytes": 7310809,
+   "bytes": 7380255,
    "file": "001.json",
-   "rows": 7672,
-   "sha256": "e2cb362e9d4ec9379caeb0e419c5fdce32b0be4f06a2ee3f7bfbfe63f397d38a"
+   "rows": 7744,
+   "sha256": "c9d969f417e0e1185e04d11a247c98199190cdde6d9dabc2350e87f2427777a8"
   }
  ],
  "signal": "heir_roll",
