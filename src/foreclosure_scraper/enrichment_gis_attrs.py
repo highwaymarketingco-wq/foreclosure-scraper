@@ -803,19 +803,36 @@ async def enrich_gis_attrs(listings: list[Listing], concurrency: int = 8) -> dic
             # 30,000+-row backlog (board-wide the number sharing this exact shape is unmeasured,
             # but the mechanism is identical everywhere `backfill_gis_attrs_boardwide.py` runs).
             #
-            # NOT fixed here, deliberately: stamping queried=True would stop the waste but, unlike
-            # the no_live_layer case (NC_GIS/SC_GIS/SC_LAYER are static code, so "no layer" truly
-            # never changes), "no parcel_id yet" is NOT provably permanent -- other enrichers in
-            # this codebase do backfill parcel_id for rows that initially lack it, and a row
-            # stamped done here would never get a second chance even after that happens. Whether
-            # that actually occurs often enough for THESE specific stuck rows to matter is
-            # unverified -- that's the open question, not whether the waste is real (it is,
-            # confirmed above). A safe fix needs either: (a) proof this codebase's parcel_id
-            # backfills essentially never reach rows that are ALSO geocoder-fallback-bound (so
-            # permanent-skip costs ~nothing), or (b) a soft-skip that excludes these rows from the
-            # --max-rows SELECTION cap without marking them permanently done, so fresh rows get a
-            # fair share of each batch while these stay eligible for a future parcel_id-equipped
-            # retry. Do not ship (a) without actually checking the backfill-overlap first.
+            # PARTIALLY FIXED 2026-11-25: the open question above ("does this codebase's parcel_id
+            # backfill ever reach a row that's ALSO geocoder-fallback-bound") now has a real,
+            # board-wide answer, checked directly rather than guessed. Two real candidates:
+            #   * enrichment_parcel_from_geo.py -- its OWN _fallback_point() check excludes EVERY
+            #     fallback-point row outright (same root reasoning as here: a point-in-polygon
+            #     query from a shared/imprecise point would return the wrong parcel). It can never
+            #     reach a fallback-bound row, regardless of street_address.
+            #   * enrichment_resolve_name_to_property.py -- its own _is_target() requires BOTH no
+            #     parcel_id AND no street_address. It can only ever reach a fallback-bound row that
+            #     ALSO has no street_address -- never one that has a real address on file.
+            # Board-wide count (2026-11-25, two-pass streaming measurement, VM): 50,063 rows are
+            # currently in this exact state (fallback point + no parcel_id + not yet gis-queried).
+            # 16,502 of them carry a street_address; 33,561 do not. For the 16,502 WITH an address,
+            # NEITHER real backfill path can ever reach them -- option (a) from the comment above
+            # is now PROVEN, not assumed, for exactly this subset: permanent-skip costs nothing,
+            # same as the no_live_layer case. For the 33,561 WITHOUT an address, the name-based
+            # resolver genuinely could still reach them later -- stamping those would still risk
+            # losing a real future chance, so that half keeps the original unstamped skip below
+            # (option (b), the soft-skip, is still unbuilt and still the right next step for them,
+            # not attempted here).
+            if (li.street_address or "").strip():
+                if not isinstance(li.raw, dict):
+                    li.raw = {}
+                g = li.raw.setdefault("gis", {})
+                if not g.get("queried"):
+                    g["queried"] = True
+                    g["source"] = "fallback_point_with_address_unreachable"
+                    stats["fallback_point_with_address_stamped"] = \
+                        stats.get("fallback_point_with_address_stamped", 0) + 1
+                return
             stats["skipped_fallback_point"] = stats.get("skipped_fallback_point", 0) + 1
             return
         # Cache hit — reuse a prior run's resolved attrs for this parcel/point; NO network.
