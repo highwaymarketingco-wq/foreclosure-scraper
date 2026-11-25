@@ -4,16 +4,16 @@
   "confirmed": 549,
   "refuted": 26,
   "rows": 984,
-  "stale": 171,
-  "unconfirmed": 236,
+  "stale": 172,
+  "unconfirmed": 235,
   "wall": 0
  },
- "generated_at": "2026-11-25T05:54:12Z",
+ "generated_at": "2026-11-25T07:07:11Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-25T05:54:12Z",
+  "at": "2026-11-25T07:07:11Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,35 +21,33 @@
   "requests": {
    "errors": {},
    "requests": {
-    "arcserver2.oconeesc.com": 3,
+    "arcserver2.oconeesc.com": 30,
     "gis.buncombecounty.org": 50,
-    "gis.charlottenc.gov": 100,
-    "laurenscountygis.org": 47,
-    "portal-nc.tylertech.cloud": 45,
+    "gis.charlottenc.gov": 26,
+    "portal-nc.tylertech.cloud": 42,
     "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:bookings.darlingtonsheriff.org": 1,
-    "roster:brunswick-so-nc.zuercherportal.com": 1,
-    "roster:colleton-so-sc.zuercherportal.com": 1,
-    "roster:kershaw-so-sc.zuercherportal.com": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
+    "roster:mugshots.spartanburgsheriff.org": 1,
+    "roster:pickens-so-sc.zuercherportal.com": 1,
     "roster:tepsweb.cityofgastonia.com": 1,
-    "roster:wakeso.policetocitizen.com": 1,
-    "vt.ncsbe.gov": 132,
+    "roster:union-so-sc.zuercherportal.com": 1,
+    "services.nconemap.gov": 1,
+    "services1.arcgis.com": 19,
+    "vt.ncsbe.gov": 141,
+    "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
   },
   "result": {
-   "checked": 28,
+   "checked": 25,
    "stale": 1,
-   "unconfirmed": 27
+   "unconfirmed": 24
   },
-  "seconds": 739,
+  "seconds": 627,
   "selection": {
    "applies": 907,
-   "due_retry": 29,
-   "not_due_retry": 195,
-   "not_due_ttl": 683,
-   "same_property_queued": 1
+   "due_retry": 25,
+   "not_due_retry": 198,
+   "not_due_ttl": 684
   },
   "source": null,
   "tier": null
@@ -60,10 +58,10 @@
  "shards": [
   {
    "bucket": 0,
-   "bytes": 1156137,
+   "bytes": 1158896,
    "file": "000.json",
    "rows": 984,
-   "sha256": "597fb67bbafc1bb5a36502a274d1b50ab5a29032c127df15f1bd268e426f7338"
+   "sha256": "aa152391d6f1b7cc232950e2eabb2f6ef580ca4cb16cf6a7dc6247ca42cad14e"
   }
  ],
  "signal": "jail_booking",

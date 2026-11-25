@@ -3,17 +3,17 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 2933,
+  "rows": 2983,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 2933
+  "wall": 2983
  },
- "generated_at": "2026-11-25T05:54:10Z",
+ "generated_at": "2026-11-25T07:07:09Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-25T05:54:10Z",
+  "at": "2026-11-25T07:07:09Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,20 +21,19 @@
   "requests": {
    "errors": {},
    "requests": {
-    "arcserver2.oconeesc.com": 3,
+    "arcserver2.oconeesc.com": 30,
     "gis.buncombecounty.org": 50,
-    "gis.charlottenc.gov": 100,
-    "laurenscountygis.org": 47,
-    "portal-nc.tylertech.cloud": 45,
+    "gis.charlottenc.gov": 26,
+    "portal-nc.tylertech.cloud": 42,
     "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:bookings.darlingtonsheriff.org": 1,
-    "roster:brunswick-so-nc.zuercherportal.com": 1,
-    "roster:colleton-so-sc.zuercherportal.com": 1,
-    "roster:kershaw-so-sc.zuercherportal.com": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
+    "roster:mugshots.spartanburgsheriff.org": 1,
+    "roster:pickens-so-sc.zuercherportal.com": 1,
     "roster:tepsweb.cityofgastonia.com": 1,
-    "roster:wakeso.policetocitizen.com": 1,
-    "vt.ncsbe.gov": 132,
+    "roster:union-so-sc.zuercherportal.com": 1,
+    "services.nconemap.gov": 1,
+    "services1.arcgis.com": 19,
+    "vt.ncsbe.gov": 141,
+    "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
   },
@@ -42,25 +41,25 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 739,
+  "seconds": 627,
   "selection": {
    "applies": 9035,
-   "due_new": 5999,
-   "not_due_ttl": 3036
+   "due_new": 5949,
+   "not_due_ttl": 3086
   },
   "source": null,
   "tier": null
  },
- "rows": 2933,
+ "rows": 2983,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 2253045,
+   "bytes": 2291195,
    "file": "000.json",
-   "rows": 2933,
-   "sha256": "504b81402f9fb642f17a0a51796d43b58d5591cb26dac8f3c8db65bc425e84f3"
+   "rows": 2983,
+   "sha256": "217484c9638722707c91e0a3d630112cab358d40e1b29662e04671b918faf9b4"
   }
  ],
  "signal": "court_wall",
