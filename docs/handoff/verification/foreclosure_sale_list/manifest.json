@@ -8,12 +8,12 @@
   "unconfirmed": 80,
   "wall": 0
  },
- "generated_at": "2026-11-25T03:55:57Z",
+ "generated_at": "2026-11-25T05:54:11Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-25T03:55:57Z",
+  "at": "2026-11-25T05:54:11Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,39 +21,36 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 66,
+    "arcserver2.oconeesc.com": 3,
+    "gis.buncombecounty.org": 50,
     "gis.charlottenc.gov": 100,
-    "laurenscountygis.org": 14,
-    "maps.spartanburgcounty.org": 9,
-    "portal-nc.tylertech.cloud": 42,
+    "laurenscountygis.org": 47,
+    "portal-nc.tylertech.cloud": 45,
     "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:apps.alamance-nc.com": 1,
-    "roster:buncombecountyso.policetocitizen.com": 1,
-    "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:cumberlandsheriffnc.gov": 1,
+    "roster:bookings.darlingtonsheriff.org": 1,
+    "roster:brunswick-so-nc.zuercherportal.com": 1,
+    "roster:colleton-so-sc.zuercherportal.com": 1,
+    "roster:kershaw-so-sc.zuercherportal.com": 1,
     "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "roster:p2c.lincolnsheriff.org": 1,
-    "roster:p2c.nhcgov.com": 1,
-    "roster:pickens-so-sc.zuercherportal.com": 1,
-    "roster:union-so-sc.zuercherportal.com": 1,
+    "roster:tepsweb.cityofgastonia.com": 1,
     "roster:wakeso.policetocitizen.com": 1,
-    "services.nconemap.gov": 24,
-    "services1.arcgis.com": 4,
-    "vt.ncsbe.gov": 75,
+    "vt.ncsbe.gov": 132,
     "www.courtlistener.com": 2
    }
   },
   "result": {
-   "checked": 40,
-   "unconfirmed": 40
+   "checked": 50,
+   "confirmed": 13,
+   "unconfirmed": 37
   },
-  "seconds": 845,
+  "seconds": 739,
   "selection": {
    "applies": 418,
    "due_new": 1,
-   "due_ttl": 39,
+   "due_ttl": 93,
    "not_due_retry": 81,
-   "not_due_ttl": 297
+   "not_due_ttl": 243,
+   "same_property_queued": 1
   },
   "source": null,
   "tier": null
@@ -64,10 +61,10 @@
  "shards": [
   {
    "bucket": 0,
-   "bytes": 473974,
+   "bytes": 475749,
    "file": "000.json",
    "rows": 420,
-   "sha256": "ea87e5b2dea55a1aa8f0dc731df0a88020d12a46660ff68b48f733228060bc3b"
+   "sha256": "f710328f4829f20e0e5a51714ea8e0db4f64eb34110382b8b422268fefc4ac01"
   }
  ],
  "signal": "foreclosure_sale_list",
