@@ -37,7 +37,8 @@ from foreclosure_scraper.block_binding import FALLBACK_POINT_MIN_ROWS  # noqa: E
 from foreclosure_scraper.enrichment_deed_chain import enrich_deed_chain  # noqa: E402
 from foreclosure_scraper.models import Listing  # noqa: E402
 from foreclosure_scraper.web_artifact import (  # noqa: E402
-    BoardLockBusy, _APPEND_SIG_FIELDS, board_lock, board_patch_size_state, patch_existing_rows,
+    BoardChangedSinceLoad, BoardLockBusy, _APPEND_SIG_FIELDS, board_lock, board_patch_size_state,
+    patch_existing_rows,
 )
 
 _LIGHT_FIELDS = _APPEND_SIG_FIELDS + ("raw", "latitude", "longitude")
@@ -138,16 +139,34 @@ def main() -> int:
         # invocations). Retrying the SAME lock acquisition a few more times here (each with its
         # own full 600s internal wait) costs nothing when the lock is free, and turns a
         # transient long hold into "wait a while longer" instead of "lose this whole run."
+        #
+        # EXTENDED 2026-11-25: confirmed live that the first fix's own retry can SUCCEED at
+        # acquiring the lock and still crash one line later. patch_existing_rows() stamps
+        # listings.json's mtime/size (web_artifact.py's _LOAD_STAMPS) after its own first
+        # successful write in this process; every call after that checks the file still
+        # matches that stamp before writing again (BoardChangedSinceLoad otherwise -- "another
+        # writer replaced the board while this one worked on a stale copy"). On this host,
+        # 5+ other lanes each take the lock and write in the gap between two of THIS script's
+        # own flush() calls, so the stamp from our last write is routinely stale by the time we
+        # get the lock back -- confirmed live 2026-11-25 00:17-ish: lock acquired on a retry
+        # (attempt 1/4 against backfill_mecklenburg_code_enforcement), then
+        # BoardChangedSinceLoad fired on the very next line and crashed the run (same
+        # restart-from-row-0 cost the first fix was written to avoid). patch_existing_rows()
+        # re-streams the current board fresh on every call rather than reusing anything from an
+        # earlier call, so simply retrying the whole lock+patch sequence again is correct here
+        # too, same as BoardLockBusy -- it will see the board as it is right now, not the stale
+        # view that triggered the guard.
         for attempt in range(4):
             try:
                 with board_lock(REPO, owner="deed_chain_backfill_v2", wait=600, poll=10):
                     pstats = patch_existing_rows(
                         patches, {"deed_chain_backfill_v2_batch": len(patches)}, docs_dir=docs_dir)
                 break
-            except BoardLockBusy as exc:
+            except (BoardLockBusy, BoardChangedSinceLoad) as exc:
                 if attempt == 3:
                     raise
-                print(f"  board lock busy (attempt {attempt + 1}/4), retrying: {exc}")
+                print(f"  board write contention (attempt {attempt + 1}/4), retrying: "
+                      f"{type(exc).__name__}: {exc}")
         print(f"  patch_existing_rows: {pstats}")
         total_patched += pstats.get("applied", 0)
 
