@@ -194,16 +194,31 @@ def main() -> int:
         # earlier call, so simply retrying the whole lock+patch sequence again is correct here
         # too, same as BoardLockBusy -- it will see the board as it is right now, not the stale
         # view that triggered the guard.
-        for attempt in range(4):
+        #
+        # WIDENED 2026-11-25 (same day, later): confirmed live that even the above two fixes
+        # together can still exhaust against SUSTAINED contention -- watched one flush lose to
+        # gis_attrs_boardwide, then mecklenburg_code_enforcement, then backfill_comps back to
+        # back (3 different holders inside one 40-min window), and separately watched
+        # mecklenburg_gis_attrs hold the SAME lock for 12 min straight (vs. the "10+ minutes"
+        # this comment originally cited as the reason for 4 attempts -- hold times have grown,
+        # not shrunk). Two consecutive full process lifetimes since the auto-resume fix
+        # (deed_chain_v2_resume.json) deployed have now failed to complete even their FIRST
+        # batch, meaning resume has had zero chance to prove itself -- it can only help once a
+        # flush actually succeeds. Doubling the attempt budget (40 min worst case -> 80 min)
+        # directly answers the observed hold-time growth; it does not fix the underlying
+        # contention, but every attempt still costs nothing when the lock is free, same
+        # reasoning as the original fix.
+        _ATTEMPTS = 8
+        for attempt in range(_ATTEMPTS):
             try:
                 with board_lock(REPO, owner="deed_chain_backfill_v2", wait=600, poll=10):
                     pstats = patch_existing_rows(
                         patches, {"deed_chain_backfill_v2_batch": len(patches)}, docs_dir=docs_dir)
                 break
             except (BoardLockBusy, BoardChangedSinceLoad) as exc:
-                if attempt == 3:
+                if attempt == _ATTEMPTS - 1:
                     raise
-                print(f"  board write contention (attempt {attempt + 1}/4), retrying: "
+                print(f"  board write contention (attempt {attempt + 1}/{_ATTEMPTS}), retrying: "
                       f"{type(exc).__name__}: {exc}")
         print(f"  patch_existing_rows: {pstats}")
         total_patched += pstats.get("applied", 0)
