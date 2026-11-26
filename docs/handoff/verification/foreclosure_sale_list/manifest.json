@@ -8,12 +8,12 @@
   "unconfirmed": 80,
   "wall": 0
  },
- "generated_at": "2026-11-26T12:28:14Z",
+ "generated_at": "2026-11-26T13:36:51Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T12:28:14Z",
+  "at": "2026-11-26T13:36:51Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,21 +21,11 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 51,
-    "portal-nc.tylertech.cloud": 36,
+    "gis.buncombecounty.org": 54,
+    "portal-nc.tylertech.cloud": 44,
     "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:apps.pittcountync.gov": 1,
-    "roster:cc.southernsoftware.com": 3,
-    "roster:cumberlandsheriffnc.gov": 1,
-    "roster:guilfordcountysheriff.policetocitizen.com": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "roster:p2c.nhcgov.com": 1,
-    "roster:rowancountync.policetocitizen.com": 1,
-    "roster:wakeso.policetocitizen.com": 1,
-    "roster:www2.co.davidson.nc.us": 1,
-    "roster:www2.dconc.gov": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 144,
+    "vt.ncsbe.gov": 141,
     "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
@@ -44,13 +34,13 @@
    "checked": 50,
    "unconfirmed": 50
   },
-  "seconds": 684,
+  "seconds": 601,
   "selection": {
    "applies": 418,
    "due_new": 1,
-   "due_retry": 37,
+   "due_retry": 46,
    "due_ttl": 125,
-   "not_due_retry": 44,
+   "not_due_retry": 35,
    "not_due_ttl": 211,
    "same_property_queued": 1
   },
@@ -63,10 +53,10 @@
  "shards": [
   {
    "bucket": 0,
-   "bytes": 498567,
+   "bytes": 498569,
    "file": "000.json",
    "rows": 420,
-   "sha256": "013fec2af396ec5a04fc75efc1a409999100cc75e48ddc2242e908c94f350908"
+   "sha256": "a11706f2cc0af66280013b795e4f02d5f7076d43dba9b9905f95dcc3e86da051"
   }
  ],
  "signal": "foreclosure_sale_list",

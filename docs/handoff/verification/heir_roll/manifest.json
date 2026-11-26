@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 16805,
+  "confirmed": 16853,
   "refuted": 11,
-  "rows": 17054,
-  "stale": 52,
-  "unconfirmed": 186,
+  "rows": 17104,
+  "stale": 53,
+  "unconfirmed": 187,
   "wall": 0
  },
- "generated_at": "2026-11-26T12:28:15Z",
+ "generated_at": "2026-11-26T13:36:52Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T12:28:14Z",
+  "at": "2026-11-26T13:36:51Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,60 +21,51 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 51,
-    "portal-nc.tylertech.cloud": 36,
+    "gis.buncombecounty.org": 54,
+    "portal-nc.tylertech.cloud": 44,
     "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:apps.pittcountync.gov": 1,
-    "roster:cc.southernsoftware.com": 3,
-    "roster:cumberlandsheriffnc.gov": 1,
-    "roster:guilfordcountysheriff.policetocitizen.com": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "roster:p2c.nhcgov.com": 1,
-    "roster:rowancountync.policetocitizen.com": 1,
-    "roster:wakeso.policetocitizen.com": 1,
-    "roster:www2.co.davidson.nc.us": 1,
-    "roster:www2.dconc.gov": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 144,
+    "vt.ncsbe.gov": 141,
     "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 47,
-   "stale": 3
+   "confirmed": 48,
+   "stale": 1,
+   "unconfirmed": 1
   },
-  "seconds": 684,
+  "seconds": 601,
   "selection": {
    "applies": 44671,
-   "due_new": 27723,
+   "due_new": 27673,
    "due_retry": 49,
    "due_retry_transient": 24,
    "due_ttl": 432,
    "not_due_retry": 109,
-   "not_due_ttl": 16334
+   "not_due_ttl": 16384
   },
   "source": null,
   "tier": null
  },
- "rows": 17054,
+ "rows": 17104,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 8185049,
+   "bytes": 8204977,
    "file": "000.json",
-   "rows": 8600,
-   "sha256": "61d33e506527f6a9b5bd479253ebc60e35c10a52f1a57d36174a90ff0ffd136b"
+   "rows": 8621,
+   "sha256": "34be6db40f55c6516820ca88dfa2ee83781019b96e0b07a749ad9521f3f74656"
   },
   {
    "bucket": 1,
-   "bytes": 8052524,
+   "bytes": 8080302,
    "file": "001.json",
-   "rows": 8454,
-   "sha256": "c2f03ce6390b30648c97acda1810fd8e66944bdce758595e1ca892d1746c313a"
+   "rows": 8483,
+   "sha256": "50588004d3c79f51680d82b9e10fe3915c277bdc5a3df2cabb541dfcb2c71ca6"
   }
  ],
  "signal": "heir_roll",

@@ -3,17 +3,17 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 2760,
+  "rows": 2810,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 2760
+  "wall": 2810
  },
- "generated_at": "2026-11-26T12:28:16Z",
+ "generated_at": "2026-11-26T13:36:52Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T12:28:15Z",
+  "at": "2026-11-26T13:36:52Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,21 +21,11 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 51,
-    "portal-nc.tylertech.cloud": 36,
+    "gis.buncombecounty.org": 54,
+    "portal-nc.tylertech.cloud": 44,
     "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:apps.pittcountync.gov": 1,
-    "roster:cc.southernsoftware.com": 3,
-    "roster:cumberlandsheriffnc.gov": 1,
-    "roster:guilfordcountysheriff.policetocitizen.com": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "roster:p2c.nhcgov.com": 1,
-    "roster:rowancountync.policetocitizen.com": 1,
-    "roster:wakeso.policetocitizen.com": 1,
-    "roster:www2.co.davidson.nc.us": 1,
-    "roster:www2.dconc.gov": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 144,
+    "vt.ncsbe.gov": 141,
     "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
@@ -44,26 +34,25 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 684,
+  "seconds": 601,
   "selection": {
    "applies": 66565,
-   "due_new": 63794,
-   "not_due_ttl": 2771,
-   "same_property_queued": 2
+   "due_new": 63742,
+   "not_due_ttl": 2823
   },
   "source": null,
   "tier": null
  },
- "rows": 2760,
+ "rows": 2810,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 2471539,
+   "bytes": 2516106,
    "file": "000.json",
-   "rows": 2760,
-   "sha256": "c165de167e6d548b131053edf2863057f3f3c208936ad4172d8b8bd93da7301d"
+   "rows": 2810,
+   "sha256": "c7ee557dec4f83dd4169251cff36b65ab9dfdf08d9ded02e87416c4f5cb3b9ea"
   }
  ],
  "signal": "lien_registry_wall",
