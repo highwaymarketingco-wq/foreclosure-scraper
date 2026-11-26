@@ -207,12 +207,25 @@ _COUNTIES = {
 # 2026-11-25: per-county override for the URL StealthyFetcher's own solve_cloudflare
 # should run its automatic detect+solve against -- see the module docstring's
 # "FINDING 1" entry. Hertford's real Cloudflare-protected url is application.asp,
-# not its bare tenant root (confirmed live); Caldwell/Franklin are a different,
-# modern LRSearch platform never tested against this specific failure mode, so they
-# keep defaulting to the bare root (base + "/") rather than guessing a path change
-# for them too.
+# not its bare tenant root (confirmed live).
+#
+# FIXED 2026-11-26: Franklin hit the EXACT SAME "No Cloudflare challenge found"
+# detector failure against its bare root during live re-verification of the
+# _body() fix above -- the same failure mode FINDING 1 already diagnosed for
+# Hertford, not yet tried here because this file's own 2026-11-25 comment
+# (removed) assumed Caldwell/Franklin's different, modern LRSearch platform
+# hadn't been tested against it. It has now, and failed the same way. Pointing
+# the solve at _LRINDEX (the real search page these two load, same modern
+# platform Gates uses unprotected) rather than the bare root, by analogy with
+# Hertford's fix. Caldwell gets the same override on the same reasoning
+# (identical platform/symptom class) even though it hasn't been individually
+# re-tested yet this round -- verify it for real before relying on it.
 _SOLVE_URL_OVERRIDE = {
     "Hertford": "/application.asp?resize=true",
+    # Mirrors _LRINDEX below (defined later in this file -- a dict literal here
+    # can't forward-reference it, so this must stay a literal, not _LRINDEX).
+    "Franklin": "/LRSearch/LRIndex?searchTabID=0",
+    "Caldwell": "/LRSearch/LRIndex?searchTabID=0",
 }
 
 # Confirmed live 2026-11-24 (see module docstring) -- these 3 need the
