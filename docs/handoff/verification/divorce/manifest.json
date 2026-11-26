@@ -3,17 +3,17 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 2858,
+  "rows": 2908,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 2858
+  "wall": 2908
  },
- "generated_at": "2026-11-26T09:56:47Z",
+ "generated_at": "2026-11-26T10:31:13Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T09:56:47Z",
+  "at": "2026-11-26T10:31:13Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,18 +21,10 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 55,
-    "portal-nc.tylertech.cloud": 44,
-    "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:forsythsheriffnc.policetocitizen.com": 1,
-    "roster:injail.catawbacountync.gov": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "roster:p2c.lincolnsheriff.org": 1,
-    "roster:tepsweb.cityofgastonia.com": 1,
-    "roster:www2.dconc.gov": 1,
+    "gis.buncombecounty.org": 51,
+    "portal-nc.tylertech.cloud": 37,
     "services.nconemap.gov": 50,
-    "tax.buncombenc.gov": 2,
-    "vt.ncsbe.gov": 138,
+    "vt.ncsbe.gov": 135,
     "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
@@ -41,25 +33,25 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 594,
+  "seconds": 550,
   "selection": {
    "applies": 4916,
-   "due_new": 2091,
-   "not_due_ttl": 2825
+   "due_new": 2041,
+   "not_due_ttl": 2875
   },
   "source": null,
   "tier": null
  },
- "rows": 2858,
+ "rows": 2908,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 2457590,
+   "bytes": 2501593,
    "file": "000.json",
-   "rows": 2858,
-   "sha256": "1e4a32fb22bd85925df790f9eb632dd9209224af2281e402e2e0b94c3386524e"
+   "rows": 2908,
+   "sha256": "c793ae383e861996faed00f64470f2d09e4ec4a0ad83627574a9706b976b164e"
   }
  ],
  "signal": "divorce",

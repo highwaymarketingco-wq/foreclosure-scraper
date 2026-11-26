@@ -1,19 +1,19 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 3020,
-  "refuted": 565,
-  "rows": 3827,
+  "confirmed": 3053,
+  "refuted": 582,
+  "rows": 3877,
   "stale": 225,
   "unconfirmed": 17,
   "wall": 0
  },
- "generated_at": "2026-11-26T09:56:47Z",
+ "generated_at": "2026-11-26T10:31:12Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T09:56:47Z",
+  "at": "2026-11-26T10:31:12Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,49 +21,40 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 55,
-    "portal-nc.tylertech.cloud": 44,
-    "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:forsythsheriffnc.policetocitizen.com": 1,
-    "roster:injail.catawbacountync.gov": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "roster:p2c.lincolnsheriff.org": 1,
-    "roster:tepsweb.cityofgastonia.com": 1,
-    "roster:www2.dconc.gov": 1,
+    "gis.buncombecounty.org": 51,
+    "portal-nc.tylertech.cloud": 37,
     "services.nconemap.gov": 50,
-    "tax.buncombenc.gov": 2,
-    "vt.ncsbe.gov": 138,
+    "vt.ncsbe.gov": 135,
     "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 24,
-   "refuted": 25,
-   "unconfirmed": 1
+   "confirmed": 33,
+   "refuted": 17
   },
-  "seconds": 594,
+  "seconds": 550,
   "selection": {
    "applies": 11927,
-   "due_new": 8031,
+   "due_new": 7981,
    "due_ttl": 112,
-   "not_due_retry": 22,
-   "not_due_ttl": 3762
+   "not_due_retry": 23,
+   "not_due_ttl": 3811
   },
   "source": null,
   "tier": null
  },
- "rows": 3827,
+ "rows": 3877,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4323414,
+   "bytes": 4376275,
    "file": "000.json",
-   "rows": 3827,
-   "sha256": "ef5be7b2c3c21f2636d4d92659d4b763ad4162e19cf0cd6a831dbf0482d0bc3d"
+   "rows": 3877,
+   "sha256": "083101f40b569793c765f7ee24b532f0b7a0378343c15a4b8dc6e1d8c2e5e4d5"
   }
  ],
  "signal": "code_enforcement",
