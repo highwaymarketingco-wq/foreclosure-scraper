@@ -31,7 +31,7 @@ from bs4 import BeautifulSoup
 from nodriver import Browser
 
 from foreclosure_scraper.base_scraper import BaseScraper
-from foreclosure_scraper.listing import Listing
+from foreclosure_scraper.models import Listing
 
 log = structlog.get_logger()
 
