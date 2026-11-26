@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 16903,
+  "confirmed": 16950,
   "refuted": 11,
-  "rows": 17154,
+  "rows": 17204,
   "stale": 53,
-  "unconfirmed": 187,
+  "unconfirmed": 190,
   "wall": 0
  },
- "generated_at": "2026-11-26T14:01:36Z",
+ "generated_at": "2026-11-26T14:21:37Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T14:01:35Z",
+  "at": "2026-11-26T14:21:36Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,49 +21,49 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 50,
-    "portal-nc.tylertech.cloud": 33,
-    "roster:pickens-so-sc.zuercherportal.com": 1,
+    "gis.buncombecounty.org": 51,
+    "portal-nc.tylertech.cloud": 36,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 141,
+    "vt.ncsbe.gov": 138,
     "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 50
+   "confirmed": 47,
+   "unconfirmed": 3
   },
-  "seconds": 561,
+  "seconds": 557,
   "selection": {
    "applies": 44671,
-   "due_new": 27623,
+   "due_new": 27573,
    "due_retry": 49,
    "due_retry_transient": 24,
    "due_ttl": 432,
    "not_due_retry": 110,
-   "not_due_ttl": 16433
+   "not_due_ttl": 16483
   },
   "source": null,
   "tier": null
  },
- "rows": 17154,
+ "rows": 17204,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 8228610,
+   "bytes": 8248612,
    "file": "000.json",
-   "rows": 8646,
-   "sha256": "4bf05b97934dcf42fa2a0728af10557bf93d06370de31094faa8ee0ef7b5276a"
+   "rows": 8667,
+   "sha256": "a4265ce299da78707aff52ca34ead52549a3c4837f2c82a222d00f333ada2e7b"
   },
   {
    "bucket": 1,
-   "bytes": 8103995,
+   "bytes": 8131921,
    "file": "001.json",
-   "rows": 8508,
-   "sha256": "5957582b00b2a51112efa6fe18fb340063d3942623ffba9fe64b92ddd35e2233"
+   "rows": 8537,
+   "sha256": "d6efbc7d2d013d3500465e201765fb38b1587993662a5ffad0e433fbfe147f05"
   }
  ],
  "signal": "heir_roll",

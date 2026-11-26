@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 8393,
+  "confirmed": 8442,
   "refuted": 99,
-  "rows": 8674,
+  "rows": 8724,
   "stale": 59,
-  "unconfirmed": 123,
+  "unconfirmed": 124,
   "wall": 0
  },
- "generated_at": "2026-11-26T14:01:35Z",
+ "generated_at": "2026-11-26T14:21:36Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T14:01:34Z",
+  "at": "2026-11-26T14:21:35Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,49 +21,49 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 50,
-    "portal-nc.tylertech.cloud": 33,
-    "roster:pickens-so-sc.zuercherportal.com": 1,
+    "gis.buncombecounty.org": 51,
+    "portal-nc.tylertech.cloud": 36,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 141,
+    "vt.ncsbe.gov": 138,
     "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 50
+   "confirmed": 49,
+   "unconfirmed": 1
   },
-  "seconds": 561,
+  "seconds": 557,
   "selection": {
    "applies": 140892,
-   "due_new": 131296,
+   "due_new": 131246,
    "due_retry": 3,
    "due_version": 1,
    "not_due_retry": 111,
-   "not_due_ttl": 9481,
+   "not_due_ttl": 9531,
    "same_property_queued": 1
   },
   "source": null,
   "tier": null
  },
- "rows": 8674,
+ "rows": 8724,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4576412,
+   "bytes": 4605407,
    "file": "000.json",
-   "rows": 4369,
-   "sha256": "1e84aafd399da743617cbcd357b087566670bddeb3dc0a09e952f865a01706ea"
+   "rows": 4392,
+   "sha256": "cadd18a2c6aed5436241d526d3fe332924bbb0f0a50ce5869eca5305b4fe5c31"
   },
   {
    "bucket": 1,
-   "bytes": 4473678,
+   "bytes": 4508252,
    "file": "001.json",
-   "rows": 4305,
-   "sha256": "43c8a7b4e0cfcc0450146fd9bc3fc851cab3457a22e3b31ece5e64a109ce8efb"
+   "rows": 4332,
+   "sha256": "d4d98bda349bb88755ff3e009a61343cfb7a001e75c8d657eb5a5c8605d2008e"
   }
  ],
  "signal": "elderly_disabled",
