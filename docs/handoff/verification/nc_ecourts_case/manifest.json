@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 9415,
+  "confirmed": 9511,
   "refuted": 26,
-  "rows": 11005,
+  "rows": 11101,
   "stale": 1313,
   "unconfirmed": 251,
   "wall": 0
  },
- "generated_at": "2026-11-26T20:00:48Z",
+ "generated_at": "2026-11-26T20:54:53Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T20:00:47Z",
+  "at": "2026-11-26T20:54:53Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,18 +21,9 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 17,
-    "gis.buncombecounty.org": 50,
-    "gis.charlottenc.gov": 86,
-    "portal-nc.tylertech.cloud": 29,
-    "roster:74.218.167.200": 1,
-    "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:buncombecountyso.policetocitizen.com": 1,
-    "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:laurens-911-sc.zuercherportal.com": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "roster:oconee-so-sc.zuercherportal.com": 1,
-    "roster:tepsweb.cityofgastonia.com": 1,
+    "gis.buncombecounty.org": 51,
+    "gis.charlottenc.gov": 100,
+    "portal-nc.tylertech.cloud": 36,
     "services.nconemap.gov": 50,
     "vt.ncsbe.gov": 147,
     "www.courtlistener.com": 2
@@ -43,35 +34,35 @@
    "confirmed": 48,
    "unconfirmed": 2
   },
-  "seconds": 832,
+  "seconds": 769,
   "selection": {
    "applies": 25671,
-   "due_new": 15019,
+   "due_new": 14923,
    "due_retry": 3,
    "due_ttl": 670,
    "not_due_retry": 259,
-   "not_due_ttl": 9720
+   "not_due_ttl": 9816
   },
   "source": null,
   "tier": null
  },
- "rows": 11005,
+ "rows": 11101,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 6860034,
+   "bytes": 6920993,
    "file": "000.json",
-   "rows": 5564,
-   "sha256": "6419b9e9b591b8ed858b791ee28c74fe09823d67a2cf1cead252e9df24084d26"
+   "rows": 5614,
+   "sha256": "8d3b4e22548590b9d8f5e9dd9713461086c62846e73dc675f874b54334552bc3"
   },
   {
    "bucket": 1,
-   "bytes": 6713148,
+   "bytes": 6769126,
    "file": "001.json",
-   "rows": 5441,
-   "sha256": "2786f4505a3a28bfbc7fd685484b5737f978ced2a9efe47dc259f4d2b4142079"
+   "rows": 5487,
+   "sha256": "e2b095fe1533c60b8fe652c1afd447d4dbdd6a3aad33de3fdcee40ae9448eff4"
   }
  ],
  "signal": "nc_ecourts_case",
