@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 8442,
+  "confirmed": 8491,
   "refuted": 99,
-  "rows": 8724,
+  "rows": 8774,
   "stale": 59,
-  "unconfirmed": 124,
+  "unconfirmed": 125,
   "wall": 0
  },
- "generated_at": "2026-11-26T14:21:36Z",
+ "generated_at": "2026-11-26T14:42:48Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T14:21:35Z",
+  "at": "2026-11-26T14:42:48Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -22,9 +22,9 @@
    "errors": {},
    "requests": {
     "gis.buncombecounty.org": 51,
-    "portal-nc.tylertech.cloud": 36,
+    "portal-nc.tylertech.cloud": 49,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 138,
+    "vt.ncsbe.gov": 144,
     "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
@@ -34,36 +34,36 @@
    "confirmed": 49,
    "unconfirmed": 1
   },
-  "seconds": 557,
+  "seconds": 635,
   "selection": {
    "applies": 140892,
-   "due_new": 131246,
+   "due_new": 131196,
    "due_retry": 3,
    "due_version": 1,
-   "not_due_retry": 111,
-   "not_due_ttl": 9531,
+   "not_due_retry": 112,
+   "not_due_ttl": 9580,
    "same_property_queued": 1
   },
   "source": null,
   "tier": null
  },
- "rows": 8724,
+ "rows": 8774,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4605407,
+   "bytes": 4638797,
    "file": "000.json",
-   "rows": 4392,
-   "sha256": "cadd18a2c6aed5436241d526d3fe332924bbb0f0a50ce5869eca5305b4fe5c31"
+   "rows": 4418,
+   "sha256": "c9ac432157dab74c1194b25cf445829904040bba26e5e4079e1a58341c625646"
   },
   {
    "bucket": 1,
-   "bytes": 4508252,
+   "bytes": 4538509,
    "file": "001.json",
-   "rows": 4332,
-   "sha256": "d4d98bda349bb88755ff3e009a61343cfb7a001e75c8d657eb5a5c8605d2008e"
+   "rows": 4356,
+   "sha256": "44e8cec2e72326b9b5d79ddc047e4c2e693f81b3f2f53ff8300917357b397261"
   }
  ],
  "signal": "elderly_disabled",

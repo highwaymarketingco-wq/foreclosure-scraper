@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 16950,
+  "confirmed": 16996,
   "refuted": 11,
-  "rows": 17204,
+  "rows": 17254,
   "stale": 53,
-  "unconfirmed": 190,
+  "unconfirmed": 194,
   "wall": 0
  },
- "generated_at": "2026-11-26T14:21:37Z",
+ "generated_at": "2026-11-26T14:42:50Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T14:21:36Z",
+  "at": "2026-11-26T14:42:49Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -22,48 +22,48 @@
    "errors": {},
    "requests": {
     "gis.buncombecounty.org": 51,
-    "portal-nc.tylertech.cloud": 36,
+    "portal-nc.tylertech.cloud": 49,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 138,
+    "vt.ncsbe.gov": 144,
     "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 47,
-   "unconfirmed": 3
+   "confirmed": 46,
+   "unconfirmed": 4
   },
-  "seconds": 557,
+  "seconds": 635,
   "selection": {
    "applies": 44671,
-   "due_new": 27573,
+   "due_new": 27523,
    "due_retry": 49,
    "due_retry_transient": 24,
    "due_ttl": 432,
-   "not_due_retry": 110,
-   "not_due_ttl": 16483
+   "not_due_retry": 113,
+   "not_due_ttl": 16530
   },
   "source": null,
   "tier": null
  },
- "rows": 17204,
+ "rows": 17254,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 8248612,
+   "bytes": 8272769,
    "file": "000.json",
-   "rows": 8667,
-   "sha256": "a4265ce299da78707aff52ca34ead52549a3c4837f2c82a222d00f333ada2e7b"
+   "rows": 8692,
+   "sha256": "fa8d43ef2f255876d8ae901ac2483608c2a3a304130d20e7566d3d235f7a681b"
   },
   {
    "bucket": 1,
-   "bytes": 8131921,
+   "bytes": 8156113,
    "file": "001.json",
-   "rows": 8537,
-   "sha256": "d6efbc7d2d013d3500465e201765fb38b1587993662a5ffad0e433fbfe147f05"
+   "rows": 8562,
+   "sha256": "3c7588e658b1221232bc268f3c88c7956d05dd283a6d3190feca3cc6a4de72a9"
   }
  ],
  "signal": "heir_roll",

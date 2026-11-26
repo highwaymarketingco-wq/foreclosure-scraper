@@ -8,12 +8,12 @@
   "unconfirmed": 80,
   "wall": 0
  },
- "generated_at": "2026-11-26T14:21:36Z",
+ "generated_at": "2026-11-26T14:42:49Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T14:21:36Z",
+  "at": "2026-11-26T14:42:49Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -22,9 +22,9 @@
    "errors": {},
    "requests": {
     "gis.buncombecounty.org": 51,
-    "portal-nc.tylertech.cloud": 36,
+    "portal-nc.tylertech.cloud": 49,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 138,
+    "vt.ncsbe.gov": 144,
     "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
@@ -33,13 +33,13 @@
    "checked": 50,
    "unconfirmed": 50
   },
-  "seconds": 557,
+  "seconds": 635,
   "selection": {
    "applies": 418,
    "due_new": 1,
-   "due_retry": 55,
+   "due_retry": 56,
    "due_ttl": 125,
-   "not_due_retry": 26,
+   "not_due_retry": 25,
    "not_due_ttl": 211,
    "same_property_queued": 1
   },
@@ -55,7 +55,7 @@
    "bytes": 498569,
    "file": "000.json",
    "rows": 420,
-   "sha256": "1cdc18af8418c056070076f305237656a1d4a5e3cf047f90ec2595fb520cf30b"
+   "sha256": "495bf4c882c8bcfc59ae20e7d95da6f69120352ee6c66ad4b1d1eca649fbe2c6"
   }
  ],
  "signal": "foreclosure_sale_list",
