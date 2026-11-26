@@ -1,79 +1,78 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 16661,
+  "confirmed": 16709,
   "refuted": 11,
-  "rows": 16904,
-  "stale": 48,
-  "unconfirmed": 184,
+  "rows": 16954,
+  "stale": 49,
+  "unconfirmed": 185,
   "wall": 0
  },
- "generated_at": "2026-11-26T08:12:57Z",
+ "generated_at": "2026-11-26T09:56:49Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T08:12:56Z",
+  "at": "2026-11-26T09:56:48Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
   "recheck_only": false,
   "requests": {
-   "errors": {
-    "roster:union-so-sc.zuercherportal.com": 1
-   },
+   "errors": {},
    "requests": {
     "gis.buncombecounty.org": 55,
-    "portal-nc.tylertech.cloud": 32,
-    "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:brunswick-so-nc.zuercherportal.com": 1,
-    "roster:colleton-so-sc.zuercherportal.com": 1,
-    "roster:kershaw-so-sc.zuercherportal.com": 1,
-    "roster:pickens-so-sc.zuercherportal.com": 1,
+    "portal-nc.tylertech.cloud": 44,
+    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "roster:forsythsheriffnc.policetocitizen.com": 1,
+    "roster:injail.catawbacountync.gov": 1,
+    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
+    "roster:p2c.lincolnsheriff.org": 1,
     "roster:tepsweb.cityofgastonia.com": 1,
-    "roster:union-so-sc.zuercherportal.com": 1,
-    "services.nconemap.gov": 53,
-    "services1.arcgis.com": 7,
-    "vt.ncsbe.gov": 141,
+    "roster:www2.dconc.gov": 1,
+    "services.nconemap.gov": 50,
+    "tax.buncombenc.gov": 2,
+    "vt.ncsbe.gov": 138,
     "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 47,
-   "unconfirmed": 3
+   "confirmed": 48,
+   "stale": 1,
+   "unconfirmed": 1
   },
-  "seconds": 647,
+  "seconds": 594,
   "selection": {
    "applies": 44671,
-   "due_new": 27873,
+   "due_new": 27823,
    "due_retry": 49,
    "due_retry_transient": 24,
    "due_ttl": 432,
-   "not_due_retry": 104,
-   "not_due_ttl": 16189
+   "not_due_retry": 107,
+   "not_due_ttl": 16236
   },
   "source": null,
   "tier": null
  },
- "rows": 16904,
+ "rows": 16954,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 8110899,
+   "bytes": 8131722,
    "file": "000.json",
-   "rows": 8522,
-   "sha256": "d2c61f3a26fec69011e312ee5de5ed10fe5c99109c00a18127aa3a5494755bc0"
+   "rows": 8544,
+   "sha256": "90ead15ba70f64fec09b4be86c093006e619791685900e5cdf4c0f6a37f106d0"
   },
   {
    "bucket": 1,
-   "bytes": 7984322,
+   "bytes": 8010705,
    "file": "001.json",
-   "rows": 8382,
-   "sha256": "9a571da13d93612d1a7cfe24ac9a185736f1967aa0beff38ece6647573c2915e"
+   "rows": 8410,
+   "sha256": "d708e4aeac26af82d489912d958c9902c6f20751da9d984f1c3f5d9259d05f3c"
   }
  ],
  "signal": "heir_roll",
