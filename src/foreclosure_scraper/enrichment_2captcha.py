@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import time
 from typing import Optional
 
 import httpx
@@ -308,3 +309,108 @@ async def get_account_balance(api_key: Optional[str] = None) -> Optional[float]:
         return None
     except Exception:
         return None
+
+
+async def solve_aws_waf_challenge(
+    page_url: str,
+    iv: str,
+    context: str,
+    challenge_js: str = None,
+    api_key: str = None,
+    timeout: float = 120.0,
+) -> Optional[str]:
+    """Solve AWS WAF Challenge using 2Captcha.
+    
+    AWS WAF is a 3x3 image grid puzzle (similar to reCAPTCHA image challenge).
+    
+    COST: $0.005 per solve (5x more expensive than reCAPTCHA)
+    
+    NOTE: CapSolver is 5x cheaper ($0.001 vs $0.005) for AWS WAF specifically.
+          Consider using CapSolver if you need to solve many AWS WAF challenges.
+          2Captcha is better for reCAPTCHA (same price, more reliable).
+    
+    Args:
+        page_url: Full URL where WAF challenge appears
+        iv: AWS WAF initialization vector
+        context: AWS WAF context value
+        challenge_js: Optional AWS WAF challenge.js script URL
+        api_key: 2Captcha API key
+        timeout: Max seconds to wait
+        
+    Returns:
+        WAF token string, or None on failure
+    """
+    key = api_key or os.environ.get("TWOCAPTCHA_API_KEY")
+    if not key:
+        for path in ["~/.secrets/2captcha_api_key.txt", ".secrets/2captcha_api_key.txt"]:
+            try:
+                with open(os.path.expanduser(path)) as f:
+                    key = f.read().strip()
+                if key:
+                    break
+            except Exception:
+                pass
+    
+    if not key:
+        log.info("2captcha.waf.no_api_key")
+        return None
+    
+    log.info("2captcha.waf.submitting", page_url=page_url[:100])
+    
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        try:
+            params = {
+                "key": key,
+                "method": "aws_waf",
+                "pageurl": page_url,
+                "sitekey": iv,
+                "context": context,
+                "json": "1",
+            }
+            if challenge_js:
+                params["challenge_script"] = challenge_js
+            
+            r = await client.get(f"{TWOCAPTCHA_BASE}/in.php", params=params)
+            data = r.json()
+        except Exception as exc:
+            log.warning("2captcha.waf.submit_fail", error=str(exc)[:200])
+            return None
+        
+        if data.get("status") != 1:
+            log.warning("2captcha.waf.submit_error", error_code=data.get("request"))
+            return None
+        
+        task_id = data.get("request")
+        log.info("2captcha.waf.task_created", task_id=task_id)
+        
+        # Poll for result
+        await asyncio.sleep(10.0)
+        start = time.monotonic()
+        
+        while time.monotonic() - start < timeout:
+            try:
+                r = await client.get(
+                    f"{TWOCAPTCHA_BASE}/res.php",
+                    params={"key": key, "action": "get", "id": task_id, "json": "1"},
+                )
+                data = r.json()
+            except Exception as exc:
+                log.warning("2captcha.waf.poll_fail", error=str(exc)[:200])
+                await asyncio.sleep(5.0)
+                continue
+            
+            if data.get("status") == 1:
+                token = data.get("request")
+                elapsed = time.monotonic() - start
+                log.info("2captcha.waf.solved", task_id=task_id, elapsed_sec=round(elapsed, 1))
+                return token
+            elif data.get("request") == "CAPCHA_NOT_READY":
+                await asyncio.sleep(5.0)
+                continue
+            else:
+                log.warning("2captcha.waf.error", error_code=data.get("request"))
+                return None
+        
+        log.warning("2captcha.waf.timeout", task_id=task_id, timeout_sec=timeout)
+        return None
+

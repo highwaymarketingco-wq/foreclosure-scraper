@@ -459,12 +459,31 @@ async def _waf_present(page) -> bool:
 
 
 async def _solve_waf(page) -> bool:
+    # Try free methods first (Gemini + Claude), then paid services
     try:
         from ...enrichment_waf_oss import solve_waf_via_browser
     except Exception as exc:  # noqa: BLE001
         log.warning("nc_ecourts_estates.waf_import_fail", error=str(exc)[:160])
         return False
+    
+    # First: Try free Gemini (9 keys) + Claude fallback
     solved = await solve_waf_via_browser(page)
+    if solved:
+        return True
+    
+    # Second: Try 2Captcha if key available
+    # NOTE: 2Captcha AWS WAF costs $0.005/solve (5x more than reCAPTCHA)
+    #       CapSolver is 5x cheaper at $0.001/solve for AWS WAF specifically
+    if os.environ.get("TWOCAPTCHA_API_KEY") or os.path.exists(".secrets/2captcha_api_key.txt"):
+        try:
+            from ...enrichment_2captcha import solve_aws_waf_challenge
+            # Extract WAF params from page (TODO: implement param extraction)
+            # For now, skip 2Captcha AWS WAF - needs more integration work
+            log.info("nc_ecourts_estates.2captcha_skip", reason="WAF param extraction not implemented")
+        except Exception as exc:  # noqa: BLE001
+            log.warning("nc_ecourts_estates.2captcha_fail", error=str(exc)[:160])
+    
+    # Third: Try CapSolver if key available (cheapest paid option for AWS WAF)
     if not solved and os.environ.get("CAPSOLVER_API_KEY"):
         try:
             from ...enrichment_capsolver import solve_aws_waf
@@ -479,6 +498,7 @@ async def _solve_waf(page) -> bool:
                 solved = True
         except Exception as exc:  # noqa: BLE001
             log.warning("nc_ecourts_estates.capsolver_fail", error=str(exc)[:160])
+    
     return bool(solved)
 
 
