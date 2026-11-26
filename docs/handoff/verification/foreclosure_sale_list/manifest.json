@@ -8,12 +8,12 @@
   "unconfirmed": 80,
   "wall": 0
  },
- "generated_at": "2026-11-26T17:16:27Z",
+ "generated_at": "2026-11-26T18:15:41Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T17:16:27Z",
+  "at": "2026-11-26T18:15:41Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,17 +21,19 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 76,
-    "portal-nc.tylertech.cloud": 35,
-    "roster:cc.southernsoftware.com": 2,
-    "roster:forsythsheriffnc.policetocitizen.com": 1,
-    "roster:kershaw-so-sc.zuercherportal.com": 1,
+    "devsvcs.gastonianc.gov": 3,
+    "gis.buncombecounty.org": 69,
+    "gis.charlottenc.gov": 26,
+    "portal-nc.tylertech.cloud": 38,
+    "rockhillgis.cityofrockhill.com": 6,
+    "roster:anderson-so-sc.zuercherportal.com": 1,
+    "roster:brunswick-so-nc.zuercherportal.com": 1,
+    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "roster:jail.richlandcountysc.gov": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
-    "roster:rowancountync.policetocitizen.com": 1,
-    "roster:services3.arcgis.com": 1,
-    "roster:www.fcso.org": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 144,
+    "services1.arcgis.com": 7,
+    "vt.ncsbe.gov": 141,
     "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
@@ -40,7 +42,7 @@
    "checked": 50,
    "unconfirmed": 50
   },
-  "seconds": 852,
+  "seconds": 807,
   "selection": {
    "applies": 418,
    "due_new": 1,
@@ -62,7 +64,7 @@
    "bytes": 498569,
    "file": "000.json",
    "rows": 420,
-   "sha256": "a7338e1d8ec83a26f5193b8c21d30eccfb240454b68e1f1e359f7099df3d5a7c"
+   "sha256": "c4483de103c18d91f34205ee03c260b8f7a6abfcb369747b0316ecfe7193767a"
   }
  ],
  "signal": "foreclosure_sale_list",

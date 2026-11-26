@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 9271,
+  "confirmed": 9319,
   "refuted": 26,
-  "rows": 10861,
+  "rows": 10909,
   "stale": 1313,
   "unconfirmed": 251,
   "wall": 0
  },
- "generated_at": "2026-11-26T17:16:29Z",
+ "generated_at": "2026-11-26T18:15:43Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T17:16:29Z",
+  "at": "2026-11-26T18:15:42Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,17 +21,19 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 76,
-    "portal-nc.tylertech.cloud": 35,
-    "roster:cc.southernsoftware.com": 2,
-    "roster:forsythsheriffnc.policetocitizen.com": 1,
-    "roster:kershaw-so-sc.zuercherportal.com": 1,
+    "devsvcs.gastonianc.gov": 3,
+    "gis.buncombecounty.org": 69,
+    "gis.charlottenc.gov": 26,
+    "portal-nc.tylertech.cloud": 38,
+    "rockhillgis.cityofrockhill.com": 6,
+    "roster:anderson-so-sc.zuercherportal.com": 1,
+    "roster:brunswick-so-nc.zuercherportal.com": 1,
+    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "roster:jail.richlandcountysc.gov": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
-    "roster:rowancountync.policetocitizen.com": 1,
-    "roster:services3.arcgis.com": 1,
-    "roster:www.fcso.org": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 144,
+    "services1.arcgis.com": 7,
+    "vt.ncsbe.gov": 141,
     "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
@@ -41,35 +43,35 @@
    "confirmed": 48,
    "unconfirmed": 2
   },
-  "seconds": 852,
+  "seconds": 807,
   "selection": {
    "applies": 25671,
-   "due_new": 15163,
+   "due_new": 15115,
    "due_retry": 3,
    "due_ttl": 670,
    "not_due_retry": 259,
-   "not_due_ttl": 9576
+   "not_due_ttl": 9624
   },
   "source": null,
   "tier": null
  },
- "rows": 10861,
+ "rows": 10909,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 6751522,
+   "bytes": 6785654,
    "file": "000.json",
-   "rows": 5475,
-   "sha256": "1fd4bf6acf9d884f55e38a834c623eca2157e3539ef31ecc8eef4f867e2504b8"
+   "rows": 5503,
+   "sha256": "2328bf0a280e957ee53978666c4cb3190d728ce9eab717b579dc4424124e78ab"
   },
   {
    "bucket": 1,
-   "bytes": 6646223,
+   "bytes": 6670506,
    "file": "001.json",
-   "rows": 5386,
-   "sha256": "c8294b1c12e894136090cb6cea03de7f20492294d8ac7b4d31326f2c42a715fa"
+   "rows": 5406,
+   "sha256": "b18b1b8ef948bc7201705f5d9dc67641fc3a16bb010de8ecdeb85a7e23f3d356"
   }
  ],
  "signal": "nc_ecourts_case",

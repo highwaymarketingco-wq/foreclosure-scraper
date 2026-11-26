@@ -3,17 +3,17 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 3110,
+  "rows": 3160,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 3110
+  "wall": 3160
  },
- "generated_at": "2026-11-26T17:16:29Z",
+ "generated_at": "2026-11-26T18:15:42Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T17:16:28Z",
+  "at": "2026-11-26T18:15:42Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,17 +21,19 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 76,
-    "portal-nc.tylertech.cloud": 35,
-    "roster:cc.southernsoftware.com": 2,
-    "roster:forsythsheriffnc.policetocitizen.com": 1,
-    "roster:kershaw-so-sc.zuercherportal.com": 1,
+    "devsvcs.gastonianc.gov": 3,
+    "gis.buncombecounty.org": 69,
+    "gis.charlottenc.gov": 26,
+    "portal-nc.tylertech.cloud": 38,
+    "rockhillgis.cityofrockhill.com": 6,
+    "roster:anderson-so-sc.zuercherportal.com": 1,
+    "roster:brunswick-so-nc.zuercherportal.com": 1,
+    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "roster:jail.richlandcountysc.gov": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
-    "roster:rowancountync.policetocitizen.com": 1,
-    "roster:services3.arcgis.com": 1,
-    "roster:www.fcso.org": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 144,
+    "services1.arcgis.com": 7,
+    "vt.ncsbe.gov": 141,
     "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
@@ -40,26 +42,26 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 852,
+  "seconds": 807,
   "selection": {
    "applies": 66565,
-   "due_new": 63438,
-   "not_due_ttl": 3127,
-   "same_property_queued": 2
+   "due_new": 63386,
+   "not_due_ttl": 3179,
+   "same_property_queued": 1
   },
   "source": null,
   "tier": null
  },
- "rows": 3110,
+ "rows": 3160,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 2781527,
+   "bytes": 2825708,
    "file": "000.json",
-   "rows": 3110,
-   "sha256": "57a8f3248731787c238630eb587b50151f2e88e440bedbc03fc20b7c562f03b7"
+   "rows": 3160,
+   "sha256": "98fa83c2a701d83e4da280d87c21e5c36035cc028497e26d2ea13bba9b1f8d1a"
   }
  ],
  "signal": "lien_registry_wall",

@@ -8,12 +8,12 @@
   "unconfirmed": 223,
   "wall": 0
  },
- "generated_at": "2026-11-26T17:16:28Z",
+ "generated_at": "2026-11-26T18:15:42Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T17:16:28Z",
+  "at": "2026-11-26T18:15:42Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,30 +21,32 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 76,
-    "portal-nc.tylertech.cloud": 35,
-    "roster:cc.southernsoftware.com": 2,
-    "roster:forsythsheriffnc.policetocitizen.com": 1,
-    "roster:kershaw-so-sc.zuercherportal.com": 1,
+    "devsvcs.gastonianc.gov": 3,
+    "gis.buncombecounty.org": 69,
+    "gis.charlottenc.gov": 26,
+    "portal-nc.tylertech.cloud": 38,
+    "rockhillgis.cityofrockhill.com": 6,
+    "roster:anderson-so-sc.zuercherportal.com": 1,
+    "roster:brunswick-so-nc.zuercherportal.com": 1,
+    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "roster:jail.richlandcountysc.gov": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
-    "roster:rowancountync.policetocitizen.com": 1,
-    "roster:services3.arcgis.com": 1,
-    "roster:www.fcso.org": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 144,
+    "services1.arcgis.com": 7,
+    "vt.ncsbe.gov": 141,
     "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
   },
   "result": {
-   "checked": 11,
-   "unconfirmed": 11
+   "checked": 10,
+   "unconfirmed": 10
   },
-  "seconds": 852,
+  "seconds": 807,
   "selection": {
    "applies": 907,
-   "due_retry": 11,
-   "not_due_retry": 199,
+   "due_retry": 10,
+   "not_due_retry": 200,
    "not_due_ttl": 697
   },
   "source": null,
@@ -56,10 +58,10 @@
  "shards": [
   {
    "bucket": 0,
-   "bytes": 1188821,
+   "bytes": 1189941,
    "file": "000.json",
    "rows": 984,
-   "sha256": "dbd17d183b9d750d8c20b8ecd32030da1849ca0b42f497f1ab05719dfc57ff0a"
+   "sha256": "afa566648f472cb7bbbb6318b33d205b9d6987289b4198b68218811a6d56bab2"
   }
  ],
  "signal": "jail_booking",
