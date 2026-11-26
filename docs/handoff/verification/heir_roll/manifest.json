@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 16417,
+  "confirmed": 16567,
   "refuted": 11,
-  "rows": 16654,
+  "rows": 16804,
   "stale": 46,
   "unconfirmed": 180,
   "wall": 0
  },
- "generated_at": "2026-11-26T00:50:32Z",
+ "generated_at": "2026-11-26T03:06:48Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T00:50:31Z",
+  "at": "2026-11-26T03:06:47Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,11 +21,11 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 60,
-    "portal-nc.tylertech.cloud": 43,
+    "gis.buncombecounty.org": 53,
+    "portal-nc.tylertech.cloud": 47,
     "services.nconemap.gov": 50,
     "services1.arcgis.com": 7,
-    "vt.ncsbe.gov": 147,
+    "vt.ncsbe.gov": 138,
     "www.courtlistener.com": 2
    }
   },
@@ -33,36 +33,36 @@
    "checked": 50,
    "confirmed": 50
   },
-  "seconds": 805,
+  "seconds": 587,
   "selection": {
    "applies": 44671,
-   "due_new": 28123,
-   "due_retry": 47,
+   "due_new": 27973,
+   "due_retry": 49,
    "due_retry_transient": 24,
    "due_ttl": 432,
-   "not_due_retry": 105,
-   "not_due_ttl": 15940
+   "not_due_retry": 103,
+   "not_due_ttl": 16090
   },
   "source": null,
   "tier": null
  },
- "rows": 16654,
+ "rows": 16804,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 7988198,
+   "bytes": 8057865,
    "file": "000.json",
-   "rows": 8395,
-   "sha256": "35ec3c3a54f6516d691774c7857b42f5b35e4651a19cb252fd02ee24312c8efa"
+   "rows": 8467,
+   "sha256": "1da90204121b194b5bde497c75fba2fc5b8c82653efb450df84a7dc046ca7c99"
   },
   {
    "bucket": 1,
-   "bytes": 7865506,
+   "bytes": 7941447,
    "file": "001.json",
-   "rows": 8259,
-   "sha256": "374f19b18b7d799aa161ae638d60c2f48d4232512b94d2e905e18d098f6edd40"
+   "rows": 8337,
+   "sha256": "2c04ba940562a2d87d8282e76c9d3b7155ccc87ff21acf85e0add936bbcc7c4a"
   }
  ],
  "signal": "heir_roll",

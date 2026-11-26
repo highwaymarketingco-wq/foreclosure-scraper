@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 8685,
+  "confirmed": 8762,
   "refuted": 26,
-  "rows": 10141,
-  "stale": 1187,
-  "unconfirmed": 243,
+  "rows": 10285,
+  "stale": 1247,
+  "unconfirmed": 250,
   "wall": 0
  },
- "generated_at": "2026-11-26T00:50:33Z",
+ "generated_at": "2026-11-26T03:06:50Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T00:50:33Z",
+  "at": "2026-11-26T03:06:49Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,49 +21,49 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 60,
-    "portal-nc.tylertech.cloud": 43,
+    "gis.buncombecounty.org": 53,
+    "portal-nc.tylertech.cloud": 47,
     "services.nconemap.gov": 50,
     "services1.arcgis.com": 7,
-    "vt.ncsbe.gov": 147,
+    "vt.ncsbe.gov": 138,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 29,
-   "stale": 19,
+   "confirmed": 37,
+   "stale": 11,
    "unconfirmed": 2
   },
-  "seconds": 805,
+  "seconds": 587,
   "selection": {
    "applies": 25671,
-   "due_new": 15883,
+   "due_new": 15739,
    "due_retry": 3,
    "due_ttl": 670,
-   "not_due_retry": 251,
-   "not_due_ttl": 8864
+   "not_due_retry": 258,
+   "not_due_ttl": 9001
   },
   "source": null,
   "tier": null
  },
- "rows": 10141,
+ "rows": 10285,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 6295035,
+   "bytes": 6384821,
    "file": "000.json",
-   "rows": 5101,
-   "sha256": "f51bd630ab8dceeda515c7d96c473bf2bbdf4f72f4725caace1ce20ed3db6f05"
+   "rows": 5175,
+   "sha256": "39d92856cc4c230cc63da635c76256a9774f52028bcb9a399754661d1f0431da"
   },
   {
    "bucket": 1,
-   "bytes": 6224450,
+   "bytes": 6308821,
    "file": "001.json",
-   "rows": 5040,
-   "sha256": "fd5300b91e1a17f8df69316b9bacc129d96acc3e6dab11495472a683b4073550"
+   "rows": 5110,
+   "sha256": "ce17b51e4b771f082e3816461278736ffc078c957778009aebe0e5178e71a498"
   }
  ],
  "signal": "nc_ecourts_case",

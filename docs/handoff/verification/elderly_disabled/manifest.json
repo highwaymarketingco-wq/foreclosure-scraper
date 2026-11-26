@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 7906,
+  "confirmed": 8052,
   "refuted": 99,
-  "rows": 8174,
+  "rows": 8324,
   "stale": 59,
-  "unconfirmed": 110,
+  "unconfirmed": 114,
   "wall": 0
  },
- "generated_at": "2026-11-26T00:50:31Z",
+ "generated_at": "2026-11-26T03:06:47Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T00:50:31Z",
+  "at": "2026-11-26T03:06:47Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,48 +21,49 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 60,
-    "portal-nc.tylertech.cloud": 43,
+    "gis.buncombecounty.org": 53,
+    "portal-nc.tylertech.cloud": 47,
     "services.nconemap.gov": 50,
     "services1.arcgis.com": 7,
-    "vt.ncsbe.gov": 147,
+    "vt.ncsbe.gov": 138,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 50
+   "confirmed": 47,
+   "unconfirmed": 3
   },
-  "seconds": 805,
+  "seconds": 587,
   "selection": {
    "applies": 140892,
-   "due_new": 131796,
+   "due_new": 131646,
    "due_retry": 3,
    "due_version": 1,
-   "not_due_retry": 98,
-   "not_due_ttl": 8994,
+   "not_due_retry": 99,
+   "not_due_ttl": 9143,
    "same_property_queued": 1
   },
   "source": null,
   "tier": null
  },
- "rows": 8174,
+ "rows": 8324,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4251011,
+   "bytes": 4352917,
    "file": "000.json",
-   "rows": 4113,
-   "sha256": "a638fdde9698d56d6cb017c8a3d5c67d775bd1976c15b7735c236d70b38823d0"
+   "rows": 4193,
+   "sha256": "a630a6305aa984b7055b8996dbdb38a5f8ab97856cc3895e1d5480a3fe32fb64"
   },
   {
    "bucket": 1,
-   "bytes": 4163435,
+   "bytes": 4251906,
    "file": "001.json",
-   "rows": 4061,
-   "sha256": "08e088a6a9fe6765edc77a70a8532629258c4d50b10dc398ec33ec55e63f1038"
+   "rows": 4131,
+   "sha256": "87951c777fdf72745e92b5791f67f74bcd00c4c73392eddb5c9328629aa6fdea"
   }
  ],
  "signal": "elderly_disabled",
