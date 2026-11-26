@@ -3,29 +3,45 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 2708,
+  "rows": 2758,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 2708
+  "wall": 2758
  },
- "generated_at": "2026-11-26T03:06:46Z",
+ "generated_at": "2026-11-26T06:59:52Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T03:06:46Z",
+  "at": "2026-11-26T06:59:52Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
   "recheck_only": false,
   "requests": {
-   "errors": {},
+   "errors": {
+    "roster:union-so-sc.zuercherportal.com": 1
+   },
    "requests": {
-    "gis.buncombecounty.org": 53,
-    "portal-nc.tylertech.cloud": 47,
+    "gis.buncombecounty.org": 50,
+    "portal-nc.tylertech.cloud": 42,
+    "roster:anderson-so-sc.zuercherportal.com": 1,
+    "roster:buncombecountyso.policetocitizen.com": 1,
+    "roster:cc.southernsoftware.com": 1,
+    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "roster:cumberlandsheriffnc.gov": 1,
+    "roster:guilfordcountysheriff.policetocitizen.com": 1,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
+    "roster:oconee-so-sc.zuercherportal.com": 1,
+    "roster:p2c.lincolnsheriff.org": 1,
+    "roster:p2c.nhcgov.com": 1,
+    "roster:pickens-so-sc.zuercherportal.com": 1,
+    "roster:union-so-sc.zuercherportal.com": 1,
+    "roster:wakeso.policetocitizen.com": 1,
     "services.nconemap.gov": 50,
     "services1.arcgis.com": 7,
-    "vt.ncsbe.gov": 138,
+    "vt.ncsbe.gov": 141,
     "www.courtlistener.com": 2
    }
   },
@@ -33,25 +49,25 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 587,
+  "seconds": 761,
   "selection": {
    "applies": 4916,
-   "due_new": 2241,
-   "not_due_ttl": 2675
+   "due_new": 2191,
+   "not_due_ttl": 2725
   },
   "source": null,
   "tier": null
  },
- "rows": 2708,
+ "rows": 2758,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 2334782,
+   "bytes": 2376831,
    "file": "000.json",
-   "rows": 2708,
-   "sha256": "3facba1286fd72bed7001c57288dcdf518f9b6623fbad8ee4fcf35cfdde56106"
+   "rows": 2758,
+   "sha256": "9581ddabb9e4acf84d9d87e1f42d1131806f9351e1a7390115461485614d6fe0"
   }
  ],
  "signal": "divorce",

@@ -4,37 +4,59 @@
   "confirmed": 549,
   "refuted": 26,
   "rows": 984,
-  "stale": 182,
-  "unconfirmed": 225,
+  "stale": 184,
+  "unconfirmed": 223,
   "wall": 0
  },
- "generated_at": "2026-11-26T03:06:49Z",
+ "generated_at": "2026-11-26T06:59:54Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T03:06:48Z",
+  "at": "2026-11-26T06:59:54Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
   "recheck_only": false,
   "requests": {
-   "errors": {},
+   "errors": {
+    "roster:union-so-sc.zuercherportal.com": 1
+   },
    "requests": {
-    "gis.buncombecounty.org": 53,
-    "portal-nc.tylertech.cloud": 47,
+    "gis.buncombecounty.org": 50,
+    "portal-nc.tylertech.cloud": 42,
+    "roster:anderson-so-sc.zuercherportal.com": 1,
+    "roster:buncombecountyso.policetocitizen.com": 1,
+    "roster:cc.southernsoftware.com": 1,
+    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "roster:cumberlandsheriffnc.gov": 1,
+    "roster:guilfordcountysheriff.policetocitizen.com": 1,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
+    "roster:oconee-so-sc.zuercherportal.com": 1,
+    "roster:p2c.lincolnsheriff.org": 1,
+    "roster:p2c.nhcgov.com": 1,
+    "roster:pickens-so-sc.zuercherportal.com": 1,
+    "roster:union-so-sc.zuercherportal.com": 1,
+    "roster:wakeso.policetocitizen.com": 1,
     "services.nconemap.gov": 50,
     "services1.arcgis.com": 7,
-    "vt.ncsbe.gov": 138,
+    "vt.ncsbe.gov": 141,
     "www.courtlistener.com": 2
    }
   },
-  "result": {},
-  "seconds": 587,
+  "result": {
+   "checked": 50,
+   "stale": 2,
+   "unconfirmed": 48
+  },
+  "seconds": 761,
   "selection": {
    "applies": 907,
-   "not_due_retry": 212,
-   "not_due_ttl": 695
+   "due_retry": 66,
+   "not_due_retry": 146,
+   "not_due_ttl": 695,
+   "same_property_queued": 1
   },
   "source": null,
   "tier": null
@@ -45,10 +67,10 @@
  "shards": [
   {
    "bucket": 0,
-   "bytes": 1173343,
+   "bytes": 1178646,
    "file": "000.json",
    "rows": 984,
-   "sha256": "8efd9316c66081fc78cc8f9b30b057e03a8988e47d40e86a3bd8babe397ad447"
+   "sha256": "8120065c0d0751ba285cf34d1d77de8fbadda4b647e5586b5d773ee767238c8a"
   }
  ],
  "signal": "jail_booking",
