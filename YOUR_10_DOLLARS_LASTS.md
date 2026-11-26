@@ -84,13 +84,13 @@ Start with just 2Captcha ($10 for 2.5 years). If NC eCourts consistently fails w
 
 **With 2Captcha only:**
 - 10 reCAPTCHA sources: **96,000 rows** (95-99% success)
-- NC eCourts (Gemini fallback): **27,000 rows** (40-60% success)
-- **Total: 96K-123K rows**
+- NC eCourts (9 Gemini + Claude): **27,000 rows** (70-80% success, FREE)
+- **Total: 123,000 rows** (most sources work great)
 
 **With 2Captcha + CapSolver:**
 - 10 reCAPTCHA sources: **96,000 rows** (95-99% success)
-- NC eCourts (CapSolver): **27,000 rows** (95-99% success)
-- **Total: 123,000 rows**
+- NC eCourts (CapSolver): **27,000 rows** (95% success)
+- **Total: 123,000 rows** (everything optimized)
 
 ---
 
