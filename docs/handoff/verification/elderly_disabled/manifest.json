@@ -1,19 +1,19 @@
 {
- "buckets": 1,
+ "buckets": 2,
  "counts": {
-  "confirmed": 7856,
+  "confirmed": 7906,
   "refuted": 99,
-  "rows": 8124,
+  "rows": 8174,
   "stale": 59,
   "unconfirmed": 110,
   "wall": 0
  },
- "generated_at": "2026-11-25T22:30:31Z",
+ "generated_at": "2026-11-26T00:50:31Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-25T22:30:30Z",
+  "at": "2026-11-26T00:50:31Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,13 +21,11 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 66,
-    "portal-nc.tylertech.cloud": 42,
-    "roster:inmatesinjail.yorkcountygov.com": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
+    "gis.buncombecounty.org": 60,
+    "portal-nc.tylertech.cloud": 43,
     "services.nconemap.gov": 50,
     "services1.arcgis.com": 7,
-    "vt.ncsbe.gov": 138,
+    "vt.ncsbe.gov": 147,
     "www.courtlistener.com": 2
    }
   },
@@ -35,29 +33,36 @@
    "checked": 50,
    "confirmed": 50
   },
-  "seconds": 797,
+  "seconds": 805,
   "selection": {
    "applies": 140892,
-   "due_new": 131846,
+   "due_new": 131796,
    "due_retry": 3,
    "due_version": 1,
    "not_due_retry": 98,
-   "not_due_ttl": 8944,
+   "not_due_ttl": 8994,
    "same_property_queued": 1
   },
   "source": null,
   "tier": null
  },
- "rows": 8124,
+ "rows": 8174,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 8351569,
+   "bytes": 4251011,
    "file": "000.json",
-   "rows": 8124,
-   "sha256": "e28660a96e3e429065f587093f77456b444eaa04405847b777e222056222d7f3"
+   "rows": 4113,
+   "sha256": "a638fdde9698d56d6cb017c8a3d5c67d775bd1976c15b7735c236d70b38823d0"
+  },
+  {
+   "bucket": 1,
+   "bytes": 4163435,
+   "file": "001.json",
+   "rows": 4061,
+   "sha256": "08e088a6a9fe6765edc77a70a8532629258c4d50b10dc398ec33ec55e63f1038"
   }
  ],
  "signal": "elderly_disabled",
