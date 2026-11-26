@@ -8,20 +8,18 @@
   "unconfirmed": 1054,
   "wall": 0
  },
- "generated_at": "2026-11-26T11:06:53Z",
+ "generated_at": "2026-11-26T11:26:36Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T11:06:52Z",
+  "at": "2026-11-26T11:26:35Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 300,
   "recheck_only": false,
   "requests": {
-   "errors": {
-    "gis.buncombecounty.org": 2
-   },
+   "errors": {},
    "requests": {
     "gis.buncombecounty.org": 2
    }
@@ -30,7 +28,7 @@
    "checked": 2,
    "unconfirmed": 2
   },
-  "seconds": 12,
+  "seconds": 5,
   "selection": {
    "applies": 9615,
    "due_ttl": 2,
@@ -63,14 +61,14 @@
    "bytes": 5009953,
    "file": "002.json",
    "rows": 2354,
-   "sha256": "2cef5f57a1304e99b4a15b39a7072b0d8d5520438de18fe3885f7b4bb909fc78"
+   "sha256": "e7bfca37a28b9088a863a528ea3917bacae44dd55e679ed244872add42c6fa1a"
   },
   {
    "bucket": 3,
    "bytes": 5023499,
    "file": "003.json",
    "rows": 2362,
-   "sha256": "c4fb2389293a0958f44ae5e8a9ad0ff6aa23699d797bf2b9c80890f98f5c7006"
+   "sha256": "becdbe31ca83ec96fd06b50dc7e28ca5e252259a68151affeaa9b6d2878befdc"
   }
  ],
  "signal": "comps",
