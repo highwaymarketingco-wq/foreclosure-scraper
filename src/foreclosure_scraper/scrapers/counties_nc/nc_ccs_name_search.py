@@ -331,7 +331,23 @@ _DOC_TYPES = (
 
 
 def _body(last: str) -> str:
-    """Build POST body for surname search."""
+    """Build POST body for surname search.
+
+    FIXED 2026-11-25 (second pass): the prior fix here only added DocTypes and
+    removed the array-style `[]` suffixes (see this file's 2026-11-25 module
+    comment) and was verified by a separate, never-applied-back test helper --
+    not by calling THIS function directly. A direct call of this exact
+    function against live Gates/Caldwell still returned the empty 31,002-byte
+    grid, and Franklin still crashed with the same "Fatal error during
+    search: The given key was not present in the dictionary" -- a literal
+    dictionary-KeyNotFoundException signature consistent with server-side code
+    doing a direct keyed lookup into the posted form, which throws if a key
+    the real form always sends is absent entirely, empty or not. Confirmed via
+    a live browser capture of the REAL full form submission: 15 more fields
+    (all empty in that capture except the one noted) are present in every real
+    request and missing here. Re-added below, same empty values as captured;
+    order does not matter for x-www-form-urlencoded/model-binding, only
+    presence of every name does."""
     params = [
         "MaxRecordCount=2000",
         "PageSize=200",
@@ -343,6 +359,9 @@ def _body(last: str) -> str:
         "LRMatchContainsDefaultOn=False",
         "allRowsAreExpanded=false",
         "SearchType=3",
+        "MarkedViewedPrimkeys=",
+        "Last=",
+        "Given=",
         f"MultiNameLast={urllib.parse.quote(last)}",
         "MultiNameGiven=",  # Empty first name
         "MultiNameSearchType=3",
@@ -353,12 +372,25 @@ def _body(last: str) -> str:
         "CodeType=3",
         "IndexType=3",
         "SymbolSetOut=false",
+        "FromDate=",
+        "ToDate=",
+        "AdvancedFromDate=",
+        "AdvancedToDate=",
+        "BookNumber=",
+        "PageNumber=",
+        "DocNumber=",
+        "TaxFrom=",
+        "TaxTo=",
+        "SearchByConveyanceAmount=false",
         "AdvancedDescriptionQualifier=%2B%2B",
         "AdvancedDescriptionAndOr=AND",
+        "AdvancedDescriptionValue=",
         "ResultsType=1",
         "ExpandAllRows=false",
         "HighlightSearchTermsInResults=false",
         "AutocompleteEnabled=false",
+        "SortColumnPrimary=",
+        "SortColumnSecondary=",
         "SortDirectionPrimary=1",
         "SortDirectionSecondary=1",
     ]
