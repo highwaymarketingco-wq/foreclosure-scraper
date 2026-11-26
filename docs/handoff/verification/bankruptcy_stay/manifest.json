@@ -8,12 +8,12 @@
   "unconfirmed": 194,
   "wall": 0
  },
- "generated_at": "2026-11-26T06:59:51Z",
+ "generated_at": "2026-11-26T08:12:54Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T06:59:51Z",
+  "at": "2026-11-26T08:12:54Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -23,25 +23,19 @@
     "roster:union-so-sc.zuercherportal.com": 1
    },
    "requests": {
-    "gis.buncombecounty.org": 50,
-    "portal-nc.tylertech.cloud": 42,
+    "gis.buncombecounty.org": 55,
+    "portal-nc.tylertech.cloud": 32,
     "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:buncombecountyso.policetocitizen.com": 1,
-    "roster:cc.southernsoftware.com": 1,
-    "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:cumberlandsheriffnc.gov": 1,
-    "roster:guilfordcountysheriff.policetocitizen.com": 1,
-    "roster:laurens-911-sc.zuercherportal.com": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "roster:oconee-so-sc.zuercherportal.com": 1,
-    "roster:p2c.lincolnsheriff.org": 1,
-    "roster:p2c.nhcgov.com": 1,
+    "roster:brunswick-so-nc.zuercherportal.com": 1,
+    "roster:colleton-so-sc.zuercherportal.com": 1,
+    "roster:kershaw-so-sc.zuercherportal.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
+    "roster:tepsweb.cityofgastonia.com": 1,
     "roster:union-so-sc.zuercherportal.com": 1,
-    "roster:wakeso.policetocitizen.com": 1,
-    "services.nconemap.gov": 50,
+    "services.nconemap.gov": 53,
     "services1.arcgis.com": 7,
     "vt.ncsbe.gov": 141,
+    "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
   },
@@ -49,7 +43,7 @@
    "checked": 7,
    "unconfirmed": 7
   },
-  "seconds": 761,
+  "seconds": 647,
   "selection": {
    "applies": 465,
    "due_ttl": 7,
@@ -68,7 +62,7 @@
    "bytes": 630380,
    "file": "000.json",
    "rows": 571,
-   "sha256": "1a26c3e5226ff8d1007d6cdf12841018c17ebd84709ab40a142d984dbd06c165"
+   "sha256": "b7eb949ef815e2dba51b6ebcd13c2093900c339f4b861884070d5aa9d66998da"
   }
  ],
  "signal": "bankruptcy_stay",

@@ -3,17 +3,17 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 2758,
+  "rows": 2808,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 2758
+  "wall": 2808
  },
- "generated_at": "2026-11-26T06:59:52Z",
+ "generated_at": "2026-11-26T08:12:55Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T06:59:52Z",
+  "at": "2026-11-26T08:12:55Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -23,25 +23,19 @@
     "roster:union-so-sc.zuercherportal.com": 1
    },
    "requests": {
-    "gis.buncombecounty.org": 50,
-    "portal-nc.tylertech.cloud": 42,
+    "gis.buncombecounty.org": 55,
+    "portal-nc.tylertech.cloud": 32,
     "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:buncombecountyso.policetocitizen.com": 1,
-    "roster:cc.southernsoftware.com": 1,
-    "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:cumberlandsheriffnc.gov": 1,
-    "roster:guilfordcountysheriff.policetocitizen.com": 1,
-    "roster:laurens-911-sc.zuercherportal.com": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "roster:oconee-so-sc.zuercherportal.com": 1,
-    "roster:p2c.lincolnsheriff.org": 1,
-    "roster:p2c.nhcgov.com": 1,
+    "roster:brunswick-so-nc.zuercherportal.com": 1,
+    "roster:colleton-so-sc.zuercherportal.com": 1,
+    "roster:kershaw-so-sc.zuercherportal.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
+    "roster:tepsweb.cityofgastonia.com": 1,
     "roster:union-so-sc.zuercherportal.com": 1,
-    "roster:wakeso.policetocitizen.com": 1,
-    "services.nconemap.gov": 50,
+    "services.nconemap.gov": 53,
     "services1.arcgis.com": 7,
     "vt.ncsbe.gov": 141,
+    "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
   },
@@ -49,25 +43,25 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 761,
+  "seconds": 647,
   "selection": {
    "applies": 4916,
-   "due_new": 2191,
-   "not_due_ttl": 2725
+   "due_new": 2141,
+   "not_due_ttl": 2775
   },
   "source": null,
   "tier": null
  },
- "rows": 2758,
+ "rows": 2808,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 2376831,
+   "bytes": 2416771,
    "file": "000.json",
-   "rows": 2758,
-   "sha256": "9581ddabb9e4acf84d9d87e1f42d1131806f9351e1a7390115461485614d6fe0"
+   "rows": 2808,
+   "sha256": "8f82d6e335bb1c0d1d3722d28414cca7a39d4ec2ebad302840bb708e3effc7c5"
   }
  ],
  "signal": "divorce",
