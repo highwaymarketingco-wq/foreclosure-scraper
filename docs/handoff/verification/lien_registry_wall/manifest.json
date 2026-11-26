@@ -3,17 +3,17 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 3410,
+  "rows": 3460,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 3410
+  "wall": 3460
  },
- "generated_at": "2026-11-26T21:29:52Z",
+ "generated_at": "2026-11-26T22:19:59Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T21:29:52Z",
+  "at": "2026-11-26T22:19:59Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -23,9 +23,9 @@
    "requests": {
     "gis.buncombecounty.org": 51,
     "gis.charlottenc.gov": 100,
-    "portal-nc.tylertech.cloud": 40,
+    "portal-nc.tylertech.cloud": 39,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 138,
+    "vt.ncsbe.gov": 147,
     "www.courtlistener.com": 2
    }
   },
@@ -33,25 +33,25 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 782,
+  "seconds": 786,
   "selection": {
    "applies": 66565,
-   "due_new": 63131,
-   "not_due_ttl": 3434
+   "due_new": 63081,
+   "not_due_ttl": 3484
   },
   "source": null,
   "tier": null
  },
- "rows": 3410,
+ "rows": 3460,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 3047496,
+   "bytes": 3091202,
    "file": "000.json",
-   "rows": 3410,
-   "sha256": "40079937cc1cb6e527869e69d68d9ca037b338c50c18e61c19ed1b76a6f7ce7b"
+   "rows": 3460,
+   "sha256": "8b2c64283931cdd7712d280e6bc204e70b9c83c27d08eafee636f075750ae295"
   }
  ],
  "signal": "lien_registry_wall",

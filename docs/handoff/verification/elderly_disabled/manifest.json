@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 8935,
+  "confirmed": 8984,
   "refuted": 99,
-  "rows": 9224,
+  "rows": 9274,
   "stale": 59,
-  "unconfirmed": 131,
+  "unconfirmed": 132,
   "wall": 0
  },
- "generated_at": "2026-11-26T21:29:50Z",
+ "generated_at": "2026-11-26T22:19:57Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T21:29:50Z",
+  "at": "2026-11-26T22:19:57Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -23,9 +23,9 @@
    "requests": {
     "gis.buncombecounty.org": 51,
     "gis.charlottenc.gov": 100,
-    "portal-nc.tylertech.cloud": 40,
+    "portal-nc.tylertech.cloud": 39,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 138,
+    "vt.ncsbe.gov": 147,
     "www.courtlistener.com": 2
    }
   },
@@ -34,36 +34,36 @@
    "confirmed": 49,
    "unconfirmed": 1
   },
-  "seconds": 782,
+  "seconds": 786,
   "selection": {
    "applies": 140892,
-   "due_new": 130746,
+   "due_new": 130696,
    "due_retry": 3,
    "due_version": 1,
-   "not_due_retry": 118,
-   "not_due_ttl": 10024,
+   "not_due_retry": 119,
+   "not_due_ttl": 10073,
    "same_property_queued": 1
   },
   "source": null,
   "tier": null
  },
- "rows": 9224,
+ "rows": 9274,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4923960,
+   "bytes": 4959409,
    "file": "000.json",
-   "rows": 4644,
-   "sha256": "ae5e1ccecfb2e2d5f506a6c9c0baec27d6eea192e1edd527688d039feb4b5417"
+   "rows": 4672,
+   "sha256": "7bcb38f48ec40cf973acbe30ea94925fee85f4f062a78effa3f60ff5a58e27f0"
   },
   {
    "bucket": 1,
-   "bytes": 4821827,
+   "bytes": 4850114,
    "file": "001.json",
-   "rows": 4580,
-   "sha256": "5d44c5e3082bbf93bca53a23878752e83bd2ca2d8818f1bd10ce43b71e99ccb4"
+   "rows": 4602,
+   "sha256": "fdf7728c1003b4e353e6c73aefdadbb03f19fd3134156b12ac8cbaa6597f6c2c"
   }
  ],
  "signal": "elderly_disabled",
