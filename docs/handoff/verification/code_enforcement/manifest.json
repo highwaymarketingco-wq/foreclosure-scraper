@@ -1,19 +1,19 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 3053,
-  "refuted": 582,
-  "rows": 3877,
+  "confirmed": 3076,
+  "refuted": 607,
+  "rows": 3927,
   "stale": 225,
-  "unconfirmed": 17,
+  "unconfirmed": 19,
   "wall": 0
  },
- "generated_at": "2026-11-26T10:31:12Z",
+ "generated_at": "2026-11-26T12:28:13Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T10:31:12Z",
+  "at": "2026-11-26T12:28:13Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -22,39 +22,51 @@
    "errors": {},
    "requests": {
     "gis.buncombecounty.org": 51,
-    "portal-nc.tylertech.cloud": 37,
+    "portal-nc.tylertech.cloud": 36,
+    "roster:anderson-so-sc.zuercherportal.com": 1,
+    "roster:apps.pittcountync.gov": 1,
+    "roster:cc.southernsoftware.com": 3,
+    "roster:cumberlandsheriffnc.gov": 1,
+    "roster:guilfordcountysheriff.policetocitizen.com": 1,
+    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
+    "roster:p2c.nhcgov.com": 1,
+    "roster:rowancountync.policetocitizen.com": 1,
+    "roster:wakeso.policetocitizen.com": 1,
+    "roster:www2.co.davidson.nc.us": 1,
+    "roster:www2.dconc.gov": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 135,
+    "vt.ncsbe.gov": 144,
     "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 33,
-   "refuted": 17
+   "confirmed": 23,
+   "refuted": 25,
+   "unconfirmed": 2
   },
-  "seconds": 550,
+  "seconds": 684,
   "selection": {
    "applies": 11927,
-   "due_new": 7981,
+   "due_new": 7931,
    "due_ttl": 112,
    "not_due_retry": 23,
-   "not_due_ttl": 3811
+   "not_due_ttl": 3861
   },
   "source": null,
   "tier": null
  },
- "rows": 3877,
+ "rows": 3927,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4376275,
+   "bytes": 4427625,
    "file": "000.json",
-   "rows": 3877,
-   "sha256": "083101f40b569793c765f7ee24b532f0b7a0378343c15a4b8dc6e1d8c2e5e4d5"
+   "rows": 3927,
+   "sha256": "763514cad11351daa9c4c80c21dcd94e324b2142496449f0037d3a88bdef7afb"
   }
  ],
  "signal": "code_enforcement",

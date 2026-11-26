@@ -3,17 +3,17 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 4183,
+  "rows": 4233,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 4183
+  "wall": 4233
  },
- "generated_at": "2026-11-26T10:31:13Z",
+ "generated_at": "2026-11-26T12:28:14Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T10:31:12Z",
+  "at": "2026-11-26T12:28:14Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -22,9 +22,20 @@
    "errors": {},
    "requests": {
     "gis.buncombecounty.org": 51,
-    "portal-nc.tylertech.cloud": 37,
+    "portal-nc.tylertech.cloud": 36,
+    "roster:anderson-so-sc.zuercherportal.com": 1,
+    "roster:apps.pittcountync.gov": 1,
+    "roster:cc.southernsoftware.com": 3,
+    "roster:cumberlandsheriffnc.gov": 1,
+    "roster:guilfordcountysheriff.policetocitizen.com": 1,
+    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
+    "roster:p2c.nhcgov.com": 1,
+    "roster:rowancountync.policetocitizen.com": 1,
+    "roster:wakeso.policetocitizen.com": 1,
+    "roster:www2.co.davidson.nc.us": 1,
+    "roster:www2.dconc.gov": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 135,
+    "vt.ncsbe.gov": 144,
     "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
@@ -33,25 +44,25 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 550,
+  "seconds": 684,
   "selection": {
    "applies": 9035,
-   "due_new": 4746,
-   "not_due_ttl": 4289
+   "due_new": 4696,
+   "not_due_ttl": 4339
   },
   "source": null,
   "tier": null
  },
- "rows": 4183,
+ "rows": 4233,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 3194135,
+   "bytes": 3232285,
    "file": "000.json",
-   "rows": 4183,
-   "sha256": "41dd55105231367477989c00d35287b4823223268a2a11ac9a3e6194cae842fc"
+   "rows": 4233,
+   "sha256": "646e7b2320a50f64c0471e9e4141b66a65d4be733cf09698fe2884e8518c4e2c"
   }
  ],
  "signal": "court_wall",

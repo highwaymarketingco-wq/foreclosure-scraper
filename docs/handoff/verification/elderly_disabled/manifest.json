@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 8248,
+  "confirmed": 8297,
   "refuted": 99,
-  "rows": 8524,
+  "rows": 8574,
   "stale": 59,
-  "unconfirmed": 118,
+  "unconfirmed": 119,
   "wall": 0
  },
- "generated_at": "2026-11-26T10:31:14Z",
+ "generated_at": "2026-11-26T12:28:14Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T10:31:13Z",
+  "at": "2026-11-26T12:28:14Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -22,9 +22,20 @@
    "errors": {},
    "requests": {
     "gis.buncombecounty.org": 51,
-    "portal-nc.tylertech.cloud": 37,
+    "portal-nc.tylertech.cloud": 36,
+    "roster:anderson-so-sc.zuercherportal.com": 1,
+    "roster:apps.pittcountync.gov": 1,
+    "roster:cc.southernsoftware.com": 3,
+    "roster:cumberlandsheriffnc.gov": 1,
+    "roster:guilfordcountysheriff.policetocitizen.com": 1,
+    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
+    "roster:p2c.nhcgov.com": 1,
+    "roster:rowancountync.policetocitizen.com": 1,
+    "roster:wakeso.policetocitizen.com": 1,
+    "roster:www2.co.davidson.nc.us": 1,
+    "roster:www2.dconc.gov": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 135,
+    "vt.ncsbe.gov": 144,
     "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
@@ -34,36 +45,36 @@
    "confirmed": 49,
    "unconfirmed": 1
   },
-  "seconds": 550,
+  "seconds": 684,
   "selection": {
    "applies": 140892,
-   "due_new": 131446,
+   "due_new": 131396,
    "due_retry": 3,
    "due_version": 1,
-   "not_due_retry": 105,
-   "not_due_ttl": 9337,
+   "not_due_retry": 106,
+   "not_due_ttl": 9386,
    "same_property_queued": 1
   },
   "source": null,
   "tier": null
  },
- "rows": 8524,
+ "rows": 8574,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4475782,
+   "bytes": 4511513,
    "file": "000.json",
-   "rows": 4290,
-   "sha256": "60731e22cd0d8e0a0fa1cead6a88770bafef1535c8d530e4e1cd2e883f8aa8aa"
+   "rows": 4318,
+   "sha256": "0ffff91d5d814dc70444613562270208dc26694dddd48090a9c7d5ef66e6651b"
   },
   {
    "bucket": 1,
-   "bytes": 4382500,
+   "bytes": 4410295,
    "file": "001.json",
-   "rows": 4234,
-   "sha256": "62a13194486fab3336c16a438b19c782bb25408da7bf1e16f2dfeba07baedd00"
+   "rows": 4256,
+   "sha256": "6c2973ae00f6b3d54b71c8b2b0461a9f2286315c9b6575c05b1c4eeb54361449"
   }
  ],
  "signal": "elderly_disabled",

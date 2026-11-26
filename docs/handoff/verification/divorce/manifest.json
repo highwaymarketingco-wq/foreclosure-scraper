@@ -3,17 +3,17 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 2908,
+  "rows": 2958,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 2908
+  "wall": 2958
  },
- "generated_at": "2026-11-26T10:31:13Z",
+ "generated_at": "2026-11-26T12:28:14Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T10:31:13Z",
+  "at": "2026-11-26T12:28:14Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -22,9 +22,20 @@
    "errors": {},
    "requests": {
     "gis.buncombecounty.org": 51,
-    "portal-nc.tylertech.cloud": 37,
+    "portal-nc.tylertech.cloud": 36,
+    "roster:anderson-so-sc.zuercherportal.com": 1,
+    "roster:apps.pittcountync.gov": 1,
+    "roster:cc.southernsoftware.com": 3,
+    "roster:cumberlandsheriffnc.gov": 1,
+    "roster:guilfordcountysheriff.policetocitizen.com": 1,
+    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
+    "roster:p2c.nhcgov.com": 1,
+    "roster:rowancountync.policetocitizen.com": 1,
+    "roster:wakeso.policetocitizen.com": 1,
+    "roster:www2.co.davidson.nc.us": 1,
+    "roster:www2.dconc.gov": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 135,
+    "vt.ncsbe.gov": 144,
     "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
@@ -33,25 +44,25 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 550,
+  "seconds": 684,
   "selection": {
    "applies": 4916,
-   "due_new": 2041,
-   "not_due_ttl": 2875
+   "due_new": 1991,
+   "not_due_ttl": 2925
   },
   "source": null,
   "tier": null
  },
- "rows": 2908,
+ "rows": 2958,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 2501593,
+   "bytes": 2545701,
    "file": "000.json",
-   "rows": 2908,
-   "sha256": "c793ae383e861996faed00f64470f2d09e4ec4a0ad83627574a9706b976b164e"
+   "rows": 2958,
+   "sha256": "b9c06a7c80bb44fa29b1c9502af7d84025a77e63de10946f02bdf063b10e06c4"
   }
  ],
  "signal": "divorce",
