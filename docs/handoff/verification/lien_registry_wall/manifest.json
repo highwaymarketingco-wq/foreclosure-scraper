@@ -3,17 +3,17 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 3160,
+  "rows": 3210,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 3160
+  "wall": 3210
  },
- "generated_at": "2026-11-26T18:15:42Z",
+ "generated_at": "2026-11-26T19:22:29Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T18:15:42Z",
+  "at": "2026-11-26T19:22:29Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,20 +21,13 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 3,
-    "gis.buncombecounty.org": 69,
-    "gis.charlottenc.gov": 26,
-    "portal-nc.tylertech.cloud": 38,
-    "rockhillgis.cityofrockhill.com": 6,
-    "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:brunswick-so-nc.zuercherportal.com": 1,
-    "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:jail.richlandcountysc.gov": 1,
-    "roster:pickens-so-sc.zuercherportal.com": 1,
+    "devsvcs.gastonianc.gov": 31,
+    "gis.buncombecounty.org": 51,
+    "gis.charlottenc.gov": 70,
+    "portal-nc.tylertech.cloud": 41,
     "services.nconemap.gov": 50,
-    "services1.arcgis.com": 7,
-    "vt.ncsbe.gov": 141,
-    "webgis2.durhamnc.gov": 3,
+    "services1.arcgis.com": 6,
+    "vt.ncsbe.gov": 150,
     "www.courtlistener.com": 2
    }
   },
@@ -42,26 +35,26 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 807,
+  "seconds": 936,
   "selection": {
    "applies": 66565,
-   "due_new": 63386,
-   "not_due_ttl": 3179,
+   "due_new": 63335,
+   "not_due_ttl": 3230,
    "same_property_queued": 1
   },
   "source": null,
   "tier": null
  },
- "rows": 3160,
+ "rows": 3210,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 2825708,
+   "bytes": 2870242,
    "file": "000.json",
-   "rows": 3160,
-   "sha256": "98fa83c2a701d83e4da280d87c21e5c36035cc028497e26d2ea13bba9b1f8d1a"
+   "rows": 3210,
+   "sha256": "5cb48478582ca31b5f7647679a9e55e4cab37a2804f2afd57ed8e24fed6a0224"
   }
  ],
  "signal": "lien_registry_wall",

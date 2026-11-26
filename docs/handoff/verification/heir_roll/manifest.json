@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 17181,
+  "confirmed": 17226,
   "refuted": 11,
-  "rows": 17454,
+  "rows": 17504,
   "stale": 55,
-  "unconfirmed": 207,
+  "unconfirmed": 212,
   "wall": 0
  },
- "generated_at": "2026-11-26T18:15:42Z",
+ "generated_at": "2026-11-26T19:22:28Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T18:15:41Z",
+  "at": "2026-11-26T19:22:27Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,59 +21,51 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 3,
-    "gis.buncombecounty.org": 69,
-    "gis.charlottenc.gov": 26,
-    "portal-nc.tylertech.cloud": 38,
-    "rockhillgis.cityofrockhill.com": 6,
-    "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:brunswick-so-nc.zuercherportal.com": 1,
-    "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:jail.richlandcountysc.gov": 1,
-    "roster:pickens-so-sc.zuercherportal.com": 1,
+    "devsvcs.gastonianc.gov": 31,
+    "gis.buncombecounty.org": 51,
+    "gis.charlottenc.gov": 70,
+    "portal-nc.tylertech.cloud": 41,
     "services.nconemap.gov": 50,
-    "services1.arcgis.com": 7,
-    "vt.ncsbe.gov": 141,
-    "webgis2.durhamnc.gov": 3,
+    "services1.arcgis.com": 6,
+    "vt.ncsbe.gov": 150,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 46,
-   "stale": 1,
-   "unconfirmed": 3
+   "confirmed": 45,
+   "unconfirmed": 5
   },
-  "seconds": 807,
+  "seconds": 936,
   "selection": {
    "applies": 44671,
-   "due_new": 27323,
-   "due_retry": 50,
+   "due_new": 27273,
+   "due_retry": 51,
    "due_retry_transient": 24,
    "due_ttl": 432,
-   "not_due_retry": 126,
-   "not_due_ttl": 16716
+   "not_due_retry": 128,
+   "not_due_ttl": 16763
   },
   "source": null,
   "tier": null
  },
- "rows": 17454,
+ "rows": 17504,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 8359069,
+   "bytes": 8385467,
    "file": "000.json",
-   "rows": 8781,
-   "sha256": "b8c41b9121e815e84513acd23f37874b8d663ebf47720a403b2b37c0926f87c8"
+   "rows": 8808,
+   "sha256": "8f6a615280fd2a663aa699c9f326904cf3552b2cb027d24adf94dba58134ba01"
   },
   {
    "bucket": 1,
-   "bytes": 8263576,
+   "bytes": 8286021,
    "file": "001.json",
-   "rows": 8673,
-   "sha256": "9213b81f8a97b2461a4c97faaef549cff68e5ef3b49a313a800550476352f4b1"
+   "rows": 8696,
+   "sha256": "b9e88c5964328ff5949784c489c3984a73d1fb83ec5c6bb6024f069fe37c95b6"
   }
  ],
  "signal": "heir_roll",

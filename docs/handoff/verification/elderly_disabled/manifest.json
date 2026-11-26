@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 8687,
+  "confirmed": 8737,
   "refuted": 99,
-  "rows": 8974,
+  "rows": 9024,
   "stale": 59,
   "unconfirmed": 129,
   "wall": 0
  },
- "generated_at": "2026-11-26T18:15:41Z",
+ "generated_at": "2026-11-26T19:22:27Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T18:15:41Z",
+  "at": "2026-11-26T19:22:27Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,20 +21,13 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 3,
-    "gis.buncombecounty.org": 69,
-    "gis.charlottenc.gov": 26,
-    "portal-nc.tylertech.cloud": 38,
-    "rockhillgis.cityofrockhill.com": 6,
-    "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:brunswick-so-nc.zuercherportal.com": 1,
-    "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:jail.richlandcountysc.gov": 1,
-    "roster:pickens-so-sc.zuercherportal.com": 1,
+    "devsvcs.gastonianc.gov": 31,
+    "gis.buncombecounty.org": 51,
+    "gis.charlottenc.gov": 70,
+    "portal-nc.tylertech.cloud": 41,
     "services.nconemap.gov": 50,
-    "services1.arcgis.com": 7,
-    "vt.ncsbe.gov": 141,
-    "webgis2.durhamnc.gov": 3,
+    "services1.arcgis.com": 6,
+    "vt.ncsbe.gov": 150,
     "www.courtlistener.com": 2
    }
   },
@@ -42,36 +35,36 @@
    "checked": 50,
    "confirmed": 50
   },
-  "seconds": 807,
+  "seconds": 936,
   "selection": {
    "applies": 140892,
-   "due_new": 130996,
+   "due_new": 130946,
    "due_retry": 3,
    "due_version": 1,
    "not_due_retry": 117,
-   "not_due_ttl": 9775,
+   "not_due_ttl": 9825,
    "same_property_queued": 1
   },
   "source": null,
   "tier": null
  },
- "rows": 8974,
+ "rows": 9024,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4765915,
+   "bytes": 4802515,
    "file": "000.json",
-   "rows": 4519,
-   "sha256": "48dc3cb836a984ad208c762fdb11150df13cf2c84a99bcd778bf78fa488077b0"
+   "rows": 4548,
+   "sha256": "831b9e1f971af01663d189884a567750a40da2983dac2da0f3fd18594f55b01b"
   },
   {
    "bucket": 1,
-   "bytes": 4663461,
+   "bytes": 4690014,
    "file": "001.json",
-   "rows": 4455,
-   "sha256": "53ad5ad3bfeb4281b2d1e4427b43c338fb8babd9a46c71c44fb84706c0e1c179"
+   "rows": 4476,
+   "sha256": "81e7738a500cf6379de8fdba357a9d3c0eeb1c8547e5f083c99c5ea0870b18f1"
   }
  ],
  "signal": "elderly_disabled",

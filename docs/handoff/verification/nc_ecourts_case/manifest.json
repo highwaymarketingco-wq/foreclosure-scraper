@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 9319,
+  "confirmed": 9367,
   "refuted": 26,
-  "rows": 10909,
+  "rows": 10957,
   "stale": 1313,
   "unconfirmed": 251,
   "wall": 0
  },
- "generated_at": "2026-11-26T18:15:43Z",
+ "generated_at": "2026-11-26T19:22:30Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T18:15:42Z",
+  "at": "2026-11-26T19:22:29Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,20 +21,13 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 3,
-    "gis.buncombecounty.org": 69,
-    "gis.charlottenc.gov": 26,
-    "portal-nc.tylertech.cloud": 38,
-    "rockhillgis.cityofrockhill.com": 6,
-    "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:brunswick-so-nc.zuercherportal.com": 1,
-    "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:jail.richlandcountysc.gov": 1,
-    "roster:pickens-so-sc.zuercherportal.com": 1,
+    "devsvcs.gastonianc.gov": 31,
+    "gis.buncombecounty.org": 51,
+    "gis.charlottenc.gov": 70,
+    "portal-nc.tylertech.cloud": 41,
     "services.nconemap.gov": 50,
-    "services1.arcgis.com": 7,
-    "vt.ncsbe.gov": 141,
-    "webgis2.durhamnc.gov": 3,
+    "services1.arcgis.com": 6,
+    "vt.ncsbe.gov": 150,
     "www.courtlistener.com": 2
    }
   },
@@ -43,35 +36,35 @@
    "confirmed": 48,
    "unconfirmed": 2
   },
-  "seconds": 807,
+  "seconds": 936,
   "selection": {
    "applies": 25671,
-   "due_new": 15115,
+   "due_new": 15067,
    "due_retry": 3,
    "due_ttl": 670,
    "not_due_retry": 259,
-   "not_due_ttl": 9624
+   "not_due_ttl": 9672
   },
   "source": null,
   "tier": null
  },
- "rows": 10909,
+ "rows": 10957,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 6785654,
+   "bytes": 6824659,
    "file": "000.json",
-   "rows": 5503,
-   "sha256": "2328bf0a280e957ee53978666c4cb3190d728ce9eab717b579dc4424124e78ab"
+   "rows": 5535,
+   "sha256": "38d5fb8038e4fb1641d3027f178e47b60378144bdd385824c3dfaf949ce58854"
   },
   {
    "bucket": 1,
-   "bytes": 6670506,
+   "bytes": 6689990,
    "file": "001.json",
-   "rows": 5406,
-   "sha256": "b18b1b8ef948bc7201705f5d9dc67641fc3a16bb010de8ecdeb85a7e23f3d356"
+   "rows": 5422,
+   "sha256": "b58e9ec744ff970ae969c6197ef91df7aa30b676c1dd52e7a87bc6563c64dff9"
   }
  ],
  "signal": "nc_ecourts_case",

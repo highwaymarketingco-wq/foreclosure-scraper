@@ -3,17 +3,17 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 3358,
+  "rows": 3408,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 3358
+  "wall": 3408
  },
- "generated_at": "2026-11-26T18:15:41Z",
+ "generated_at": "2026-11-26T19:22:27Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T18:15:41Z",
+  "at": "2026-11-26T19:22:26Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,20 +21,13 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 3,
-    "gis.buncombecounty.org": 69,
-    "gis.charlottenc.gov": 26,
-    "portal-nc.tylertech.cloud": 38,
-    "rockhillgis.cityofrockhill.com": 6,
-    "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:brunswick-so-nc.zuercherportal.com": 1,
-    "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:jail.richlandcountysc.gov": 1,
-    "roster:pickens-so-sc.zuercherportal.com": 1,
+    "devsvcs.gastonianc.gov": 31,
+    "gis.buncombecounty.org": 51,
+    "gis.charlottenc.gov": 70,
+    "portal-nc.tylertech.cloud": 41,
     "services.nconemap.gov": 50,
-    "services1.arcgis.com": 7,
-    "vt.ncsbe.gov": 141,
-    "webgis2.durhamnc.gov": 3,
+    "services1.arcgis.com": 6,
+    "vt.ncsbe.gov": 150,
     "www.courtlistener.com": 2
    }
   },
@@ -42,25 +35,25 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 807,
+  "seconds": 936,
   "selection": {
    "applies": 4916,
-   "due_new": 1591,
-   "not_due_ttl": 3325
+   "due_new": 1541,
+   "not_due_ttl": 3375
   },
   "source": null,
   "tier": null
  },
- "rows": 3358,
+ "rows": 3408,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 2863719,
+   "bytes": 2906538,
    "file": "000.json",
-   "rows": 3358,
-   "sha256": "9b5813e61292748b3e37ff9eef61f0a5bc7321e0a8d97390961c842a6291f3b2"
+   "rows": 3408,
+   "sha256": "0d7cd6e4e97f970717f2a6e7baa709f342fd28974012bd88636407968344f5cd"
   }
  ],
  "signal": "divorce",

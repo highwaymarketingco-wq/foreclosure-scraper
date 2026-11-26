@@ -1,19 +1,19 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 3268,
-  "refuted": 809,
-  "rows": 4327,
-  "stale": 228,
+  "confirmed": 3289,
+  "refuted": 832,
+  "rows": 4377,
+  "stale": 234,
   "unconfirmed": 22,
   "wall": 0
  },
- "generated_at": "2026-11-26T18:15:40Z",
+ "generated_at": "2026-11-26T19:22:26Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T18:15:40Z",
+  "at": "2026-11-26T19:22:26Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,50 +21,43 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 3,
-    "gis.buncombecounty.org": 69,
-    "gis.charlottenc.gov": 26,
-    "portal-nc.tylertech.cloud": 38,
-    "rockhillgis.cityofrockhill.com": 6,
-    "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:brunswick-so-nc.zuercherportal.com": 1,
-    "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:jail.richlandcountysc.gov": 1,
-    "roster:pickens-so-sc.zuercherportal.com": 1,
+    "devsvcs.gastonianc.gov": 31,
+    "gis.buncombecounty.org": 51,
+    "gis.charlottenc.gov": 70,
+    "portal-nc.tylertech.cloud": 41,
     "services.nconemap.gov": 50,
-    "services1.arcgis.com": 7,
-    "vt.ncsbe.gov": 141,
-    "webgis2.durhamnc.gov": 3,
+    "services1.arcgis.com": 6,
+    "vt.ncsbe.gov": 150,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
    "confirmed": 21,
-   "refuted": 26,
-   "stale": 3
+   "refuted": 23,
+   "stale": 6
   },
-  "seconds": 807,
+  "seconds": 936,
   "selection": {
    "applies": 11927,
-   "due_new": 7531,
+   "due_new": 7481,
    "due_ttl": 112,
    "not_due_retry": 28,
-   "not_due_ttl": 4256
+   "not_due_ttl": 4306
   },
   "source": null,
   "tier": null
  },
- "rows": 4327,
+ "rows": 4377,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4838906,
+   "bytes": 4891361,
    "file": "000.json",
-   "rows": 4327,
-   "sha256": "4e1b00fae593b47a9dffcb4ca72b341471f23c4d065fe60affe2cb86ba086b14"
+   "rows": 4377,
+   "sha256": "4b447fd51e016ca8f4e5c7f82e071eec9605aae35b6363d352344de2bd440b83"
   }
  ],
  "signal": "code_enforcement",
