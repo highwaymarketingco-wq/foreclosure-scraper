@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 8984,
+  "confirmed": 9032,
   "refuted": 99,
-  "rows": 9274,
+  "rows": 9324,
   "stale": 59,
-  "unconfirmed": 132,
+  "unconfirmed": 134,
   "wall": 0
  },
- "generated_at": "2026-11-26T22:19:57Z",
+ "generated_at": "2026-11-26T22:55:38Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T22:19:57Z",
+  "at": "2026-11-26T22:55:37Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,49 +21,51 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 51,
+    "gis.buncombecounty.org": 52,
     "gis.charlottenc.gov": 100,
-    "portal-nc.tylertech.cloud": 39,
+    "portal-nc.tylertech.cloud": 46,
+    "roster:inmatesinjail.yorkcountygov.com": 1,
+    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 147,
+    "vt.ncsbe.gov": 135,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 49,
-   "unconfirmed": 1
+   "confirmed": 48,
+   "unconfirmed": 2
   },
-  "seconds": 786,
+  "seconds": 801,
   "selection": {
    "applies": 140892,
-   "due_new": 130696,
+   "due_new": 130646,
    "due_retry": 3,
    "due_version": 1,
-   "not_due_retry": 119,
-   "not_due_ttl": 10073,
+   "not_due_retry": 120,
+   "not_due_ttl": 10122,
    "same_property_queued": 1
   },
   "source": null,
   "tier": null
  },
- "rows": 9274,
+ "rows": 9324,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4959409,
+   "bytes": 4999092,
    "file": "000.json",
-   "rows": 4672,
-   "sha256": "7bcb38f48ec40cf973acbe30ea94925fee85f4f062a78effa3f60ff5a58e27f0"
+   "rows": 4703,
+   "sha256": "cc914fe1ef504a1f632d99ee94d6def13e00ff550e7cd0a1263cc75cedc43e3f"
   },
   {
    "bucket": 1,
-   "bytes": 4850114,
+   "bytes": 4874471,
    "file": "001.json",
-   "rows": 4602,
-   "sha256": "fdf7728c1003b4e353e6c73aefdadbb03f19fd3134156b12ac8cbaa6597f6c2c"
+   "rows": 4621,
+   "sha256": "a7b044c937a6ec4eedf6802b4a5fb05973fbec5feb03262b450ca98fc287582a"
   }
  ],
  "signal": "elderly_disabled",

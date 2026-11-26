@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 9607,
+  "confirmed": 9655,
   "refuted": 26,
-  "rows": 11197,
+  "rows": 11245,
   "stale": 1313,
   "unconfirmed": 251,
   "wall": 0
  },
- "generated_at": "2026-11-26T22:20:00Z",
+ "generated_at": "2026-11-26T22:55:40Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T22:19:59Z",
+  "at": "2026-11-26T22:55:39Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,11 +21,13 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 51,
+    "gis.buncombecounty.org": 52,
     "gis.charlottenc.gov": 100,
-    "portal-nc.tylertech.cloud": 39,
+    "portal-nc.tylertech.cloud": 46,
+    "roster:inmatesinjail.yorkcountygov.com": 1,
+    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 147,
+    "vt.ncsbe.gov": 135,
     "www.courtlistener.com": 2
    }
   },
@@ -34,35 +36,35 @@
    "confirmed": 48,
    "unconfirmed": 2
   },
-  "seconds": 786,
+  "seconds": 801,
   "selection": {
    "applies": 25671,
-   "due_new": 14827,
+   "due_new": 14779,
    "due_retry": 3,
    "due_ttl": 670,
    "not_due_retry": 259,
-   "not_due_ttl": 9912
+   "not_due_ttl": 9960
   },
   "source": null,
   "tier": null
  },
- "rows": 11197,
+ "rows": 11245,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 6970876,
+   "bytes": 7001372,
    "file": "000.json",
-   "rows": 5655,
-   "sha256": "9872fbd504b45c75ac803c4862eb5335e36cd44d6f3eae46408f878c48968522"
+   "rows": 5680,
+   "sha256": "ec0a3c819d6d34c088638c0738f6269c148a8e0b8e9f708f11fa874ed026ea58"
   },
   {
    "bucket": 1,
-   "bytes": 6836006,
+   "bytes": 6864143,
    "file": "001.json",
-   "rows": 5542,
-   "sha256": "beb1e49635a3f13b8c52a61be78a0ccec2b3ee349f0b8e1ad938934362589de3"
+   "rows": 5565,
+   "sha256": "c5a24be1d3cee21254d19f62a035f27c49a6d9bbd87ecc5c37798841d169b24e"
   }
  ],
  "signal": "nc_ecourts_case",
