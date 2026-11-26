@@ -28,7 +28,7 @@ import structlog
 from bs4 import BeautifulSoup
 
 from ...base_scraper import BaseScraper
-from ...listing import Listing
+from ...models import Listing
 from ...http_client import get_text
 
 log = structlog.get_logger()
