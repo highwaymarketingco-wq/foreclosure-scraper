@@ -8,12 +8,12 @@
   "unconfirmed": 223,
   "wall": 0
  },
- "generated_at": "2026-11-26T19:22:29Z",
+ "generated_at": "2026-11-26T20:00:47Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T19:22:28Z",
+  "at": "2026-11-26T20:00:47Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,21 +21,32 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 31,
-    "gis.buncombecounty.org": 51,
-    "gis.charlottenc.gov": 70,
-    "portal-nc.tylertech.cloud": 41,
+    "devsvcs.gastonianc.gov": 17,
+    "gis.buncombecounty.org": 50,
+    "gis.charlottenc.gov": 86,
+    "portal-nc.tylertech.cloud": 29,
+    "roster:74.218.167.200": 1,
+    "roster:anderson-so-sc.zuercherportal.com": 1,
+    "roster:buncombecountyso.policetocitizen.com": 1,
+    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
+    "roster:oconee-so-sc.zuercherportal.com": 1,
+    "roster:tepsweb.cityofgastonia.com": 1,
     "services.nconemap.gov": 50,
-    "services1.arcgis.com": 6,
-    "vt.ncsbe.gov": 150,
+    "vt.ncsbe.gov": 147,
     "www.courtlistener.com": 2
    }
   },
-  "result": {},
-  "seconds": 936,
+  "result": {
+   "checked": 35,
+   "unconfirmed": 35
+  },
+  "seconds": 832,
   "selection": {
    "applies": 907,
-   "not_due_retry": 210,
+   "due_retry": 35,
+   "not_due_retry": 175,
    "not_due_ttl": 697
   },
   "source": null,
@@ -47,10 +58,10 @@
  "shards": [
   {
    "bucket": 0,
-   "bytes": 1189941,
+   "bytes": 1193979,
    "file": "000.json",
    "rows": 984,
-   "sha256": "afa566648f472cb7bbbb6318b33d205b9d6987289b4198b68218811a6d56bab2"
+   "sha256": "25dbf94d7c275444377c34b43264f5cf97c8c3070018f19db08dc433d0f905b5"
   }
  ],
  "signal": "jail_booking",

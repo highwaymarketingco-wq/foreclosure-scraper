@@ -3,17 +3,17 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 3408,
+  "rows": 3458,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 3408
+  "wall": 3458
  },
- "generated_at": "2026-11-26T19:22:27Z",
+ "generated_at": "2026-11-26T20:00:45Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T19:22:26Z",
+  "at": "2026-11-26T20:00:44Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,13 +21,20 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 31,
-    "gis.buncombecounty.org": 51,
-    "gis.charlottenc.gov": 70,
-    "portal-nc.tylertech.cloud": 41,
+    "devsvcs.gastonianc.gov": 17,
+    "gis.buncombecounty.org": 50,
+    "gis.charlottenc.gov": 86,
+    "portal-nc.tylertech.cloud": 29,
+    "roster:74.218.167.200": 1,
+    "roster:anderson-so-sc.zuercherportal.com": 1,
+    "roster:buncombecountyso.policetocitizen.com": 1,
+    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
+    "roster:oconee-so-sc.zuercherportal.com": 1,
+    "roster:tepsweb.cityofgastonia.com": 1,
     "services.nconemap.gov": 50,
-    "services1.arcgis.com": 6,
-    "vt.ncsbe.gov": 150,
+    "vt.ncsbe.gov": 147,
     "www.courtlistener.com": 2
    }
   },
@@ -35,25 +42,25 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 936,
+  "seconds": 832,
   "selection": {
    "applies": 4916,
-   "due_new": 1541,
-   "not_due_ttl": 3375
+   "due_new": 1491,
+   "not_due_ttl": 3425
   },
   "source": null,
   "tier": null
  },
- "rows": 3408,
+ "rows": 3458,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 2906538,
+   "bytes": 2945724,
    "file": "000.json",
-   "rows": 3408,
-   "sha256": "0d7cd6e4e97f970717f2a6e7baa709f342fd28974012bd88636407968344f5cd"
+   "rows": 3458,
+   "sha256": "44f63d32f182a89cec765a53df176f8659278e3fe6119edd35c90f377ffcf4ba"
   }
  ],
  "signal": "divorce",

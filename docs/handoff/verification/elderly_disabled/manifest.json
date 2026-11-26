@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 8737,
+  "confirmed": 8787,
   "refuted": 99,
-  "rows": 9024,
+  "rows": 9074,
   "stale": 59,
   "unconfirmed": 129,
   "wall": 0
  },
- "generated_at": "2026-11-26T19:22:27Z",
+ "generated_at": "2026-11-26T20:00:45Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T19:22:27Z",
+  "at": "2026-11-26T20:00:45Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,13 +21,20 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 31,
-    "gis.buncombecounty.org": 51,
-    "gis.charlottenc.gov": 70,
-    "portal-nc.tylertech.cloud": 41,
+    "devsvcs.gastonianc.gov": 17,
+    "gis.buncombecounty.org": 50,
+    "gis.charlottenc.gov": 86,
+    "portal-nc.tylertech.cloud": 29,
+    "roster:74.218.167.200": 1,
+    "roster:anderson-so-sc.zuercherportal.com": 1,
+    "roster:buncombecountyso.policetocitizen.com": 1,
+    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
+    "roster:oconee-so-sc.zuercherportal.com": 1,
+    "roster:tepsweb.cityofgastonia.com": 1,
     "services.nconemap.gov": 50,
-    "services1.arcgis.com": 6,
-    "vt.ncsbe.gov": 150,
+    "vt.ncsbe.gov": 147,
     "www.courtlistener.com": 2
    }
   },
@@ -35,36 +42,36 @@
    "checked": 50,
    "confirmed": 50
   },
-  "seconds": 936,
+  "seconds": 832,
   "selection": {
    "applies": 140892,
-   "due_new": 130946,
+   "due_new": 130896,
    "due_retry": 3,
    "due_version": 1,
    "not_due_retry": 117,
-   "not_due_ttl": 9825,
+   "not_due_ttl": 9875,
    "same_property_queued": 1
   },
   "source": null,
   "tier": null
  },
- "rows": 9024,
+ "rows": 9074,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4802515,
+   "bytes": 4831407,
    "file": "000.json",
-   "rows": 4548,
-   "sha256": "831b9e1f971af01663d189884a567750a40da2983dac2da0f3fd18594f55b01b"
+   "rows": 4571,
+   "sha256": "3b04526c23ec70d2018ef15e70bd6912e7aa6de3f30376cec71cfed264d4ed74"
   },
   {
    "bucket": 1,
-   "bytes": 4690014,
+   "bytes": 4724103,
    "file": "001.json",
-   "rows": 4476,
-   "sha256": "81e7738a500cf6379de8fdba357a9d3c0eeb1c8547e5f083c99c5ea0870b18f1"
+   "rows": 4503,
+   "sha256": "076689460bd9146d9fcdafac53352a2a7bc3fb8ec8aefa6d133246583dbd62a2"
   }
  ],
  "signal": "elderly_disabled",

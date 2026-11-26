@@ -1,19 +1,19 @@
 {
- "buckets": 2,
+ "buckets": 4,
  "counts": {
-  "confirmed": 17226,
+  "confirmed": 17276,
   "refuted": 11,
-  "rows": 17504,
+  "rows": 17554,
   "stale": 55,
   "unconfirmed": 212,
   "wall": 0
  },
- "generated_at": "2026-11-26T19:22:28Z",
+ "generated_at": "2026-11-26T20:00:46Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T19:22:27Z",
+  "at": "2026-11-26T20:00:45Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,51 +21,71 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 31,
-    "gis.buncombecounty.org": 51,
-    "gis.charlottenc.gov": 70,
-    "portal-nc.tylertech.cloud": 41,
+    "devsvcs.gastonianc.gov": 17,
+    "gis.buncombecounty.org": 50,
+    "gis.charlottenc.gov": 86,
+    "portal-nc.tylertech.cloud": 29,
+    "roster:74.218.167.200": 1,
+    "roster:anderson-so-sc.zuercherportal.com": 1,
+    "roster:buncombecountyso.policetocitizen.com": 1,
+    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
+    "roster:oconee-so-sc.zuercherportal.com": 1,
+    "roster:tepsweb.cityofgastonia.com": 1,
     "services.nconemap.gov": 50,
-    "services1.arcgis.com": 6,
-    "vt.ncsbe.gov": 150,
+    "vt.ncsbe.gov": 147,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 45,
-   "unconfirmed": 5
+   "confirmed": 50
   },
-  "seconds": 936,
+  "seconds": 832,
   "selection": {
    "applies": 44671,
-   "due_new": 27273,
+   "due_new": 27223,
    "due_retry": 51,
    "due_retry_transient": 24,
    "due_ttl": 432,
-   "not_due_retry": 128,
-   "not_due_ttl": 16763
+   "not_due_retry": 133,
+   "not_due_ttl": 16808
   },
   "source": null,
   "tier": null
  },
- "rows": 17504,
+ "rows": 17554,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 8385467,
+   "bytes": 4249417,
    "file": "000.json",
-   "rows": 8808,
-   "sha256": "8f6a615280fd2a663aa699c9f326904cf3552b2cb027d24adf94dba58134ba01"
+   "rows": 4460,
+   "sha256": "dac3449418a423dbd2ad8a44cee5cc964c0c270592dc576fc6e7ee19d08c4abb"
   },
   {
    "bucket": 1,
-   "bytes": 8286021,
+   "bytes": 4139530,
    "file": "001.json",
-   "rows": 8696,
-   "sha256": "b9e88c5964328ff5949784c489c3984a73d1fb83ec5c6bb6024f069fe37c95b6"
+   "rows": 4344,
+   "sha256": "255db3ee4320ff1933ece65c38d01f318e1084a482c0202304211650f3285a6e"
+  },
+  {
+   "bucket": 2,
+   "bytes": 4158126,
+   "file": "002.json",
+   "rows": 4371,
+   "sha256": "f76659e6d4913d657cca9e4cd19f165f74fe78bec70bbc79f8d9c91941a47eba"
+  },
+  {
+   "bucket": 3,
+   "bytes": 4172478,
+   "file": "003.json",
+   "rows": 4379,
+   "sha256": "a8b46c77f34629f79542c53f0840bf7f452d1be85dde37c9126ddf77697f3faf"
   }
  ],
  "signal": "heir_roll",
