@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 9223,
+  "confirmed": 9271,
   "refuted": 26,
-  "rows": 10813,
+  "rows": 10861,
   "stale": 1313,
   "unconfirmed": 251,
   "wall": 0
  },
- "generated_at": "2026-11-26T16:51:09Z",
+ "generated_at": "2026-11-26T17:16:29Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T16:51:07Z",
+  "at": "2026-11-26T17:16:29Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,49 +21,55 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 70,
-    "portal-nc.tylertech.cloud": 44,
+    "gis.buncombecounty.org": 76,
+    "portal-nc.tylertech.cloud": 35,
+    "roster:cc.southernsoftware.com": 2,
+    "roster:forsythsheriffnc.policetocitizen.com": 1,
+    "roster:kershaw-so-sc.zuercherportal.com": 1,
+    "roster:pickens-so-sc.zuercherportal.com": 1,
+    "roster:rowancountync.policetocitizen.com": 1,
+    "roster:services3.arcgis.com": 1,
+    "roster:www.fcso.org": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 135,
+    "vt.ncsbe.gov": 144,
     "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 41,
-   "stale": 6,
-   "unconfirmed": 3
+   "confirmed": 48,
+   "unconfirmed": 2
   },
-  "seconds": 845,
+  "seconds": 852,
   "selection": {
    "applies": 25671,
-   "due_new": 15211,
+   "due_new": 15163,
    "due_retry": 3,
    "due_ttl": 670,
-   "not_due_retry": 258,
-   "not_due_ttl": 9529
+   "not_due_retry": 259,
+   "not_due_ttl": 9576
   },
   "source": null,
   "tier": null
  },
- "rows": 10813,
+ "rows": 10861,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 6717471,
+   "bytes": 6751522,
    "file": "000.json",
-   "rows": 5447,
-   "sha256": "152cf70354261f6dc13f02bde02d41aebce0be125ae58f5e947ebb835c0d60ca"
+   "rows": 5475,
+   "sha256": "1fd4bf6acf9d884f55e38a834c623eca2157e3539ef31ecc8eef4f867e2504b8"
   },
   {
    "bucket": 1,
-   "bytes": 6621931,
+   "bytes": 6646223,
    "file": "001.json",
-   "rows": 5366,
-   "sha256": "e6a12f82d5746370b3df8aeb6440d5a51c4e4c69b20555ee9c45812e21f1f50b"
+   "rows": 5386,
+   "sha256": "c8294b1c12e894136090cb6cea03de7f20492294d8ac7b4d31326f2c42a715fa"
   }
  ],
  "signal": "nc_ecourts_case",

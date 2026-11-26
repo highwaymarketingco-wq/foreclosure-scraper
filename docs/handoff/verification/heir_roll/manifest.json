@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 17087,
+  "confirmed": 17135,
   "refuted": 11,
-  "rows": 17354,
+  "rows": 17404,
   "stale": 54,
-  "unconfirmed": 202,
+  "unconfirmed": 204,
   "wall": 0
  },
- "generated_at": "2026-11-26T16:51:06Z",
+ "generated_at": "2026-11-26T17:16:28Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T16:51:05Z",
+  "at": "2026-11-26T17:16:27Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,49 +21,56 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 70,
-    "portal-nc.tylertech.cloud": 44,
+    "gis.buncombecounty.org": 76,
+    "portal-nc.tylertech.cloud": 35,
+    "roster:cc.southernsoftware.com": 2,
+    "roster:forsythsheriffnc.policetocitizen.com": 1,
+    "roster:kershaw-so-sc.zuercherportal.com": 1,
+    "roster:pickens-so-sc.zuercherportal.com": 1,
+    "roster:rowancountync.policetocitizen.com": 1,
+    "roster:services3.arcgis.com": 1,
+    "roster:www.fcso.org": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 135,
+    "vt.ncsbe.gov": 144,
     "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 45,
-   "unconfirmed": 5
+   "confirmed": 48,
+   "unconfirmed": 2
   },
-  "seconds": 845,
+  "seconds": 852,
   "selection": {
    "applies": 44671,
-   "due_new": 27423,
+   "due_new": 27373,
    "due_retry": 49,
    "due_retry_transient": 24,
    "due_ttl": 432,
-   "not_due_retry": 120,
-   "not_due_ttl": 16623
+   "not_due_retry": 125,
+   "not_due_ttl": 16668
   },
   "source": null,
   "tier": null
  },
- "rows": 17354,
+ "rows": 17404,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 8321102,
+   "bytes": 8343456,
    "file": "000.json",
-   "rows": 8742,
-   "sha256": "faa6e4fd79897e584f1ba21e005be7fe660b9a5d05e60d95f9ff5c9e28f4f2dd"
+   "rows": 8765,
+   "sha256": "a19630c9ad2137dd9fb1674964c02c826f943faf8f224af6fb311d630216b490"
   },
   {
    "bucket": 1,
-   "bytes": 8204480,
+   "bytes": 8230609,
    "file": "001.json",
-   "rows": 8612,
-   "sha256": "0123e0bea296facee60e5d248e97bd30c2231f66f7b76c84a55682b040dd6a19"
+   "rows": 8639,
+   "sha256": "b7c63fc0e8c63813b1da2433ce40e8cab3262273498cde248ba2cd9dd7f22b4e"
   }
  ],
  "signal": "heir_roll",

@@ -8,12 +8,12 @@
   "unconfirmed": 223,
   "wall": 0
  },
- "generated_at": "2026-11-26T16:51:07Z",
+ "generated_at": "2026-11-26T17:16:28Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T16:51:07Z",
+  "at": "2026-11-26T17:16:28Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,19 +21,30 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 70,
-    "portal-nc.tylertech.cloud": 44,
+    "gis.buncombecounty.org": 76,
+    "portal-nc.tylertech.cloud": 35,
+    "roster:cc.southernsoftware.com": 2,
+    "roster:forsythsheriffnc.policetocitizen.com": 1,
+    "roster:kershaw-so-sc.zuercherportal.com": 1,
+    "roster:pickens-so-sc.zuercherportal.com": 1,
+    "roster:rowancountync.policetocitizen.com": 1,
+    "roster:services3.arcgis.com": 1,
+    "roster:www.fcso.org": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 135,
+    "vt.ncsbe.gov": 144,
     "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
   },
-  "result": {},
-  "seconds": 845,
+  "result": {
+   "checked": 11,
+   "unconfirmed": 11
+  },
+  "seconds": 852,
   "selection": {
    "applies": 907,
-   "not_due_retry": 210,
+   "due_retry": 11,
+   "not_due_retry": 199,
    "not_due_ttl": 697
   },
   "source": null,
@@ -45,10 +56,10 @@
  "shards": [
   {
    "bucket": 0,
-   "bytes": 1187589,
+   "bytes": 1188821,
    "file": "000.json",
    "rows": 984,
-   "sha256": "16e7781b91c52fa3339bd17c01dd4647f7e37c322823d1aa483b820c5dce6e91"
+   "sha256": "dbd17d183b9d750d8c20b8ecd32030da1849ca0b42f497f1ab05719dfc57ff0a"
   }
  ],
  "signal": "jail_booking",

@@ -3,17 +3,17 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 4533,
+  "rows": 4583,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 4533
+  "wall": 4583
  },
- "generated_at": "2026-11-26T16:51:04Z",
+ "generated_at": "2026-11-26T17:16:25Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T16:51:04Z",
+  "at": "2026-11-26T17:16:25Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,10 +21,17 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 70,
-    "portal-nc.tylertech.cloud": 44,
+    "gis.buncombecounty.org": 76,
+    "portal-nc.tylertech.cloud": 35,
+    "roster:cc.southernsoftware.com": 2,
+    "roster:forsythsheriffnc.policetocitizen.com": 1,
+    "roster:kershaw-so-sc.zuercherportal.com": 1,
+    "roster:pickens-so-sc.zuercherportal.com": 1,
+    "roster:rowancountync.policetocitizen.com": 1,
+    "roster:services3.arcgis.com": 1,
+    "roster:www.fcso.org": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 135,
+    "vt.ncsbe.gov": 144,
     "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
@@ -33,25 +40,25 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 845,
+  "seconds": 852,
   "selection": {
    "applies": 9035,
-   "due_new": 4396,
-   "not_due_ttl": 4639
+   "due_new": 4346,
+   "not_due_ttl": 4689
   },
   "source": null,
   "tier": null
  },
- "rows": 4533,
+ "rows": 4583,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 3459880,
+   "bytes": 3497566,
    "file": "000.json",
-   "rows": 4533,
-   "sha256": "7e4b2572b25ee45c7eec4dbde09b60be8ee01bf39e1e0a97b7eb7b10a3487e65"
+   "rows": 4583,
+   "sha256": "c7a8016c40f5ea3a2ff4cf1b58fcbee22b1efaa1543f3a6dc51e764d35246f3b"
   }
  ],
  "signal": "court_wall",

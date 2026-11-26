@@ -1,19 +1,19 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 3224,
-  "refuted": 756,
-  "rows": 4227,
+  "confirmed": 3247,
+  "refuted": 783,
+  "rows": 4277,
   "stale": 225,
   "unconfirmed": 22,
   "wall": 0
  },
- "generated_at": "2026-11-26T16:51:04Z",
+ "generated_at": "2026-11-26T17:16:25Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T16:51:04Z",
+  "at": "2026-11-26T17:16:25Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,41 +21,47 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 70,
-    "portal-nc.tylertech.cloud": 44,
+    "gis.buncombecounty.org": 76,
+    "portal-nc.tylertech.cloud": 35,
+    "roster:cc.southernsoftware.com": 2,
+    "roster:forsythsheriffnc.policetocitizen.com": 1,
+    "roster:kershaw-so-sc.zuercherportal.com": 1,
+    "roster:pickens-so-sc.zuercherportal.com": 1,
+    "roster:rowancountync.policetocitizen.com": 1,
+    "roster:services3.arcgis.com": 1,
+    "roster:www.fcso.org": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 135,
+    "vt.ncsbe.gov": 144,
     "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 25,
-   "refuted": 24,
-   "unconfirmed": 1
+   "confirmed": 23,
+   "refuted": 27
   },
-  "seconds": 845,
+  "seconds": 852,
   "selection": {
    "applies": 11927,
-   "due_new": 7631,
+   "due_new": 7581,
    "due_ttl": 112,
-   "not_due_retry": 27,
-   "not_due_ttl": 4157
+   "not_due_retry": 28,
+   "not_due_ttl": 4206
   },
   "source": null,
   "tier": null
  },
- "rows": 4227,
+ "rows": 4277,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4737896,
+   "bytes": 4789065,
    "file": "000.json",
-   "rows": 4227,
-   "sha256": "2a5074bacff1562d994e5816f9e48f342b120e6ca048cf6704e3d3301d4ace97"
+   "rows": 4277,
+   "sha256": "72dfd5ebe3512ae1088af2d76e9b7226bc0e60594a3f779b580aa3fffb59ef4b"
   }
  ],
  "signal": "code_enforcement",
