@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 16996,
+  "confirmed": 17042,
   "refuted": 11,
-  "rows": 17254,
-  "stale": 53,
-  "unconfirmed": 194,
+  "rows": 17304,
+  "stale": 54,
+  "unconfirmed": 197,
   "wall": 0
  },
- "generated_at": "2026-11-26T14:42:50Z",
+ "generated_at": "2026-11-26T15:29:01Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T14:42:49Z",
+  "at": "2026-11-26T15:29:00Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,10 +21,12 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 51,
-    "portal-nc.tylertech.cloud": 49,
+    "gis.buncombecounty.org": 82,
+    "portal-nc.tylertech.cloud": 44,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "roster:union-so-sc.zuercherportal.com": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 144,
+    "vt.ncsbe.gov": 129,
     "webgis2.durhamnc.gov": 3,
     "www.courtlistener.com": 2
    }
@@ -32,38 +34,39 @@
   "result": {
    "checked": 50,
    "confirmed": 46,
-   "unconfirmed": 4
+   "stale": 1,
+   "unconfirmed": 3
   },
-  "seconds": 635,
+  "seconds": 1020,
   "selection": {
    "applies": 44671,
-   "due_new": 27523,
+   "due_new": 27473,
    "due_retry": 49,
    "due_retry_transient": 24,
    "due_ttl": 432,
-   "not_due_retry": 113,
-   "not_due_ttl": 16530
+   "not_due_retry": 117,
+   "not_due_ttl": 16576
   },
   "source": null,
   "tier": null
  },
- "rows": 17254,
+ "rows": 17304,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 8272769,
+   "bytes": 8295956,
    "file": "000.json",
-   "rows": 8692,
-   "sha256": "fa8d43ef2f255876d8ae901ac2483608c2a3a304130d20e7566d3d235f7a681b"
+   "rows": 8716,
+   "sha256": "71ccd9725bb41f1b208c57df2e32e6824493c73552c4fe09d60bf8f3fda09668"
   },
   {
    "bucket": 1,
-   "bytes": 8156113,
+   "bytes": 8181126,
    "file": "001.json",
-   "rows": 8562,
-   "sha256": "3c7588e658b1221232bc268f3c88c7956d05dd283a6d3190feca3cc6a4de72a9"
+   "rows": 8588,
+   "sha256": "267695b9c42b9e20b136a9ccf1df11e44070d154de3dfb81da80113a717431e9"
   }
  ],
  "signal": "heir_roll",
