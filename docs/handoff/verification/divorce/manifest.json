@@ -3,17 +3,17 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 3008,
+  "rows": 3058,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 3008
+  "wall": 3058
  },
- "generated_at": "2026-11-26T13:36:50Z",
+ "generated_at": "2026-11-26T14:01:34Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T13:36:50Z",
+  "at": "2026-11-26T14:01:34Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,9 +21,9 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 54,
-    "portal-nc.tylertech.cloud": 44,
-    "roster:anderson-so-sc.zuercherportal.com": 1,
+    "gis.buncombecounty.org": 50,
+    "portal-nc.tylertech.cloud": 33,
+    "roster:pickens-so-sc.zuercherportal.com": 1,
     "services.nconemap.gov": 50,
     "vt.ncsbe.gov": 141,
     "webgis2.durhamnc.gov": 3,
@@ -34,25 +34,25 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 601,
+  "seconds": 561,
   "selection": {
    "applies": 4916,
-   "due_new": 1941,
-   "not_due_ttl": 2975
+   "due_new": 1891,
+   "not_due_ttl": 3025
   },
   "source": null,
   "tier": null
  },
- "rows": 3008,
+ "rows": 3058,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 2586935,
+   "bytes": 2625496,
    "file": "000.json",
-   "rows": 3008,
-   "sha256": "90fa25ca2d8bf7470c2104f3847fbf718e2aa08a0023b0bef27ae8307714a0c2"
+   "rows": 3058,
+   "sha256": "5f224c6f13d25d02168b6e2097f5741281d4088e1777e5b2358d9ec1d6207765"
   }
  ],
  "signal": "divorce",

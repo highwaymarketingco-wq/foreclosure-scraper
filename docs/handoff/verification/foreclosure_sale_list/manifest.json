@@ -8,12 +8,12 @@
   "unconfirmed": 80,
   "wall": 0
  },
- "generated_at": "2026-11-26T13:36:51Z",
+ "generated_at": "2026-11-26T14:01:35Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T13:36:51Z",
+  "at": "2026-11-26T14:01:35Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,9 +21,9 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 54,
-    "portal-nc.tylertech.cloud": 44,
-    "roster:anderson-so-sc.zuercherportal.com": 1,
+    "gis.buncombecounty.org": 50,
+    "portal-nc.tylertech.cloud": 33,
+    "roster:pickens-so-sc.zuercherportal.com": 1,
     "services.nconemap.gov": 50,
     "vt.ncsbe.gov": 141,
     "webgis2.durhamnc.gov": 3,
@@ -34,7 +34,7 @@
    "checked": 50,
    "unconfirmed": 50
   },
-  "seconds": 601,
+  "seconds": 561,
   "selection": {
    "applies": 418,
    "due_new": 1,
@@ -56,7 +56,7 @@
    "bytes": 498569,
    "file": "000.json",
    "rows": 420,
-   "sha256": "a11706f2cc0af66280013b795e4f02d5f7076d43dba9b9905f95dcc3e86da051"
+   "sha256": "c095f3043d1c556b5ceecc376770c6556ac2fa13228a95cc964d4210f8cb01a3"
   }
  ],
  "signal": "foreclosure_sale_list",
