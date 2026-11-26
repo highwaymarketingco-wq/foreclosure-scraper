@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 9032,
+  "confirmed": 9081,
   "refuted": 99,
-  "rows": 9324,
+  "rows": 9374,
   "stale": 59,
-  "unconfirmed": 134,
+  "unconfirmed": 135,
   "wall": 0
  },
- "generated_at": "2026-11-26T22:55:38Z",
+ "generated_at": "2026-11-26T23:18:25Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T22:55:37Z",
+  "at": "2026-11-26T23:18:24Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,51 +21,50 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 52,
-    "gis.charlottenc.gov": 100,
-    "portal-nc.tylertech.cloud": 46,
-    "roster:inmatesinjail.yorkcountygov.com": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
+    "devsvcs.gastonianc.gov": 20,
+    "gis.buncombecounty.org": 50,
+    "gis.charlottenc.gov": 46,
+    "portal-nc.tylertech.cloud": 38,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 135,
+    "vt.ncsbe.gov": 144,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 48,
-   "unconfirmed": 2
+   "confirmed": 49,
+   "unconfirmed": 1
   },
-  "seconds": 801,
+  "seconds": 685,
   "selection": {
    "applies": 140892,
-   "due_new": 130646,
+   "due_new": 130596,
    "due_retry": 3,
    "due_version": 1,
-   "not_due_retry": 120,
-   "not_due_ttl": 10122,
+   "not_due_retry": 122,
+   "not_due_ttl": 10170,
    "same_property_queued": 1
   },
   "source": null,
   "tier": null
  },
- "rows": 9324,
+ "rows": 9374,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4999092,
+   "bytes": 5025672,
    "file": "000.json",
-   "rows": 4703,
-   "sha256": "cc914fe1ef504a1f632d99ee94d6def13e00ff550e7cd0a1263cc75cedc43e3f"
+   "rows": 4724,
+   "sha256": "ba0a9acf4f0d98d09670941b7b9bb61014e8a3c07baf5d93cad528cb12a66c71"
   },
   {
    "bucket": 1,
-   "bytes": 4874471,
+   "bytes": 4910771,
    "file": "001.json",
-   "rows": 4621,
-   "sha256": "a7b044c937a6ec4eedf6802b4a5fb05973fbec5feb03262b450ca98fc287582a"
+   "rows": 4650,
+   "sha256": "4fdee915a03f3e5cafe0ca8384ae386384f2f4ea307dad96ea234a039d452291"
   }
  ],
  "signal": "elderly_disabled",

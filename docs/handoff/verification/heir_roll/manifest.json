@@ -1,19 +1,19 @@
 {
  "buckets": 4,
  "counts": {
-  "confirmed": 17526,
+  "confirmed": 17575,
   "refuted": 11,
-  "rows": 17804,
-  "stale": 55,
+  "rows": 17854,
+  "stale": 56,
   "unconfirmed": 212,
   "wall": 0
  },
- "generated_at": "2026-11-26T22:55:39Z",
+ "generated_at": "2026-11-26T23:18:26Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T22:55:38Z",
+  "at": "2026-11-26T23:18:25Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,64 +21,64 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 52,
-    "gis.charlottenc.gov": 100,
-    "portal-nc.tylertech.cloud": 46,
-    "roster:inmatesinjail.yorkcountygov.com": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
+    "devsvcs.gastonianc.gov": 20,
+    "gis.buncombecounty.org": 50,
+    "gis.charlottenc.gov": 46,
+    "portal-nc.tylertech.cloud": 38,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 135,
+    "vt.ncsbe.gov": 144,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 50
+   "confirmed": 49,
+   "stale": 1
   },
-  "seconds": 801,
+  "seconds": 685,
   "selection": {
    "applies": 44671,
-   "due_new": 26973,
+   "due_new": 26923,
    "due_retry": 51,
    "due_retry_transient": 24,
    "due_ttl": 432,
    "not_due_retry": 133,
-   "not_due_ttl": 17058
+   "not_due_ttl": 17108
   },
   "source": null,
   "tier": null
  },
- "rows": 17804,
+ "rows": 17854,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4319297,
+   "bytes": 4331790,
    "file": "000.json",
-   "rows": 4533,
-   "sha256": "bf23a7bfe1d6ec890bd6f07aac2d05a702babe04fe2600e321a7a8401ded6a6e"
+   "rows": 4546,
+   "sha256": "39d46f543d920167a509301bfdd5fe88b92000b8ce826d4470e852602a259eae"
   },
   {
    "bucket": 1,
-   "bytes": 4197743,
+   "bytes": 4210293,
    "file": "001.json",
-   "rows": 4405,
-   "sha256": "467b01cb9ff0eea3084e638558a847387c51e657cfd13c0f4bd2d92f68497012"
+   "rows": 4418,
+   "sha256": "4ce99529e7849dd5ee649030188a810e178fc40422b2061a30c1c12b7916a163"
   },
   {
    "bucket": 2,
-   "bytes": 4214225,
+   "bytes": 4221934,
    "file": "002.json",
-   "rows": 4430,
-   "sha256": "55d58c52fa1d6cc6e7907170558dec16c61db0fda89461e1ed5a093893a870d3"
+   "rows": 4438,
+   "sha256": "6ea8379c3705372df48481f30382ad3873aa8fb5d861b84c62a124b20712ed48"
   },
   {
    "bucket": 3,
-   "bytes": 4226931,
+   "bytes": 4242305,
    "file": "003.json",
-   "rows": 4436,
-   "sha256": "f8c5113d6d1c2038df09d6abbcfe6ac7869aa38ab2f7cf9374e2118753356a06"
+   "rows": 4452,
+   "sha256": "443a293dff7db72159c7a46e6c896308cd37d6bbc438537b7eec7c69609c722e"
   }
  ],
  "signal": "heir_roll",

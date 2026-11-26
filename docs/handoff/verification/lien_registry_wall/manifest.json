@@ -3,17 +3,17 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 3510,
+  "rows": 3560,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 3510
+  "wall": 3560
  },
- "generated_at": "2026-11-26T22:55:39Z",
+ "generated_at": "2026-11-26T23:18:26Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T22:55:39Z",
+  "at": "2026-11-26T23:18:26Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,13 +21,12 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.buncombecounty.org": 52,
-    "gis.charlottenc.gov": 100,
-    "portal-nc.tylertech.cloud": 46,
-    "roster:inmatesinjail.yorkcountygov.com": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
+    "devsvcs.gastonianc.gov": 20,
+    "gis.buncombecounty.org": 50,
+    "gis.charlottenc.gov": 46,
+    "portal-nc.tylertech.cloud": 38,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 135,
+    "vt.ncsbe.gov": 144,
     "www.courtlistener.com": 2
    }
   },
@@ -35,25 +34,26 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 801,
+  "seconds": 685,
   "selection": {
    "applies": 66565,
-   "due_new": 63031,
-   "not_due_ttl": 3534
+   "due_new": 62981,
+   "not_due_ttl": 3584,
+   "same_property_queued": 1
   },
   "source": null,
   "tier": null
  },
- "rows": 3510,
+ "rows": 3560,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 3135846,
+   "bytes": 3180478,
    "file": "000.json",
-   "rows": 3510,
-   "sha256": "2a1caf08c10b70602b5a8318425fd296a80774a01cdbef766b5063da52df4fa3"
+   "rows": 3560,
+   "sha256": "a6cdc78bbcd0d0f7a4c2d481c34c7a8f44b12ff998a0b6029e44d7cc9d9ddfe6"
   }
  ],
  "signal": "lien_registry_wall",
