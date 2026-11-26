@@ -10,55 +10,55 @@
  "ledgers": {
   "bankruptcy_stay": {
    "entries": 571,
-   "generated_at": "2026-11-26T17:16:25Z"
+   "generated_at": "2026-11-26T20:54:50Z"
   },
   "code_enforcement": {
-   "entries": 4277,
-   "generated_at": "2026-11-26T17:16:25Z"
+   "entries": 4527,
+   "generated_at": "2026-11-26T20:54:50Z"
   },
   "comps": {
    "entries": 9559,
-   "generated_at": "2026-11-26T17:42:10Z"
+   "generated_at": "2026-11-26T18:41:40Z"
   },
   "court_wall": {
-   "entries": 4583,
-   "generated_at": "2026-11-26T17:16:25Z"
+   "entries": 4833,
+   "generated_at": "2026-11-26T20:54:51Z"
   },
   "divorce": {
-   "entries": 3308,
-   "generated_at": "2026-11-26T17:16:26Z"
+   "entries": 3558,
+   "generated_at": "2026-11-26T20:54:51Z"
   },
   "elderly_disabled": {
-   "entries": 8924,
-   "generated_at": "2026-11-26T17:16:27Z"
+   "entries": 9174,
+   "generated_at": "2026-11-26T20:54:51Z"
   },
   "foreclosure_rod": {
    "entries": 236,
-   "generated_at": "2026-11-26T17:16:27Z"
+   "generated_at": "2026-11-26T20:54:51Z"
   },
   "foreclosure_sale_list": {
    "entries": 420,
-   "generated_at": "2026-11-26T17:16:27Z"
+   "generated_at": "2026-11-26T20:54:51Z"
   },
   "heir_roll": {
-   "entries": 17404,
-   "generated_at": "2026-11-26T17:16:28Z"
+   "entries": 17654,
+   "generated_at": "2026-11-26T20:54:52Z"
   },
   "jail_booking": {
    "entries": 984,
-   "generated_at": "2026-11-26T17:16:28Z"
+   "generated_at": "2026-11-26T20:54:53Z"
   },
   "lien_registry_wall": {
-   "entries": 3110,
-   "generated_at": "2026-11-26T17:16:29Z"
+   "entries": 3360,
+   "generated_at": "2026-11-26T20:54:53Z"
   },
   "nc_ecourts_case": {
-   "entries": 10861,
-   "generated_at": "2026-11-26T17:16:29Z"
+   "entries": 11101,
+   "generated_at": "2026-11-26T20:54:53Z"
   },
   "probate_heir": {
    "entries": 1066,
-   "generated_at": "2026-11-26T17:16:30Z"
+   "generated_at": "2026-11-26T20:54:54Z"
   },
   "tax_lien": {
    "entries": 103737,
@@ -70,7 +70,7 @@
   },
   "vacant_structure": {
    "entries": 1737,
-   "generated_at": "2026-11-26T17:16:25Z"
+   "generated_at": "2026-11-26T20:54:50Z"
   }
  },
  "listings": 188228,
@@ -208,8 +208,8 @@
    "sc_publicindex": 3962
   },
   "by_wall_state": {
-   "not_yet_labelled": 13832,
-   "recorded": 8647
+   "not_yet_labelled": 13332,
+   "recorded": 9147
   },
   "top_counties": {
    "NC:cabarrus": 299,
