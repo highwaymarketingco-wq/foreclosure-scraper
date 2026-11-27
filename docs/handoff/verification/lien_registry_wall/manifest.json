@@ -3,17 +3,17 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 3610,
+  "rows": 3710,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 3610
+  "wall": 3710
  },
- "generated_at": "2026-11-27T00:00:27Z",
+ "generated_at": "2026-11-27T18:25:10Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-27T00:00:27Z",
+  "at": "2026-11-27T18:25:09Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,11 +21,23 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 64,
-    "gis.buncombecounty.org": 50,
-    "portal-nc.tylertech.cloud": 42,
+    "devsvcs.gastonianc.gov": 78,
+    "gis.buncombecounty.org": 53,
+    "portal-nc.tylertech.cloud": 27,
+    "roster:buncombecountyso.policetocitizen.com": 1,
+    "roster:cc.southernsoftware.com": 4,
+    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "roster:forsythsheriffnc.policetocitizen.com": 1,
+    "roster:guilfordcountysheriff.policetocitizen.com": 1,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "roster:legacyweb.randolphcountync.gov": 1,
+    "roster:lexingtonsheriffsc.policetocitizen.com": 1,
+    "roster:oconee-so-sc.zuercherportal.com": 1,
+    "roster:pickens-so-sc.zuercherportal.com": 1,
+    "roster:tepsweb.cityofgastonia.com": 1,
+    "roster:www2.co.davidson.nc.us": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 147,
+    "vt.ncsbe.gov": 135,
     "www.courtlistener.com": 2
    }
   },
@@ -33,26 +45,26 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 805,
+  "seconds": 1395,
   "selection": {
    "applies": 66565,
-   "due_new": 62930,
-   "not_due_ttl": 3635,
-   "same_property_queued": 1
+   "due_new": 62828,
+   "not_due_ttl": 3737,
+   "same_property_queued": 3
   },
   "source": null,
   "tier": null
  },
- "rows": 3610,
+ "rows": 3710,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 3224779,
+   "bytes": 3313420,
    "file": "000.json",
-   "rows": 3610,
-   "sha256": "8350d3c6e0cee653b80e36fbbd487e1fc750d6e5c688af88919a24532378171c"
+   "rows": 3710,
+   "sha256": "b81a25c485db3982ac623d9f2c85553f0058fc0cfc3d418512c6e1dc6441cc73"
   }
  ],
  "signal": "lien_registry_wall",

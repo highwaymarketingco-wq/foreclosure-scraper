@@ -3,17 +3,17 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 3808,
+  "rows": 3908,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 3808
+  "wall": 3908
  },
- "generated_at": "2026-11-27T00:00:24Z",
+ "generated_at": "2026-11-27T18:25:05Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-27T00:00:24Z",
+  "at": "2026-11-27T18:25:04Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,11 +21,23 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 64,
-    "gis.buncombecounty.org": 50,
-    "portal-nc.tylertech.cloud": 42,
+    "devsvcs.gastonianc.gov": 78,
+    "gis.buncombecounty.org": 53,
+    "portal-nc.tylertech.cloud": 27,
+    "roster:buncombecountyso.policetocitizen.com": 1,
+    "roster:cc.southernsoftware.com": 4,
+    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "roster:forsythsheriffnc.policetocitizen.com": 1,
+    "roster:guilfordcountysheriff.policetocitizen.com": 1,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "roster:legacyweb.randolphcountync.gov": 1,
+    "roster:lexingtonsheriffsc.policetocitizen.com": 1,
+    "roster:oconee-so-sc.zuercherportal.com": 1,
+    "roster:pickens-so-sc.zuercherportal.com": 1,
+    "roster:tepsweb.cityofgastonia.com": 1,
+    "roster:www2.co.davidson.nc.us": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 147,
+    "vt.ncsbe.gov": 135,
     "www.courtlistener.com": 2
    }
   },
@@ -33,25 +45,25 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 805,
+  "seconds": 1395,
   "selection": {
    "applies": 4916,
-   "due_new": 1141,
-   "not_due_ttl": 3775
+   "due_new": 1041,
+   "not_due_ttl": 3875
   },
   "source": null,
   "tier": null
  },
- "rows": 3808,
+ "rows": 3908,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 3237697,
+   "bytes": 3327432,
    "file": "000.json",
-   "rows": 3808,
-   "sha256": "43f7a3bd52ae92e1f9efd698afb118dbb81b315f1502461ff347128dbf9284d2"
+   "rows": 3908,
+   "sha256": "6c56a1c35bef019a12d5d440aca98c212a74c9a0e0ee03698b52cd9d9bf195e8"
   }
  ],
  "signal": "divorce",

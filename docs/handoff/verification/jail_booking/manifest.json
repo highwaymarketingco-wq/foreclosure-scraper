@@ -4,16 +4,16 @@
   "confirmed": 549,
   "refuted": 26,
   "rows": 984,
-  "stale": 186,
-  "unconfirmed": 221,
+  "stale": 187,
+  "unconfirmed": 220,
   "wall": 0
  },
- "generated_at": "2026-11-27T00:00:27Z",
+ "generated_at": "2026-11-27T18:25:09Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-27T00:00:27Z",
+  "at": "2026-11-27T18:25:09Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,20 +21,42 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 64,
-    "gis.buncombecounty.org": 50,
-    "portal-nc.tylertech.cloud": 42,
+    "devsvcs.gastonianc.gov": 78,
+    "gis.buncombecounty.org": 53,
+    "portal-nc.tylertech.cloud": 27,
+    "roster:buncombecountyso.policetocitizen.com": 1,
+    "roster:cc.southernsoftware.com": 4,
+    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "roster:forsythsheriffnc.policetocitizen.com": 1,
+    "roster:guilfordcountysheriff.policetocitizen.com": 1,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "roster:legacyweb.randolphcountync.gov": 1,
+    "roster:lexingtonsheriffsc.policetocitizen.com": 1,
+    "roster:oconee-so-sc.zuercherportal.com": 1,
+    "roster:pickens-so-sc.zuercherportal.com": 1,
+    "roster:tepsweb.cityofgastonia.com": 1,
+    "roster:www2.co.davidson.nc.us": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 147,
+    "vt.ncsbe.gov": 135,
     "www.courtlistener.com": 2
    }
   },
-  "result": {},
-  "seconds": 805,
+  "result": {
+   "checked": 50,
+   "confirmed": 20,
+   "deferred": 2,
+   "rechecked_after_deferral": 2,
+   "refuted": 3,
+   "stale": 6,
+   "unconfirmed": 21
+  },
+  "seconds": 1395,
   "selection": {
    "applies": 907,
-   "not_due_retry": 208,
-   "not_due_ttl": 699
+   "due_retry": 143,
+   "due_ttl": 592,
+   "not_due_retry": 65,
+   "not_due_ttl": 107
   },
   "source": null,
   "tier": null
@@ -45,10 +67,10 @@
  "shards": [
   {
    "bucket": 0,
-   "bytes": 1196263,
+   "bytes": 1202600,
    "file": "000.json",
    "rows": 984,
-   "sha256": "e07dc23e0738552cbb6924b1eec11e95b844dfe9d293bdb5ecbb66361c7a7c51"
+   "sha256": "b0053ea94187c04a7c820ec4d0b0ca1b112f401a9bea63cce25e9129fd500b96"
   }
  ],
  "signal": "jail_booking",
