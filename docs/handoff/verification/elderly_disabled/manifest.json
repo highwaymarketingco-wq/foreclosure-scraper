@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 9081,
+  "confirmed": 9131,
   "refuted": 99,
-  "rows": 9374,
+  "rows": 9424,
   "stale": 59,
   "unconfirmed": 135,
   "wall": 0
  },
- "generated_at": "2026-11-26T23:18:25Z",
+ "generated_at": "2026-11-27T00:00:25Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T23:18:24Z",
+  "at": "2026-11-27T00:00:24Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,50 +21,48 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 20,
+    "devsvcs.gastonianc.gov": 64,
     "gis.buncombecounty.org": 50,
-    "gis.charlottenc.gov": 46,
-    "portal-nc.tylertech.cloud": 38,
+    "portal-nc.tylertech.cloud": 42,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 144,
+    "vt.ncsbe.gov": 147,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 49,
-   "unconfirmed": 1
+   "confirmed": 50
   },
-  "seconds": 685,
+  "seconds": 805,
   "selection": {
    "applies": 140892,
-   "due_new": 130596,
+   "due_new": 130546,
    "due_retry": 3,
    "due_version": 1,
-   "not_due_retry": 122,
-   "not_due_ttl": 10170,
+   "not_due_retry": 123,
+   "not_due_ttl": 10219,
    "same_property_queued": 1
   },
   "source": null,
   "tier": null
  },
- "rows": 9374,
+ "rows": 9424,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 5025672,
+   "bytes": 5049628,
    "file": "000.json",
-   "rows": 4724,
-   "sha256": "ba0a9acf4f0d98d09670941b7b9bb61014e8a3c07baf5d93cad528cb12a66c71"
+   "rows": 4743,
+   "sha256": "1cb01e52d8052d915ad92d803b5b95513a402edc2641699e7ca8882a43e044d7"
   },
   {
    "bucket": 1,
-   "bytes": 4910771,
+   "bytes": 4949711,
    "file": "001.json",
-   "rows": 4650,
-   "sha256": "4fdee915a03f3e5cafe0ca8384ae386384f2f4ea307dad96ea234a039d452291"
+   "rows": 4681,
+   "sha256": "300f3885fb1508892e8cb307f13cd2a2d2493a528cb434a28f63b3f5256537e8"
   }
  ],
  "signal": "elderly_disabled",

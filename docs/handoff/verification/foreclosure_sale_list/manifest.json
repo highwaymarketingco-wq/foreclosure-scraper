@@ -8,12 +8,12 @@
   "unconfirmed": 80,
   "wall": 0
  },
- "generated_at": "2026-11-26T23:18:25Z",
+ "generated_at": "2026-11-27T00:00:25Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T23:18:25Z",
+  "at": "2026-11-27T00:00:25Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,12 +21,11 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 20,
+    "devsvcs.gastonianc.gov": 64,
     "gis.buncombecounty.org": 50,
-    "gis.charlottenc.gov": 46,
-    "portal-nc.tylertech.cloud": 38,
+    "portal-nc.tylertech.cloud": 42,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 144,
+    "vt.ncsbe.gov": 147,
     "www.courtlistener.com": 2
    }
   },
@@ -34,7 +33,7 @@
    "checked": 50,
    "unconfirmed": 50
   },
-  "seconds": 685,
+  "seconds": 805,
   "selection": {
    "applies": 418,
    "due_new": 1,
@@ -56,7 +55,7 @@
    "bytes": 498569,
    "file": "000.json",
    "rows": 420,
-   "sha256": "d40a09f8a3f5162a4be881cf56a205f4b41296cae3fc91134a4db4093fa5445b"
+   "sha256": "6a839eb5294b211b5df45c694a91a34f587353a270dcfda032a9f5cf2d1abab9"
   }
  ],
  "signal": "foreclosure_sale_list",

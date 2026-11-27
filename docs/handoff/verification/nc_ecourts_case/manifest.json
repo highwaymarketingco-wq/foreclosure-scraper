@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 9703,
+  "confirmed": 9751,
   "refuted": 26,
-  "rows": 11293,
+  "rows": 11341,
   "stale": 1313,
   "unconfirmed": 251,
   "wall": 0
  },
- "generated_at": "2026-11-26T23:18:27Z",
+ "generated_at": "2026-11-27T00:00:28Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T23:18:26Z",
+  "at": "2026-11-27T00:00:27Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,12 +21,11 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 20,
+    "devsvcs.gastonianc.gov": 64,
     "gis.buncombecounty.org": 50,
-    "gis.charlottenc.gov": 46,
-    "portal-nc.tylertech.cloud": 38,
+    "portal-nc.tylertech.cloud": 42,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 144,
+    "vt.ncsbe.gov": 147,
     "www.courtlistener.com": 2
    }
   },
@@ -35,35 +34,35 @@
    "confirmed": 48,
    "unconfirmed": 2
   },
-  "seconds": 685,
+  "seconds": 805,
   "selection": {
    "applies": 25671,
-   "due_new": 14731,
+   "due_new": 14683,
    "due_retry": 3,
    "due_ttl": 670,
    "not_due_retry": 259,
-   "not_due_ttl": 10008
+   "not_due_ttl": 10056
   },
   "source": null,
   "tier": null
  },
- "rows": 11293,
+ "rows": 11341,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 7028170,
+   "bytes": 7060992,
    "file": "000.json",
-   "rows": 5702,
-   "sha256": "0310b9144cd557197639d4866d169ed2a373fd4b2b7617a0d8cd10e43cbfc74c"
+   "rows": 5729,
+   "sha256": "905cbbd5b9c89c1b529e382bb0bd68795504960334dddc9e55e577b5a095c399"
   },
   {
    "bucket": 1,
-   "bytes": 6895876,
+   "bytes": 6921440,
    "file": "001.json",
-   "rows": 5591,
-   "sha256": "f9f1647e505dda1332722ff8ac433a226793cea054ffc74db0959f58cac45a9e"
+   "rows": 5612,
+   "sha256": "765849dc4b7050ce41f570c3d81ab85743cc2ea0dd72a920e087830510acec0c"
   }
  ],
  "signal": "nc_ecourts_case",

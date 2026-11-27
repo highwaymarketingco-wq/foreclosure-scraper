@@ -3,17 +3,17 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 3758,
+  "rows": 3808,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 3758
+  "wall": 3808
  },
- "generated_at": "2026-11-26T23:18:24Z",
+ "generated_at": "2026-11-27T00:00:24Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-26T23:18:24Z",
+  "at": "2026-11-27T00:00:24Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,12 +21,11 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 20,
+    "devsvcs.gastonianc.gov": 64,
     "gis.buncombecounty.org": 50,
-    "gis.charlottenc.gov": 46,
-    "portal-nc.tylertech.cloud": 38,
+    "portal-nc.tylertech.cloud": 42,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 144,
+    "vt.ncsbe.gov": 147,
     "www.courtlistener.com": 2
    }
   },
@@ -34,25 +33,25 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 685,
+  "seconds": 805,
   "selection": {
    "applies": 4916,
-   "due_new": 1191,
-   "not_due_ttl": 3725
+   "due_new": 1141,
+   "not_due_ttl": 3775
   },
   "source": null,
   "tier": null
  },
- "rows": 3758,
+ "rows": 3808,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 3193005,
+   "bytes": 3237697,
    "file": "000.json",
-   "rows": 3758,
-   "sha256": "796f6381ee49a2f679efa8e07389aa8f919a38540257e1b0a13d4cb8b9df49ba"
+   "rows": 3808,
+   "sha256": "43f7a3bd52ae92e1f9efd698afb118dbb81b315f1502461ff347128dbf9284d2"
   }
  ],
  "signal": "divorce",
