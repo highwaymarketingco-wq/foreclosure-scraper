@@ -3,17 +3,17 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 3958,
+  "rows": 4008,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 3958
+  "wall": 4008
  },
- "generated_at": "2026-11-27T19:08:56Z",
+ "generated_at": "2026-11-27T19:47:12Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-27T19:08:55Z",
+  "at": "2026-11-27T19:47:12Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,21 +21,16 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 77,
-    "gis.buncombecounty.org": 50,
-    "portal-nc.tylertech.cloud": 30,
+    "devsvcs.gastonianc.gov": 52,
+    "gis.buncombecounty.org": 51,
+    "portal-nc.tylertech.cloud": 42,
     "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:buncombecountyso.policetocitizen.com": 1,
-    "roster:cc.southernsoftware.com": 2,
     "roster:cherokee-so-sc.zuercherportal.com": 1,
     "roster:laurens-911-sc.zuercherportal.com": 1,
-    "roster:morgantonpdnc.policetocitizen.com": 1,
-    "roster:oconee-so-sc.zuercherportal.com": 1,
-    "roster:p2c.nhcgov.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
     "roster:union-so-sc.zuercherportal.com": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 141,
+    "vt.ncsbe.gov": 117,
     "www.courtlistener.com": 2
    }
   },
@@ -43,25 +38,25 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 999,
+  "seconds": 626,
   "selection": {
    "applies": 4916,
-   "due_new": 991,
-   "not_due_ttl": 3925
+   "due_new": 941,
+   "not_due_ttl": 3975
   },
   "source": null,
   "tier": null
  },
- "rows": 3958,
+ "rows": 4008,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 3371361,
+   "bytes": 3415138,
    "file": "000.json",
-   "rows": 3958,
-   "sha256": "d95c0934ee94e45730a5ddb58482dc49849b60bfdfa1cd206e964177a34994da"
+   "rows": 4008,
+   "sha256": "a5b3edee6c45d1bb7cfbfdba4bcda40622a5726af73301b0514dba283c1c81b4"
   }
  ],
  "signal": "divorce",

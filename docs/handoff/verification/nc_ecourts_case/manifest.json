@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 9815,
+  "confirmed": 9863,
   "refuted": 26,
-  "rows": 11405,
+  "rows": 11453,
   "stale": 1313,
   "unconfirmed": 251,
   "wall": 0
  },
- "generated_at": "2026-11-27T19:08:58Z",
+ "generated_at": "2026-11-27T19:47:15Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-27T19:08:57Z",
+  "at": "2026-11-27T19:47:14Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,58 +21,53 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 77,
-    "gis.buncombecounty.org": 50,
-    "portal-nc.tylertech.cloud": 30,
+    "devsvcs.gastonianc.gov": 52,
+    "gis.buncombecounty.org": 51,
+    "portal-nc.tylertech.cloud": 42,
     "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:buncombecountyso.policetocitizen.com": 1,
-    "roster:cc.southernsoftware.com": 2,
     "roster:cherokee-so-sc.zuercherportal.com": 1,
     "roster:laurens-911-sc.zuercherportal.com": 1,
-    "roster:morgantonpdnc.policetocitizen.com": 1,
-    "roster:oconee-so-sc.zuercherportal.com": 1,
-    "roster:p2c.nhcgov.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
     "roster:union-so-sc.zuercherportal.com": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 141,
+    "vt.ncsbe.gov": 117,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 16,
-   "unconfirmed": 34
+   "confirmed": 48,
+   "unconfirmed": 2
   },
-  "seconds": 999,
+  "seconds": 626,
   "selection": {
    "applies": 25671,
-   "due_new": 14587,
-   "due_retry": 116,
+   "due_new": 14571,
+   "due_retry": 84,
    "due_ttl": 670,
-   "not_due_retry": 146,
-   "not_due_ttl": 10152
+   "not_due_retry": 178,
+   "not_due_ttl": 10168
   },
   "source": null,
   "tier": null
  },
- "rows": 11405,
+ "rows": 11453,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 7106141,
+   "bytes": 7131715,
    "file": "000.json",
-   "rows": 5763,
-   "sha256": "d8cd81f424d88c56423a3b69591a66e8ea402b02fac794a43d687849e99886b3"
+   "rows": 5784,
+   "sha256": "a4e25478f9b9321f36144f605ede63a7aaea6b2caf327f5fe0f16f688fd2607e"
   },
   {
    "bucket": 1,
-   "bytes": 6963447,
+   "bytes": 6996340,
    "file": "001.json",
-   "rows": 5642,
-   "sha256": "29cade7cd13db24d671fe21813df3b6a58cd6d1eb287f832c911319abb86f1b2"
+   "rows": 5669,
+   "sha256": "59a659b459f1a089f132ff075d7b9b2cbe723e79ec79966f93a846483cfc732a"
   }
  ],
  "signal": "nc_ecourts_case",

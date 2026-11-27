@@ -1,19 +1,19 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 3605,
-  "refuted": 963,
-  "rows": 4924,
-  "stale": 333,
+  "confirmed": 3619,
+  "refuted": 985,
+  "rows": 4974,
+  "stale": 347,
   "unconfirmed": 23,
   "wall": 0
  },
- "generated_at": "2026-11-27T19:08:55Z",
+ "generated_at": "2026-11-27T19:47:12Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-27T19:08:55Z",
+  "at": "2026-11-27T19:47:12Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,51 +21,46 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 77,
-    "gis.buncombecounty.org": 50,
-    "portal-nc.tylertech.cloud": 30,
+    "devsvcs.gastonianc.gov": 52,
+    "gis.buncombecounty.org": 51,
+    "portal-nc.tylertech.cloud": 42,
     "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:buncombecountyso.policetocitizen.com": 1,
-    "roster:cc.southernsoftware.com": 2,
     "roster:cherokee-so-sc.zuercherportal.com": 1,
     "roster:laurens-911-sc.zuercherportal.com": 1,
-    "roster:morgantonpdnc.policetocitizen.com": 1,
-    "roster:oconee-so-sc.zuercherportal.com": 1,
-    "roster:p2c.nhcgov.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
     "roster:union-so-sc.zuercherportal.com": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 141,
+    "vt.ncsbe.gov": 117,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 12,
-   "refuted": 17,
-   "stale": 21
+   "confirmed": 14,
+   "refuted": 22,
+   "stale": 14
   },
-  "seconds": 999,
+  "seconds": 626,
   "selection": {
    "applies": 11927,
-   "due_new": 6929,
+   "due_new": 6879,
    "due_ttl": 112,
    "not_due_retry": 29,
-   "not_due_ttl": 4857
+   "not_due_ttl": 4907
   },
   "source": null,
   "tier": null
  },
- "rows": 4924,
+ "rows": 4974,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 5486525,
+   "bytes": 5541544,
    "file": "000.json",
-   "rows": 4924,
-   "sha256": "1f3776d1e4801beee4cbe1865b1ba3b207b21502bbcf64ab8078076e69efc2fe"
+   "rows": 4974,
+   "sha256": "9ca6b32fe05e752f39a58b4399f7f5fbd73b1bc2b605c36d685246243bab5985"
   }
  ],
  "signal": "code_enforcement",

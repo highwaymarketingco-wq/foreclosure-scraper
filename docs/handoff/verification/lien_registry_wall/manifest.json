@@ -3,17 +3,17 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 3760,
+  "rows": 3810,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 3760
+  "wall": 3810
  },
- "generated_at": "2026-11-27T19:08:57Z",
+ "generated_at": "2026-11-27T19:47:14Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-27T19:08:57Z",
+  "at": "2026-11-27T19:47:14Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,21 +21,16 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 77,
-    "gis.buncombecounty.org": 50,
-    "portal-nc.tylertech.cloud": 30,
+    "devsvcs.gastonianc.gov": 52,
+    "gis.buncombecounty.org": 51,
+    "portal-nc.tylertech.cloud": 42,
     "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:buncombecountyso.policetocitizen.com": 1,
-    "roster:cc.southernsoftware.com": 2,
     "roster:cherokee-so-sc.zuercherportal.com": 1,
     "roster:laurens-911-sc.zuercherportal.com": 1,
-    "roster:morgantonpdnc.policetocitizen.com": 1,
-    "roster:oconee-so-sc.zuercherportal.com": 1,
-    "roster:p2c.nhcgov.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
     "roster:union-so-sc.zuercherportal.com": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 141,
+    "vt.ncsbe.gov": 117,
     "www.courtlistener.com": 2
    }
   },
@@ -43,25 +38,25 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 999,
+  "seconds": 626,
   "selection": {
    "applies": 66565,
-   "due_new": 62775,
-   "not_due_ttl": 3790
+   "due_new": 62725,
+   "not_due_ttl": 3840
   },
   "source": null,
   "tier": null
  },
- "rows": 3760,
+ "rows": 3810,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 3357562,
+   "bytes": 3401530,
    "file": "000.json",
-   "rows": 3760,
-   "sha256": "d2a2b8e0b41f711bbc2895a1e58ea885dca58edc349ac8e9aa67819081c9abf4"
+   "rows": 3810,
+   "sha256": "05a9da3af2297005378fb35718a2785312d6b99749f1fd44a40d98c3bde4e0b1"
   }
  ],
  "signal": "lien_registry_wall",

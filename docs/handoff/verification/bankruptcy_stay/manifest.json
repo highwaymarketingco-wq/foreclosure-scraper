@@ -8,12 +8,12 @@
   "unconfirmed": 194,
   "wall": 0
  },
- "generated_at": "2026-11-27T19:08:55Z",
+ "generated_at": "2026-11-27T19:47:12Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-27T19:08:55Z",
+  "at": "2026-11-27T19:47:12Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,21 +21,16 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 77,
-    "gis.buncombecounty.org": 50,
-    "portal-nc.tylertech.cloud": 30,
+    "devsvcs.gastonianc.gov": 52,
+    "gis.buncombecounty.org": 51,
+    "portal-nc.tylertech.cloud": 42,
     "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:buncombecountyso.policetocitizen.com": 1,
-    "roster:cc.southernsoftware.com": 2,
     "roster:cherokee-so-sc.zuercherportal.com": 1,
     "roster:laurens-911-sc.zuercherportal.com": 1,
-    "roster:morgantonpdnc.policetocitizen.com": 1,
-    "roster:oconee-so-sc.zuercherportal.com": 1,
-    "roster:p2c.nhcgov.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
     "roster:union-so-sc.zuercherportal.com": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 141,
+    "vt.ncsbe.gov": 117,
     "www.courtlistener.com": 2
    }
   },
@@ -43,7 +38,7 @@
    "checked": 7,
    "unconfirmed": 7
   },
-  "seconds": 999,
+  "seconds": 626,
   "selection": {
    "applies": 465,
    "due_ttl": 7,
@@ -62,7 +57,7 @@
    "bytes": 630380,
    "file": "000.json",
    "rows": 571,
-   "sha256": "3a186dd1fdc9d25e3bcc995ba6448818ae8559da3de9824f0cd624e685545785"
+   "sha256": "8c5f1fd82c2c1e33b0cc701fdf4b2c5ecbd3e090b93351b53ae190b30bc15762"
   }
  ],
  "signal": "bankruptcy_stay",

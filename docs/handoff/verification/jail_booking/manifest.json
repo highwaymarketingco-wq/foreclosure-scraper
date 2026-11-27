@@ -8,12 +8,12 @@
   "unconfirmed": 220,
   "wall": 0
  },
- "generated_at": "2026-11-27T19:08:57Z",
+ "generated_at": "2026-11-27T19:47:14Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-27T19:08:57Z",
+  "at": "2026-11-27T19:47:14Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,37 +21,32 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 77,
-    "gis.buncombecounty.org": 50,
-    "portal-nc.tylertech.cloud": 30,
+    "devsvcs.gastonianc.gov": 52,
+    "gis.buncombecounty.org": 51,
+    "portal-nc.tylertech.cloud": 42,
     "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:buncombecountyso.policetocitizen.com": 1,
-    "roster:cc.southernsoftware.com": 2,
     "roster:cherokee-so-sc.zuercherportal.com": 1,
     "roster:laurens-911-sc.zuercherportal.com": 1,
-    "roster:morgantonpdnc.policetocitizen.com": 1,
-    "roster:oconee-so-sc.zuercherportal.com": 1,
-    "roster:p2c.nhcgov.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
     "roster:union-so-sc.zuercherportal.com": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 141,
+    "vt.ncsbe.gov": 117,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 40,
-   "stale": 6,
-   "unconfirmed": 4
+   "confirmed": 41,
+   "stale": 8,
+   "unconfirmed": 1
   },
-  "seconds": 999,
+  "seconds": 626,
   "selection": {
    "applies": 907,
-   "due_retry": 136,
-   "due_ttl": 603,
-   "not_due_retry": 71,
-   "not_due_ttl": 97
+   "due_retry": 132,
+   "due_ttl": 582,
+   "not_due_retry": 75,
+   "not_due_ttl": 118
   },
   "source": null,
   "tier": null
@@ -62,10 +57,10 @@
  "shards": [
   {
    "bucket": 0,
-   "bytes": 1207558,
+   "bytes": 1213090,
    "file": "000.json",
    "rows": 984,
-   "sha256": "7d95ecee570705121f885698f3404e42f76caeee2499d3833474a04d31665a6a"
+   "sha256": "7c4f28a4e61aab4c64a675d54a751d437f3540404cd62edfaa22c7b329c2be93"
   }
  ],
  "signal": "jail_booking",
