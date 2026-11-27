@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-11-27T17:52:54.330640Z",
+  "run_time": "2026-11-27T21:53:48.658514Z",
   "total": 636657,
   "by_source": {
     "national.auction_bank_reo": 3,
@@ -529,7 +529,7 @@
     "counties_sc.berkeley_paystar_tax: got 25, expected ≥ 500"
   ],
   "errors": null,
-  "notes": "daily vision pass: 46301 of 636657 listings have a vision report (+204 this run)",
+  "notes": "Gaston NC ROD lien-existence by owner name (batched)",
   "detail_count": 636657,
   "detail_digest": "678a9612c8a75fc1",
   "board_parts": {
@@ -608,8 +608,8 @@
         "start": 92000,
         "end": 103500,
         "records": 11500,
-        "bytes": 9084967,
-        "sha256": "ea655214bf3c69bd05e32146c743f58717bce504d6f094dadcaf9f8ff92c00e8"
+        "bytes": 9088565,
+        "sha256": "6dec7ab6dcd3d195e51e3a991e2559ee8c372be03448397b8eb59a68c336b5e1"
       },
       {
         "name": "listings_part_009.json.gz",
@@ -1001,7 +1001,7 @@
     }
   },
   "health_as_of": "2026-10-16T20:24:46.640274Z",
-  "health_age_hours": 1005.47,
+  "health_age_hours": 1009.48,
   "health_stale": true,
   "source_last_success": {
     "city_websites.charlotte_open_data": "2026-10-16T20:24:46.640274Z",
