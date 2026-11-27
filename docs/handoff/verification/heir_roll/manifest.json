@@ -1,19 +1,19 @@
 {
  "buckets": 4,
  "counts": {
-  "confirmed": 17925,
+  "confirmed": 17975,
   "refuted": 11,
-  "rows": 18204,
+  "rows": 18254,
   "stale": 56,
   "unconfirmed": 212,
   "wall": 0
  },
- "generated_at": "2026-11-27T21:19:57Z",
+ "generated_at": "2026-11-27T21:42:04Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-27T21:19:56Z",
+  "at": "2026-11-27T21:42:02Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,18 +21,23 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 68,
+    "devsvcs.gastonianc.gov": 45,
     "gis.buncombecounty.org": 50,
-    "portal-nc.tylertech.cloud": 32,
-    "roster:cc.southernsoftware.com": 2,
+    "portal-nc.tylertech.cloud": 38,
     "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:guilfordcountysheriff.policetocitizen.com": 1,
+    "roster:injail.catawbacountync.gov": 1,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
     "roster:legacyweb.randolphcountync.gov": 1,
     "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
     "roster:onlineservices.cabarruscounty.us": 1,
+    "roster:p2c.nhcgov.com": 1,
+    "roster:pasquotank-911-nc.zuercherportal.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
+    "roster:rowancountync.policetocitizen.com": 1,
+    "roster:tepsweb.cityofgastonia.com": 1,
+    "roster:www2.co.davidson.nc.us": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 135,
+    "vt.ncsbe.gov": 138,
     "www.courtlistener.com": 2
    }
   },
@@ -40,50 +45,50 @@
    "checked": 50,
    "confirmed": 50
   },
-  "seconds": 793,
+  "seconds": 917,
   "selection": {
    "applies": 44671,
-   "due_new": 26573,
+   "due_new": 26523,
    "due_retry": 113,
    "due_retry_transient": 24,
    "due_ttl": 432,
    "not_due_retry": 71,
-   "not_due_ttl": 17458
+   "not_due_ttl": 17508
   },
   "source": null,
   "tier": null
  },
- "rows": 18204,
+ "rows": 18254,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4425419,
+   "bytes": 4436635,
    "file": "000.json",
-   "rows": 4645,
-   "sha256": "c08e65baa1a024cdf1eb0686eb1bd8559f4fa3c17c15db2cc466b05dd8046277"
+   "rows": 4657,
+   "sha256": "2aef449723c6678ff9f91f7cd16d58696a882c8de769d4ba28e28c7452c808f4"
   },
   {
    "bucket": 1,
-   "bytes": 4291686,
+   "bytes": 4305559,
    "file": "001.json",
-   "rows": 4504,
-   "sha256": "1c9d8f42cf57e89f98670604c02f0135d4d1a6104b131ddd6f144250b8ff6d99"
+   "rows": 4519,
+   "sha256": "95307931568d372d6d103a41c0318d037942216a17438c5e43dcdcc3442d274a"
   },
   {
    "bucket": 2,
-   "bytes": 4302942,
+   "bytes": 4313209,
    "file": "002.json",
-   "rows": 4524,
-   "sha256": "abe37c81e49bda934c54fd74a987dbb8fe0d6ba3522d9640aa64d12225058ba9"
+   "rows": 4535,
+   "sha256": "af5b0033dc753975b8fbde812ad94873d0877a2f5349a90f35c8efd751e79f96"
   },
   {
    "bucket": 3,
-   "bytes": 4317085,
+   "bytes": 4328302,
    "file": "003.json",
-   "rows": 4531,
-   "sha256": "350aa1fbc5137dabf2f55d163a67966c1fda8eec873ac6bf46dadff728b4c95f"
+   "rows": 4543,
+   "sha256": "abaaa386d09c8b2a8a3c6b229f14af148f6a7d6257d64388d5f72739a2aea96b"
   }
  ],
  "signal": "heir_roll",

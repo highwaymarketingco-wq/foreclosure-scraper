@@ -8,12 +8,12 @@
   "unconfirmed": 194,
   "wall": 0
  },
- "generated_at": "2026-11-27T21:19:54Z",
+ "generated_at": "2026-11-27T21:41:59Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-27T21:19:53Z",
+  "at": "2026-11-27T21:41:59Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,18 +21,23 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 68,
+    "devsvcs.gastonianc.gov": 45,
     "gis.buncombecounty.org": 50,
-    "portal-nc.tylertech.cloud": 32,
-    "roster:cc.southernsoftware.com": 2,
+    "portal-nc.tylertech.cloud": 38,
     "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:guilfordcountysheriff.policetocitizen.com": 1,
+    "roster:injail.catawbacountync.gov": 1,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
     "roster:legacyweb.randolphcountync.gov": 1,
     "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
     "roster:onlineservices.cabarruscounty.us": 1,
+    "roster:p2c.nhcgov.com": 1,
+    "roster:pasquotank-911-nc.zuercherportal.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
+    "roster:rowancountync.policetocitizen.com": 1,
+    "roster:tepsweb.cityofgastonia.com": 1,
+    "roster:www2.co.davidson.nc.us": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 135,
+    "vt.ncsbe.gov": 138,
     "www.courtlistener.com": 2
    }
   },
@@ -40,7 +45,7 @@
    "checked": 7,
    "unconfirmed": 7
   },
-  "seconds": 793,
+  "seconds": 917,
   "selection": {
    "applies": 465,
    "due_ttl": 7,
@@ -59,7 +64,7 @@
    "bytes": 630380,
    "file": "000.json",
    "rows": 571,
-   "sha256": "51b6ef36f5eaa9f9188b6b0b1c490ca74249d8cc42ccd4ecc21e15679ff62829"
+   "sha256": "70d5c85555233c5982f42981c38a43ce3627baf8cc9b15b694062ad1f41d003d"
   }
  ],
  "signal": "bankruptcy_stay",

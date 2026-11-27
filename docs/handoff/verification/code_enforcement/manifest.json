@@ -1,19 +1,19 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 3637,
-  "refuted": 1034,
-  "rows": 5074,
-  "stale": 380,
+  "confirmed": 3641,
+  "refuted": 1058,
+  "rows": 5124,
+  "stale": 402,
   "unconfirmed": 23,
   "wall": 0
  },
- "generated_at": "2026-11-27T21:19:54Z",
+ "generated_at": "2026-11-27T21:42:00Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-27T21:19:54Z",
+  "at": "2026-11-27T21:41:59Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,48 +21,53 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 68,
+    "devsvcs.gastonianc.gov": 45,
     "gis.buncombecounty.org": 50,
-    "portal-nc.tylertech.cloud": 32,
-    "roster:cc.southernsoftware.com": 2,
+    "portal-nc.tylertech.cloud": 38,
     "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:guilfordcountysheriff.policetocitizen.com": 1,
+    "roster:injail.catawbacountync.gov": 1,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
     "roster:legacyweb.randolphcountync.gov": 1,
     "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
     "roster:onlineservices.cabarruscounty.us": 1,
+    "roster:p2c.nhcgov.com": 1,
+    "roster:pasquotank-911-nc.zuercherportal.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
+    "roster:rowancountync.policetocitizen.com": 1,
+    "roster:tepsweb.cityofgastonia.com": 1,
+    "roster:www2.co.davidson.nc.us": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 135,
+    "vt.ncsbe.gov": 138,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 10,
-   "refuted": 22,
-   "stale": 18
+   "confirmed": 4,
+   "refuted": 24,
+   "stale": 22
   },
-  "seconds": 793,
+  "seconds": 917,
   "selection": {
    "applies": 11927,
-   "due_new": 6779,
+   "due_new": 6729,
    "due_ttl": 112,
    "not_due_retry": 29,
-   "not_due_ttl": 5007
+   "not_due_ttl": 5057
   },
   "source": null,
   "tier": null
  },
- "rows": 5074,
+ "rows": 5124,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 5652847,
+   "bytes": 5707057,
    "file": "000.json",
-   "rows": 5074,
-   "sha256": "25aa603f89f10d36c773ce462f51d2f119d2d4d8267656d244ea2e5f7bbf1eb7"
+   "rows": 5124,
+   "sha256": "ae91821a305f53154fd6ed02733f7c4cb08eeddb54660cc228d9fd77af3ed5e7"
   }
  ],
  "signal": "code_enforcement",
