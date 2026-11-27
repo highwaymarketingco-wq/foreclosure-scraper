@@ -151,6 +151,7 @@ class YorkCountyPropertyTaxScraper(BaseScraper):
                         
                         if tax_map_id:
                             listing = Listing(
+                                source=self.slug,
                                 county="York",
                                 state="SC",
                                 listing_type="Property Parcel",
@@ -190,6 +191,7 @@ class YorkCountyPropertyTaxScraper(BaseScraper):
             
             for tax_id, owner in matches:
                 listing = Listing(
+                    source=self.slug,
                     county="York",
                     state="SC",
                     listing_type="Property Parcel",
