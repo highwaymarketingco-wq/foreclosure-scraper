@@ -8,12 +8,12 @@
   "unconfirmed": 220,
   "wall": 0
  },
- "generated_at": "2026-11-27T18:25:09Z",
+ "generated_at": "2026-11-27T19:08:57Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-27T18:25:09Z",
+  "at": "2026-11-27T19:08:57Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,42 +21,37 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 78,
-    "gis.buncombecounty.org": 53,
-    "portal-nc.tylertech.cloud": 27,
+    "devsvcs.gastonianc.gov": 77,
+    "gis.buncombecounty.org": 50,
+    "portal-nc.tylertech.cloud": 30,
+    "roster:anderson-so-sc.zuercherportal.com": 1,
     "roster:buncombecountyso.policetocitizen.com": 1,
-    "roster:cc.southernsoftware.com": 4,
+    "roster:cc.southernsoftware.com": 2,
     "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:forsythsheriffnc.policetocitizen.com": 1,
-    "roster:guilfordcountysheriff.policetocitizen.com": 1,
     "roster:laurens-911-sc.zuercherportal.com": 1,
-    "roster:legacyweb.randolphcountync.gov": 1,
-    "roster:lexingtonsheriffsc.policetocitizen.com": 1,
+    "roster:morgantonpdnc.policetocitizen.com": 1,
     "roster:oconee-so-sc.zuercherportal.com": 1,
+    "roster:p2c.nhcgov.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
-    "roster:tepsweb.cityofgastonia.com": 1,
-    "roster:www2.co.davidson.nc.us": 1,
+    "roster:union-so-sc.zuercherportal.com": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 135,
+    "vt.ncsbe.gov": 141,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 20,
-   "deferred": 2,
-   "rechecked_after_deferral": 2,
-   "refuted": 3,
+   "confirmed": 40,
    "stale": 6,
-   "unconfirmed": 21
+   "unconfirmed": 4
   },
-  "seconds": 1395,
+  "seconds": 999,
   "selection": {
    "applies": 907,
-   "due_retry": 143,
-   "due_ttl": 592,
-   "not_due_retry": 65,
-   "not_due_ttl": 107
+   "due_retry": 136,
+   "due_ttl": 603,
+   "not_due_retry": 71,
+   "not_due_ttl": 97
   },
   "source": null,
   "tier": null
@@ -67,10 +62,10 @@
  "shards": [
   {
    "bucket": 0,
-   "bytes": 1202600,
+   "bytes": 1207558,
    "file": "000.json",
    "rows": 984,
-   "sha256": "b0053ea94187c04a7c820ec4d0b0ca1b112f401a9bea63cce25e9129fd500b96"
+   "sha256": "7d95ecee570705121f885698f3404e42f76caeee2499d3833474a04d31665a6a"
   }
  ],
  "signal": "jail_booking",
