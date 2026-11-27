@@ -1,19 +1,19 @@
 {
  "buckets": 4,
  "counts": {
-  "confirmed": 17875,
+  "confirmed": 17925,
   "refuted": 11,
-  "rows": 18154,
+  "rows": 18204,
   "stale": 56,
   "unconfirmed": 212,
   "wall": 0
  },
- "generated_at": "2026-11-27T20:33:04Z",
+ "generated_at": "2026-11-27T21:19:57Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-27T20:33:03Z",
+  "at": "2026-11-27T21:19:56Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,29 +21,18 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 39,
-    "gis.buncombecounty.org": 52,
-    "portal-nc.tylertech.cloud": 38,
-    "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:buncombecountyso.policetocitizen.com": 1,
+    "devsvcs.gastonianc.gov": 68,
+    "gis.buncombecounty.org": 50,
+    "portal-nc.tylertech.cloud": 32,
     "roster:cc.southernsoftware.com": 2,
     "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:forsythsheriffnc.policetocitizen.com": 1,
     "roster:guilfordcountysheriff.policetocitizen.com": 1,
+    "roster:legacyweb.randolphcountync.gov": 1,
     "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "roster:oconee-so-sc.zuercherportal.com": 1,
     "roster:onlineservices.cabarruscounty.us": 1,
-    "roster:p2c.iredellcountync.gov": 1,
-    "roster:p2c.lincolnsheriff.org": 1,
-    "roster:p2c.nhcgov.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
-    "roster:rowancountync.policetocitizen.com": 1,
-    "roster:tepsweb.cityofgastonia.com": 1,
-    "roster:union-so-sc.zuercherportal.com": 1,
-    "roster:wakeso.policetocitizen.com": 1,
-    "roster:www.fcso.org": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 141,
+    "vt.ncsbe.gov": 135,
     "www.courtlistener.com": 2
    }
   },
@@ -51,50 +40,50 @@
    "checked": 50,
    "confirmed": 50
   },
-  "seconds": 970,
+  "seconds": 793,
   "selection": {
    "applies": 44671,
-   "due_new": 26623,
+   "due_new": 26573,
    "due_retry": 113,
    "due_retry_transient": 24,
    "due_ttl": 432,
    "not_due_retry": 71,
-   "not_due_ttl": 17408
+   "not_due_ttl": 17458
   },
   "source": null,
   "tier": null
  },
- "rows": 18154,
+ "rows": 18204,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4414092,
+   "bytes": 4425419,
    "file": "000.json",
-   "rows": 4633,
-   "sha256": "23a31e86bb58775124991d6281d9f704b21b0f36b61e3eb04975f1c6e68fedeb"
+   "rows": 4645,
+   "sha256": "c08e65baa1a024cdf1eb0686eb1bd8559f4fa3c17c15db2cc466b05dd8046277"
   },
   {
    "bucket": 1,
-   "bytes": 4282271,
+   "bytes": 4291686,
    "file": "001.json",
-   "rows": 4494,
-   "sha256": "dc408f3fa6613e9a8c940c64f1876e3eb6f96d4a81744d4926751e9349e6cb00"
+   "rows": 4504,
+   "sha256": "1c9d8f42cf57e89f98670604c02f0135d4d1a6104b131ddd6f144250b8ff6d99"
   },
   {
    "bucket": 2,
-   "bytes": 4289805,
+   "bytes": 4302942,
    "file": "002.json",
-   "rows": 4510,
-   "sha256": "d82dd9de22b07d7bcac2d44e8b7107a05454b62a32cdb54a5c34afc14cbd8181"
+   "rows": 4524,
+   "sha256": "abe37c81e49bda934c54fd74a987dbb8fe0d6ba3522d9640aa64d12225058ba9"
   },
   {
    "bucket": 3,
-   "bytes": 4303832,
+   "bytes": 4317085,
    "file": "003.json",
-   "rows": 4517,
-   "sha256": "bd6dc416fbabf12e5f4b244ef337fe787ee960248a43274b6015e4114bc45e77"
+   "rows": 4531,
+   "sha256": "350aa1fbc5137dabf2f55d163a67966c1fda8eec873ac6bf46dadff728b4c95f"
   }
  ],
  "signal": "heir_roll",
