@@ -43,7 +43,7 @@ from bs4 import BeautifulSoup
 from nodriver import Browser
 
 from foreclosure_scraper.base_scraper import BaseScraper
-from foreclosure_scraper.models import Listing
+from foreclosure_scraper.models import Listing, ListingType
 
 log = structlog.get_logger()
 
@@ -80,7 +80,13 @@ class ScSosBusinessDissolutionScraper(BaseScraper):
         
         try:
             # Start browser
-            browser = await uc.start(headless=False)
+            # On VM, use patchright-installed chromium
+            import os
+            chromium_path = os.path.expanduser("~/.cache/ms-playwright/chromium-1217/chrome-linux/chrome")
+            if os.path.exists(chromium_path):
+                browser = await uc.start(headless=True, browser_executable_path=chromium_path)
+            else:
+                browser = await uc.start(headless=True)
             page = await browser.get(_SEARCH_URL)
             await page.wait(2)
 
@@ -222,12 +228,13 @@ class ScSosBusinessDissolutionScraper(BaseScraper):
                     # Only include dissolved/withdrawn entities
                     if any(word in status.lower() for word in ["dissolv", "withdraw", "cancel", "revok"]):
                         listing = Listing(
+                            source=self.slug,
                             county="Statewide",
                             state="SC",
-                            listing_type="Business Dissolution",
+                            listing_type=ListingType.UNKNOWN,  # Will be tagged as business_dissolution via category
+                            defendant=business_name,  # Business name as defendant
                             case_number=business_name,  # Use as identifier
-                            status=status,
-                            notes=f"Entity Type: {entity_type}, Search: {search_letter}*",
+                            description=f"Status: {status}, Entity Type: {entity_type}, Search: {search_letter}*",
                             source_url=_SEARCH_URL,
                         )
                         results.append(listing)
