@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 11325,
+  "confirmed": 11361,
   "refuted": 26,
-  "rows": 12941,
-  "stale": 1339,
-  "unconfirmed": 251,
+  "rows": 12989,
+  "stale": 1349,
+  "unconfirmed": 253,
   "wall": 0
  },
- "generated_at": "2026-11-28T22:14:03Z",
+ "generated_at": "2026-11-28T22:43:53Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-28T22:14:02Z",
+  "at": "2026-11-28T22:43:52Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -23,7 +23,8 @@
    "requests": {
     "gis.charlottenc.gov": 100,
     "maps.spartanburgcounty.org": 50,
-    "portal-nc.tylertech.cloud": 36,
+    "portal-nc.tylertech.cloud": 44,
+    "roster:inmatesinjail.yorkcountygov.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
     "services.nconemap.gov": 50,
     "www.courtlistener.com": 2
@@ -31,39 +32,39 @@
   },
   "result": {
    "checked": 50,
-   "confirmed": 46,
-   "stale": 2,
-   "unconfirmed": 2
+   "confirmed": 36,
+   "stale": 10,
+   "unconfirmed": 4
   },
-  "seconds": 706,
+  "seconds": 669,
   "selection": {
    "applies": 25671,
-   "due_new": 13083,
+   "due_new": 13035,
    "due_retry": 162,
    "due_ttl": 670,
    "not_due_retry": 100,
-   "not_due_ttl": 11656
+   "not_due_ttl": 11704
   },
   "source": null,
   "tier": null
  },
- "rows": 12941,
+ "rows": 12989,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 8011208,
+   "bytes": 8046692,
    "file": "000.json",
-   "rows": 6506,
-   "sha256": "948b2cbd7553ff4065fb27a8b0df116d7ae44829fdabb53003f80d8c2208375a"
+   "rows": 6535,
+   "sha256": "f6374d53c6190d443b6bec5338d2dac10822fa4ddf00f8785f4ecc48b0d4b660"
   },
   {
    "bucket": 1,
-   "bytes": 7929275,
+   "bytes": 7951991,
    "file": "001.json",
-   "rows": 6435,
-   "sha256": "71b05d8cfbcdec37730bd4323a745626eead85b73781993443d392a34d7f3f4e"
+   "rows": 6454,
+   "sha256": "21443b58be74a73fe7f1d3fbe470a0ad440eb1d7ca78464f5ac746d8050ac120"
   }
  ],
  "signal": "nc_ecourts_case",

@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 10837,
+  "confirmed": 10887,
   "refuted": 99,
-  "rows": 11174,
+  "rows": 11224,
   "stale": 80,
   "unconfirmed": 158,
   "wall": 0
  },
- "generated_at": "2026-11-28T22:14:01Z",
+ "generated_at": "2026-11-28T22:43:51Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-28T22:14:00Z",
+  "at": "2026-11-28T22:43:50Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -23,7 +23,8 @@
    "requests": {
     "gis.charlottenc.gov": 100,
     "maps.spartanburgcounty.org": 50,
-    "portal-nc.tylertech.cloud": 36,
+    "portal-nc.tylertech.cloud": 44,
+    "roster:inmatesinjail.yorkcountygov.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
     "services.nconemap.gov": 50,
     "www.courtlistener.com": 2
@@ -33,36 +34,36 @@
    "checked": 50,
    "confirmed": 50
   },
-  "seconds": 706,
+  "seconds": 669,
   "selection": {
    "applies": 140892,
-   "due_new": 128747,
+   "due_new": 128697,
    "due_retry": 15,
    "due_version": 1,
    "not_due_retry": 143,
-   "not_due_ttl": 11986,
+   "not_due_ttl": 12036,
    "same_property_queued": 7
   },
   "source": null,
   "tier": null
  },
- "rows": 11174,
+ "rows": 11224,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 5992972,
+   "bytes": 6011462,
    "file": "000.json",
-   "rows": 5637,
-   "sha256": "d9b7292968004836c1d5b28f63cb1e620519022d0c2cb9b9475ef2f5f4afc81c"
+   "rows": 5657,
+   "sha256": "2027777f1859a7914d3c7ad9241e3ec420d9d42c46d652e298cf56ef0933eecb"
   },
   {
    "bucket": 1,
-   "bytes": 5855257,
+   "bytes": 5882971,
    "file": "001.json",
-   "rows": 5537,
-   "sha256": "6478ec4ce509e4739143c83f86f2929c7a1a5addfba68ef7fde7945d9c454d73"
+   "rows": 5567,
+   "sha256": "1eacb0d9a0f02508ff116847520fb097db48f27031854e1919986c05d97c0cf4"
   }
  ],
  "signal": "elderly_disabled",

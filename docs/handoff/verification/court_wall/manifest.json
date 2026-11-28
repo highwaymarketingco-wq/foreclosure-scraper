@@ -3,17 +3,17 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 6832,
+  "rows": 6882,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 6832
+  "wall": 6882
  },
- "generated_at": "2026-11-28T22:14:00Z",
+ "generated_at": "2026-11-28T22:43:50Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-28T22:14:00Z",
+  "at": "2026-11-28T22:43:49Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -23,7 +23,8 @@
    "requests": {
     "gis.charlottenc.gov": 100,
     "maps.spartanburgcounty.org": 50,
-    "portal-nc.tylertech.cloud": 36,
+    "portal-nc.tylertech.cloud": 44,
+    "roster:inmatesinjail.yorkcountygov.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
     "services.nconemap.gov": 50,
     "www.courtlistener.com": 2
@@ -33,25 +34,25 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 706,
+  "seconds": 669,
   "selection": {
    "applies": 9035,
-   "due_new": 2089,
-   "not_due_ttl": 6946
+   "due_new": 2039,
+   "not_due_ttl": 6996
   },
   "source": null,
   "tier": null
  },
- "rows": 6832,
+ "rows": 6882,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 5190774,
+   "bytes": 5228124,
    "file": "000.json",
-   "rows": 6832,
-   "sha256": "048f7f609467f74379c602bf029af0fa82d3663b00d0cb947fe69c5b4dc4383c"
+   "rows": 6882,
+   "sha256": "4cfba20262f639775f657bf85a2b036dd0131648f5369290643a6270e09cbdbc"
   }
  ],
  "signal": "court_wall",
