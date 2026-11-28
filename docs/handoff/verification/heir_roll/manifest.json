@@ -1,19 +1,19 @@
 {
  "buckets": 4,
  "counts": {
-  "confirmed": 18075,
+  "confirmed": 18125,
   "refuted": 11,
-  "rows": 18354,
+  "rows": 18404,
   "stale": 56,
   "unconfirmed": 212,
   "wall": 0
  },
- "generated_at": "2026-11-28T00:24:37Z",
+ "generated_at": "2026-11-28T01:01:16Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-28T00:24:36Z",
+  "at": "2026-11-28T01:01:15Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,13 +21,13 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 52,
-    "gis.buncombecounty.org": 74,
-    "portal-nc.tylertech.cloud": 36,
+    "devsvcs.gastonianc.gov": 69,
+    "gis.buncombecounty.org": 77,
+    "portal-nc.tylertech.cloud": 38,
     "roster:anderson-so-sc.zuercherportal.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 78,
+    "vt.ncsbe.gov": 99,
     "www.courtlistener.com": 2
    }
   },
@@ -35,50 +35,50 @@
    "checked": 50,
    "confirmed": 50
   },
-  "seconds": 1332,
+  "seconds": 858,
   "selection": {
    "applies": 44671,
-   "due_new": 26423,
+   "due_new": 26373,
    "due_retry": 113,
    "due_retry_transient": 24,
    "due_ttl": 432,
    "not_due_retry": 71,
-   "not_due_ttl": 17608
+   "not_due_ttl": 17658
   },
   "source": null,
   "tier": null
  },
- "rows": 18354,
+ "rows": 18404,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4457917,
+   "bytes": 4472055,
    "file": "000.json",
-   "rows": 4680,
-   "sha256": "e97a06839761ecf2aa41d0166c9ed77acf4704955ccf490fa315c22907b0212b"
+   "rows": 4695,
+   "sha256": "16a855d49cd8189d3dfdf911397b9ee6e7d94b7dcfaa9333d4f9ac6f27884ba7"
   },
   {
    "bucket": 1,
-   "bytes": 4323275,
+   "bytes": 4329769,
    "file": "001.json",
-   "rows": 4538,
-   "sha256": "7ab5e85d4991a2f8366fe12226271509ab24ca13f1d6d8351a1da66a64d6bfab"
+   "rows": 4545,
+   "sha256": "658bc7d0655cf0b5c7fc2438f93dff3f21b0ccfe3a968e992ac628066a91f54b"
   },
   {
    "bucket": 2,
-   "bytes": 4340399,
+   "bytes": 4355217,
    "file": "002.json",
-   "rows": 4564,
-   "sha256": "de5f28d50208b4766a64eaf3d76d8a651992f2a2613955e65e86c707ccc6d143"
+   "rows": 4580,
+   "sha256": "89eac78b48d9811ee23799ac013a64667ff33c9d2009f533a7750a948505f2de"
   },
   {
    "bucket": 3,
-   "bytes": 4355404,
+   "bytes": 4366540,
    "file": "003.json",
-   "rows": 4572,
-   "sha256": "8488ddbc4c02c372b941d292ab09458ebd84ed812ca6bf616ce71b9792573a92"
+   "rows": 4584,
+   "sha256": "5a421fe6c916f431a29746983f8a5c9b51a206a571d52d7d81c01f922236309e"
   }
  ],
  "signal": "heir_roll",

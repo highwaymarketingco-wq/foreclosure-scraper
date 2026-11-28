@@ -1,19 +1,19 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 3651,
-  "refuted": 1120,
-  "rows": 5223,
-  "stale": 429,
+  "confirmed": 3660,
+  "refuted": 1142,
+  "rows": 5273,
+  "stale": 448,
   "unconfirmed": 23,
   "wall": 0
  },
- "generated_at": "2026-11-28T00:24:35Z",
+ "generated_at": "2026-11-28T01:01:13Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-28T00:24:34Z",
+  "at": "2026-11-28T01:01:12Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,43 +21,43 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 52,
-    "gis.buncombecounty.org": 74,
-    "portal-nc.tylertech.cloud": 36,
+    "devsvcs.gastonianc.gov": 69,
+    "gis.buncombecounty.org": 77,
+    "portal-nc.tylertech.cloud": 38,
     "roster:anderson-so-sc.zuercherportal.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 78,
+    "vt.ncsbe.gov": 99,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 8,
-   "refuted": 25,
-   "stale": 17
+   "confirmed": 9,
+   "refuted": 22,
+   "stale": 19
   },
-  "seconds": 1332,
+  "seconds": 858,
   "selection": {
    "applies": 11927,
-   "due_new": 6630,
+   "due_new": 6580,
    "due_ttl": 112,
    "not_due_retry": 29,
-   "not_due_ttl": 5156
+   "not_due_ttl": 5206
   },
   "source": null,
   "tier": null
  },
- "rows": 5223,
+ "rows": 5273,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 5812151,
+   "bytes": 5870979,
    "file": "000.json",
-   "rows": 5223,
-   "sha256": "03191f090ee6f4c8663bdd374a3a801b50ab4ed1454595b8a87c0b33a73d8f54"
+   "rows": 5273,
+   "sha256": "37f33aa5d2f8c87b4ebbc3a76599380fb0e7e891af5703f2ebc2f8b9ac0cf3f3"
   }
  ],
  "signal": "code_enforcement",

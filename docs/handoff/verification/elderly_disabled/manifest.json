@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 9569,
+  "confirmed": 9612,
   "refuted": 99,
-  "rows": 9874,
+  "rows": 9924,
   "stale": 59,
-  "unconfirmed": 147,
+  "unconfirmed": 154,
   "wall": 0
  },
- "generated_at": "2026-11-28T00:24:36Z",
+ "generated_at": "2026-11-28T01:01:15Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-28T00:24:36Z",
+  "at": "2026-11-28T01:01:14Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,51 +21,51 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 52,
-    "gis.buncombecounty.org": 74,
-    "portal-nc.tylertech.cloud": 36,
+    "devsvcs.gastonianc.gov": 69,
+    "gis.buncombecounty.org": 77,
+    "portal-nc.tylertech.cloud": 38,
     "roster:anderson-so-sc.zuercherportal.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 78,
+    "vt.ncsbe.gov": 99,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 48,
-   "unconfirmed": 2
+   "confirmed": 43,
+   "unconfirmed": 7
   },
-  "seconds": 1332,
+  "seconds": 858,
   "selection": {
    "applies": 140892,
-   "due_new": 130096,
+   "due_new": 130046,
    "due_retry": 8,
    "due_version": 1,
-   "not_due_retry": 128,
-   "not_due_ttl": 10659,
+   "not_due_retry": 130,
+   "not_due_ttl": 10707,
    "same_property_queued": 1
   },
   "source": null,
   "tier": null
  },
- "rows": 9874,
+ "rows": 9924,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 5340957,
+   "bytes": 5369227,
    "file": "000.json",
-   "rows": 4973,
-   "sha256": "c7bbd98849e16ec1e61414548f06706ee0eba0eb84fd88b6041c77bc19b73fa6"
+   "rows": 4994,
+   "sha256": "a7b697d7ec79aa7dfa25fbd22c1c9a862efb3c7576a7f56dd98a70bf6b38ff2e"
   },
   {
    "bucket": 1,
-   "bytes": 5230715,
+   "bytes": 5268758,
    "file": "001.json",
-   "rows": 4901,
-   "sha256": "b205f9d794fb6351dbfa13cb3202ef7030a9cfcc223afb2e821d3d04d39a0b7d"
+   "rows": 4930,
+   "sha256": "4e62e01e5af50a73204a568c85e9420fbc431ff03e1b349212580814aa4f5fa0"
   }
  ],
  "signal": "elderly_disabled",

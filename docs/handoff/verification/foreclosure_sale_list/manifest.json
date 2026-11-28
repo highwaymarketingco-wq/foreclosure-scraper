@@ -8,12 +8,12 @@
   "unconfirmed": 80,
   "wall": 0
  },
- "generated_at": "2026-11-28T00:24:36Z",
+ "generated_at": "2026-11-28T01:01:15Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-28T00:24:36Z",
+  "at": "2026-11-28T01:01:15Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,13 +21,13 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 52,
-    "gis.buncombecounty.org": 74,
-    "portal-nc.tylertech.cloud": 36,
+    "devsvcs.gastonianc.gov": 69,
+    "gis.buncombecounty.org": 77,
+    "portal-nc.tylertech.cloud": 38,
     "roster:anderson-so-sc.zuercherportal.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 78,
+    "vt.ncsbe.gov": 99,
     "www.courtlistener.com": 2
    }
   },
@@ -35,7 +35,7 @@
    "checked": 50,
    "unconfirmed": 50
   },
-  "seconds": 1332,
+  "seconds": 858,
   "selection": {
    "applies": 418,
    "due_new": 1,
@@ -57,7 +57,7 @@
    "bytes": 498569,
    "file": "000.json",
    "rows": 420,
-   "sha256": "95f9b08e7c7e7c6ecf89a250811b3722afb918b7c43f89e4778235d99ca3865f"
+   "sha256": "7510a9140b56eb4f9b1aa7082dcc766bca1eefb806305623c31a46ade0d7c6f3"
   }
  ],
  "signal": "foreclosure_sale_list",
