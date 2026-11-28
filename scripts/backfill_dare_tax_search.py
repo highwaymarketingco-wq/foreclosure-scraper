@@ -27,7 +27,8 @@ from foreclosure_scraper.enrichment_dare_tax_search import (  # noqa: E402
 )
 from foreclosure_scraper.models import Listing  # noqa: E402
 from foreclosure_scraper.web_artifact import (  # noqa: E402
-    _APPEND_SIG_FIELDS, board_lock, board_patch_size_state, patch_existing_rows,
+    BoardChangedSinceLoad, BoardLockBusy, _APPEND_SIG_FIELDS, board_lock,
+    board_patch_size_state, patch_existing_rows,
 )
 
 _LIGHT_FIELDS = _APPEND_SIG_FIELDS + ("raw", "state", "county", "parcel_id")
@@ -115,8 +116,23 @@ def main() -> int:
     if _allow_large:
         os.environ["BOARD_PATCH_ALLOW_LARGE"] = "1"
 
-    with board_lock(REPO, owner="dare_tax_search_backfill"):
-        result = patch_existing_rows(patches, {"qualified": qualified}, docs_dir=docs)
+    # Retry pattern matches backfill_watauga_tax_search.py's own (added the same day, same real
+    # incident: a live run found this exact script lose a completed 15-row fetch batch to a
+    # TOCTOU race -- an external shell loop saw the lock free, then by the time this script
+    # finished its live fetches and reached board_lock() itself, a different process had
+    # already grabbed it). wait=600 moves the waiting to the actual point of need.
+    _ATTEMPTS = 8
+    result = None
+    for attempt in range(_ATTEMPTS):
+        try:
+            with board_lock(REPO, owner="dare_tax_search_backfill", wait=600, poll=10):
+                result = patch_existing_rows(patches, {"qualified": qualified}, docs_dir=docs)
+            break
+        except (BoardLockBusy, BoardChangedSinceLoad) as exc:
+            if attempt == _ATTEMPTS - 1:
+                raise
+            print(f"  board write contention (attempt {attempt + 1}/{_ATTEMPTS}), retrying: "
+                  f"{type(exc).__name__}: {exc}")
     print(f"\nwrote board: patched {result['applied']:,}/{len(patches):,} rows "
           f"(existing: {result['existing']:,}, not_found: {result['not_found']:,}, "
           f"duplicate_key_matches: {result['duplicate_key_matches']:,})")

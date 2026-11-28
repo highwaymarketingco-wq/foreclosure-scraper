@@ -30,7 +30,8 @@ from foreclosure_scraper.enrichment_watauga_tax_search import (  # noqa: E402
 )
 from foreclosure_scraper.models import Listing  # noqa: E402
 from foreclosure_scraper.web_artifact import (  # noqa: E402
-    _APPEND_SIG_FIELDS, board_lock, board_patch_size_state, patch_existing_rows,
+    BoardChangedSinceLoad, BoardLockBusy, _APPEND_SIG_FIELDS, board_lock,
+    board_patch_size_state, patch_existing_rows,
 )
 
 _LIGHT_FIELDS = _APPEND_SIG_FIELDS + ("raw", "state", "county", "parcel_id")
@@ -128,8 +129,26 @@ def main() -> int:
     if _allow_large:
         os.environ["BOARD_PATCH_ALLOW_LARGE"] = "1"
 
-    with board_lock(REPO, owner="watauga_tax_search_backfill"):
-        result = patch_existing_rows(patches, {"qualified": qualified}, docs_dir=docs)
+    # Retry pattern matches backfill_deed_chain_v2.py's own (board_lock's wait=/poll= already
+    # retries internally up to 600s; the outer _ATTEMPTS loop additionally covers
+    # BoardChangedSinceLoad, and gives real headroom beyond one 600s window). Added 2026-11-28
+    # after a live run found a genuine race: an external shell loop saw the lock free, then by
+    # the time this script finished its ~15 live fetches and reached board_lock() itself, a
+    # DIFFERENT process had already grabbed it -- BoardLockBusy with no internal wait threw away
+    # every fetch this invocation had just done over the network. wait=600 moves the waiting to
+    # the actual point of need instead of a check-then-act race against it.
+    _ATTEMPTS = 8
+    result = None
+    for attempt in range(_ATTEMPTS):
+        try:
+            with board_lock(REPO, owner="watauga_tax_search_backfill", wait=600, poll=10):
+                result = patch_existing_rows(patches, {"qualified": qualified}, docs_dir=docs)
+            break
+        except (BoardLockBusy, BoardChangedSinceLoad) as exc:
+            if attempt == _ATTEMPTS - 1:
+                raise
+            print(f"  board write contention (attempt {attempt + 1}/{_ATTEMPTS}), retrying: "
+                  f"{type(exc).__name__}: {exc}")
     print(f"\nwrote board: patched {result['applied']:,}/{len(patches):,} rows "
           f"(existing: {result['existing']:,}, not_found: {result['not_found']:,}, "
           f"duplicate_key_matches: {result['duplicate_key_matches']:,})")
