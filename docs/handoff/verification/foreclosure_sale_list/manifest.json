@@ -8,22 +8,24 @@
   "unconfirmed": 80,
   "wall": 0
  },
- "generated_at": "2026-11-28T08:31:39Z",
+ "generated_at": "2026-11-28T09:04:34Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-28T08:31:39Z",
+  "at": "2026-11-28T09:04:34Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
   "recheck_only": false,
   "requests": {
-   "errors": {},
+   "errors": {
+    "portal-nc.tylertech.cloud": 2
+   },
    "requests": {
     "gis.charlottenc.gov": 100,
     "maps.spartanburgcounty.org": 50,
-    "portal-nc.tylertech.cloud": 29,
+    "portal-nc.tylertech.cloud": 43,
     "roster:pickens-so-sc.zuercherportal.com": 1,
     "services.nconemap.gov": 50,
     "www.courtlistener.com": 2
@@ -33,13 +35,13 @@
    "checked": 50,
    "unconfirmed": 50
   },
-  "seconds": 581,
+  "seconds": 737,
   "selection": {
    "applies": 418,
    "due_new": 1,
-   "due_retry": 64,
+   "due_retry": 56,
    "due_ttl": 136,
-   "not_due_retry": 17,
+   "not_due_retry": 25,
    "not_due_ttl": 200,
    "same_property_queued": 1
   },
@@ -55,7 +57,7 @@
    "bytes": 500989,
    "file": "000.json",
    "rows": 420,
-   "sha256": "3572adfea3347d9b851f1f5c87012165bbc23d607e3543cd82cd65f0913d6138"
+   "sha256": "dc6d6432b4459e698a5170b62d19c7282a65730181702d68803bf6165da44cb7"
   }
  ],
  "signal": "foreclosure_sale_list",

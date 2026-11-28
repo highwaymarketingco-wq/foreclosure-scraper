@@ -1,29 +1,31 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 10154,
+  "confirmed": 10204,
   "refuted": 99,
-  "rows": 10474,
+  "rows": 10524,
   "stale": 64,
   "unconfirmed": 157,
   "wall": 0
  },
- "generated_at": "2026-11-28T08:31:39Z",
+ "generated_at": "2026-11-28T09:04:34Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-28T08:31:38Z",
+  "at": "2026-11-28T09:04:32Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
   "recheck_only": false,
   "requests": {
-   "errors": {},
+   "errors": {
+    "portal-nc.tylertech.cloud": 2
+   },
    "requests": {
     "gis.charlottenc.gov": 100,
     "maps.spartanburgcounty.org": 50,
-    "portal-nc.tylertech.cloud": 29,
+    "portal-nc.tylertech.cloud": 43,
     "roster:pickens-so-sc.zuercherportal.com": 1,
     "services.nconemap.gov": 50,
     "www.courtlistener.com": 2
@@ -31,39 +33,38 @@
   },
   "result": {
    "checked": 50,
-   "confirmed": 49,
-   "stale": 1
+   "confirmed": 50
   },
-  "seconds": 581,
+  "seconds": 737,
   "selection": {
    "applies": 140892,
-   "due_new": 129489,
+   "due_new": 129434,
    "due_retry": 8,
    "due_version": 1,
    "not_due_retry": 140,
-   "not_due_ttl": 11254,
-   "same_property_queued": 6
+   "not_due_ttl": 11309,
+   "same_property_queued": 1
   },
   "source": null,
   "tier": null
  },
- "rows": 10474,
+ "rows": 10524,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 5659377,
+   "bytes": 5679751,
    "file": "000.json",
-   "rows": 5276,
-   "sha256": "2d951a3e0b79a8c593274bfd096b41e46bd95df836cb628a4cfec078a4bcea91"
+   "rows": 5298,
+   "sha256": "2102e4fa48b960f37e4328512b3904dec592b74adfba8295dfa2d32f6487ab16"
   },
   {
    "bucket": 1,
-   "bytes": 5541934,
+   "bytes": 5567848,
    "file": "001.json",
-   "rows": 5198,
-   "sha256": "e5a9498163f6c29356cf150c256ecefeadbee72bef9acf030eecfb78ff87ca18"
+   "rows": 5226,
+   "sha256": "cef57fb271acef257d354539df5ee7851f2d9b8874bd8d03c9fd25c80d0cbb99"
   }
  ],
  "signal": "elderly_disabled",
