@@ -3,17 +3,17 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 5832,
+  "rows": 5882,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 5832
+  "wall": 5882
  },
- "generated_at": "2026-11-28T04:59:16Z",
+ "generated_at": "2026-11-28T05:21:18Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-28T04:59:16Z",
+  "at": "2026-11-28T05:21:18Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,17 +21,21 @@
   "requests": {
    "errors": {},
    "requests": {
+    "gis.charlottenc.gov": 34,
     "maps.spartanburgcounty.org": 50,
-    "portal-nc.tylertech.cloud": 39,
+    "portal-nc.tylertech.cloud": 32,
     "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:apps.alamance-nc.com": 1,
-    "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:laurens-911-sc.zuercherportal.com": 1,
-    "roster:morgantonpdnc.policetocitizen.com": 1,
-    "roster:oconee-so-sc.zuercherportal.com": 1,
+    "roster:brunswick-so-nc.zuercherportal.com": 1,
+    "roster:colleton-so-sc.zuercherportal.com": 1,
+    "roster:cumberlandsheriffnc.gov": 1,
+    "roster:kershaw-so-sc.zuercherportal.com": 1,
+    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
     "roster:p2c.lincolnsheriff.org": 1,
+    "roster:p2c.nhcgov.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
     "roster:tepsweb.cityofgastonia.com": 1,
+    "roster:union-so-sc.zuercherportal.com": 1,
+    "roster:wakeso.policetocitizen.com": 1,
     "services.nconemap.gov": 50,
     "services1.arcgis.com": 4,
     "www.courtlistener.com": 2
@@ -41,25 +45,25 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 414,
+  "seconds": 534,
   "selection": {
    "applies": 9035,
-   "due_new": 3089,
-   "not_due_ttl": 5946
+   "due_new": 3039,
+   "not_due_ttl": 5996
   },
   "source": null,
   "tier": null
  },
- "rows": 5832,
+ "rows": 5882,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4446064,
+   "bytes": 4483466,
    "file": "000.json",
-   "rows": 5832,
-   "sha256": "0e007be5ed9ad41720cc03b7b37ad197afd286a082e176aadc6eb7e2f1be6c1b"
+   "rows": 5882,
+   "sha256": "b02728607f59276127974591638c80cd9ab07bfebbb87aa355637a22750a4933"
   }
  ],
  "signal": "court_wall",

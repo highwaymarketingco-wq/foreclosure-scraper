@@ -8,12 +8,12 @@
   "unconfirmed": 220,
   "wall": 0
  },
- "generated_at": "2026-11-28T04:59:19Z",
+ "generated_at": "2026-11-28T05:21:22Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-28T04:59:19Z",
+  "at": "2026-11-28T05:21:22Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,17 +21,21 @@
   "requests": {
    "errors": {},
    "requests": {
+    "gis.charlottenc.gov": 34,
     "maps.spartanburgcounty.org": 50,
-    "portal-nc.tylertech.cloud": 39,
+    "portal-nc.tylertech.cloud": 32,
     "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:apps.alamance-nc.com": 1,
-    "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:laurens-911-sc.zuercherportal.com": 1,
-    "roster:morgantonpdnc.policetocitizen.com": 1,
-    "roster:oconee-so-sc.zuercherportal.com": 1,
+    "roster:brunswick-so-nc.zuercherportal.com": 1,
+    "roster:colleton-so-sc.zuercherportal.com": 1,
+    "roster:cumberlandsheriffnc.gov": 1,
+    "roster:kershaw-so-sc.zuercherportal.com": 1,
+    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
     "roster:p2c.lincolnsheriff.org": 1,
+    "roster:p2c.nhcgov.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
     "roster:tepsweb.cityofgastonia.com": 1,
+    "roster:union-so-sc.zuercherportal.com": 1,
+    "roster:wakeso.policetocitizen.com": 1,
     "services.nconemap.gov": 50,
     "services1.arcgis.com": 4,
     "www.courtlistener.com": 2
@@ -39,17 +43,17 @@
   },
   "result": {
    "checked": 50,
-   "confirmed": 36,
-   "stale": 12,
-   "unconfirmed": 2
+   "stale": 1,
+   "unconfirmed": 49
   },
-  "seconds": 414,
+  "seconds": 534,
   "selection": {
    "applies": 907,
    "due_retry": 187,
-   "due_ttl": 70,
+   "due_ttl": 21,
    "not_due_retry": 20,
-   "not_due_ttl": 630
+   "not_due_ttl": 679,
+   "same_property_queued": 1
   },
   "source": null,
   "tier": null
@@ -60,10 +64,10 @@
  "shards": [
   {
    "bucket": 0,
-   "bytes": 1271696,
+   "bytes": 1277183,
    "file": "000.json",
    "rows": 984,
-   "sha256": "cf4cb827bace9ff4964d58e3cbde73615cc6967a53bb961ae9bce05b3dfcaf31"
+   "sha256": "bb139c05ec295fad03120a50febf1d97cdd8f5d3f650ddc349f1292c93d76421"
   }
  ],
  "signal": "jail_booking",
