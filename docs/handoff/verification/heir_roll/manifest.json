@@ -1,19 +1,19 @@
 {
  "buckets": 4,
  "counts": {
-  "confirmed": 18471,
+  "confirmed": 18521,
   "refuted": 11,
-  "rows": 18754,
+  "rows": 18804,
   "stale": 59,
   "unconfirmed": 213,
   "wall": 0
  },
- "generated_at": "2026-11-28T06:09:52Z",
+ "generated_at": "2026-11-28T06:28:29Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-28T06:09:51Z",
+  "at": "2026-11-28T06:28:28Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -23,26 +23,22 @@
    "requests": {
     "gis.charlottenc.gov": 100,
     "maps.spartanburgcounty.org": 50,
-    "portal-nc.tylertech.cloud": 40,
+    "portal-nc.tylertech.cloud": 33,
     "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:apps.pittcountync.gov": 1,
-    "roster:bookings.darlingtonsheriff.org": 1,
-    "roster:cc.southernsoftware.com": 3,
+    "roster:brunswick-so-nc.zuercherportal.com": 1,
+    "roster:buncombecountyso.policetocitizen.com": 1,
+    "roster:cc.southernsoftware.com": 2,
     "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:cumberlandsheriffnc.gov": 1,
     "roster:forsythsheriffnc.policetocitizen.com": 1,
-    "roster:guilfordcountysheriff.policetocitizen.com": 1,
-    "roster:injail.catawbacountync.gov": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "roster:p2c.lincolnsheriff.org": 1,
-    "roster:p2c.nhcgov.com": 1,
+    "roster:jail.richlandcountysc.gov": 1,
+    "roster:kershaw-so-sc.zuercherportal.com": 1,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
     "roster:rowancountync.policetocitizen.com": 1,
+    "roster:services3.arcgis.com": 1,
     "roster:tepsweb.cityofgastonia.com": 1,
     "roster:union-so-sc.zuercherportal.com": 1,
-    "roster:wakeso.policetocitizen.com": 1,
-    "roster:www2.co.davidson.nc.us": 1,
-    "roster:www2.dconc.gov": 1,
+    "roster:www.fcso.org": 1,
     "services.nconemap.gov": 50,
     "www.courtlistener.com": 2
    }
@@ -51,50 +47,50 @@
    "checked": 50,
    "confirmed": 50
   },
-  "seconds": 748,
+  "seconds": 693,
   "selection": {
    "applies": 44671,
-   "due_new": 26023,
+   "due_new": 25973,
    "due_retry": 113,
    "due_retry_transient": 24,
    "due_ttl": 432,
    "not_due_retry": 72,
-   "not_due_ttl": 18007
+   "not_due_ttl": 18057
   },
   "source": null,
   "tier": null
  },
- "rows": 18754,
+ "rows": 18804,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4560592,
+   "bytes": 4573209,
    "file": "000.json",
-   "rows": 4787,
-   "sha256": "cb6e2dcc1fef2c1a17ee044678e395bbfaa48db57803f34aa10b14ac25bb8c97"
+   "rows": 4800,
+   "sha256": "b9b4d99960c46539e97af3083645c2e1d1d4580847956106e8b8c67ebed96883"
   },
   {
    "bucket": 1,
-   "bytes": 4418022,
+   "bytes": 4424808,
    "file": "001.json",
-   "rows": 4637,
-   "sha256": "070456cdf39ee55c7e9461fdc05e8740d32768e51a9c3fcdb53b85f2692875d4"
+   "rows": 4644,
+   "sha256": "f23d9ae115e3a7aef900052744fcbad7471b6cd85bdc52bb255c284152c1e167"
   },
   {
    "bucket": 2,
-   "bytes": 4432965,
+   "bytes": 4449545,
    "file": "002.json",
-   "rows": 4661,
-   "sha256": "fd60c8d9a9640ff1bdff7297068826b45c4e45ba195fb9e47368627f606b51be"
+   "rows": 4678,
+   "sha256": "d7e0c55b3ffaa068a86315fd65bbe9f45b2c4df5e05d8c99f4a99c150130bc8d"
   },
   {
    "bucket": 3,
-   "bytes": 4448107,
+   "bytes": 4460674,
    "file": "003.json",
-   "rows": 4669,
-   "sha256": "28d95be912eb0f4194de7f49569bea3aa2e97ce2a5db99a0040974756ed1ab4e"
+   "rows": 4682,
+   "sha256": "14c5aac8b6f6abb4c33ec0ab4bc458d351286214b7ea1d1cd2687fd0bb7eb0a7"
   }
  ],
  "signal": "heir_roll",

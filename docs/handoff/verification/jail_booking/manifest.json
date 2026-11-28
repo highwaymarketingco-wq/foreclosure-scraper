@@ -8,12 +8,12 @@
   "unconfirmed": 220,
   "wall": 0
  },
- "generated_at": "2026-11-28T06:09:52Z",
+ "generated_at": "2026-11-28T06:28:29Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-28T06:09:52Z",
+  "at": "2026-11-28T06:28:29Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -23,42 +23,37 @@
    "requests": {
     "gis.charlottenc.gov": 100,
     "maps.spartanburgcounty.org": 50,
-    "portal-nc.tylertech.cloud": 40,
+    "portal-nc.tylertech.cloud": 33,
     "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:apps.pittcountync.gov": 1,
-    "roster:bookings.darlingtonsheriff.org": 1,
-    "roster:cc.southernsoftware.com": 3,
+    "roster:brunswick-so-nc.zuercherportal.com": 1,
+    "roster:buncombecountyso.policetocitizen.com": 1,
+    "roster:cc.southernsoftware.com": 2,
     "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:cumberlandsheriffnc.gov": 1,
     "roster:forsythsheriffnc.policetocitizen.com": 1,
-    "roster:guilfordcountysheriff.policetocitizen.com": 1,
-    "roster:injail.catawbacountync.gov": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "roster:p2c.lincolnsheriff.org": 1,
-    "roster:p2c.nhcgov.com": 1,
+    "roster:jail.richlandcountysc.gov": 1,
+    "roster:kershaw-so-sc.zuercherportal.com": 1,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
     "roster:rowancountync.policetocitizen.com": 1,
+    "roster:services3.arcgis.com": 1,
     "roster:tepsweb.cityofgastonia.com": 1,
     "roster:union-so-sc.zuercherportal.com": 1,
-    "roster:wakeso.policetocitizen.com": 1,
-    "roster:www2.co.davidson.nc.us": 1,
-    "roster:www2.dconc.gov": 1,
+    "roster:www.fcso.org": 1,
     "services.nconemap.gov": 50,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "stale": 1,
-   "unconfirmed": 49
+   "unconfirmed": 50
   },
-  "seconds": 748,
+  "seconds": 693,
   "selection": {
    "applies": 907,
-   "due_retry": 138,
-   "due_ttl": 21,
-   "not_due_retry": 69,
-   "not_due_ttl": 679
+   "due_retry": 90,
+   "due_ttl": 20,
+   "not_due_retry": 117,
+   "not_due_ttl": 680
   },
   "source": null,
   "tier": null
@@ -69,10 +64,10 @@
  "shards": [
   {
    "bucket": 0,
-   "bytes": 1283018,
+   "bytes": 1288506,
    "file": "000.json",
    "rows": 984,
-   "sha256": "9d0e94ff0c83fbe1493ababef4e190e70162cf5e3bfad88290174632d1ed747c"
+   "sha256": "25940175fa7104f7557dda89df8891e8cd969640e3c8a4ed93ebfcb4ff49ce68"
   }
  ],
  "signal": "jail_booking",

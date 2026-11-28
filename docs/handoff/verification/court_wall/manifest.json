@@ -3,17 +3,17 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 5932,
+  "rows": 5982,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 5932
+  "wall": 5982
  },
- "generated_at": "2026-11-28T06:09:50Z",
+ "generated_at": "2026-11-28T06:28:27Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-28T06:09:50Z",
+  "at": "2026-11-28T06:28:26Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -23,26 +23,22 @@
    "requests": {
     "gis.charlottenc.gov": 100,
     "maps.spartanburgcounty.org": 50,
-    "portal-nc.tylertech.cloud": 40,
+    "portal-nc.tylertech.cloud": 33,
     "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:apps.pittcountync.gov": 1,
-    "roster:bookings.darlingtonsheriff.org": 1,
-    "roster:cc.southernsoftware.com": 3,
+    "roster:brunswick-so-nc.zuercherportal.com": 1,
+    "roster:buncombecountyso.policetocitizen.com": 1,
+    "roster:cc.southernsoftware.com": 2,
     "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:cumberlandsheriffnc.gov": 1,
     "roster:forsythsheriffnc.policetocitizen.com": 1,
-    "roster:guilfordcountysheriff.policetocitizen.com": 1,
-    "roster:injail.catawbacountync.gov": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "roster:p2c.lincolnsheriff.org": 1,
-    "roster:p2c.nhcgov.com": 1,
+    "roster:jail.richlandcountysc.gov": 1,
+    "roster:kershaw-so-sc.zuercherportal.com": 1,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
     "roster:rowancountync.policetocitizen.com": 1,
+    "roster:services3.arcgis.com": 1,
     "roster:tepsweb.cityofgastonia.com": 1,
     "roster:union-so-sc.zuercherportal.com": 1,
-    "roster:wakeso.policetocitizen.com": 1,
-    "roster:www2.co.davidson.nc.us": 1,
-    "roster:www2.dconc.gov": 1,
+    "roster:www.fcso.org": 1,
     "services.nconemap.gov": 50,
     "www.courtlistener.com": 2
    }
@@ -51,25 +47,25 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 748,
+  "seconds": 693,
   "selection": {
    "applies": 9035,
-   "due_new": 2989,
-   "not_due_ttl": 6046
+   "due_new": 2939,
+   "not_due_ttl": 6096
   },
   "source": null,
   "tier": null
  },
- "rows": 5932,
+ "rows": 5982,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4520642,
+   "bytes": 4557840,
    "file": "000.json",
-   "rows": 5932,
-   "sha256": "ef63b0aef0480be2e88cf640878aafa1202916d396046d565638f7b095b76149"
+   "rows": 5982,
+   "sha256": "8d13142bc3879c459d2df962566a7e062896f0fc06ea07998d98d754c184b5c5"
   }
  ],
  "signal": "court_wall",
