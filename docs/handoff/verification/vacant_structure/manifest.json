@@ -8,12 +8,12 @@
   "unconfirmed": 19,
   "wall": 0
  },
- "generated_at": "2026-11-28T08:02:05Z",
+ "generated_at": "2026-11-28T08:31:37Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-28T08:02:04Z",
+  "at": "2026-11-28T08:31:36Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -23,17 +23,14 @@
    "requests": {
     "gis.charlottenc.gov": 100,
     "maps.spartanburgcounty.org": 50,
-    "portal-nc.tylertech.cloud": 30,
-    "roster:inmatesinjail.yorkcountygov.com": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "roster:mugshots.spartanburgsheriff.org": 1,
+    "portal-nc.tylertech.cloud": 29,
     "roster:pickens-so-sc.zuercherportal.com": 1,
     "services.nconemap.gov": 50,
     "www.courtlistener.com": 2
    }
   },
   "result": {},
-  "seconds": 596,
+  "seconds": 581,
   "selection": {
    "applies": 1737,
    "not_due_retry": 19,
