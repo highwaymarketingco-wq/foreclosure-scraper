@@ -1,19 +1,19 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 3684,
-  "refuted": 1205,
-  "rows": 5423,
-  "stale": 511,
+  "confirmed": 3690,
+  "refuted": 1216,
+  "rows": 5444,
+  "stale": 515,
   "unconfirmed": 23,
   "wall": 0
  },
- "generated_at": "2026-11-28T03:19:35Z",
+ "generated_at": "2026-11-28T04:20:52Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-28T03:19:34Z",
+  "at": "2026-11-28T04:20:52Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,56 +21,52 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 67,
-    "gis.buncombecounty.org": 71,
-    "portal-nc.tylertech.cloud": 41,
-    "roster:brunswick-so-nc.zuercherportal.com": 1,
+    "devsvcs.gastonianc.gov": 16,
+    "gis.buncombecounty.org": 20,
+    "maps.spartanburgcounty.org": 36,
+    "portal-nc.tylertech.cloud": 38,
     "roster:buncombecountyso.policetocitizen.com": 1,
-    "roster:cc.southernsoftware.com": 3,
+    "roster:cc.southernsoftware.com": 1,
     "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:dcn.leecountync.gov": 1,
-    "roster:forsythsheriffnc.policetocitizen.com": 1,
-    "roster:guilfordcountysheriff.policetocitizen.com": 1,
-    "roster:kershaw-so-sc.zuercherportal.com": 1,
     "roster:laurens-911-sc.zuercherportal.com": 1,
-    "roster:legacyweb.randolphcountync.gov": 1,
-    "roster:lexingtonsheriffsc.policetocitizen.com": 1,
-    "roster:mugshots.spartanburgsheriff.org": 1,
-    "roster:oconee-so-sc.zuercherportal.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
     "roster:rowancountync.policetocitizen.com": 1,
+    "roster:union-so-sc.zuercherportal.com": 1,
+    "roster:www2.co.davidson.nc.us": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 144,
+    "services1.arcgis.com": 4,
+    "tax.buncombenc.gov": 3,
+    "vt.ncsbe.gov": 42,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 8,
-   "refuted": 21,
-   "stale": 21
+   "confirmed": 15,
+   "refuted": 23,
+   "stale": 12
   },
-  "seconds": 1072,
+  "seconds": 490,
   "selection": {
    "applies": 11927,
-   "due_new": 6430,
+   "due_new": 6380,
    "due_ttl": 112,
    "not_due_retry": 29,
-   "not_due_ttl": 5356
+   "not_due_ttl": 5406
   },
   "source": null,
   "tier": null
  },
- "rows": 5423,
+ "rows": 5444,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 6053042,
+   "bytes": 6078767,
    "file": "000.json",
-   "rows": 5423,
-   "sha256": "87572e42a12f648775d1abccda20d4c106c6609b6cb994b5a2db43ba5c1634c4"
+   "rows": 5444,
+   "sha256": "2e7b79c377c717756969d566f7ca1aedf024760d48d8faf0f99fdb4b14bc781d"
   }
  ],
  "signal": "code_enforcement",

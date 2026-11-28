@@ -1,19 +1,19 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 546,
+  "confirmed": 545,
   "refuted": 26,
   "rows": 984,
-  "stale": 190,
+  "stale": 191,
   "unconfirmed": 220,
   "wall": 0
  },
- "generated_at": "2026-11-28T03:19:37Z",
+ "generated_at": "2026-11-28T04:20:55Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-28T03:19:37Z",
+  "at": "2026-11-28T04:20:55Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,43 +21,38 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 67,
-    "gis.buncombecounty.org": 71,
-    "portal-nc.tylertech.cloud": 41,
-    "roster:brunswick-so-nc.zuercherportal.com": 1,
+    "devsvcs.gastonianc.gov": 16,
+    "gis.buncombecounty.org": 20,
+    "maps.spartanburgcounty.org": 36,
+    "portal-nc.tylertech.cloud": 38,
     "roster:buncombecountyso.policetocitizen.com": 1,
-    "roster:cc.southernsoftware.com": 3,
+    "roster:cc.southernsoftware.com": 1,
     "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:dcn.leecountync.gov": 1,
-    "roster:forsythsheriffnc.policetocitizen.com": 1,
-    "roster:guilfordcountysheriff.policetocitizen.com": 1,
-    "roster:kershaw-so-sc.zuercherportal.com": 1,
     "roster:laurens-911-sc.zuercherportal.com": 1,
-    "roster:legacyweb.randolphcountync.gov": 1,
-    "roster:lexingtonsheriffsc.policetocitizen.com": 1,
-    "roster:mugshots.spartanburgsheriff.org": 1,
-    "roster:oconee-so-sc.zuercherportal.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
     "roster:rowancountync.policetocitizen.com": 1,
+    "roster:union-so-sc.zuercherportal.com": 1,
+    "roster:www2.co.davidson.nc.us": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 144,
+    "services1.arcgis.com": 4,
+    "tax.buncombenc.gov": 3,
+    "vt.ncsbe.gov": 42,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 29,
-   "refuted": 2,
-   "stale": 18,
+   "confirmed": 30,
+   "stale": 19,
    "unconfirmed": 1
   },
-  "seconds": 1072,
+  "seconds": 490,
   "selection": {
    "applies": 907,
    "due_retry": 187,
-   "due_ttl": 159,
+   "due_ttl": 119,
    "not_due_retry": 20,
-   "not_due_ttl": 541
+   "not_due_ttl": 581
   },
   "source": null,
   "tier": null
@@ -68,10 +63,10 @@
  "shards": [
   {
    "bucket": 0,
-   "bytes": 1261103,
+   "bytes": 1266290,
    "file": "000.json",
    "rows": 984,
-   "sha256": "2a58e9b8e5a81e3e354ad390a828f5e3a917a90597ad5569e326f3e41b3d17f7"
+   "sha256": "1f7312096d9b04b9cea4f3051eab8447a05218483a78c75f2a200877e24c047a"
   }
  ],
  "signal": "jail_booking",
