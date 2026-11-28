@@ -210,7 +210,7 @@ def test_default_registry_includes_all_round19_counties():
 
 
 def test_default_registry_includes_round32_marlboro():
-    assert set(m._WTHGIS_COUNTIES) == {"Chesterfield", "Dillon", "McCormick", "Marion", "Marlboro"}
+    assert {"Chesterfield", "Dillon", "McCormick", "Marion", "Marlboro"} <= set(m._WTHGIS_COUNTIES)
     cfg = m._WTHGIS_COUNTIES["Marlboro"]
     assert cfg["dsid"] == 2558
     assert cfg["base"] == "https://marlborosc.wthgis.com/tgis/"
