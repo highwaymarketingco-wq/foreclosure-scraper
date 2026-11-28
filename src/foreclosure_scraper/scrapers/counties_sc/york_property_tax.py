@@ -30,7 +30,7 @@ import structlog
 from playwright.async_api import async_playwright
 
 from foreclosure_scraper.base_scraper import BaseScraper
-from foreclosure_scraper.models import Listing
+from foreclosure_scraper.models import Listing, ListingType
 
 log = structlog.get_logger()
 
@@ -154,7 +154,7 @@ class YorkCountyPropertyTaxScraper(BaseScraper):
                                 source=self.slug,
                                 county="York",
                                 state="SC",
-                                listing_type="Property Parcel",
+                                listing_type=ListingType.TAX_LIEN,
                                 parcel_id=str(tax_map_id),
                                 defendant=owner or "",
                                 street_address=address or "",
@@ -194,7 +194,7 @@ class YorkCountyPropertyTaxScraper(BaseScraper):
                     source=self.slug,
                     county="York",
                     state="SC",
-                    listing_type="Property Parcel",
+                    listing_type=ListingType.TAX_LIEN,
                     parcel_id=tax_id,
                     defendant=owner.strip(),
                     source_url=_PROPERTY_SEARCH,

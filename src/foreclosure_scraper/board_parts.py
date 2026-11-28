@@ -46,6 +46,7 @@ import json
 import os
 import re
 import sys
+import time
 from collections import deque
 from pathlib import Path
 from typing import Iterable, Iterator, List, Optional, Sequence
@@ -296,13 +297,33 @@ def _read_run_meta_block(docs) -> Optional[dict]:
     return None
 
 
+class _TornPartsError(BoardIntegrityError):
+    """A manifest/run_meta listing disagrees with what's actually on disk RIGHT NOW. resolve()
+    retries a few times on this specific error (never on UnlistedPartsError or the
+    non-contiguous-disk case below, where retrying cannot help) because it is exactly what a
+    reader sees mid-write: write_parts()'s commit loop (below, "stage_self") replaces the ~56
+    part files one at a time -- atomic per file, not atomic as a set -- and the new manifest
+    that would make the new files match again is only written by the CALLER, after write_parts()
+    returns. A reader landing in that gap sees a few new-content files against the old manifest's
+    old sizes/hashes. The gap is normally sub-second (renames are cheap, same-filesystem); if it
+    is still torn after the retry budget, something other than an in-flight write is wrong, and
+    this surfaces as BoardIntegrityError exactly as before (every caller already catches that)."""
+
+
 def _torn(docs, problems) -> BoardIntegrityError:
-    return BoardIntegrityError(
+    return _TornPartsError(
         "the board parts do not match %s: %s. The part set is torn or mixed (a write was "
         "interrupted, or parts from two different publishes are on disk). Restore a "
         "consistent set (scripts/restore_board.sh <commit>) or, if you know the files are "
         "right, scripts/board_manifest.py --rebuild. BOARD_MANIFEST_SKIP=1 bypasses this "
         "check." % (MANIFEST_NAME, "; ".join(problems[:5]) + (" ..." if len(problems) > 5 else "")))
+
+
+# Retry budget for _TornPartsError specifically (see class docstring). Total worst-case added
+# latency across all sleeps is ~3s (0.2+0.4+0.6+0.8+1.0) -- negligible next to the board reads
+# this guards, and far cheaper than the batch job it would otherwise crash.
+_TORN_READ_RETRIES = 6
+_TORN_READ_BACKOFF_S = 0.2
 
 
 def resolve(docs, *, verify: bool = True, man: Optional[dict] = None) -> Optional[Resolution]:
@@ -322,9 +343,30 @@ def resolve(docs, *, verify: bool = True, man: Optional[dict] = None) -> Optiona
       listing, checked the same way. write_artifact writes it after the last part, so a
       half-written set has no listing that matches it.
     * no listing anywhere: BoardIntegrityError. BOARD_PARTS_ALLOW_UNLISTED=1 reads the contiguous
-      parts found on disk unverified (an operator who has checked them by hand)."""
+      parts found on disk unverified (an operator who has checked them by hand).
+
+    A torn/mismatched part set (_TornPartsError, see its docstring) is retried a few times
+    before it is allowed to escape as BoardIntegrityError: the first attempt uses `man` exactly
+    as given (so a caller that passed its own manifest gets identical behavior to before this
+    retry existed whenever nothing is actually torn); every retry re-reads the manifest fresh
+    from disk, since what ends a torn window is the NEW manifest landing, not the old one
+    re-matching. Every other failure here (no listing at all, non-contiguous disk parts) still
+    raises immediately -- retrying those would not help and could mask a real problem."""
     docs = Path(docs)
-    man = man if man is not None else read_manifest(docs)
+    last_exc: Optional[_TornPartsError] = None
+    for attempt in range(_TORN_READ_RETRIES):
+        cur_man = man if (attempt == 0 and man is not None) else read_manifest(docs)
+        try:
+            return _resolve_attempt(docs, cur_man, verify)
+        except _TornPartsError as exc:
+            last_exc = exc
+            if attempt < _TORN_READ_RETRIES - 1:
+                time.sleep(_TORN_READ_BACKOFF_S * (attempt + 1))
+    raise last_exc
+
+
+def _resolve_attempt(docs, man, verify: bool) -> Optional[Resolution]:
+    """One resolve() attempt -- split out so resolve() can retry it on a torn read (see there)."""
     if man is not None:
         blk = manifest_parts_block(man)
         if blk is None:
