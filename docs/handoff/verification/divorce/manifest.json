@@ -3,17 +3,17 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 4758,
+  "rows": 4808,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 4758
+  "wall": 4808
  },
- "generated_at": "2026-11-28T07:11:58Z",
+ "generated_at": "2026-11-28T08:02:05Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-28T07:11:58Z",
+  "at": "2026-11-28T08:02:05Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,17 +21,13 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.charlottenc.gov": 98,
+    "gis.charlottenc.gov": 100,
     "maps.spartanburgcounty.org": 50,
-    "portal-nc.tylertech.cloud": 41,
-    "roster:74.218.167.200": 1,
-    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "portal-nc.tylertech.cloud": 30,
     "roster:inmatesinjail.yorkcountygov.com": 1,
-    "roster:laurens-911-sc.zuercherportal.com": 1,
     "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "roster:oconee-so-sc.zuercherportal.com": 1,
+    "roster:mugshots.spartanburgsheriff.org": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
-    "roster:tepsweb.cityofgastonia.com": 1,
     "services.nconemap.gov": 50,
     "www.courtlistener.com": 2
    }
@@ -40,25 +36,25 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 594,
+  "seconds": 596,
   "selection": {
    "applies": 4916,
-   "due_new": 187,
-   "not_due_ttl": 4729
+   "due_new": 137,
+   "not_due_ttl": 4779
   },
   "source": null,
   "tier": null
  },
- "rows": 4758,
+ "rows": 4808,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4070300,
+   "bytes": 4114268,
    "file": "000.json",
-   "rows": 4758,
-   "sha256": "38b32154cdfdd9342dd5ccc33655e8d449129928833ce8ca2fbdc7c5ebd556bb"
+   "rows": 4808,
+   "sha256": "c435730d1a73774b669df4b4577cd668cf0ac81f8ec7fededafbc6c21ab180b9"
   }
  ],
  "signal": "divorce",
