@@ -123,7 +123,8 @@ class ScSosBusinessDissolutionScraper(BaseScraper):
                     recaptcha_frame = None
                     
                     for frame in frames:
-                        src = await frame.get_attribute("src")
+                        # nodriver Element uses .attrs dict, not get_attribute()
+                        src = frame.attrs.get("src", "") if hasattr(frame, "attrs") else ""
                         if src and "recaptcha" in src:
                             recaptcha_frame = frame
                             break

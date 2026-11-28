@@ -604,6 +604,7 @@ DATELESS_OK_SOURCES = {
     "national.bankruptcy_rss_relief_from_stay",   # lender motions to resume foreclosure (debtor + district, no sale date)
     "counties_sc.horry_probate",                 # Horry estates filed in the last year (no sale date)
     "counties_sc.york_tax_sale_parcels",         # York tax sale parcels (the sale date is on the row; listed for safety)
+    "sc.york_property_tax",                      # York property tax parcels (no sale date, standing tax condition)
     "counties_nc.rocky_mount_blight_survey",     # condition survey rows: no sale date
     "city_websites.raleigh_structure_fires",     # fire addresses: no sale date
     "counties_nc.kinston_proposed_demolition",   # proposed demolition list: no sale date
