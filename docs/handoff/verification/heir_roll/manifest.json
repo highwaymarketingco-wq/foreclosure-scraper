@@ -1,19 +1,19 @@
 {
  "buckets": 4,
  "counts": {
-  "confirmed": 19021,
+  "confirmed": 19071,
   "refuted": 11,
-  "rows": 19304,
+  "rows": 19354,
   "stale": 59,
   "unconfirmed": 213,
   "wall": 0
  },
- "generated_at": "2026-11-28T15:06:24Z",
+ "generated_at": "2026-11-28T16:31:40Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-28T15:06:23Z",
+  "at": "2026-11-28T16:31:39Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,9 +21,9 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.charlottenc.gov": 82,
+    "gis.charlottenc.gov": 100,
     "maps.spartanburgcounty.org": 50,
-    "portal-nc.tylertech.cloud": 39,
+    "portal-nc.tylertech.cloud": 36,
     "roster:pickens-so-sc.zuercherportal.com": 1,
     "services.nconemap.gov": 50,
     "www.courtlistener.com": 2
@@ -33,50 +33,50 @@
    "checked": 50,
    "confirmed": 50
   },
-  "seconds": 564,
+  "seconds": 583,
   "selection": {
    "applies": 44671,
-   "due_new": 25473,
+   "due_new": 25423,
    "due_retry": 113,
    "due_retry_transient": 24,
    "due_ttl": 432,
    "not_due_retry": 72,
-   "not_due_ttl": 18557
+   "not_due_ttl": 18607
   },
   "source": null,
   "tier": null
  },
- "rows": 19304,
+ "rows": 19354,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4695781,
+   "bytes": 4708985,
    "file": "000.json",
-   "rows": 4928,
-   "sha256": "d9b2525e6bc31fa74971970ba00f92604c43ca90d571a3c89fe497967261e0df"
+   "rows": 4942,
+   "sha256": "9788ba19547f3ed3a0b65a78ecfe0d09d5dc473be6894af8ba305c35ffd427e5"
   },
   {
    "bucket": 1,
-   "bytes": 4539887,
+   "bytes": 4555231,
    "file": "001.json",
-   "rows": 4764,
-   "sha256": "2e6b268aa0cd23336eabaca831eb7ff6e6c4fb5abb230d72b8039c85526dc0c2"
+   "rows": 4780,
+   "sha256": "0670e650ee294b97501dadc8155dffb751812be10dea85f0e863fc404b926cc2"
   },
   {
    "bucket": 2,
-   "bytes": 4571608,
+   "bytes": 4582087,
    "file": "002.json",
-   "rows": 4805,
-   "sha256": "cbd02774645385870995ce6adfebb97f55f6cefabe5db2aaae2e8c6ff68cede8"
+   "rows": 4816,
+   "sha256": "844066984d34e88a1508af6f722934dad6f4906566d13f9dea29577261a88e03"
   },
   {
    "bucket": 3,
-   "bytes": 4580678,
+   "bytes": 4589213,
    "file": "003.json",
-   "rows": 4807,
-   "sha256": "b4744ed8f45f00c10567e581abaa8a2db5684dba2cdd7ca75454bd535ef7c5ba"
+   "rows": 4816,
+   "sha256": "d202c80c0b9949cab4dcfac8a7248f7b2aaa0f56f26baa26fb7a9fa086261be4"
   }
  ],
  "signal": "heir_roll",
