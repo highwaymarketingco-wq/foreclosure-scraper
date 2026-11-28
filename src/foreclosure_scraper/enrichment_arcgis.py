@@ -15,8 +15,11 @@ from __future__ import annotations
 
 import asyncio
 import re
+import ssl
+from functools import lru_cache
 from typing import Any
 
+import certifi
 import httpx
 import structlog
 
@@ -26,6 +29,74 @@ from . import owner_freshness
 from .sensitive_fields import drop_sensitive
 
 log = structlog.get_logger()
+
+
+# Montgomery NC's www.webgis.net (Hurt & Proffitt-hosted) sends only its leaf TLS
+# cert, missing the "Network Solutions RSA OV SSL CA 4" intermediate -- a server
+# misconfiguration, confirmed via `openssl s_client -showcerts`, same class of issue
+# enrichment_incarceration.py's _ssl_context() already works around for SC DOC.
+# Downloaded from the leaf's own AIA "CA Issuers" URI
+# (http://crt.sectigo.com/NetworkSolutionsRSAOVSSLCA4.crt). Adding this one extra
+# trusted intermediate never weakens verification for any other host -- it only
+# completes the one chain webgis.net fails to serve in full.
+_NETSOL_RSA_OV_SSL_CA_4 = """-----BEGIN CERTIFICATE-----
+MIIGNTCCBB2gAwIBAgIRAP2bOeDs90bNFDEoYMiujnUwDQYJKoZIhvcNAQEMBQAw
+XzELMAkGA1UEBhMCR0IxGDAWBgNVBAoTD1NlY3RpZ28gTGltaXRlZDE2MDQGA1UE
+AxMtU2VjdGlnbyBQdWJsaWMgU2VydmVyIEF1dGhlbnRpY2F0aW9uIFJvb3QgUjQ2
+MB4XDTI1MDgyMDAwMDAwMFoXDTM1MDgxOTIzNTk1OVowWjELMAkGA1UEBhMCVVMx
+HzAdBgNVBAoTFk5ldHdvcmsgU29sdXRpb25zLCBMTEMxKjAoBgNVBAMTIU5ldHdv
+cmsgU29sdXRpb25zIFJTQSBPViBTU0wgQ0EgNDCCAaIwDQYJKoZIhvcNAQEBBQAD
+ggGPADCCAYoCggGBANF22vxZGfteJOGzGeFU7IUE9kMXa1Um5fhaXl87kSU4Cujw
+mmQSfGhh5ZkyMqjDQuUriIBdxWHsx1b6gngZWMscIWSMi5QU7h87m8uA3GhmBb3q
+sjG2a4jndn1fv8DTUCmpIM5B6GQADdhMvn9UB9qyoRQAL4eEcQD7VX+XOnMe/RGK
+Fqhgts+2SJDx+uPSc9rQK1egoIETX3aluX3YPHpNoeENymFzCR/bq5DhrXPBiir1
+xX0aDSN7ZLgo1YZGX8ORIRnhYhD5uoRqSsKIVfyE8ov4J3D+B9jslKmmMqtpunRU
+nWocYqXTzcrEsZtPZnWrfthzDhcea8h7iy1WHZU7qmYrmcDylMEl8PpogsbBLit3
+CEpStZnQktlDYmFSXG2+6W5GcSX6O6fwTtESO3BHwervpUYz1D3xWM6v/g2U2YSw
+wAxS3Wdx/Ibv3hvNGTCXFm/+MZtbsRqq8e8SD9aDF6+61GPnYaOGorLkIbEk/eg+
+goeiQ+BKvMFZhtJJGwIDAQABo4IBbzCCAWswHwYDVR0jBBgwFoAUVnNYZJX5khqw
+EioEYnmhQBWIIUkwHQYDVR0OBBYEFGkt2MRqitg4HehS62tTyKERZlTvMA4GA1Ud
+DwEB/wQEAwIBhjASBgNVHRMBAf8ECDAGAQH/AgEAMBMGA1UdJQQMMAoGCCsGAQUF
+BwMBMBMGA1UdIAQMMAowCAYGZ4EMAQICMFQGA1UdHwRNMEswSaBHoEWGQ2h0dHA6
+Ly9jcmwuc2VjdGlnby5jb20vU2VjdGlnb1B1YmxpY1NlcnZlckF1dGhlbnRpY2F0
+aW9uUm9vdFI0Ni5jcmwwgYQGCCsGAQUFBwEBBHgwdjBPBggrBgEFBQcwAoZDaHR0
+cDovL2NydC5zZWN0aWdvLmNvbS9TZWN0aWdvUHVibGljU2VydmVyQXV0aGVudGlj
+YXRpb25Sb290UjQ2LnA3YzAjBggrBgEFBQcwAYYXaHR0cDovL29jc3Auc2VjdGln
+by5jb20wDQYJKoZIhvcNAQEMBQADggIBAIiLsCWqfi/pSvkMYzmXjwFKkkg8mcym
+YA4OxNYxrZGiUmG6YHBuviSbsPLIsYjsonz1Tpn5JKRFkufx1l9Xt7R0ZJHMpgLp
+QQ9uOkg9F3+it1GrbXBoMjng+craIl1wHz+hOgkI/y4Xjp6F8QhsZ7PqOI6+v74f
+vKY4aV1lE/zJBxKr1iTwRL1c8BiK0IBJVvQbSC3c3VcLk6Xnr1T0v3/G8EmWt2Pp
+MVMzScMo+uQXcgz5umpfI2PRfOUXI+N1K9vIU3XTrkXEsMmg7Ancpe21WLwD727a
+LOLp/w+FxsemyBtvZgfAKTLUcsNVg3nL6RXBHxCbuztQ892w2la/2fC2XgcS2k0c
+pqCuHcGbN14DyDQ2oyktDMtuShCxNXEWjHshkIZgsZw1w6DN9LkJ/IPK0Ea5B0fT
+XMGkQM1wCUWSDODauCiIfkzk3OGKbi//HsZZWTOlph06JPbmRgIUIyW/7QrbdatJ
+CoIFYczrgEAv+5ARt8ziqLrprHMTASVPfvXCpNVPxpJDAw8kRUam0oCPCu4fnSNC
+xG3CZiHdU+x8xAcQdeA0lTnEs5AYglRkefRmq/NJnRv5vn6iPNjykNdMsecFdCqi
+ys1IkQGmjmTONP90HnJnTnhpSsjcJ9+R1gUPoNcA5UWv7QkvvXMGmEoPd6B0U2Vi
+cmDP42Smg0yZ
+-----END CERTIFICATE-----
+"""
+
+
+@lru_cache(maxsize=1)
+def _montgomery_ssl_context() -> ssl.SSLContext:
+    """Default certifi trust store PLUS the NetSol intermediate above. Built once
+    per process, not once per lookup (see enrichment_incarceration._ssl_context)."""
+    ctx = ssl.create_default_context(cafile=certifi.where())
+    ctx.load_verify_locations(cadata=_NETSOL_RSA_OV_SSL_CA_4)
+    return ctx
+
+
+_MONTGOMERY_HOST = "www.webgis.net"
+
+
+def _client_for(base_url: str, default: httpx.AsyncClient,
+                 cert_client: httpx.AsyncClient | None) -> httpx.AsyncClient:
+    """`cert_client` for a host needing the extra trusted intermediate above, else
+    `default` (the normal shared client)."""
+    if cert_client is not None and _host_of(base_url) == _MONTGOMERY_HOST:
+        return cert_client
+    return default
 
 
 # ---- SC: single SCDOT base URL with per-county layer ID ---------------------------
@@ -366,6 +437,31 @@ NC_GIS: dict[str, dict[str, Any]] = {
         "url": "https://services3.arcgis.com/axQ4OCSpcxALIQsV/arcgis/rest/services/Tax_Parcels/FeatureServer/0/query",
         "addr_field": "LOCATION_ADDR",
     },
+    "Montgomery": {
+        # www.webgis.net/arcgis/rest/services/NC/Montgomery/MapServer, layer id=1
+        # ("Parcels"). Found via the county's own site -> www.webgis.net/nc/
+        # Montgomery/ -> scripts/siteSettings.js. Live-verified 2026-11-28 against
+        # 3 real board parcel_ids: PinNoDash matches the board's parcel_id format
+        # exactly (e.g. board '666208893334' == layer PinNoDash '666208893334',
+        # PIN itself is the same value dash-formatted '6662 08 89 3334'). PhyAddress
+        # is the real situs ("131 STORMY CT" matched the board's "131 Stormy Ct.").
+        # TLS note: this host sends only its leaf cert, missing the "Network
+        # Solutions RSA OV SSL CA 4" intermediate -- a server misconfiguration, NOT
+        # a reason for verify=False. See _montgomery_ssl_context()/_client_for()
+        # above and the client-selection branch in enrich() below, which route only
+        # this host's queries through a client trusting that one extra intermediate.
+        # Explicit out_fields (not "*") matching the Gaston/Cleveland convention --
+        # confirmed live this layer carries no SSN-shaped column, but pin the exact
+        # list anyway per this file's own standing safeguard.
+        "url": "https://www.webgis.net/arcgis/rest/services/NC/Montgomery/MapServer/1/query",
+        "addr_field": "PhyAddress",
+        "out_fields": (
+            "PIN,PinNoDash,Name_1,Name_2,PhyAddress,DeedBook,DeedPage,DeedYear,"
+            "TransDate,SalesAmt,LandASVCur,ImpMajASVC,ImpMisASVC,TotASVCur,"
+            "YearBuilt,FinishedAr,Num_Baths,Num_Bedrms,Deed_Acre,ACRES,"
+            "ClassCode,ClassCdDes,LandUse_YN"
+        ),
+    },
     # ---- Coastal NC (added 2026-06-26, all live-verified against the layer's
     #      DescribeFeatureType + a real residential address-LIKE query) -------
     "Carteret": {
@@ -465,7 +561,10 @@ FIELD_ALIASES = {
                    # SC county-native (2026-08-12): Colleton=OwnerName1,
                    # Beaufort=GisFile_Owner1 (Spartanburg=OwnerName, Pickens=NAME1,
                    # Laurens=Name1 already covered above).
-                   "OwnerName1", "GisFile_Owner1"),
+                   "OwnerName1", "GisFile_Owner1",
+                   # Montgomery NC webgis.net: Name_1 (underscore; not matched by
+                   # the bare "Name1"/"NAME1" aliases already above)
+                   "Name_1"),
     "mailing_addr": ("txt_mailaddr1", "MailAddr", "OWNER_MAIL_1", "mailadd",
                      "Mailing_Address", "OwnerMailingAddress",
                      # Gaston county layer 11 = CURR_ADDR1 (owner mailing, NOT
@@ -500,7 +599,10 @@ FIELD_ALIASES = {
                      # publishes the full situs as a single ADDRESS field, joined
                      # to the CAMA layer (24) by TMS — see
                      # sc_coastal_rosters._COASTAL_SC_GIS.
-                     "ADDRESS"),
+                     "ADDRESS",
+                     # Montgomery NC webgis.net: PhyAddress (physical situs,
+                     # confirmed live -- distinct from the Addr_1-4 mailing block)
+                     "PhyAddress"),
     "acreage": ("Acreage", "ACRES", "gisacres", "ACREAGE", "LegalAc",
                 "DEEDED_ACRES", "Acres", "ACRE", "Acres_Calc",
                 # Gaston county layer 11 = CALCAC/DEEDAC; Cleveland = COUNTY_ACRES
@@ -510,14 +612,16 @@ FIELD_ALIASES = {
                    # coastal NC: Carteret=Y_BLT_HOUSE, Brunswick=ActualYearBuilt,
                    # Dare(WFS)=yrblt
                    "Y_BLT_HOUSE", "ActualYearBuilt", "yrblt"),
-    "bedrooms": ("BEDROOMS", "BedRooms", "Bedrooms", "BEDS", "XBEDRM"),
+    "bedrooms": ("BEDROOMS", "BedRooms", "Bedrooms", "BEDS", "XBEDRM",
+                 "Num_Bedrms"),  # Montgomery NC webgis.net
     "bathrooms": ("BATHRMS", "BATHS", "Bathrooms", "FullBaths", "BathRoom",
-                  "XBATHS"),
+                  "XBATHS", "Num_Baths"),  # Montgomery NC webgis.net
     "living_sqft": ("HEATED_SQ_", "SQFEET", "TotLiving", "TotalLiving", "BLDGSQFT",
                     "BUILDING_S", "HeatedSqFt", "BLDGSF",
                     # coastal NC: Carteret=HtdSqFt, Onslow=HEATEDSQUAREFEET,
                     # Pender=HEAT_SQ_FT, Dare(WFS)=sfla
-                    "HtdSqFt", "HEATEDSQUAREFEET", "HEAT_SQ_FT", "sfla"),
+                    "HtdSqFt", "HEATEDSQUAREFEET", "HEAT_SQ_FT", "sfla",
+                    "FinishedAr"),  # Montgomery NC webgis.net
     "tax_value": ("TAXMKTVAL", "FAIRMKTVAL", "MRKT_VALUE", "Total", "parval",
                   "presentval", "TotalVal", "TotalValue", "Tot_Val", "AppraisalValue",
                   "TOTAL_VAL",
@@ -540,7 +644,8 @@ FIELD_ALIASES = {
                   # SC's 4%/6% assessment ratio — MarketProp matches the "total
                   # appraised" semantics of the other GisFile_Appraised-style
                   # aliases above).
-                  "MarketProp"),
+                  "MarketProp",
+                  "TotASVCur"),  # Montgomery NC webgis.net (total assessed value)
     "deed_book": ("DEEDBK", "Deed_Book", "DEED_BK", "DeedBook", "DB",
                   # SC SCDOT: Charleston=DEED_BOOK_, Anderson=DBOOK,
                   # Beaufort=Book, Laurens=DEEDBOOK
@@ -565,7 +670,8 @@ FIELD_ALIASES = {
                   # (string "m/d/yyyy"); Charleston's county-native layer (61) uses
                   # RECORDED_DATE (epoch-ms) — a DIFFERENT, differently-prefixed
                   # field from the dead SCDOT-era RECORDED_D already aliased above.
-                  "GisFile_SaleDate", "RECORDED_DATE"),
+                  "GisFile_SaleDate", "RECORDED_DATE",
+                  "TransDate"),  # Montgomery NC webgis.net (YYYYMMDD int)
     "sale_amount": ("SaleAmount", "SALEAMT", "SalePrice", "Sale_Price",
                     # SC SCDOT: Pickens=SALEP, Charleston/Anderson=SALE_PRICE,
                     # Laurens=Considerat (True_Sale is a Y/N flag, not an amount).
@@ -574,13 +680,16 @@ FIELD_ALIASES = {
                     # Gaston county layer 11
                     "SALESAMT",
                     # Beaufort county-native (2026-10-02)
-                    "GisFile_SalePrice"),
+                    "GisFile_SalePrice",
+                    "SalesAmt"),  # Montgomery NC webgis.net
     "zoning": ("Zoning", "ZONING", "ZONE", "ZoneCode", "zone_code", "PRIM_ZONE"),
     "land_value": ("landval", "Land", "LANDVAL", "LandValue", "Land_Val",
-                   "FMV_LAND", "COUNTY_LAND_VALUE"),
+                   "FMV_LAND", "COUNTY_LAND_VALUE",
+                   "LandASVCur"),  # Montgomery NC webgis.net
     "improvement_value": ("improvval", "Dwelling", "BLDG_VAL", "ImpValue",
                           "Improvement", "STRUCT_VAL",
-                          "FMV_IMPRV", "COUNTY_BUILDING_VALUE"),
+                          "FMV_IMPRV", "COUNTY_BUILDING_VALUE",
+                          "ImpMajASVC"),  # Montgomery NC webgis.net (ImpMisASVC unaliased)
     # The PROPERTY's city and ZIP (both callers write li.city / li.zip_code). MAIL_CITY and
     # MAIL_ZIP were in these two lists until 2026-10-06: Carteret's MAIL_CITY put
     # "WASHINGTON" (a federal owner's DC mailing city) on all 40 of 40 live-sampled
@@ -953,6 +1062,39 @@ def _missing_cohort_flags(li: Listing) -> bool:
         return False
     gis = li.raw.get("gis") if isinstance(li.raw, dict) else None
     return not (isinstance(gis, dict) and "vacant" in gis)
+
+
+# Counties whose LOCAL parcel_cache is confirmed to carry owner/value/acreage but
+# NEVER bedrooms/bathrooms/living_sqft -- checked live 2026-11-28: Montgomery's
+# cache (data/parcel_cache/montgomery.sqlite, 60,777 rows) has living_sqft NULL on
+# every single row and no bedrooms/bathrooms column at all, even though the live
+# webgis.net layer carries real Num_Bedrms/Num_Baths/FinishedAr data (confirmed:
+# 229 Porters Glen Ln is 4bd/5ba/7,607sqft there, per the NC_GIS entry added this
+# same day). Same exact problem _missing_cohort_flags documents for Gaston's
+# vacant/absentee cohorts -- the fast path below returns on a cache hit before
+# _apply_attrs (and this file's new Montgomery FIELD_ALIASES) ever run.
+_CAMA_DETAIL_COUNTIES = frozenset({"Montgomery"})
+
+
+def _missing_cama_detail(li: Listing) -> bool:
+    """True when `li` is in a county whose parcel_cache entry never carries
+    bedrooms/bathrooms/living_sqft, those fields are still empty on `li`, AND a
+    live catch-up query for them hasn't been attempted yet.
+
+    One-time per row, like _missing_cohort_flags: once attempted,
+    raw['gis']['cama_detail_checked'] is stamped (see one()'s NC_GIS branch)
+    regardless of whether the live query actually found anything, so a genuinely
+    CAMA-sparse parcel (e.g. a vacant lot -- confirmed live: 2 of 3 sampled
+    Montgomery parcels have YearBuilt=0/FinishedAr=0/Num_Baths=0/Num_Bedrms=0,
+    which maybe() correctly treats as absent, not a real zero-bedroom house) is
+    never re-queried every run forever."""
+    county = (li.county or "").replace(" County", "").strip()
+    if county not in _CAMA_DETAIL_COUNTIES:
+        return False
+    if li.bedrooms or li.bathrooms or li.living_sqft:
+        return False
+    gis = li.raw.get("gis") if isinstance(li.raw, dict) else None
+    return not (isinstance(gis, dict) and gis.get("cama_detail_checked"))
 
 
 def _street_keywords(street: str) -> str:
@@ -1501,7 +1643,8 @@ async def enrich(listings: list[Listing], concurrency: int = 8) -> list[Listing]
     sem = asyncio.Semaphore(concurrency)
     counts = {"queried": 0, "matched": 0, "fields_filled": 0}
 
-    async def one(c: httpx.AsyncClient, li: Listing) -> None:
+    async def one(c: httpx.AsyncClient, li: Listing,
+                  c_mont: httpx.AsyncClient | None = None) -> None:
         if not (li.street_address and li.county and li.state):
             return
         # TAX_SALE_OVERAGE: street_address here is the parcel the claimant
@@ -1583,7 +1726,7 @@ async def enrich(listings: list[Listing], concurrency: int = 8) -> list[Listing]
                 # column, so a county where _cohort_flags actually works gets one live
                 # catch-up query instead of returning here -- a one-time cost, not a standing
                 # one (the gate flips False once this row's flags are stamped).
-                if not _missing_cohort_flags(li):
+                if not (_missing_cohort_flags(li) or _missing_cama_detail(li)):
                     return
             elif owner_refresh_due and li.market_value:
                 # Entered ONLY for a stale-owner recheck (owner+value both already
@@ -1593,7 +1736,7 @@ async def enrich(listings: list[Listing], concurrency: int = 8) -> list[Listing]
                 # is not grounds to pay for a live network re-query just to re-verify
                 # an owner name; this lead's owner gets another free chance to refresh
                 # whenever its county's parcel_cache next carries a row for it.
-                if not _missing_cohort_flags(li):
+                if not (_missing_cohort_flags(li) or _missing_cama_detail(li)):
                     return
         # Normalize county: strip "County", trailing ", NC" or ", SC", whitespace
         county_clean = li.county.replace(" County", "").strip()
@@ -1710,8 +1853,8 @@ async def enrich(listings: list[Listing], concurrency: int = 8) -> list[Listing]
 
         async with sem:
             counts["queried"] += 1
-            results = await _arcgis_query(c, base, addr_field, li.street_address,
-                                          house_no, out_fields=out_fields)
+            results = await _arcgis_query(_client_for(base, c, c_mont), base, addr_field,
+                                          li.street_address, house_no, out_fields=out_fields)
             if not results:
                 return
             counts["matched"] += 1
@@ -1742,9 +1885,16 @@ async def enrich(listings: list[Listing], concurrency: int = 8) -> list[Listing]
             # confident, since a wrong parcel_id corrupts the dedupe key.
             best["_match_confident"] = confident
             counts["fields_filled"] += _apply_attrs(li, best)
+            if county_clean in _CAMA_DETAIL_COUNTIES:
+                # One-time catch-up done (see _missing_cama_detail) -- stamped even
+                # when this specific parcel turns out CAMA-sparse (e.g. a vacant lot;
+                # confirmed live some Montgomery parcels are), so it is never
+                # re-queried every run just because beds/baths/sqft stayed empty.
+                li.raw.setdefault("gis", {})["cama_detail_checked"] = True
 
-    async with client(timeout=20.0) as c:
-        await asyncio.gather(*(one(c, li) for li in listings))
+    async with client(timeout=20.0) as c, \
+            httpx.AsyncClient(timeout=20.0, verify=_montgomery_ssl_context()) as c_mont:
+        await asyncio.gather(*(one(c, li, c_mont) for li in listings))
 
     log.info("enrichment.gis.done", **counts)
     return listings
