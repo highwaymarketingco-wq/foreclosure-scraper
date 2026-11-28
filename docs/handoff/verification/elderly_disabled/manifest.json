@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 10448,
+  "confirmed": 10495,
   "refuted": 99,
-  "rows": 10774,
-  "stale": 69,
+  "rows": 10824,
+  "stale": 72,
   "unconfirmed": 158,
   "wall": 0
  },
- "generated_at": "2026-11-28T12:36:44Z",
+ "generated_at": "2026-11-28T15:06:23Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-28T12:36:43Z",
+  "at": "2026-11-28T15:06:21Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,7 +21,7 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.charlottenc.gov": 100,
+    "gis.charlottenc.gov": 82,
     "maps.spartanburgcounty.org": 50,
     "portal-nc.tylertech.cloud": 39,
     "roster:pickens-so-sc.zuercherportal.com": 1,
@@ -31,40 +31,39 @@
   },
   "result": {
    "checked": 50,
-   "confirmed": 46,
-   "stale": 3,
-   "unconfirmed": 1
+   "confirmed": 47,
+   "stale": 3
   },
-  "seconds": 580,
+  "seconds": 564,
   "selection": {
    "applies": 140892,
-   "due_new": 129163,
+   "due_new": 129101,
    "due_retry": 8,
    "due_version": 1,
-   "not_due_retry": 140,
-   "not_due_ttl": 11580,
-   "same_property_queued": 13
+   "not_due_retry": 150,
+   "not_due_ttl": 11632,
+   "same_property_queued": 1
   },
   "source": null,
   "tier": null
  },
- "rows": 10774,
+ "rows": 10824,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 5801699,
+   "bytes": 5825604,
    "file": "000.json",
-   "rows": 5430,
-   "sha256": "e6374b09b5d7bc14bf91e8922006ad932f0d224f9517c742f3e0629844e1a9f8"
+   "rows": 5456,
+   "sha256": "71ec8825e556cc4adff6d870bce7cc9911ab218edeaf7b014f4c3cb59554aa6c"
   },
   {
    "bucket": 1,
-   "bytes": 5676709,
+   "bytes": 5698953,
    "file": "001.json",
-   "rows": 5344,
-   "sha256": "1da4907230fdfeef11dbaf3d54cb8aaee44bcff706aeb4947fb025c5da7e1f59"
+   "rows": 5368,
+   "sha256": "dee44c0fda8399cf24683ab8e419f9062410997967d85211f2e65a4435f4fb8c"
   }
  ],
  "signal": "elderly_disabled",

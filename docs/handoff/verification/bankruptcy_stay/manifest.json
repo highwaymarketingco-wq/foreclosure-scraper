@@ -8,12 +8,12 @@
   "unconfirmed": 194,
   "wall": 0
  },
- "generated_at": "2026-11-28T12:36:42Z",
+ "generated_at": "2026-11-28T15:06:20Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-28T12:36:42Z",
+  "at": "2026-11-28T15:06:20Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,7 +21,7 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.charlottenc.gov": 100,
+    "gis.charlottenc.gov": 82,
     "maps.spartanburgcounty.org": 50,
     "portal-nc.tylertech.cloud": 39,
     "roster:pickens-so-sc.zuercherportal.com": 1,
@@ -33,7 +33,7 @@
    "checked": 7,
    "unconfirmed": 7
   },
-  "seconds": 580,
+  "seconds": 564,
   "selection": {
    "applies": 465,
    "due_ttl": 7,
@@ -52,7 +52,7 @@
    "bytes": 630381,
    "file": "000.json",
    "rows": 571,
-   "sha256": "f1009c26d73957fa4ac913f16daacd529fdf9a50e315c2e280a37949f2b1d791"
+   "sha256": "d8004f0f32e9adbd88f75cddbd89d15517be5c38a3658f148524a65542cb2138"
   }
  ],
  "signal": "bankruptcy_stay",

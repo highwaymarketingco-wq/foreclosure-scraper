@@ -1,19 +1,19 @@
 {
  "buckets": 4,
  "counts": {
-  "confirmed": 18971,
+  "confirmed": 19021,
   "refuted": 11,
-  "rows": 19254,
+  "rows": 19304,
   "stale": 59,
   "unconfirmed": 213,
   "wall": 0
  },
- "generated_at": "2026-11-28T12:36:46Z",
+ "generated_at": "2026-11-28T15:06:24Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-28T12:36:45Z",
+  "at": "2026-11-28T15:06:23Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,7 +21,7 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.charlottenc.gov": 100,
+    "gis.charlottenc.gov": 82,
     "maps.spartanburgcounty.org": 50,
     "portal-nc.tylertech.cloud": 39,
     "roster:pickens-so-sc.zuercherportal.com": 1,
@@ -33,50 +33,50 @@
    "checked": 50,
    "confirmed": 50
   },
-  "seconds": 580,
+  "seconds": 564,
   "selection": {
    "applies": 44671,
-   "due_new": 25523,
+   "due_new": 25473,
    "due_retry": 113,
    "due_retry_transient": 24,
    "due_ttl": 432,
    "not_due_retry": 72,
-   "not_due_ttl": 18507
+   "not_due_ttl": 18557
   },
   "source": null,
   "tier": null
  },
- "rows": 19254,
+ "rows": 19304,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4679496,
+   "bytes": 4695781,
    "file": "000.json",
-   "rows": 4911,
-   "sha256": "fb4c4137eb5f7b92956695a71232817ff28dc611d698dbe0a520872a78ae4eeb"
+   "rows": 4928,
+   "sha256": "d9b2525e6bc31fa74971970ba00f92604c43ca90d571a3c89fe497967261e0df"
   },
   {
    "bucket": 1,
-   "bytes": 4529421,
+   "bytes": 4539887,
    "file": "001.json",
-   "rows": 4753,
-   "sha256": "89abd597ab47236ab8929d9aa17052f7babdcb5f393c8f68c9795f6f379b6ac4"
+   "rows": 4764,
+   "sha256": "2e6b268aa0cd23336eabaca831eb7ff6e6c4fb5abb230d72b8039c85526dc0c2"
   },
   {
    "bucket": 2,
-   "bytes": 4559126,
+   "bytes": 4571608,
    "file": "002.json",
-   "rows": 4792,
-   "sha256": "9039dc10feef68c0e3f3828973fef4ad5af55a20a80e0be3a538fc382c10735c"
+   "rows": 4805,
+   "sha256": "cbd02774645385870995ce6adfebb97f55f6cefabe5db2aaae2e8c6ff68cede8"
   },
   {
    "bucket": 3,
-   "bytes": 4571998,
+   "bytes": 4580678,
    "file": "003.json",
-   "rows": 4798,
-   "sha256": "81b42a833b1cc24715f577d820c1bf67a316df4e0f7c818f25422e560d514956"
+   "rows": 4807,
+   "sha256": "b4744ed8f45f00c10567e581abaa8a2db5684dba2cdd7ca75454bd535ef7c5ba"
   }
  ],
  "signal": "heir_roll",
