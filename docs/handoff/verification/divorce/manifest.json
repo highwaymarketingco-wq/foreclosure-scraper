@@ -3,17 +3,17 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 4208,
+  "rows": 4258,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 4208
+  "wall": 4258
  },
- "generated_at": "2026-11-27T22:47:28Z",
+ "generated_at": "2026-11-28T00:24:35Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-27T22:47:28Z",
+  "at": "2026-11-28T00:24:35Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,22 +21,13 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 27,
-    "gis.buncombecounty.org": 50,
+    "devsvcs.gastonianc.gov": 52,
+    "gis.buncombecounty.org": 74,
     "portal-nc.tylertech.cloud": 36,
     "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:apps.alamance-nc.com": 1,
-    "roster:apps.pittcountync.gov": 1,
-    "roster:cc.southernsoftware.com": 1,
-    "roster:guilfordcountysheriff.policetocitizen.com": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "roster:morgantonpdnc.policetocitizen.com": 1,
-    "roster:p2c.iredellcountync.gov": 1,
-    "roster:p2c.nhcgov.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
-    "roster:www2.dconc.gov": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 111,
+    "vt.ncsbe.gov": 78,
     "www.courtlistener.com": 2
    }
   },
@@ -44,25 +35,26 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 634,
+  "seconds": 1332,
   "selection": {
    "applies": 4916,
-   "due_new": 741,
-   "not_due_ttl": 4175
+   "due_new": 691,
+   "not_due_ttl": 4225,
+   "same_property_queued": 4
   },
   "source": null,
   "tier": null
  },
- "rows": 4208,
+ "rows": 4258,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 3580208,
+   "bytes": 3625208,
    "file": "000.json",
-   "rows": 4208,
-   "sha256": "9eda5e48958d46c9866377c0b906a61235df442fe287da1c68284b26e7f1fc2f"
+   "rows": 4258,
+   "sha256": "b7a5907274bc3d9a6475f808df870426fcadce3305909d3205bddc1544aa2365"
   }
  ],
  "signal": "divorce",

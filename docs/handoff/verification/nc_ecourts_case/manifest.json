@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 10055,
+  "confirmed": 10103,
   "refuted": 26,
-  "rows": 11645,
+  "rows": 11693,
   "stale": 1313,
   "unconfirmed": 251,
   "wall": 0
  },
- "generated_at": "2026-11-27T22:47:31Z",
+ "generated_at": "2026-11-28T00:24:38Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-27T22:47:30Z",
+  "at": "2026-11-28T00:24:38Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,22 +21,13 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 27,
-    "gis.buncombecounty.org": 50,
+    "devsvcs.gastonianc.gov": 52,
+    "gis.buncombecounty.org": 74,
     "portal-nc.tylertech.cloud": 36,
     "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:apps.alamance-nc.com": 1,
-    "roster:apps.pittcountync.gov": 1,
-    "roster:cc.southernsoftware.com": 1,
-    "roster:guilfordcountysheriff.policetocitizen.com": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "roster:morgantonpdnc.policetocitizen.com": 1,
-    "roster:p2c.iredellcountync.gov": 1,
-    "roster:p2c.nhcgov.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
-    "roster:www2.dconc.gov": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 111,
+    "vt.ncsbe.gov": 78,
     "www.courtlistener.com": 2
    }
   },
@@ -45,35 +36,35 @@
    "confirmed": 48,
    "unconfirmed": 2
   },
-  "seconds": 634,
+  "seconds": 1332,
   "selection": {
    "applies": 25671,
-   "due_new": 14379,
-   "due_retry": 91,
+   "due_new": 14331,
+   "due_retry": 97,
    "due_ttl": 670,
-   "not_due_retry": 171,
-   "not_due_ttl": 10360
+   "not_due_retry": 165,
+   "not_due_ttl": 10408
   },
   "source": null,
   "tier": null
  },
- "rows": 11645,
+ "rows": 11693,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 7243763,
+   "bytes": 7272977,
    "file": "000.json",
-   "rows": 5876,
-   "sha256": "2b57a05a8273161a2ecb77df68d814a2d0704dd14d1f580868cd7da3cb65cbf2"
+   "rows": 5900,
+   "sha256": "8abbcfa2beaea92e5802c168bae2f5f7e44bd90264aa09bd7378cce34806a3d9"
   },
   {
    "bucket": 1,
-   "bytes": 7117960,
+   "bytes": 7147199,
    "file": "001.json",
-   "rows": 5769,
-   "sha256": "4eddd974a90de83e1393d36c385d7a067953ef41928981726a9bb6905b59ff61"
+   "rows": 5793,
+   "sha256": "f64fbfb948c335c2e7a4e6ab8abd718eb4a3a33a2d94938575a851755211f3da"
   }
  ],
  "signal": "nc_ecourts_case",

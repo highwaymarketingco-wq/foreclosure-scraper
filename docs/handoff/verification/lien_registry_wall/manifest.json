@@ -3,17 +3,17 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 4010,
+  "rows": 4060,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 4010
+  "wall": 4060
  },
- "generated_at": "2026-11-27T22:47:30Z",
+ "generated_at": "2026-11-28T00:24:38Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-27T22:47:30Z",
+  "at": "2026-11-28T00:24:37Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,22 +21,13 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 27,
-    "gis.buncombecounty.org": 50,
+    "devsvcs.gastonianc.gov": 52,
+    "gis.buncombecounty.org": 74,
     "portal-nc.tylertech.cloud": 36,
     "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:apps.alamance-nc.com": 1,
-    "roster:apps.pittcountync.gov": 1,
-    "roster:cc.southernsoftware.com": 1,
-    "roster:guilfordcountysheriff.policetocitizen.com": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "roster:morgantonpdnc.policetocitizen.com": 1,
-    "roster:p2c.iredellcountync.gov": 1,
-    "roster:p2c.nhcgov.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
-    "roster:www2.dconc.gov": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 111,
+    "vt.ncsbe.gov": 78,
     "www.courtlistener.com": 2
    }
   },
@@ -44,25 +35,26 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 634,
+  "seconds": 1332,
   "selection": {
    "applies": 66565,
-   "due_new": 62525,
-   "not_due_ttl": 4040
+   "due_new": 62474,
+   "not_due_ttl": 4091,
+   "same_property_queued": 33
   },
   "source": null,
   "tier": null
  },
- "rows": 4010,
+ "rows": 4060,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 3578150,
+   "bytes": 3622857,
    "file": "000.json",
-   "rows": 4010,
-   "sha256": "03d483194500dbca4199ea66de0d7b385fbeed79be6be21d9fdcd064428f8766"
+   "rows": 4060,
+   "sha256": "f4d3211a0c0aeb76c5a4494fa7b892140980556b12bba889ec34bede7b24f8dc"
   }
  ],
  "signal": "lien_registry_wall",

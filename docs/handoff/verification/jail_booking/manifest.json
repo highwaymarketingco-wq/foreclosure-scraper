@@ -8,12 +8,12 @@
   "unconfirmed": 220,
   "wall": 0
  },
- "generated_at": "2026-11-27T22:47:30Z",
+ "generated_at": "2026-11-28T00:24:37Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-27T22:47:30Z",
+  "at": "2026-11-28T00:24:37Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,38 +21,29 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 27,
-    "gis.buncombecounty.org": 50,
+    "devsvcs.gastonianc.gov": 52,
+    "gis.buncombecounty.org": 74,
     "portal-nc.tylertech.cloud": 36,
     "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:apps.alamance-nc.com": 1,
-    "roster:apps.pittcountync.gov": 1,
-    "roster:cc.southernsoftware.com": 1,
-    "roster:guilfordcountysheriff.policetocitizen.com": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "roster:morgantonpdnc.policetocitizen.com": 1,
-    "roster:p2c.iredellcountync.gov": 1,
-    "roster:p2c.nhcgov.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
-    "roster:www2.dconc.gov": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 111,
+    "vt.ncsbe.gov": 78,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 43,
-   "stale": 6,
+   "confirmed": 40,
+   "stale": 9,
    "unconfirmed": 1
   },
-  "seconds": 634,
+  "seconds": 1332,
   "selection": {
    "applies": 907,
-   "due_retry": 167,
-   "due_ttl": 404,
-   "not_due_retry": 40,
-   "not_due_ttl": 296
+   "due_retry": 187,
+   "due_ttl": 355,
+   "not_due_retry": 20,
+   "not_due_ttl": 345
   },
   "source": null,
   "tier": null
@@ -63,10 +54,10 @@
  "shards": [
   {
    "bucket": 0,
-   "bytes": 1235201,
+   "bytes": 1240508,
    "file": "000.json",
    "rows": 984,
-   "sha256": "3f2c29ee202f6ffeb154c205eb9b23332bf54bb0b931996e89860dd71acc0f46"
+   "sha256": "4a3f6befe63c0ae42b4f334b9eafcc3afa05d5eb400f873be85093e92b0939fa"
   }
  ],
  "signal": "jail_booking",

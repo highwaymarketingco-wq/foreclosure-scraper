@@ -8,12 +8,12 @@
   "unconfirmed": 490,
   "wall": 0
  },
- "generated_at": "2026-11-27T22:47:31Z",
+ "generated_at": "2026-11-28T00:24:38Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-27T22:47:31Z",
+  "at": "2026-11-28T00:24:38Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,27 +21,18 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 27,
-    "gis.buncombecounty.org": 50,
+    "devsvcs.gastonianc.gov": 52,
+    "gis.buncombecounty.org": 74,
     "portal-nc.tylertech.cloud": 36,
     "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:apps.alamance-nc.com": 1,
-    "roster:apps.pittcountync.gov": 1,
-    "roster:cc.southernsoftware.com": 1,
-    "roster:guilfordcountysheriff.policetocitizen.com": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "roster:morgantonpdnc.policetocitizen.com": 1,
-    "roster:p2c.iredellcountync.gov": 1,
-    "roster:p2c.nhcgov.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
-    "roster:www2.dconc.gov": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 111,
+    "vt.ncsbe.gov": 78,
     "www.courtlistener.com": 2
    }
   },
   "result": {},
-  "seconds": 634,
+  "seconds": 1332,
   "selection": {
    "applies": 1052,
    "not_due_retry": 478,

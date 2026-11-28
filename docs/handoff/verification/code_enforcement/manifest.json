@@ -1,19 +1,19 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 3643,
-  "refuted": 1095,
-  "rows": 5173,
-  "stale": 412,
+  "confirmed": 3651,
+  "refuted": 1120,
+  "rows": 5223,
+  "stale": 429,
   "unconfirmed": 23,
   "wall": 0
  },
- "generated_at": "2026-11-27T22:47:27Z",
+ "generated_at": "2026-11-28T00:24:35Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-27T22:47:27Z",
+  "at": "2026-11-28T00:24:34Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,54 +21,43 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 27,
-    "gis.buncombecounty.org": 50,
+    "devsvcs.gastonianc.gov": 52,
+    "gis.buncombecounty.org": 74,
     "portal-nc.tylertech.cloud": 36,
     "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:apps.alamance-nc.com": 1,
-    "roster:apps.pittcountync.gov": 1,
-    "roster:cc.southernsoftware.com": 1,
-    "roster:guilfordcountysheriff.policetocitizen.com": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "roster:morgantonpdnc.policetocitizen.com": 1,
-    "roster:p2c.iredellcountync.gov": 1,
-    "roster:p2c.nhcgov.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
-    "roster:www2.dconc.gov": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 111,
+    "vt.ncsbe.gov": 78,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 2,
-   "refuted": 37,
-   "stale": 10,
-   "unconfirmed": 1
+   "confirmed": 8,
+   "refuted": 25,
+   "stale": 17
   },
-  "seconds": 634,
+  "seconds": 1332,
   "selection": {
    "applies": 11927,
-   "due_new": 6679,
-   "due_retry": 1,
+   "due_new": 6630,
    "due_ttl": 112,
-   "not_due_retry": 28,
-   "not_due_ttl": 5107
+   "not_due_retry": 29,
+   "not_due_ttl": 5156
   },
   "source": null,
   "tier": null
  },
- "rows": 5173,
+ "rows": 5223,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 5756632,
+   "bytes": 5812151,
    "file": "000.json",
-   "rows": 5173,
-   "sha256": "2835f69d28b1f650ef6b336008f689da715990715c0f1803e1ca18abe9bbeb63"
+   "rows": 5223,
+   "sha256": "03191f090ee6f4c8663bdd374a3a801b50ab4ed1454595b8a87c0b33a73d8f54"
   }
  ],
  "signal": "code_enforcement",

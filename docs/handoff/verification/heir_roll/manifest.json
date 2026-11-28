@@ -1,19 +1,19 @@
 {
  "buckets": 4,
  "counts": {
-  "confirmed": 18025,
+  "confirmed": 18075,
   "refuted": 11,
-  "rows": 18304,
+  "rows": 18354,
   "stale": 56,
   "unconfirmed": 212,
   "wall": 0
  },
- "generated_at": "2026-11-27T22:47:30Z",
+ "generated_at": "2026-11-28T00:24:37Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-27T22:47:29Z",
+  "at": "2026-11-28T00:24:36Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,22 +21,13 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 27,
-    "gis.buncombecounty.org": 50,
+    "devsvcs.gastonianc.gov": 52,
+    "gis.buncombecounty.org": 74,
     "portal-nc.tylertech.cloud": 36,
     "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:apps.alamance-nc.com": 1,
-    "roster:apps.pittcountync.gov": 1,
-    "roster:cc.southernsoftware.com": 1,
-    "roster:guilfordcountysheriff.policetocitizen.com": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "roster:morgantonpdnc.policetocitizen.com": 1,
-    "roster:p2c.iredellcountync.gov": 1,
-    "roster:p2c.nhcgov.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
-    "roster:www2.dconc.gov": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 111,
+    "vt.ncsbe.gov": 78,
     "www.courtlistener.com": 2
    }
   },
@@ -44,50 +35,50 @@
    "checked": 50,
    "confirmed": 50
   },
-  "seconds": 634,
+  "seconds": 1332,
   "selection": {
    "applies": 44671,
-   "due_new": 26473,
+   "due_new": 26423,
    "due_retry": 113,
    "due_retry_transient": 24,
    "due_ttl": 432,
    "not_due_retry": 71,
-   "not_due_ttl": 17558
+   "not_due_ttl": 17608
   },
   "source": null,
   "tier": null
  },
- "rows": 18304,
+ "rows": 18354,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4450597,
+   "bytes": 4457917,
    "file": "000.json",
-   "rows": 4672,
-   "sha256": "98597ae4020a3ac82a4fbca1e27cdd75c8b630e979ff10822cd513c0e24f354c"
+   "rows": 4680,
+   "sha256": "e97a06839761ecf2aa41d0166c9ed77acf4704955ccf490fa315c22907b0212b"
   },
   {
    "bucket": 1,
-   "bytes": 4314903,
+   "bytes": 4323275,
    "file": "001.json",
-   "rows": 4529,
-   "sha256": "70016261e19993fd2049e0b4a92bc59a14672a0115a19a01fa9fc49f709a52a1"
+   "rows": 4538,
+   "sha256": "7ab5e85d4991a2f8366fe12226271509ab24ca13f1d6d8351a1da66a64d6bfab"
   },
   {
    "bucket": 2,
-   "bytes": 4325426,
+   "bytes": 4340399,
    "file": "002.json",
-   "rows": 4548,
-   "sha256": "d5634c04eff60c1b38ad7a7b22d2595ab7e258a6214b60daf546e22f97419a85"
+   "rows": 4564,
+   "sha256": "de5f28d50208b4766a64eaf3d76d8a651992f2a2613955e65e86c707ccc6d143"
   },
   {
    "bucket": 3,
-   "bytes": 4339458,
+   "bytes": 4355404,
    "file": "003.json",
-   "rows": 4555,
-   "sha256": "f73192383408c9365ed8fdf61524db80156b5db448c13ea59f012c6963002c7b"
+   "rows": 4572,
+   "sha256": "8488ddbc4c02c372b941d292ab09458ebd84ed812ca6bf616ce71b9792573a92"
   }
  ],
  "signal": "heir_roll",

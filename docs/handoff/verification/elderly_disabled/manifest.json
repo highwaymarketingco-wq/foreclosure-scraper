@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 9521,
+  "confirmed": 9569,
   "refuted": 99,
-  "rows": 9824,
+  "rows": 9874,
   "stale": 59,
-  "unconfirmed": 145,
+  "unconfirmed": 147,
   "wall": 0
  },
- "generated_at": "2026-11-27T22:47:29Z",
+ "generated_at": "2026-11-28T00:24:36Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-27T22:47:28Z",
+  "at": "2026-11-28T00:24:36Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,59 +21,51 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 27,
-    "gis.buncombecounty.org": 50,
+    "devsvcs.gastonianc.gov": 52,
+    "gis.buncombecounty.org": 74,
     "portal-nc.tylertech.cloud": 36,
     "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:apps.alamance-nc.com": 1,
-    "roster:apps.pittcountync.gov": 1,
-    "roster:cc.southernsoftware.com": 1,
-    "roster:guilfordcountysheriff.policetocitizen.com": 1,
-    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
-    "roster:morgantonpdnc.policetocitizen.com": 1,
-    "roster:p2c.iredellcountync.gov": 1,
-    "roster:p2c.nhcgov.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
-    "roster:www2.dconc.gov": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 111,
+    "vt.ncsbe.gov": 78,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 50
+   "confirmed": 48,
+   "unconfirmed": 2
   },
-  "seconds": 634,
+  "seconds": 1332,
   "selection": {
    "applies": 140892,
-   "due_new": 130146,
+   "due_new": 130096,
    "due_retry": 8,
    "due_version": 1,
    "not_due_retry": 128,
-   "not_due_ttl": 10609,
+   "not_due_ttl": 10659,
    "same_property_queued": 1
   },
   "source": null,
   "tier": null
  },
- "rows": 9824,
+ "rows": 9874,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 5313614,
+   "bytes": 5340957,
    "file": "000.json",
-   "rows": 4952,
-   "sha256": "49cbe50afeaba433f706ef627cbd4c9938c6aea9ec5518203c3645dd76c6b08a"
+   "rows": 4973,
+   "sha256": "c7bbd98849e16ec1e61414548f06706ee0eba0eb84fd88b6041c77bc19b73fa6"
   },
   {
    "bucket": 1,
-   "bytes": 5194361,
+   "bytes": 5230715,
    "file": "001.json",
-   "rows": 4872,
-   "sha256": "8dbd8581fb1af7123eebd096069f29b5ecc19a6aaf1f4825f65bd83661bca0be"
+   "rows": 4901,
+   "sha256": "b205f9d794fb6351dbfa13cb3202ef7030a9cfcc223afb2e821d3d04d39a0b7d"
   }
  ],
  "signal": "elderly_disabled",
