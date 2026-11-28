@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 10254,
+  "confirmed": 10353,
   "refuted": 99,
-  "rows": 10574,
-  "stale": 64,
+  "rows": 10674,
+  "stale": 65,
   "unconfirmed": 157,
   "wall": 0
  },
- "generated_at": "2026-11-28T10:02:10Z",
+ "generated_at": "2026-11-28T11:16:50Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-28T10:02:09Z",
+  "at": "2026-11-28T11:16:50Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -23,7 +23,7 @@
    "requests": {
     "gis.charlottenc.gov": 100,
     "maps.spartanburgcounty.org": 50,
-    "portal-nc.tylertech.cloud": 31,
+    "portal-nc.tylertech.cloud": 28,
     "roster:pickens-so-sc.zuercherportal.com": 1,
     "services.nconemap.gov": 50,
     "www.courtlistener.com": 2
@@ -31,38 +31,39 @@
   },
   "result": {
    "checked": 50,
-   "confirmed": 50
+   "confirmed": 49,
+   "stale": 1
   },
-  "seconds": 560,
+  "seconds": 600,
   "selection": {
    "applies": 140892,
-   "due_new": 129384,
+   "due_new": 129284,
    "due_retry": 8,
    "due_version": 1,
    "not_due_retry": 140,
-   "not_due_ttl": 11359,
-   "same_property_queued": 1
+   "not_due_ttl": 11459,
+   "same_property_queued": 11
   },
   "source": null,
   "tier": null
  },
- "rows": 10574,
+ "rows": 10674,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 5704720,
+   "bytes": 5748974,
    "file": "000.json",
-   "rows": 5325,
-   "sha256": "bb5dff8301316bf71a0233c90bbe9a8173f73fefd6da1be0ae946a80fa3becfd"
+   "rows": 5373,
+   "sha256": "5ea3f8bb9fdee134ea0492267db7cc276e5ebc15f59ec539af18527a24416940"
   },
   {
    "bucket": 1,
-   "bytes": 5589121,
+   "bytes": 5637032,
    "file": "001.json",
-   "rows": 5249,
-   "sha256": "1203fed3ec255e6552046addd6852f17bb954108495db0b0db869d1e87580f58"
+   "rows": 5301,
+   "sha256": "348dfcb6a86439ae4caef1baf01dbdff3d67e2e5647956802f1c022b723c9fe6"
   }
  ],
  "signal": "elderly_disabled",
