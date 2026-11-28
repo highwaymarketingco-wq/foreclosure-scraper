@@ -1,19 +1,19 @@
 {
  "buckets": 1,
  "counts": {
-  "confirmed": 3774,
-  "refuted": 1835,
-  "rows": 6149,
+  "confirmed": 3786,
+  "refuted": 1923,
+  "rows": 6249,
   "stale": 517,
   "unconfirmed": 23,
   "wall": 0
  },
- "generated_at": "2026-11-28T17:18:05Z",
+ "generated_at": "2026-11-28T18:22:44Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-28T17:18:04Z",
+  "at": "2026-11-28T18:22:44Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -23,39 +23,37 @@
    "requests": {
     "gis.charlottenc.gov": 100,
     "maps.spartanburgcounty.org": 50,
-    "portal-nc.tylertech.cloud": 39,
-    "roster:cc.southernsoftware.com": 1,
-    "roster:hoke-so-nc.zuercherportal.com": 1,
+    "portal-nc.tylertech.cloud": 31,
     "roster:pickens-so-sc.zuercherportal.com": 1,
-    "services.nconemap.gov": 50,
+    "services.nconemap.gov": 51,
     "www.courtlistener.com": 2
    }
   },
   "result": {
    "checked": 50,
-   "confirmed": 8,
-   "refuted": 42
+   "confirmed": 4,
+   "refuted": 46
   },
-  "seconds": 657,
+  "seconds": 625,
   "selection": {
    "applies": 11927,
-   "due_new": 5704,
+   "due_new": 5604,
    "not_due_retry": 29,
-   "not_due_ttl": 6194
+   "not_due_ttl": 6294
   },
   "source": null,
   "tier": null
  },
- "rows": 6149,
+ "rows": 6249,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 6738722,
+   "bytes": 6830508,
    "file": "000.json",
-   "rows": 6149,
-   "sha256": "b0affd81c4c27c5c64a6a23ca3a8724834ae253d11a79a37a2224518d7aa6be7"
+   "rows": 6249,
+   "sha256": "5fce0659fa3e2069552d2c67c430ec7ab4ae4f05af9c75b77ff84eed234cadad"
   }
  ],
  "signal": "code_enforcement",
