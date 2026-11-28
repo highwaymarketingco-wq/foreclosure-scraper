@@ -86,17 +86,16 @@ class TylerNcAuthenticatedScraper(BaseScraper):
             log.error("tyler_nc_auth.no_password")
             return results
 
-        # Username is typically the account/email used for Tyler portals
-        # For now, using a common pattern - adjust if login fails
-        username = "cashhigh"  # Adjust based on actual account
+        # Username is the email address
+        username = "cashrandolphhigh@gmail.com"
 
         try:
             log.info("tyler_nc_auth.starting", counties=len(TARGET_COUNTIES))
             
             async with async_playwright() as p:
-                # Launch browser
+                # Launch browser (headless for VM)
                 browser = await p.chromium.launch(
-                    headless=False,  # Visible for CAPTCHA solving if needed
+                    headless=True,  # VM requires headless with Xvfb
                     args=["--no-sandbox", "--disable-gpu"],
                 )
                 

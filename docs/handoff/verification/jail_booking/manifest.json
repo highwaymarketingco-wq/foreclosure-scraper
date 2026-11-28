@@ -8,7 +8,7 @@
   "unconfirmed": 220,
   "wall": 0
  },
- "generated_at": "2026-11-28T05:21:22Z",
+ "generated_at": "2026-11-28T06:06:17Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
@@ -64,10 +64,10 @@
  "shards": [
   {
    "bucket": 0,
-   "bytes": 1277183,
+   "bytes": 1280778,
    "file": "000.json",
    "rows": 984,
-   "sha256": "bb139c05ec295fad03120a50febf1d97cdd8f5d3f650ddc349f1292c93d76421"
+   "sha256": "c0232f1b9e2eb5a1cd71b1c81bfe562ec73935c389d911b34f6a9722d45326ef"
   }
  ],
  "signal": "jail_booking",
