@@ -8,12 +8,12 @@
   "unconfirmed": 194,
   "wall": 0
  },
- "generated_at": "2026-11-28T21:34:05Z",
+ "generated_at": "2026-11-28T22:13:59Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-28T21:34:05Z",
+  "at": "2026-11-28T22:13:59Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -23,8 +23,7 @@
    "requests": {
     "gis.charlottenc.gov": 100,
     "maps.spartanburgcounty.org": 50,
-    "portal-nc.tylertech.cloud": 37,
-    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "portal-nc.tylertech.cloud": 36,
     "roster:pickens-so-sc.zuercherportal.com": 1,
     "services.nconemap.gov": 50,
     "www.courtlistener.com": 2
@@ -34,7 +33,7 @@
    "checked": 7,
    "unconfirmed": 7
   },
-  "seconds": 728,
+  "seconds": 706,
   "selection": {
    "applies": 465,
    "due_ttl": 7,
@@ -50,10 +49,10 @@
  "shards": [
   {
    "bucket": 0,
-   "bytes": 630382,
+   "bytes": 630387,
    "file": "000.json",
    "rows": 571,
-   "sha256": "e86f0719e3f7432a58cd6a2bf05d48bd25e804b17f22b26cd7fd72eaa0022f9b"
+   "sha256": "0498e2bb72381ac1023259580df38d66602e21150c9bfc96232adb2ccf9c315d"
   }
  ],
  "signal": "bankruptcy_stay",
