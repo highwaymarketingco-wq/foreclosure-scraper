@@ -4228,12 +4228,22 @@ def reseal_board(docs_dir: Path | str = "docs", *, resplit: bool = False,
     return block or {}
 
 
-# Rolling pre-write backups kept per pattern (main board + detail sidecar). Each
-# main copy is ~1.04GB, so 10 of them was 12GB of a laptop that needed 50-80GB
-# back (2026-09-19). Every committed board is also in git history and the live
-# board is the newest state; 3 still covers the "a bad write just landed" case
-# the backup exists for. Override with BOARD_BACKUP_KEEP.
-_BACKUP_KEEP = int(os.environ.get("BOARD_BACKUP_KEEP", "3"))  # 0 = skip backup
+# Rolling pre-write backups kept per pattern (main board + detail sidecar). The 2026-09-19
+# comment this replaces sized this default off a ~1.04GB main copy; the board has grown ~5.6x
+# since then (5.86GB today), so the OLD default of 3 was quietly costing ~19GB (main+detail,
+# both patterns) rather than the ~12GB that comment assumed -- found 2026-11-28 when the VM
+# crossed 94%/13GB free with 3 full pairs sitting in backups/, all from continuous backfill
+# wrappers that set BOARD_PATCH_ALLOW_LARGE etc. in their own `for i in ...; do PY; done` loops
+# but never BOARD_BACKUP_KEEP (that var lived only in supervise_wrappers.sh's own export, which
+# never reaches a wrapper loop started outside that script -- an env var set in a script cannot
+# retroactively reach an already-running process either way). Lowering the DEFAULT itself (not
+# just the override) is what actually reaches every wrapper on its very next spawn, regardless
+# of launch path. Every committed board is also in git history and the live board is the newest
+# state; 1 still covers the "a bad write just landed" case the backup exists for -- it trades
+# rollback DEPTH (how many prior bad writes you can walk back through) for headroom on a disk
+# that is a scarcer resource than that depth has been worth in practice. Override with
+# BOARD_BACKUP_KEEP for a one-off deeper-rollback need.
+_BACKUP_KEEP = int(os.environ.get("BOARD_BACKUP_KEEP", "1"))  # 0 = skip backup
 
 
 def _backup_listings_board(listings_path: Path, backup_dir: Path, ts: str) -> Path:
