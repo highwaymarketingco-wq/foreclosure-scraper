@@ -3,7 +3,7 @@
 NEW SOURCE discovered 2026-11-25 by subagent gap spreadsheet investigation.
 
 URL: https://businessfilings.sc.gov/businessfiling/Entity/Search
-Status: LIVE, reCAPTCHA v2 (2Captcha compatible)
+Status: LIVE, reCAPTCHA markup present on page load (2Captcha compatible)
 Data: SC business dissolutions (~26K rows estimated)
 
 CAPTCHA Strategy:
@@ -18,6 +18,18 @@ Fields available:
 - Status (Dissolved, Withdrawn, etc.)
 - Filing date / dissolution date
 - Registered agent
+
+SELECTORS CONFIRMED LIVE 2026-11-28 (form #EntitySearchForm, POST to same URL):
+- Search box: input#SearchTextBox (name=EntityName)
+- Search type: select#EntitySearchTypeEnumId (2=Begins With, 1=Contains, 3=Exact Match) --
+  previously not set at all; now forced to "Begins With" (2) before each letter.
+- Search button: button#EntitySearchButton (name=ButtonType, value=Search) -- a <button>, not
+  an <input>. The old selector "button:contains('Search')" is invalid CSS (:contains is a
+  jQuery extension, not supported by querySelector) and "input[value='Search']" can never
+  match a <button>, so search submission was silently a no-op before this fix.
+Still UNVERIFIED (no live search was executed to inspect real output): the reCAPTCHA
+site-key extraction/token-injection flow, and _parse_results()'s row structure. Confirm both
+against a real post-search page before relying on this scraper's output.
 """
 from __future__ import annotations
 
@@ -78,16 +90,23 @@ class ScSosBusinessDissolutionScraper(BaseScraper):
             
             for letter in letters:
                 log.info("sc_sos.searching_letter", letter=letter)
-                
-                # Fill search box
-                search_box = await page.select("input[name*='BusinessName'], input[type='text']")
+
+                # Force search type to "Begins With" (value=2) -- not set by default
+                await page.evaluate(
+                    "var el=document.getElementById('EntitySearchTypeEnumId');"
+                    "if(el){el.value='2';el.dispatchEvent(new Event('change',{bubbles:true}));}"
+                )
+
+                # Fill search box (confirmed live: input#SearchTextBox, name=EntityName)
+                search_box = await page.select("#SearchTextBox, input[name='EntityName'], input[type='text']")
                 if search_box:
                     await search_box.clear_input()
                     await search_box.send_keys(letter)
                     await page.wait(1)
-                
-                # Click search button
-                search_btn = await page.select("button:contains('Search'), input[value='Search']")
+
+                # Click search button (confirmed live: button#EntitySearchButton -- a <button>,
+                # not an <input>; the previous selector never matched, see module docstring)
+                search_btn = await page.select("#EntitySearchButton, button[name='ButtonType'][value='Search']")
                 if search_btn:
                     await search_btn.click()
                     await page.wait(3)
