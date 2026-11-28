@@ -8,12 +8,12 @@
   "unconfirmed": 0,
   "wall": 4658
  },
- "generated_at": "2026-11-28T06:00:56Z",
+ "generated_at": "2026-11-28T06:09:51Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-28T05:21:18Z",
+  "at": "2026-11-28T06:09:50Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,23 +21,29 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.charlottenc.gov": 34,
+    "gis.charlottenc.gov": 100,
     "maps.spartanburgcounty.org": 50,
-    "portal-nc.tylertech.cloud": 32,
+    "portal-nc.tylertech.cloud": 40,
     "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:brunswick-so-nc.zuercherportal.com": 1,
-    "roster:colleton-so-sc.zuercherportal.com": 1,
+    "roster:apps.pittcountync.gov": 1,
+    "roster:bookings.darlingtonsheriff.org": 1,
+    "roster:cc.southernsoftware.com": 3,
+    "roster:cherokee-so-sc.zuercherportal.com": 1,
     "roster:cumberlandsheriffnc.gov": 1,
-    "roster:kershaw-so-sc.zuercherportal.com": 1,
+    "roster:forsythsheriffnc.policetocitizen.com": 1,
+    "roster:guilfordcountysheriff.policetocitizen.com": 1,
+    "roster:injail.catawbacountync.gov": 1,
     "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
     "roster:p2c.lincolnsheriff.org": 1,
     "roster:p2c.nhcgov.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
+    "roster:rowancountync.policetocitizen.com": 1,
     "roster:tepsweb.cityofgastonia.com": 1,
     "roster:union-so-sc.zuercherportal.com": 1,
     "roster:wakeso.policetocitizen.com": 1,
+    "roster:www2.co.davidson.nc.us": 1,
+    "roster:www2.dconc.gov": 1,
     "services.nconemap.gov": 50,
-    "services1.arcgis.com": 4,
     "www.courtlistener.com": 2
    }
   },
@@ -45,11 +51,11 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 534,
+  "seconds": 748,
   "selection": {
    "applies": 4916,
-   "due_new": 337,
-   "not_due_ttl": 4579
+   "due_new": 287,
+   "not_due_ttl": 4629
   },
   "source": null,
   "tier": null

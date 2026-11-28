@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 10439,
+  "confirmed": 10487,
   "refuted": 26,
-  "rows": 12029,
+  "rows": 12077,
   "stale": 1313,
   "unconfirmed": 251,
   "wall": 0
  },
- "generated_at": "2026-11-28T05:21:23Z",
+ "generated_at": "2026-11-28T06:09:53Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-28T05:21:22Z",
+  "at": "2026-11-28T06:09:52Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,23 +21,29 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.charlottenc.gov": 34,
+    "gis.charlottenc.gov": 100,
     "maps.spartanburgcounty.org": 50,
-    "portal-nc.tylertech.cloud": 32,
+    "portal-nc.tylertech.cloud": 40,
     "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:brunswick-so-nc.zuercherportal.com": 1,
-    "roster:colleton-so-sc.zuercherportal.com": 1,
+    "roster:apps.pittcountync.gov": 1,
+    "roster:bookings.darlingtonsheriff.org": 1,
+    "roster:cc.southernsoftware.com": 3,
+    "roster:cherokee-so-sc.zuercherportal.com": 1,
     "roster:cumberlandsheriffnc.gov": 1,
-    "roster:kershaw-so-sc.zuercherportal.com": 1,
+    "roster:forsythsheriffnc.policetocitizen.com": 1,
+    "roster:guilfordcountysheriff.policetocitizen.com": 1,
+    "roster:injail.catawbacountync.gov": 1,
     "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
     "roster:p2c.lincolnsheriff.org": 1,
     "roster:p2c.nhcgov.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
+    "roster:rowancountync.policetocitizen.com": 1,
     "roster:tepsweb.cityofgastonia.com": 1,
     "roster:union-so-sc.zuercherportal.com": 1,
     "roster:wakeso.policetocitizen.com": 1,
+    "roster:www2.co.davidson.nc.us": 1,
+    "roster:www2.dconc.gov": 1,
     "services.nconemap.gov": 50,
-    "services1.arcgis.com": 4,
     "www.courtlistener.com": 2
    }
   },
@@ -46,35 +52,35 @@
    "confirmed": 48,
    "unconfirmed": 2
   },
-  "seconds": 534,
+  "seconds": 748,
   "selection": {
    "applies": 25671,
-   "due_new": 13995,
-   "due_retry": 115,
+   "due_new": 13947,
+   "due_retry": 116,
    "due_ttl": 670,
-   "not_due_retry": 147,
-   "not_due_ttl": 10744
+   "not_due_retry": 146,
+   "not_due_ttl": 10792
   },
   "source": null,
   "tier": null
  },
- "rows": 12029,
+ "rows": 12077,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 7476371,
+   "bytes": 7512822,
    "file": "000.json",
-   "rows": 6067,
-   "sha256": "aef9ced12b5954d24c9e9905c27018744a12631476a619a2921e1881d523c6d2"
+   "rows": 6097,
+   "sha256": "5185fd55db4403270b81942256c79d32ddc6896e1b18d79a992242734cfd70e1"
   },
   {
    "bucket": 1,
-   "bytes": 7352875,
+   "bytes": 7374781,
    "file": "001.json",
-   "rows": 5962,
-   "sha256": "18ef5d16f1ad79da541cbb7825671902a14e935b0f6fb6e84fbb1eb184160bca"
+   "rows": 5980,
+   "sha256": "7754a0913f8e3cf707a971a3201edc3dfe88c44d6a9e392434e3c900cf883f86"
   }
  ],
  "signal": "nc_ecourts_case",

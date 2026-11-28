@@ -44,8 +44,9 @@ from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
 
+# Tyler NC uses federated identity provider
+LOGIN_URL = "https://odysseyidentityprovider.tylerhost.net/idp/account/signin"
 PORTAL_BASE = "https://portal-nc.tylertech.cloud/Portal"
-LOGIN_URL = f"{PORTAL_BASE}/Account/Login"
 SEARCH_URL = f"{PORTAL_BASE}/Home/Dashboard/29"  # Smart Search
 
 # NC footprint counties
