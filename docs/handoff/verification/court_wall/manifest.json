@@ -3,17 +3,17 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 5982,
+  "rows": 6032,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 5982
+  "wall": 6032
  },
- "generated_at": "2026-11-28T06:28:27Z",
+ "generated_at": "2026-11-28T07:11:58Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-28T06:28:26Z",
+  "at": "2026-11-28T07:11:57Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,24 +21,17 @@
   "requests": {
    "errors": {},
    "requests": {
-    "gis.charlottenc.gov": 100,
+    "gis.charlottenc.gov": 98,
     "maps.spartanburgcounty.org": 50,
-    "portal-nc.tylertech.cloud": 33,
-    "roster:anderson-so-sc.zuercherportal.com": 1,
-    "roster:brunswick-so-nc.zuercherportal.com": 1,
-    "roster:buncombecountyso.policetocitizen.com": 1,
-    "roster:cc.southernsoftware.com": 2,
+    "portal-nc.tylertech.cloud": 41,
+    "roster:74.218.167.200": 1,
     "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:forsythsheriffnc.policetocitizen.com": 1,
-    "roster:jail.richlandcountysc.gov": 1,
-    "roster:kershaw-so-sc.zuercherportal.com": 1,
+    "roster:inmatesinjail.yorkcountygov.com": 1,
     "roster:laurens-911-sc.zuercherportal.com": 1,
+    "roster:mecksheriffweb.mecklenburgcountync.gov": 1,
+    "roster:oconee-so-sc.zuercherportal.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
-    "roster:rowancountync.policetocitizen.com": 1,
-    "roster:services3.arcgis.com": 1,
     "roster:tepsweb.cityofgastonia.com": 1,
-    "roster:union-so-sc.zuercherportal.com": 1,
-    "roster:www.fcso.org": 1,
     "services.nconemap.gov": 50,
     "www.courtlistener.com": 2
    }
@@ -47,25 +40,25 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 693,
+  "seconds": 594,
   "selection": {
    "applies": 9035,
-   "due_new": 2939,
-   "not_due_ttl": 6096
+   "due_new": 2889,
+   "not_due_ttl": 6146
   },
   "source": null,
   "tier": null
  },
- "rows": 5982,
+ "rows": 6032,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4557840,
+   "bytes": 4595064,
    "file": "000.json",
-   "rows": 5982,
-   "sha256": "8d13142bc3879c459d2df962566a7e062896f0fc06ea07998d98d754c184b5c5"
+   "rows": 6032,
+   "sha256": "e6c87c77c8dae9ca34b0f2e048f5894d718955ae502d719ac50dcad7da3efaaf"
   }
  ],
  "signal": "court_wall",
