@@ -51,6 +51,10 @@ PY="$ROOT/.venv/bin/python3.12"
 LOG="$ROOT/logs/supervisor.log"
 ALERTLOG="$ROOT/logs/SUPERVISOR_ALERTS.log"
 mkdir -p "$ROOT/logs"
+export BOARD_BACKUP_KEEP=1  # persist only 1 backup per type -- /etc/environment does NOT reach
+                            # cron-spawned processes (confirmed 2026-11-27); this export is the
+                            # only durable place for it, since relaunch()'s children inherit
+                            # whatever this script's own environment holds at call time.
 
 alive() {  # alive "<match-pattern>" -> exit 0 if a real process matches, 1 if not
   local n
@@ -68,7 +72,17 @@ check_stuck() {  # check_stuck "<name>" "<log file>" -> appends an alert if the
                  # tail looks like a repeated-failure loop, never blocks/stops anything
   local name="$1" logfile="$2" hits
   [ -f "$logfile" ] || return 0
-  hits=$(tail -n 40 "$logfile" 2>/dev/null | grep -cE 'BoardIntegrityError|Traceback \(most recent call last\)')
+  # WINDOW SIZE BUG FOUND LIVE 2026-11-28: a single real crash's own traceback
+  # (the "Traceback (most recent call last):" header plus the final exception
+  # line) spans ~15-20 lines by itself on this codebase's deepest call stacks.
+  # The original `tail -n 40` could therefore never contain more than ~2 full
+  # crash cycles (~4 hits) -- the `-ge 8` threshold was mathematically
+  # unreachable no matter how severely a lane crash-looped. Confirmed against
+  # the real 2026-11-27 BoardIntegrityError incident: tail -n 40 on that log
+  # scored 3 hits; tail -n 300 on the same window scored 35. 300 lines holds
+  # comfortably more than 8 hits' worth of real crashes while still requiring
+  # several genuine failures (not one transient blip) to trip the alert.
+  hits=$(tail -n 300 "$logfile" 2>/dev/null | grep -cE 'BoardIntegrityError|Traceback \(most recent call last\)')
   if [ "${hits:-0}" -ge 8 ]; then
     # Only write one alert per hour per wrapper -- don't spam the alert log
     # itself into the same kind of noise this is meant to fix.
@@ -77,7 +91,7 @@ check_stuck() {  # check_stuck "<name>" "<log file>" -> appends an alert if the
     local last=0
     [ -f "$marker" ] && last=$(cat "$marker" 2>/dev/null || echo 0)
     if [ $((now - last)) -ge 3600 ]; then
-      echo "$(date -u +%FT%TZ) STUCK $name: ${hits}/40 recent log lines show BoardIntegrityError/Traceback -- check $logfile" >> "$ALERTLOG"
+      echo "$(date -u +%FT%TZ) STUCK $name: ${hits}/300 recent log lines show BoardIntegrityError/Traceback -- check $logfile" >> "$ALERTLOG"
       echo "$now" > "$marker"
     fi
   fi
