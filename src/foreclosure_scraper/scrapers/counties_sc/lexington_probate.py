@@ -359,13 +359,22 @@ class LexingtonProbateScraper(BaseScraper):
             return results
 
         async with async_playwright() as p:
+            # On VM with DISPLAY=:99 (Xvfb), use headless=False but with proper display
+            # On Mac or missing DISPLAY, must use headless=True
+            display = os.environ.get("DISPLAY", "")
+            use_headless = not display or display == ""
+            
+            launch_args = [
+                "--disable-blink-features=AutomationControlled",
+                "--no-sandbox",
+                "--disable-gpu",
+            ]
+            if display:
+                launch_args.append(f"--display={display}")
+            
             browser = await p.chromium.launch(
-                headless=False,  # Changed 2026-11-24: headful mode works, headless blocked
-                args=[
-                    "--disable-blink-features=AutomationControlled",
-                    "--no-sandbox",
-                    "--disable-gpu",
-                ],
+                headless=use_headless,
+                args=launch_args,
             )
             page = await browser.new_page()
 
