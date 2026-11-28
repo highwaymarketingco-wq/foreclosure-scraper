@@ -3,12 +3,12 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 5882,
+  "rows": 5932,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 5882
+  "wall": 5932
  },
- "generated_at": "2026-11-28T05:21:18Z",
+ "generated_at": "2026-11-28T06:00:52Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
@@ -54,16 +54,16 @@
   "source": null,
   "tier": null
  },
- "rows": 5882,
+ "rows": 5932,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4483466,
+   "bytes": 4520642,
    "file": "000.json",
-   "rows": 5882,
-   "sha256": "b02728607f59276127974591638c80cd9ab07bfebbb87aa355637a22750a4933"
+   "rows": 5932,
+   "sha256": "ef63b0aef0480be2e88cf640878aafa1202916d396046d565638f7b095b76149"
   }
  ],
  "signal": "court_wall",
