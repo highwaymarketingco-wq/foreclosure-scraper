@@ -1,19 +1,19 @@
 {
  "buckets": 2,
  "counts": {
-  "confirmed": 11063,
+  "confirmed": 11111,
   "refuted": 26,
-  "rows": 12653,
+  "rows": 12701,
   "stale": 1313,
   "unconfirmed": 251,
   "wall": 0
  },
- "generated_at": "2026-11-28T16:31:42Z",
+ "generated_at": "2026-11-28T17:18:09Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-28T16:31:41Z",
+  "at": "2026-11-28T17:18:08Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -23,7 +23,9 @@
    "requests": {
     "gis.charlottenc.gov": 100,
     "maps.spartanburgcounty.org": 50,
-    "portal-nc.tylertech.cloud": 36,
+    "portal-nc.tylertech.cloud": 39,
+    "roster:cc.southernsoftware.com": 1,
+    "roster:hoke-so-nc.zuercherportal.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
     "services.nconemap.gov": 50,
     "www.courtlistener.com": 2
@@ -34,35 +36,35 @@
    "confirmed": 48,
    "unconfirmed": 2
   },
-  "seconds": 583,
+  "seconds": 657,
   "selection": {
    "applies": 25671,
-   "due_new": 13371,
-   "due_retry": 126,
+   "due_new": 13323,
+   "due_retry": 128,
    "due_ttl": 670,
-   "not_due_retry": 136,
-   "not_due_ttl": 11368
+   "not_due_retry": 134,
+   "not_due_ttl": 11416
   },
   "source": null,
   "tier": null
  },
- "rows": 12653,
+ "rows": 12701,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 7836734,
+   "bytes": 7869536,
    "file": "000.json",
-   "rows": 6363,
-   "sha256": "b92c452552a6a90c43ea07d5f19b484cc9bf00143e5002b3b4317f56a4a73658"
+   "rows": 6390,
+   "sha256": "68cb3867968244bf6bb657ddb1c76c887c63c1fab9668b0718e172c007c5a8c6"
   },
   {
    "bucket": 1,
-   "bytes": 7752164,
+   "bytes": 7777708,
    "file": "001.json",
-   "rows": 6290,
-   "sha256": "80f4503acbb359a19e281f79315d9d9d80fc9e8ab103294de1ac732acbc9958a"
+   "rows": 6311,
+   "sha256": "0e98ccb0993aefee79d8d7c628d09d8f811950d77659bc9404de4a94df4e9c1d"
   }
  ],
  "signal": "nc_ecourts_case",
