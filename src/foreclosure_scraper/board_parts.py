@@ -319,11 +319,22 @@ def _torn(docs, problems) -> BoardIntegrityError:
         "check." % (MANIFEST_NAME, "; ".join(problems[:5]) + (" ..." if len(problems) > 5 else "")))
 
 
-# Retry budget for _TornPartsError specifically (see class docstring). Total worst-case added
-# latency across all sleeps is ~3s (0.2+0.4+0.6+0.8+1.0) -- negligible next to the board reads
-# this guards, and far cheaper than the batch job it would otherwise crash.
-_TORN_READ_RETRIES = 6
-_TORN_READ_BACKOFF_S = 0.2
+# Retry budget for _TornPartsError specifically (see class docstring). Capped-exponential
+# backoff (0.5, 1, 2, 4, 8, 8, 8, 8, 8 -- ~47.5s worst case across 10 attempts): a first cut at
+# this used a flat ~3s budget, sized for "a rename loop is cheap, the gap is sub-second" -- live
+# on the VM under real concurrent load (2026-11-28, 6 lanes, disk at 89%) that was wrong by more
+# than an order of magnitude: backfill_mecklenburg_tax hit the IDENTICAL torn state across 6
+# separate script invocations ~15-20s apart (~100s+), meaning the lock-holder's own commit-loop-
+# then-manifest-write was simply slower than "sub-second" under load, not stuck. ~48s is still
+# bounded -- genuine corruption (nothing ever finishes the write) surfaces, just after a wait
+# that can actually span a slow concurrent write instead of only a textbook-fast one.
+_TORN_READ_RETRIES = 10
+_TORN_READ_BACKOFF_BASE_S = 0.5
+_TORN_READ_BACKOFF_CAP_S = 8.0
+
+
+def _torn_read_backoff(attempt: int) -> float:
+    return min(_TORN_READ_BACKOFF_BASE_S * (2 ** attempt), _TORN_READ_BACKOFF_CAP_S)
 
 
 def resolve(docs, *, verify: bool = True, man: Optional[dict] = None) -> Optional[Resolution]:
@@ -361,7 +372,7 @@ def resolve(docs, *, verify: bool = True, man: Optional[dict] = None) -> Optiona
         except _TornPartsError as exc:
             last_exc = exc
             if attempt < _TORN_READ_RETRIES - 1:
-                time.sleep(_TORN_READ_BACKOFF_S * (attempt + 1))
+                time.sleep(_torn_read_backoff(attempt))
     raise last_exc
 
 

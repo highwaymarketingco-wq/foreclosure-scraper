@@ -6473,6 +6473,46 @@
       "reason": "gap_matrix's own suggested source (a tax-roll reader for tax/property card: www.bttaxpayerportal.com) is already confirmed dead for this exact purpose: enrichment_bt_parcel_info.py's own module docstring (live-verified 2026-10-16, Warren County, a real board owner) found this 14-county vendor family (Carteret included) is a CAMA/assessment system only -- owner, deed, legal description, current value -- with NO tax-payment or delinquency data anywhere on the search results, the Parcel Information panel, or the Property Record Card PDF, and names atty_tax_verified_confirmed by name among the columns this same mis-attribution hit. A sibling column on this exact county (tax_aging_surfaced) already carries a declined entry citing the identical finding; this entry closes the matching atty_tax_verified_confirmed cell, which the registry had not yet covered.",
       "confirmed_date": "2026-11-19",
       "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Jasper",
+      "column": "vacant_lot",
+      "reason": "parcel_cache.PARCEL_LAYERS[\"Jasper\"] (City of Hardeeville AGOL copy of the county parcel layer) went from public to token-walled (HTTP 499 \"Token Required\", GWM_0003) as of 2026-11-16 and was re-verified still walled on 2026-11-19 (round 53) -- hard-blocked at the source, not a mapping bug. Re-verified live again 2026-11-28: the parent qpublic.schneidercorp.com host itself also 403s a curl_cffi chrome-impersonated request, confirming this is a real wall (Cloudflare-class), not a missing-header issue a better scraper would fix.",
+      "confirmed_date": "2026-11-28",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Clarendon",
+      "column": "vacant_lot",
+      "reason": "No county-run GIS exists (clarendoncountysc.gov has no GIS/map link in its nav or /sitemap/, confirmed live). The only AGOL hit for Clarendon parcels is GDIT's statewide SC_Parcels sublayer (MapServer/13), the same statewide product already on record as token-walled -- re-confirmed live 2026-11-19 (round 53) with HTTP 499 \"Token Required\" at the service root, the layer root, AND a /query call. No alternative found. qpublic.schneidercorp.com (gap_matrix's suggested source) is the same Cloudflare-walled host confirmed live 2026-11-28 (403 even with curl_cffi chrome impersonation).",
+      "confirmed_date": "2026-11-28",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Bamberg",
+      "column": "vacant_lot",
+      "reason": "gap_matrix's suggested source, qpublic.schneidercorp.com, 403s a curl_cffi chrome-impersonated request (live-checked 2026-11-28) -- the same Cloudflare-class wall already confirmed for Jasper/Orangeburg/Union's qPublic/Beacon access on this project. Also checked for the WTH tgis alternative that worked for Dillon/Chesterfield/Marlboro (round 62, 2026-11-19): bamberg.wthgis.com is connection-refused, no WTH tenant exists for this county. No non-walled source found.",
+      "confirmed_date": "2026-11-28",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Abbeville",
+      "column": "vacant_lot",
+      "reason": "gap_matrix's suggested source, qpublic.schneidercorp.com, 403s a curl_cffi chrome-impersonated request (live-checked 2026-11-28) -- the same Cloudflare-class wall already confirmed for Jasper/Orangeburg/Union's qPublic/Beacon access on this project. Also checked for the WTH tgis alternative that worked for Dillon/Chesterfield/Marlboro (round 62, 2026-11-19): abbeville.wthgis.com is connection-refused, no WTH tenant exists for this county. No non-walled source found.",
+      "confirmed_date": "2026-11-28",
+      "confidence": "high"
+    },
+    {
+      "state": "SC",
+      "county": "Lee",
+      "column": "vacant_lot",
+      "reason": "gap_matrix's suggested source, qpublic.schneidercorp.com, 403s a curl_cffi chrome-impersonated request (live-checked 2026-11-28) -- the same Cloudflare-class wall already confirmed for Jasper/Orangeburg/Union's qPublic/Beacon access on this project. Also checked for the WTH tgis alternative that worked for Dillon/Chesterfield/Marlboro (round 62, 2026-11-19): lee.wthgis.com is connection-refused, no WTH tenant exists for this county. No non-walled source found.",
+      "confirmed_date": "2026-11-28",
+      "confidence": "high"
     }
   ]
 }
