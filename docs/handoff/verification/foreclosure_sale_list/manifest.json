@@ -8,12 +8,12 @@
   "unconfirmed": 80,
   "wall": 0
  },
- "generated_at": "2026-11-28T01:01:15Z",
+ "generated_at": "2026-11-28T03:19:36Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-28T01:01:15Z",
+  "at": "2026-11-28T03:19:36Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,13 +21,26 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 69,
-    "gis.buncombecounty.org": 77,
-    "portal-nc.tylertech.cloud": 38,
-    "roster:anderson-so-sc.zuercherportal.com": 1,
+    "devsvcs.gastonianc.gov": 67,
+    "gis.buncombecounty.org": 71,
+    "portal-nc.tylertech.cloud": 41,
+    "roster:brunswick-so-nc.zuercherportal.com": 1,
+    "roster:buncombecountyso.policetocitizen.com": 1,
+    "roster:cc.southernsoftware.com": 3,
+    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "roster:dcn.leecountync.gov": 1,
+    "roster:forsythsheriffnc.policetocitizen.com": 1,
+    "roster:guilfordcountysheriff.policetocitizen.com": 1,
+    "roster:kershaw-so-sc.zuercherportal.com": 1,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "roster:legacyweb.randolphcountync.gov": 1,
+    "roster:lexingtonsheriffsc.policetocitizen.com": 1,
+    "roster:mugshots.spartanburgsheriff.org": 1,
+    "roster:oconee-so-sc.zuercherportal.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
+    "roster:rowancountync.policetocitizen.com": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 99,
+    "vt.ncsbe.gov": 144,
     "www.courtlistener.com": 2
    }
   },
@@ -35,13 +48,13 @@
    "checked": 50,
    "unconfirmed": 50
   },
-  "seconds": 858,
+  "seconds": 1072,
   "selection": {
    "applies": 418,
    "due_new": 1,
-   "due_retry": 56,
+   "due_retry": 59,
    "due_ttl": 136,
-   "not_due_retry": 25,
+   "not_due_retry": 22,
    "not_due_ttl": 200,
    "same_property_queued": 1
   },
@@ -54,10 +67,10 @@
  "shards": [
   {
    "bucket": 0,
-   "bytes": 498569,
+   "bytes": 498932,
    "file": "000.json",
    "rows": 420,
-   "sha256": "7510a9140b56eb4f9b1aa7082dcc766bca1eefb806305623c31a46ade0d7c6f3"
+   "sha256": "68c92a810aec4b58c946cd74ee569e6d306ab3c92865c24e3ecd5c31b1aaf8ae"
   }
  ],
  "signal": "foreclosure_sale_list",

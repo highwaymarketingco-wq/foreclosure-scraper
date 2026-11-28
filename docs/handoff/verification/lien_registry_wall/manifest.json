@@ -3,17 +3,17 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 4110,
+  "rows": 4260,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 4110
+  "wall": 4260
  },
- "generated_at": "2026-11-28T01:01:17Z",
+ "generated_at": "2026-11-28T03:19:37Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-28T01:01:17Z",
+  "at": "2026-11-28T03:19:37Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,13 +21,26 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 69,
-    "gis.buncombecounty.org": 77,
-    "portal-nc.tylertech.cloud": 38,
-    "roster:anderson-so-sc.zuercherportal.com": 1,
+    "devsvcs.gastonianc.gov": 67,
+    "gis.buncombecounty.org": 71,
+    "portal-nc.tylertech.cloud": 41,
+    "roster:brunswick-so-nc.zuercherportal.com": 1,
+    "roster:buncombecountyso.policetocitizen.com": 1,
+    "roster:cc.southernsoftware.com": 3,
+    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "roster:dcn.leecountync.gov": 1,
+    "roster:forsythsheriffnc.policetocitizen.com": 1,
+    "roster:guilfordcountysheriff.policetocitizen.com": 1,
+    "roster:kershaw-so-sc.zuercherportal.com": 1,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "roster:legacyweb.randolphcountync.gov": 1,
+    "roster:lexingtonsheriffsc.policetocitizen.com": 1,
+    "roster:mugshots.spartanburgsheriff.org": 1,
+    "roster:oconee-so-sc.zuercherportal.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
+    "roster:rowancountync.policetocitizen.com": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 99,
+    "vt.ncsbe.gov": 144,
     "www.courtlistener.com": 2
    }
   },
@@ -35,26 +48,25 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 858,
+  "seconds": 1072,
   "selection": {
    "applies": 66565,
-   "due_new": 62391,
-   "not_due_ttl": 4174,
-   "same_property_queued": 1
+   "due_new": 62239,
+   "not_due_ttl": 4326
   },
   "source": null,
   "tier": null
  },
- "rows": 4110,
+ "rows": 4260,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 3667904,
+   "bytes": 3800566,
    "file": "000.json",
-   "rows": 4110,
-   "sha256": "0563172c6520f65272be26e82822dbc361816af7d2f43af551f7f4191cb0249a"
+   "rows": 4260,
+   "sha256": "b331a84efb113aa0d07b48e21b57d43ee4b9f79ca6619a45bfe29d8ed58b1796"
   }
  ],
  "signal": "lien_registry_wall",

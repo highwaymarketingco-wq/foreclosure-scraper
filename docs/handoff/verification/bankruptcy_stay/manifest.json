@@ -8,12 +8,12 @@
   "unconfirmed": 194,
   "wall": 0
  },
- "generated_at": "2026-11-28T01:01:12Z",
+ "generated_at": "2026-11-28T03:19:34Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-28T01:01:12Z",
+  "at": "2026-11-28T03:19:34Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
@@ -21,13 +21,26 @@
   "requests": {
    "errors": {},
    "requests": {
-    "devsvcs.gastonianc.gov": 69,
-    "gis.buncombecounty.org": 77,
-    "portal-nc.tylertech.cloud": 38,
-    "roster:anderson-so-sc.zuercherportal.com": 1,
+    "devsvcs.gastonianc.gov": 67,
+    "gis.buncombecounty.org": 71,
+    "portal-nc.tylertech.cloud": 41,
+    "roster:brunswick-so-nc.zuercherportal.com": 1,
+    "roster:buncombecountyso.policetocitizen.com": 1,
+    "roster:cc.southernsoftware.com": 3,
+    "roster:cherokee-so-sc.zuercherportal.com": 1,
+    "roster:dcn.leecountync.gov": 1,
+    "roster:forsythsheriffnc.policetocitizen.com": 1,
+    "roster:guilfordcountysheriff.policetocitizen.com": 1,
+    "roster:kershaw-so-sc.zuercherportal.com": 1,
+    "roster:laurens-911-sc.zuercherportal.com": 1,
+    "roster:legacyweb.randolphcountync.gov": 1,
+    "roster:lexingtonsheriffsc.policetocitizen.com": 1,
+    "roster:mugshots.spartanburgsheriff.org": 1,
+    "roster:oconee-so-sc.zuercherportal.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
+    "roster:rowancountync.policetocitizen.com": 1,
     "services.nconemap.gov": 50,
-    "vt.ncsbe.gov": 99,
+    "vt.ncsbe.gov": 144,
     "www.courtlistener.com": 2
    }
   },
@@ -35,7 +48,7 @@
    "checked": 7,
    "unconfirmed": 7
   },
-  "seconds": 858,
+  "seconds": 1072,
   "selection": {
    "applies": 465,
    "due_ttl": 7,
@@ -54,7 +67,7 @@
    "bytes": 630380,
    "file": "000.json",
    "rows": 571,
-   "sha256": "3fb588e5922219ffe6d7f3249910b9c846e8db66ab44367bd75028f2395fbe27"
+   "sha256": "be495a06854e29d2fadb7cb423823830cde7b05c055b0446eda4efccf8eacc4e"
   }
  ],
  "signal": "bankruptcy_stay",
