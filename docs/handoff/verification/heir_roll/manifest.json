@@ -1,36 +1,30 @@
 {
  "buckets": 4,
  "counts": {
-  "confirmed": 19262,
+  "confirmed": 19311,
   "refuted": 11,
-  "rows": 19554,
-  "stale": 63,
+  "rows": 19604,
+  "stale": 64,
   "unconfirmed": 218,
   "wall": 0
  },
- "generated_at": "2026-11-28T19:24:32Z",
+ "generated_at": "2026-11-28T21:34:10Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-28T19:24:31Z",
+  "at": "2026-11-28T21:34:09Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
   "recheck_only": false,
   "requests": {
-   "errors": {
-    "roster:buncombecountyso.policetocitizen.com": 1
-   },
+   "errors": {},
    "requests": {
     "gis.charlottenc.gov": 100,
     "maps.spartanburgcounty.org": 50,
-    "portal-nc.tylertech.cloud": 41,
-    "roster:buncombecountyso.policetocitizen.com": 1,
-    "roster:cc.southernsoftware.com": 1,
+    "portal-nc.tylertech.cloud": 37,
     "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:guilfordcountysheriff.policetocitizen.com": 1,
-    "roster:oconee-so-sc.zuercherportal.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
     "services.nconemap.gov": 50,
     "www.courtlistener.com": 2
@@ -38,54 +32,53 @@
   },
   "result": {
    "checked": 50,
-   "confirmed": 46,
-   "stale": 2,
-   "unconfirmed": 2
+   "confirmed": 49,
+   "stale": 1
   },
-  "seconds": 714,
+  "seconds": 728,
   "selection": {
    "applies": 44671,
-   "due_new": 25223,
+   "due_new": 25173,
    "due_retry": 113,
    "due_retry_transient": 24,
    "due_ttl": 432,
-   "not_due_retry": 75,
-   "not_due_ttl": 18804
+   "not_due_retry": 77,
+   "not_due_ttl": 18852
   },
   "source": null,
   "tier": null
  },
- "rows": 19554,
+ "rows": 19604,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 4756689,
+   "bytes": 4765633,
    "file": "000.json",
-   "rows": 4991,
-   "sha256": "4ab4b982f0afc51852000e399da4dc730186051ea5ef7bb31f864c2c8ec337f6"
+   "rows": 5000,
+   "sha256": "b72e3183ebd6da4834bce0aaf6a49f6ad9762f33d7b81ba4d36e227de4614eb1"
   },
   {
    "bucket": 1,
-   "bytes": 4606279,
+   "bytes": 4620877,
    "file": "001.json",
-   "rows": 4832,
-   "sha256": "ca4f0509b7d0e517c7bea6490511a6af878f85054fb22c960f6c950328598287"
+   "rows": 4847,
+   "sha256": "074bda8b551672254294065f5eef61c00272aa422df65acb5be9f8c9b96cc34c"
   },
   {
    "bucket": 2,
-   "bytes": 4637736,
+   "bytes": 4644634,
    "file": "002.json",
-   "rows": 4873,
-   "sha256": "a4c1bd928902752533016aa4f48925397dab02ec231f2dc2a5572500ccb8b511"
+   "rows": 4880,
+   "sha256": "88f33b11782c504bcedfd886121409b861b3add67170ed709528ca234a40df36"
   },
   {
    "bucket": 3,
-   "bytes": 4630155,
+   "bytes": 4648941,
    "file": "003.json",
-   "rows": 4858,
-   "sha256": "7d82b75365ac7695a04036c456db4a79bc0ddcc9b4c02e5fc3b4e50e99a7baa2"
+   "rows": 4877,
+   "sha256": "876b29bf25ef00884f6a9b965f66ffe99adf97af81faba278a1e69a14d6c7d22"
   }
  ],
  "signal": "heir_roll",

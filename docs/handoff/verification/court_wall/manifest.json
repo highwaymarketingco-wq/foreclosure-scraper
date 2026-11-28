@@ -3,34 +3,28 @@
  "counts": {
   "confirmed": 0,
   "refuted": 0,
-  "rows": 6732,
+  "rows": 6782,
   "stale": 0,
   "unconfirmed": 0,
-  "wall": 6732
+  "wall": 6782
  },
- "generated_at": "2026-11-28T19:24:30Z",
+ "generated_at": "2026-11-28T21:34:07Z",
  "hash": "int.from_bytes(sha256(entry_key.encode('utf-8')).digest()[:8], 'big') % buckets",
  "host": "SMB-LTSEO05",
  "kind": "verification_ledger_manifest",
  "last_run": {
-  "at": "2026-11-28T19:24:30Z",
+  "at": "2026-11-28T21:34:06Z",
   "county": null,
   "host": "SMB-LTSEO05",
   "max_rows": 50,
   "recheck_only": false,
   "requests": {
-   "errors": {
-    "roster:buncombecountyso.policetocitizen.com": 1
-   },
+   "errors": {},
    "requests": {
     "gis.charlottenc.gov": 100,
     "maps.spartanburgcounty.org": 50,
-    "portal-nc.tylertech.cloud": 41,
-    "roster:buncombecountyso.policetocitizen.com": 1,
-    "roster:cc.southernsoftware.com": 1,
+    "portal-nc.tylertech.cloud": 37,
     "roster:cherokee-so-sc.zuercherportal.com": 1,
-    "roster:guilfordcountysheriff.policetocitizen.com": 1,
-    "roster:oconee-so-sc.zuercherportal.com": 1,
     "roster:pickens-so-sc.zuercherportal.com": 1,
     "services.nconemap.gov": 50,
     "www.courtlistener.com": 2
@@ -40,25 +34,25 @@
    "checked": 50,
    "wall": 50
   },
-  "seconds": 714,
+  "seconds": 728,
   "selection": {
    "applies": 9035,
-   "due_new": 2189,
-   "not_due_ttl": 6846
+   "due_new": 2139,
+   "not_due_ttl": 6896
   },
   "source": null,
   "tier": null
  },
- "rows": 6732,
+ "rows": 6782,
  "schema": 1,
  "shard_max_bytes": 8388608,
  "shards": [
   {
    "bucket": 0,
-   "bytes": 5116365,
+   "bytes": 5153565,
    "file": "000.json",
-   "rows": 6732,
-   "sha256": "4233086aecff18c12dd558a07627773edb50a4c6955108d83a7e134d14f65ad6"
+   "rows": 6782,
+   "sha256": "4ed090e3d403f305194d2d8b58729cfcd449e1287d9c37880eab2b708b4186e5"
   }
  ],
  "signal": "court_wall",
